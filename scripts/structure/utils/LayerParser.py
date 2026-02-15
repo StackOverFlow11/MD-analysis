@@ -9,8 +9,8 @@ for a water–metal–water slice, there are typically **two** interfaces.
 
 Design principles
 -----------------
-- No hard-coded "data contract": caller must provide at least the metal symbols
-  (e.g., {"Cu", "Ag"}). Heuristics are optional and explicit.
+- Default metal symbols are centralized in `config.py` and can be overridden
+  explicitly by caller input.
 - Works with non-orthogonal cells by projecting positions onto a chosen normal.
 - Layering is done by 1D clustering on the projected coordinate.
 
@@ -28,6 +28,11 @@ try:
     from ase import Atoms
 except Exception:  # pragma: no cover
     Atoms = object  # type: ignore
+
+try:
+    from .config import DEFAULT_METAL_SYMBOLS
+except Exception:  # pragma: no cover
+    from config import DEFAULT_METAL_SYMBOLS  # type: ignore
 
 
 NormalSpec = Literal["a", "b", "c"] | Sequence[float]
@@ -148,7 +153,7 @@ def _mic_delta_fractional(df: np.ndarray) -> np.ndarray:
 def detect_interface_layers(
     atoms: Atoms,
     *,
-    metal_symbols: Iterable[str],
+    metal_symbols: Iterable[str] | None = None,
     normal: NormalSpec = "c",
     layer_tol_A: float = 0.6,
     n_interface_layers: int = 2,
@@ -170,7 +175,7 @@ def detect_interface_layers(
         One frame as `ase.Atoms`.
     metal_symbols
         Symbols considered as *metal slab* atoms, e.g. {"Cu", "Ag"}.
-        Must be provided explicitly (no implicit contract).
+        If omitted, uses `DEFAULT_METAL_SYMBOLS` from `config.py`.
     normal
         Surface normal spec:
         - "a"/"b"/"c" -> use the corresponding cell vector
@@ -192,7 +197,8 @@ def detect_interface_layers(
     if n_interface_layers <= 0:
         raise ValueError("n_interface_layers must be >= 1")
 
-    metal_symbols_set = {str(s) for s in metal_symbols}
+    metal_symbols_iter = DEFAULT_METAL_SYMBOLS if metal_symbols is None else metal_symbols
+    metal_symbols_set = {str(s) for s in metal_symbols_iter}
     if not metal_symbols_set:
         raise ValueError("metal_symbols must be non-empty")
 
@@ -308,4 +314,3 @@ def format_detection_summary(result: SurfaceDetectionResult) -> str:
         else:
             lines.append(f"  Layer {i:02d}: center_s={layer.center_s:.3f} Å, n={len(layer.atom_indices)}")
     return "\n".join(lines)
-

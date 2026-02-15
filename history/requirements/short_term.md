@@ -18,19 +18,19 @@
 ## 近期任务清单（可拆成 issue / TODO）
 
 - **数据读取层（I/O）**
-  - 支持读取：`md-*.ener`、`md-pos-*.xyz`、`CHARGE.mulliken`、`md-POTENTIAL-*.cube`
-  - 约定：单位、时间步、采样间隔的解析与记录
+  - 支持读取：`md-*.ener`/`md-pos-*.xyz`/`CHARGE.mulliken`/`md-POTENTIAL-*.cube`
+  - 约定：单位、时间步、采样间隔的解析与记录(在`md.inp`中)
 - **分析层（Analysis）**
   - 复现/生成：`water_profile.csv/png`（密度与取向 profile）
   - 电势相关：从 Hartree cube 得到沿界面法向的平均电势 profile（含对齐与零点约定）
   - 电荷相关：按元素/分组/分层统计 Mulliken 电荷（明确“输出什么”和“局限性说明”）
 - **输出层（Export）**
-  - 统一导出：csv（长表/宽表约定）、png（绘图风格）、以及元数据（json/yaml）
+  - 统一导出：csv（长表/宽表约定）、png（绘图风格）
 
 ## 当前已知卡点 / 需要明确的问题（建议写清）
 
 - 界面参考面怎么定义？（top layer / 拟合平面 / COM）
 - 法向方向如何自动确定？是否总是 z？
 - 电势零点/对齐策略是什么？（真空区、体相水、或平均为 0）
-- 水取向的 \(\cos\theta\) 定义：采用偶极/HOH 平面法向/OH 向量？
+- 水取向的 $\cos\theta$ 定义：采用偶极/HOH 平面法向/OH 向量？
 

@@ -32,5 +32,7 @@
 ## 本目录子内容
 
 - `modules/`：各模块的详细设计与接口草案
+  - `glossary_units.md`：术语、单位与符号约定
+  - `data_contract.md`：`scripts/structure/utils` 的输入输出与计算口径约定
 - `decisions/`：架构/技术决策（ADR），每条决策一份 md
 
