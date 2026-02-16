@@ -1,8 +1,0 @@
-window_mode=manual
-frames_processed=396
-avg_water_molecules_per_frame=70.000000
-window_c_fraction_start=1.1700000000
-window_c_fraction_end=0.2800000000
-avg_selected_waters_per_frame=12.679293
-z_bin_width_A=0.25
-theta_bin_width_deg=4.0

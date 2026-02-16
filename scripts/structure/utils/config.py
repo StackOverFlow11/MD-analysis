@@ -53,7 +53,7 @@ TRANSITION_METAL_SYMBOLS: tuple[str, ...] = (
 DEFAULT_METAL_SYMBOLS: tuple[str, ...] = TRANSITION_METAL_SYMBOLS
 
 # Default z-axis bin width for profile/distribution calculations (Angstrom).
-DEFAULT_Z_BIN_WIDTH_A: float = 0.25
+DEFAULT_Z_BIN_WIDTH_A: float = 0.1
 
 # Default theta bin width for angular probability-density profiles (degree).
 DEFAULT_THETA_BIN_DEG: float = 5.0

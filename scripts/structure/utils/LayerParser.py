@@ -165,9 +165,9 @@ def detect_interface_layers(
     Notes
     -----
     In your (user-confirmed) periodic water–metal–water setting, there are
-    typically **two** interfaces in one frame. This function marks the outermost
-    `n_interface_layers` metal layers on BOTH sides as interface layers, and
-    assigns `Layer.normal_unit` for those layers (metal -> water).
+    typically **two** interfaces in one frame. This function marks only the
+    two metal layers that directly face the non-metal region (one on each side),
+    and assigns `Layer.normal_unit` for those layers (metal -> water).
 
     Parameters
     ----------
@@ -184,7 +184,8 @@ def detect_interface_layers(
         1D clustering tolerance (Å) when grouping metal atoms into layers
         along the normal projection coordinate.
     n_interface_layers
-        How many outermost layers to return on the interface side (typically 1 or 2).
+        Kept for backward compatibility. Interface marking now always keeps only
+        one directly water-facing layer per side.
     nonmetal_symbols_hint
         Optional hint for which symbols represent "environment" (water/ions/etc.).
         If omitted, we use all atoms not in `metal_symbols` as non-metal for deciding
@@ -245,13 +246,10 @@ def detect_interface_layers(
 
     layers_sorted = tuple(sorted(layers, key=lambda L: L.center_s))
 
-    # Mark interface layers on BOTH sides (low-s and high-s).
+    # Mark only the two layers that directly face the non-metal region.
     n_layers = len(layers_sorted)
     if n_layers == 0:
         raise SurfaceGeometryError("No metal layers detected (unexpected).")
-
-    n_each_side = min(n_interface_layers, n_layers)
-    interface_layer_ids: set[int] = set(range(n_each_side)) | set(range(max(0, n_layers - n_each_side), n_layers))
 
     # Assign per-layer interface normal using fractional-coordinate MIC along the chosen axis, if possible.
     axis_map = {"a": 0, "b": 1, "c": 2}
@@ -264,23 +262,68 @@ def detect_interface_layers(
         scaled = np.asarray(atoms.get_scaled_positions(wrap=True), dtype=float)
         env_frac_axis = scaled[nonmetal_idx, axis_idx]
 
+    interface_layer_ids: set[int]
+    normal_sign_by_layer: dict[int, float] = {}
+
+    if axis_idx is not None and scaled is not None:
+        # Use circular ordering along fractional axis and pick the pair across the
+        # largest gap, which corresponds to the non-metal region between two surfaces.
+        layer_frac: list[tuple[int, float]] = []
+        for i, layer in enumerate(layers_sorted):
+            fvals = scaled[list(layer.atom_indices), axis_idx]
+            layer_frac.append((i, _circular_mean_fractional(fvals)))
+
+        if len(layer_frac) == 1:
+            interface_layer_ids = {0}
+            normal_sign_by_layer[0] = -1.0
+        else:
+            layer_frac_sorted = sorted(layer_frac, key=lambda x: x[1])
+            ids = [item[0] for item in layer_frac_sorted]
+            fracs = [item[1] for item in layer_frac_sorted]
+
+            gaps = []
+            for k in range(len(fracs)):
+                f0 = fracs[k]
+                f1 = fracs[(k + 1) % len(fracs)]
+                gap = (f1 - f0) % 1.0
+                gaps.append(gap)
+
+            k_max = int(np.argmax(np.asarray(gaps, dtype=float)))
+            low_side_id = ids[k_max]
+            high_side_id = ids[(k_max + 1) % len(ids)]
+            interface_layer_ids = {low_side_id, high_side_id}
+            # Moving forward (increasing fractional coordinate) through the largest gap
+            # points from low-side interface toward the non-metal region.
+            normal_sign_by_layer[low_side_id] = 1.0
+            normal_sign_by_layer[high_side_id] = -1.0
+    else:
+        # Fallback without fractional-axis context: keep two geometric end layers.
+        if n_layers == 1:
+            interface_layer_ids = {0}
+            normal_sign_by_layer[0] = -1.0
+        else:
+            interface_layer_ids = {0, n_layers - 1}
+            normal_sign_by_layer[0] = -1.0
+            normal_sign_by_layer[n_layers - 1] = 1.0
+
     marked_layers: list[Layer] = []
     for i, layer in enumerate(layers_sorted):
         if i not in interface_layer_ids:
             marked_layers.append(layer)
             continue
 
-        # Decide normal sign (+axis or -axis) for this interface layer.
-        if scaled is None or env_frac_axis is None or env_frac_axis.size == 0:
-            # Fallback: use geometric side (low-end -> -axis, high-end -> +axis).
-            sign = -1.0 if i < n_layers / 2 else 1.0
-        else:
-            m_frac = _circular_mean_fractional(scaled[list(layer.atom_indices), axis_idx])
-            df_mic = _mic_delta_fractional(env_frac_axis - m_frac)
-            j = int(np.argmin(np.abs(df_mic)))
-            sign = float(np.sign(df_mic[j]))
-            if sign == 0.0:
+        # Decide normal sign (+axis or -axis) for the selected interface layer.
+        sign = normal_sign_by_layer.get(i)
+        if sign is None:
+            if scaled is None or env_frac_axis is None or env_frac_axis.size == 0:
                 sign = -1.0 if i < n_layers / 2 else 1.0
+            else:
+                m_frac = _circular_mean_fractional(scaled[list(layer.atom_indices), axis_idx])
+                df_mic = _mic_delta_fractional(env_frac_axis - m_frac)
+                j = int(np.argmin(np.abs(df_mic)))
+                sign = float(np.sign(df_mic[j]))
+                if sign == 0.0:
+                    sign = -1.0 if i < n_layers / 2 else 1.0
 
         nvec = axis_unit_vec * sign
         marked_layers.append(

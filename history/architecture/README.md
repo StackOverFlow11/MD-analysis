@@ -32,7 +32,21 @@
 ## 本目录子内容
 
 - `modules/`：各模块的详细设计与接口草案
+  - `README.md`：`modules/` 维护硬约束（目录镜像 + 双文档 + 颗粒度）
   - `glossary_units.md`：术语、单位与符号约定
   - `data_contract.md`：`scripts/structure/utils` 的输入输出与计算口径约定
+  - 记录落位规则：全局约束仅写在 `data_contract.md` 与 `glossary_units.md`；
+    其余记录统一写入各镜像目录下的 `interface_exposure.md` 与 `implementation_guidelines.md`
+  - `scripts/`：与代码目录 `scripts/` 对齐的接口/实现文档
+    - `scripts/interface_exposure.md`
+    - `scripts/implementation_guidelines.md`
+    - `scripts/structure/interface_exposure.md`
+    - `scripts/structure/implementation_guidelines.md`
+    - `scripts/structure/Analysis/interface_exposure.md`
+    - `scripts/structure/Analysis/implementation_guidelines.md`
+    - `scripts/structure/Analysis/WaterAnalysis/interface_exposure.md`
+    - `scripts/structure/Analysis/WaterAnalysis/implementation_guidelines.md`
+    - `scripts/structure/utils/interface_exposure.md`
+    - `scripts/structure/utils/implementation_guidelines.md`
 - `decisions/`：架构/技术决策（ADR），每条决策一份 md
 

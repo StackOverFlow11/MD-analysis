@@ -1,6 +1,9 @@
 # Glossary / Units（约定汇总）
 
 > 仅记录**已与用户协商确认**的约定；未确认内容必须标注“待讨论/待确认”，不得当作既定事实写入。
+>
+> 记录落位硬约束：本文件仅承载“全局术语/单位约定”；非全局目录级补充记录必须写入
+> 对应目录的 `interface_exposure.md` / `implementation_guidelines.md`。
 
 ## 文档公式格式（已确认）
 
@@ -8,18 +11,11 @@
 - 块级公式统一使用 `$$...$$`
 - 不使用 `\(...\)` 与 `\[...\]` 作为公式定界符
 
-## 元素分组约定（已确认）
+## 术语与统计口径索引（当前实现）
 
-- `metal_symbols` 默认包含所有过渡金属元素符号（配置位置：`scripts/structure/utils/config.py`）
-- 为避免第 3 族定义差异，当前同时包含 `La/Ac` 与 `Lu/Lr`；后续如需收紧口径再单独确认
-
-## z 分箱与单位约定（当前实现）
-
-- z 方向 profile 的默认分箱宽度：`dz = 0.25 Angstrom`（配置：`DEFAULT_Z_BIN_WIDTH_A`）
-- 水质量密度 profile 单位：`g/cm^3`
-- 取向加权 profile 单位：`1/Angstrom^3`
-- 水取向角的参考方向为晶胞 `+c` 方向（`001`）；实现上使用分子角平分线与 `c_unit` 的夹角计算 `cos(theta)`
-- 指定 c 轴区间的角度 PDF 默认分箱宽度：`ndeg = 5.0 degree`（配置：`DEFAULT_THETA_BIN_DEG`），PDF 单位 `degree^-1`
+- 跨模块统计数据形状、单位、公式口径：`data_contract.md`
+- `scripts` 层级接口暴露约定：`modules/scripts/**/interface_exposure.md`
+- `scripts` 层级内部实现准则：`modules/scripts/**/implementation_guidelines.md`
 
 ## 体系前提（已确认）
 

@@ -19,7 +19,8 @@
   - `README.md`：诉求拆分原则与维护说明
 - `architecture/`
   - `README.md`：代码架构总览（目录/模块职责/数据流）
-  - `modules/`：子模块说明（可继续扩展）
+  - `modules/`：子模块说明（含 `scripts/` 目录层级对应的接口暴露/实现准则文档）
+    - `modules/README.md`：模块文档治理硬约束（目录镜像与双文档）
   - `decisions/`：架构/技术决策记录（ADR）
 - `temp/`：重要上下文临时寄存区（可放 md）
 

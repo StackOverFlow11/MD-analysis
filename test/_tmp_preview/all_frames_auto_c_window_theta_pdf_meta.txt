@@ -1,6 +1,0 @@
-frames_processed=396
-avg_water_molecules_per_frame=70.000000
-auto_c_fraction_start=0.0047309061
-auto_c_fraction_end=0.0236545303
-z_bin_width_A=0.25
-theta_bin_width_deg=5
