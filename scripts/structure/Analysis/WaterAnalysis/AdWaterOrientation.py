@@ -3,24 +3,43 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Iterable
 
 import numpy as np
 
-from ...utils.WaterParser import detect_water_molecule_indices
-from ...utils.WaterParser import get_water_oxygen_indices_array
-from ...utils.config import DEFAULT_THETA_BIN_DEG
-from ...utils.config import DEFAULT_Z_BIN_WIDTH_A
-from ..config import DEFAULT_ADSORBED_WATER_PROFILE_CSV_NAME
-from ..config import DEFAULT_ADSORBED_WATER_RANGE_TXT_NAME
-from ..config import DEFAULT_ADSORBED_WATER_THETA_DISTRIBUTION_CSV_NAME
-from ..config import DEFAULT_OUTPUT_DIR
-from ..config import DEFAULT_START_INTERFACE
-from .WaterDensity import StartInterface
-from .WaterDensity import _detect_low_high_interface_fractions
-from .WaterDensity import _parse_abc_from_md_inp
-from .WaterDensity import water_mass_density_z_distribution_analysis
-from .WaterOrientation import water_orientation_weighted_density_z_distribution_analysis
+from ...utils.WaterParser import (
+    _compute_bisector_cos_theta_vec,
+    _oxygen_to_hydrogen_map,
+    _theta_bin_count_from_ndeg,
+    detect_water_molecule_indices,
+    get_water_oxygen_indices_array,
+)
+from ...utils.config import DEFAULT_THETA_BIN_DEG, DEFAULT_Z_BIN_WIDTH_A
+from ..config import (
+    DEFAULT_ADSORBED_WATER_PROFILE_CSV_NAME,
+    DEFAULT_ADSORBED_WATER_RANGE_TXT_NAME,
+    DEFAULT_ADSORBED_WATER_THETA_DISTRIBUTION_CSV_NAME,
+    DEFAULT_OUTPUT_DIR,
+    DEFAULT_START_INTERFACE,
+)
+from ._common import (
+    StartInterface,
+    _compute_density_orientation_ensemble,
+    _detect_low_high_interface_fractions,
+    _iter_trajectory,
+    _parse_abc_from_md_inp,
+)
 
+__all__ = [
+    "detect_adsorbed_layer_range_from_density_profile",
+    "ad_water_orientation_analysis",
+    "compute_adsorbed_water_theta_distribution",
+]
+
+
+# ---------------------------------------------------------------------------
+# Smoothing helper (local to this module)
+# ---------------------------------------------------------------------------
 
 def _smooth_1d(values: np.ndarray, window_bins: int) -> np.ndarray:
     values = np.asarray(values, dtype=float).reshape(-1)
@@ -37,6 +56,10 @@ def _smooth_1d(values: np.ndarray, window_bins: int) -> np.ndarray:
     kernel = np.ones(window_bins, dtype=float) / float(window_bins)
     return np.convolve(values, kernel, mode="same")
 
+
+# ---------------------------------------------------------------------------
+# Adsorbed layer range detection
+# ---------------------------------------------------------------------------
 
 def detect_adsorbed_layer_range_from_density_profile(
     distance_A: np.ndarray,
@@ -92,29 +115,9 @@ def detect_adsorbed_layer_range_from_density_profile(
     return start_distance_A, end_distance_A, peak_distance_A
 
 
-def _theta_bin_count_from_ndeg(ndeg: float) -> int:
-    ndeg = float(ndeg)
-    if ndeg <= 0.0:
-        raise ValueError("ndeg must be > 0")
-    n_bins_float = 180.0 / ndeg
-    n_bins = int(round(n_bins_float))
-    if not np.isclose(n_bins_float, float(n_bins), rtol=0.0, atol=1.0e-12):
-        raise ValueError("ndeg must divide 180 exactly")
-    return n_bins
-
-
-def _oxygen_to_hydrogen_map(water_molecule_indices: np.ndarray) -> dict[int, tuple[int, int]]:
-    water_molecule_indices = np.asarray(water_molecule_indices, dtype=int)
-    if water_molecule_indices.ndim != 2 or water_molecule_indices.shape[1] != 3:
-        raise ValueError("water_molecule_indices must have shape (n_water, 3)")
-    mapping: dict[int, tuple[int, int]] = {}
-    for row in water_molecule_indices:
-        o_idx = int(row[0])
-        h1_idx = int(row[1])
-        h2_idx = int(row[2])
-        mapping[o_idx] = (h1_idx, h2_idx)
-    return mapping
-
+# ---------------------------------------------------------------------------
+# Adsorbed water theta distribution
+# ---------------------------------------------------------------------------
 
 def compute_adsorbed_water_theta_distribution(
     xyz_path: str | Path,
@@ -137,27 +140,21 @@ def compute_adsorbed_water_theta_distribution(
     """
     xyz_path = Path(xyz_path)
     md_inp_path = Path(md_inp_path)
-
-    if output_dir is None:
-        output_dir_path = DEFAULT_OUTPUT_DIR
-    else:
-        output_dir_path = Path(output_dir)
+    output_dir_path = Path(output_dir) if output_dir is not None else Path.cwd()
     output_dir_path.mkdir(parents=True, exist_ok=True)
 
     if adsorbed_range_A is None:
-        density_csv_path = water_mass_density_z_distribution_analysis(
-            xyz_path=xyz_path,
-            md_inp_path=md_inp_path,
-            output_dir=output_dir_path,
+        # One trajectory pass to get density, then derive range.
+        common_centers_u, mean_path_A, rho_ensemble, _ = _compute_density_orientation_ensemble(
+            xyz_path,
+            md_inp_path,
             start_interface=start_interface,
             dz_A=dz_A,
         )
-        density_data = np.loadtxt(density_csv_path, delimiter=",", skiprows=1)
-        if density_data.ndim == 1:
-            density_data = density_data.reshape(1, -1)
+        distance_A_tmp = common_centers_u * mean_path_A
         d_start_A, d_end_A, _ = detect_adsorbed_layer_range_from_density_profile(
-            density_data[:, 1],
-            density_data[:, 2],
+            distance_A_tmp,
+            rho_ensemble,
             near_zero_ratio=near_zero_ratio,
             smoothing_window_bins=smoothing_window_bins,
         )
@@ -167,29 +164,21 @@ def compute_adsorbed_water_theta_distribution(
     if d_end_A <= d_start_A:
         raise ValueError("adsorbed_range_A must satisfy end > start")
 
-    try:
-        from ase.io import iread
-    except Exception as exc:  # pragma: no cover
-        raise RuntimeError("ASE is required: please install `ase` to read trajectory frames.") from exc
-
     a_A, b_A, c_A = _parse_abc_from_md_inp(md_inp_path)
-    theta_values_deg: list[float] = []
+    n_bins = _theta_bin_count_from_ndeg(float(ndeg))
+    theta_values_deg: list[np.ndarray] = []
 
-    for atoms in iread(str(xyz_path), index=":"):
-        atoms.set_cell([a_A, b_A, c_A])
-        atoms.set_pbc([True, True, True])
-
+    for atoms in _iter_trajectory(xyz_path, a_A, b_A, c_A):
         low_c, high_c = _detect_low_high_interface_fractions(atoms)
         water_idx = detect_water_molecule_indices(atoms)
         oxygen_indices = get_water_oxygen_indices_array(water_idx).reshape(-1)
         o_to_h = _oxygen_to_hydrogen_map(water_idx)
 
         cell = np.asarray(atoms.cell.array, dtype=float)
-        c_vec = cell[2]
-        c_norm = float(np.linalg.norm(c_vec))
+        c_norm = float(np.linalg.norm(cell[2]))
         if c_norm <= 0.0:
             raise ValueError("cell c-axis norm must be positive")
-        c_unit = c_vec / c_norm
+        c_unit = cell[2] / c_norm
 
         scaled = np.asarray(atoms.get_scaled_positions(wrap=True), dtype=float)
         oxygen_c = scaled[oxygen_indices, 2]
@@ -198,43 +187,41 @@ def compute_adsorbed_water_theta_distribution(
         else:
             delta_c = np.mod(high_c - oxygen_c, 1.0)
         delta_A = delta_c * c_norm
+
         in_adsorbed = (delta_A >= d_start_A) & (delta_A <= d_end_A)
         selected_oxygen = oxygen_indices[in_adsorbed]
+        if selected_oxygen.size == 0:
+            continue
 
-        for o_idx in selected_oxygen:
-            o_int = int(o_idx)
-            h1_idx, h2_idx = o_to_h[o_int]
-            vecs = np.asarray(atoms.get_distances(o_int, [int(h1_idx), int(h2_idx)], vector=True, mic=True), dtype=float)
-            v1 = vecs[0]
-            v2 = vecs[1]
+        # Vectorized bisector computation
+        cos_theta = _compute_bisector_cos_theta_vec(atoms, selected_oxygen, o_to_h, c_unit)
+        cos_theta_clipped = np.clip(cos_theta, -1.0, 1.0)
+        theta_values_deg.append(np.degrees(np.arccos(cos_theta_clipped)))
 
-            n1 = float(np.linalg.norm(v1))
-            n2 = float(np.linalg.norm(v2))
-            if n1 == 0.0 or n2 == 0.0:
-                continue
-            bisector = v1 / n1 + v2 / n2
-            nb = float(np.linalg.norm(bisector))
-            if nb == 0.0:
-                continue
-            cos_theta = float(np.dot(bisector, c_unit) / nb)
-            cos_theta = float(np.clip(cos_theta, -1.0, 1.0))
-            theta_values_deg.append(float(np.degrees(np.arccos(cos_theta))))
-
-    theta_values = np.asarray(theta_values_deg, dtype=float)
-    n_bins = _theta_bin_count_from_ndeg(float(ndeg))
     theta_edges = np.linspace(0.0, 180.0, n_bins + 1, dtype=float)
     theta_centers = 0.5 * (theta_edges[:-1] + theta_edges[1:])
-    if theta_values.size == 0:
-        theta_pdf = np.zeros(n_bins, dtype=float)
-    else:
-        theta_pdf, _ = np.histogram(theta_values, bins=theta_edges, density=True)
+
+    if theta_values_deg:
+        all_theta = np.concatenate(theta_values_deg)
+        theta_pdf, _ = np.histogram(all_theta, bins=theta_edges, density=True)
         theta_pdf = theta_pdf.astype(float, copy=False)
+    else:
+        theta_pdf = np.zeros(n_bins, dtype=float)
 
     out_csv_path = output_dir_path / output_csv_name
-    out = np.column_stack([theta_centers, theta_pdf])
-    np.savetxt(out_csv_path, out, delimiter=",", header="theta_degree,pdf_degree_inv", comments="")
+    np.savetxt(
+        out_csv_path,
+        np.column_stack([theta_centers, theta_pdf]),
+        delimiter=",",
+        header="theta_degree,pdf_degree_inv",
+        comments="",
+    )
     return theta_centers, theta_pdf, out_csv_path
 
+
+# ---------------------------------------------------------------------------
+# Adsorbed water orientation profile
+# ---------------------------------------------------------------------------
 
 def ad_water_orientation_analysis(
     xyz_path: str | Path,
@@ -251,65 +238,38 @@ def ad_water_orientation_analysis(
     """
     Build adsorbed-water orientation profile based on detected adsorbed layer range.
 
+    Single trajectory pass: density and orientation are computed simultaneously.
+
     Returns:
     - profile CSV path (distance, density, orientation, adsorbed-mask)
     - range TXT path (start/end/peak)
     """
-    if output_dir is None:
-        output_dir_path = DEFAULT_OUTPUT_DIR
-    else:
-        output_dir_path = Path(output_dir)
+    xyz_path = Path(xyz_path)
+    md_inp_path = Path(md_inp_path)
+    output_dir_path = Path(output_dir) if output_dir is not None else Path.cwd()
     output_dir_path.mkdir(parents=True, exist_ok=True)
 
-    density_csv_path = water_mass_density_z_distribution_analysis(
-        xyz_path=xyz_path,
-        md_inp_path=md_inp_path,
-        output_dir=output_dir_path,
+    # Single trajectory pass — replaces two separate analysis calls.
+    common_centers_u, mean_path_A, rho_ensemble, orient_ensemble = _compute_density_orientation_ensemble(
+        xyz_path,
+        md_inp_path,
         start_interface=start_interface,
         dz_A=dz_A,
     )
-    orient_csv_path = water_orientation_weighted_density_z_distribution_analysis(
-        xyz_path=xyz_path,
-        md_inp_path=md_inp_path,
-        output_dir=output_dir_path,
-        start_interface=start_interface,
-        dz_A=dz_A,
-    )
-
-    density_data = np.loadtxt(density_csv_path, delimiter=",", skiprows=1)
-    if density_data.ndim == 1:
-        density_data = density_data.reshape(1, -1)
-    orient_data = np.loadtxt(orient_csv_path, delimiter=",", skiprows=1)
-    if orient_data.ndim == 1:
-        orient_data = orient_data.reshape(1, -1)
-
-    distance_A = density_data[:, 1]
-    rho_g_cm3 = density_data[:, 2]
-    orient_1_A3 = orient_data[:, 2]
-
-    if distance_A.shape != orient_data[:, 1].shape or not np.allclose(distance_A, orient_data[:, 1]):
-        raise ValueError("density and orientation distance grids are inconsistent")
+    distance_A = common_centers_u * mean_path_A
 
     d_start, d_end, d_peak = detect_adsorbed_layer_range_from_density_profile(
         distance_A,
-        rho_g_cm3,
+        rho_ensemble,
         near_zero_ratio=near_zero_ratio,
         smoothing_window_bins=smoothing_window_bins,
     )
     in_adsorbed = (distance_A >= d_start) & (distance_A <= d_end)
 
     profile_csv_path = output_dir_path / output_profile_csv_name
-    out = np.column_stack(
-        [
-            distance_A,
-            rho_g_cm3,
-            orient_1_A3,
-            in_adsorbed.astype(int),
-        ]
-    )
     np.savetxt(
         profile_csv_path,
-        out,
+        np.column_stack([distance_A, rho_ensemble, orient_ensemble, in_adsorbed.astype(int)]),
         delimiter=",",
         header="distance_A,rho_ensemble_avg_g_cm3,orientation_ensemble_avg_1_A3,is_adsorbed_layer_bin",
         comments="",
@@ -317,15 +277,13 @@ def ad_water_orientation_analysis(
 
     range_txt_path = output_dir_path / output_range_txt_name
     range_txt_path.write_text(
-        "\n".join(
-            [
-                f"adsorbed_layer_start_A={d_start:.10f}",
-                f"adsorbed_layer_end_A={d_end:.10f}",
-                f"main_peak_distance_A={d_peak:.10f}",
-                f"near_zero_ratio={near_zero_ratio:.6f}",
-                f"smoothing_window_bins={int(smoothing_window_bins)}",
-            ]
-        ),
+        "\n".join([
+            f"adsorbed_layer_start_A={d_start:.10f}",
+            f"adsorbed_layer_end_A={d_end:.10f}",
+            f"main_peak_distance_A={d_peak:.10f}",
+            f"near_zero_ratio={near_zero_ratio:.6f}",
+            f"smoothing_window_bins={int(smoothing_window_bins)}",
+        ]),
         encoding="utf-8",
     )
     return profile_csv_path, range_txt_path

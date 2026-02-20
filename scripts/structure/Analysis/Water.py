@@ -3,24 +3,22 @@
 from __future__ import annotations
 
 from pathlib import Path
-import re
 
 import numpy as np
 from matplotlib.ticker import MultipleLocator
 from matplotlib.ticker import NullFormatter
 
+from .config import DEFAULT_ADSORBED_WATER_PROFILE_CSV_NAME
+from .config import DEFAULT_ADSORBED_WATER_RANGE_TXT_NAME
 from .config import DEFAULT_OUTPUT_DIR
 from .config import DEFAULT_START_INTERFACE
 from .config import DEFAULT_WATER_MASS_DENSITY_CSV_NAME
 from .config import DEFAULT_WATER_ORIENTATION_WEIGHTED_DENSITY_CSV_NAME
 from .config import DEFAULT_WATER_THREE_PANEL_PLOT_PNG_NAME
-from .WaterAnalysis import ad_water_orientation_analysis
 from .WaterAnalysis import compute_adsorbed_water_theta_distribution
-from .WaterAnalysis import water_mass_density_z_distribution_analysis
-from .WaterAnalysis import water_orientation_weighted_density_z_distribution_analysis
-from .WaterAnalysis.WaterDensity import StartInterface
-from ..utils.config import DEFAULT_THETA_BIN_DEG
-from ..utils.config import DEFAULT_Z_BIN_WIDTH_A
+from .WaterAnalysis import detect_adsorbed_layer_range_from_density_profile
+from .WaterAnalysis._common import StartInterface, _compute_density_orientation_ensemble
+from ..utils.config import DEFAULT_THETA_BIN_DEG, DEFAULT_Z_BIN_WIDTH_A
 
 
 def _savgol_smooth_window5(values: np.ndarray) -> np.ndarray:
@@ -37,19 +35,6 @@ def _savgol_smooth_window5(values: np.ndarray) -> np.ndarray:
     return np.convolve(padded, kernel, mode="valid")
 
 
-def _parse_adsorbed_range_txt(range_txt_path: Path) -> tuple[float, float]:
-    text = range_txt_path.read_text(encoding="utf-8")
-    m_start = re.search(r"adsorbed_layer_start_A=([0-9.eE+-]+)", text)
-    m_end = re.search(r"adsorbed_layer_end_A=([0-9.eE+-]+)", text)
-    if m_start is None or m_end is None:
-        raise ValueError(f"Cannot parse adsorbed layer range from {range_txt_path}")
-    d_start_A = float(m_start.group(1))
-    d_end_A = float(m_end.group(1))
-    if d_end_A <= d_start_A:
-        raise ValueError("adsorbed layer range is invalid: end must be greater than start")
-    return d_start_A, d_end_A
-
-
 def plot_water_three_panel_analysis(
     xyz_path: str | Path,
     md_inp_path: str | Path,
@@ -63,43 +48,76 @@ def plot_water_three_panel_analysis(
     """
     Create an integrated three-panel figure:
     1) water mass density vs distance
-    2) orientation-weighted density vs distance (share x with panel 1)
+    2) orientation-weighted density vs distance (shared x range with panel 1)
     3) adsorbed-layer theta distribution PDF (0-180 degree)
+
+    The trajectory is read exactly twice:
+    - Read #1: compute density + orientation profiles (single combined pass).
+    - Read #2: collect theta values for adsorbed-layer molecules.
     """
     xyz_path = Path(xyz_path)
     md_inp_path = Path(md_inp_path)
-
-    if output_dir is None:
-        output_dir_path = DEFAULT_OUTPUT_DIR
-    else:
-        output_dir_path = Path(output_dir)
+    output_dir_path = Path(output_dir) if output_dir is not None else Path.cwd()
     output_dir_path.mkdir(parents=True, exist_ok=True)
 
-    density_csv_path = water_mass_density_z_distribution_analysis(
-        xyz_path=xyz_path,
-        md_inp_path=md_inp_path,
-        output_dir=output_dir_path,
-        output_csv_name=DEFAULT_WATER_MASS_DENSITY_CSV_NAME,
+    # --- Trajectory read #1: density + orientation in one pass ---
+    common_centers_u, mean_path_A, rho_ensemble, orient_ensemble = _compute_density_orientation_ensemble(
+        xyz_path,
+        md_inp_path,
         start_interface=start_interface,
         dz_A=dz_A,
     )
-    orientation_csv_path = water_orientation_weighted_density_z_distribution_analysis(
-        xyz_path=xyz_path,
-        md_inp_path=md_inp_path,
-        output_dir=output_dir_path,
-        output_csv_name=DEFAULT_WATER_ORIENTATION_WEIGHTED_DENSITY_CSV_NAME,
-        start_interface=start_interface,
-        dz_A=dz_A,
-    )
-    _, range_txt_path = ad_water_orientation_analysis(
-        xyz_path=xyz_path,
-        md_inp_path=md_inp_path,
-        output_dir=output_dir_path,
-        start_interface=start_interface,
-        dz_A=dz_A,
+    distance_A = common_centers_u * mean_path_A
+
+    # Save density CSV
+    density_csv_path = output_dir_path / DEFAULT_WATER_MASS_DENSITY_CSV_NAME
+    np.savetxt(
+        density_csv_path,
+        np.column_stack([common_centers_u, distance_A, rho_ensemble]),
+        delimiter=",",
+        header="path_fraction_center,distance_A,rho_ensemble_avg_g_cm3",
+        comments="",
     )
 
-    d_start_A, d_end_A = _parse_adsorbed_range_txt(range_txt_path)
+    # Save orientation CSV
+    orientation_csv_path = output_dir_path / DEFAULT_WATER_ORIENTATION_WEIGHTED_DENSITY_CSV_NAME
+    np.savetxt(
+        orientation_csv_path,
+        np.column_stack([common_centers_u, distance_A, orient_ensemble]),
+        delimiter=",",
+        header="path_fraction_center,distance_A,orientation_ensemble_avg_1_A3",
+        comments="",
+    )
+
+    # Detect adsorbed layer range in-memory (no trajectory read)
+    d_start_A, d_end_A, d_peak_A = detect_adsorbed_layer_range_from_density_profile(
+        distance_A, rho_ensemble
+    )
+    in_adsorbed = (distance_A >= d_start_A) & (distance_A <= d_end_A)
+
+    # Save adsorbed profile CSV and range TXT (side effects expected by callers)
+    adsorbed_profile_path = output_dir_path / DEFAULT_ADSORBED_WATER_PROFILE_CSV_NAME
+    np.savetxt(
+        adsorbed_profile_path,
+        np.column_stack([distance_A, rho_ensemble, orient_ensemble, in_adsorbed.astype(int)]),
+        delimiter=",",
+        header="distance_A,rho_ensemble_avg_g_cm3,orientation_ensemble_avg_1_A3,is_adsorbed_layer_bin",
+        comments="",
+    )
+
+    range_txt_path = output_dir_path / DEFAULT_ADSORBED_WATER_RANGE_TXT_NAME
+    range_txt_path.write_text(
+        "\n".join([
+            f"adsorbed_layer_start_A={d_start_A:.10f}",
+            f"adsorbed_layer_end_A={d_end_A:.10f}",
+            f"main_peak_distance_A={d_peak_A:.10f}",
+            "near_zero_ratio=0.050000",
+            "smoothing_window_bins=5",
+        ]),
+        encoding="utf-8",
+    )
+
+    # --- Trajectory read #2: adsorbed-layer theta distribution ---
     theta_centers, theta_pdf, _ = compute_adsorbed_water_theta_distribution(
         xyz_path=xyz_path,
         md_inp_path=md_inp_path,
@@ -110,19 +128,9 @@ def plot_water_three_panel_analysis(
         ndeg=ndeg,
     )
 
-    density_data = np.loadtxt(density_csv_path, delimiter=",", skiprows=1)
-    if density_data.ndim == 1:
-        density_data = density_data.reshape(1, -1)
-    orientation_data = np.loadtxt(orientation_csv_path, delimiter=",", skiprows=1)
-    if orientation_data.ndim == 1:
-        orientation_data = orientation_data.reshape(1, -1)
-
-    distance_A_density = density_data[:, 1]
-    rho_g_cm3 = density_data[:, 2]
-    distance_A_orientation = orientation_data[:, 1]
-    orient_1_A3 = orientation_data[:, 2]
-    rho_smooth = _savgol_smooth_window5(rho_g_cm3)
-    orient_smooth = _savgol_smooth_window5(orient_1_A3)
+    # --- Smooth and plot ---
+    rho_smooth = _savgol_smooth_window5(rho_ensemble)
+    orient_smooth = _savgol_smooth_window5(orient_ensemble)
     theta_pdf_smooth = _savgol_smooth_window5(theta_pdf)
 
     try:
@@ -139,24 +147,23 @@ def plot_water_three_panel_analysis(
         fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(8.6, 10.8), sharex=False)
 
         # Panel 1: density profile.
-        ax1.plot(distance_A_density, rho_smooth, color="tab:blue", lw=1.5)
+        ax1.plot(distance_A, rho_smooth, color="tab:blue", lw=1.5)
         ax1.set_ylabel(r"$\rho_\mathrm{{H_2O}}\ \mathrm{(g\cdot cm^3)}$", fontsize=18)
         ax1.set_xlabel(r"$\mathrm{distance(\AA)}$", fontsize=18)
         ax1.set_title("Water density distribution", fontsize=18)
         ax1.tick_params(axis="both", which="major", labelsize=16)
 
-        # Panel 2: orientation-weighted profile, sharing x-range with panel 1.
-        ax2.plot(distance_A_orientation, orient_smooth, color="tab:orange", lw=1.5)
+        # Panel 2: orientation-weighted profile.
+        ax2.plot(distance_A, orient_smooth, color="tab:orange", lw=1.5)
         ax2.set_ylabel(r"$\rho_\mathrm{{H_2O}}\cdot cos \varphi\ \mathrm{(a.u.)}$", fontsize=18)
         ax2.set_xlabel(r"$\mathrm{distance(\AA)}$", fontsize=18)
         ax2.set_title("Water dipole", fontsize=18)
         ax2.set_yticks([0.0])
         ax2.tick_params(axis="both", which="major", labelsize=16)
 
-        x_min = 0.0
-        x_max = float(max(np.max(distance_A_density), np.max(distance_A_orientation)))
-        ax1.set_xlim(x_min, x_max)
-        ax2.set_xlim(x_min, x_max)
+        x_max = float(np.max(distance_A))
+        ax1.set_xlim(0.0, x_max)
+        ax2.set_xlim(0.0, x_max)
         ax1.xaxis.set_minor_locator(MultipleLocator(0.5))
         ax2.xaxis.set_minor_locator(MultipleLocator(0.5))
         ax1.xaxis.set_minor_formatter(NullFormatter())
@@ -178,4 +185,5 @@ def plot_water_three_panel_analysis(
         out_png_path = output_dir_path / output_png_name
         fig.savefig(out_png_path, dpi=180)
         plt.close(fig)
+
     return out_png_path

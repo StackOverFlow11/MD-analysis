@@ -9,25 +9,19 @@ This module provides:
 
 from __future__ import annotations
 
-from typing import Iterable, Sequence
+from typing import Sequence
 
 import numpy as np
+
+from .config import DEFAULT_THETA_BIN_DEG
+from .config import DEFAULT_WATER_OH_CUTOFF_A
+from .config import DEFAULT_Z_BIN_WIDTH_A
+from .config import WATER_MOLAR_MASS_G_PER_MOL
 
 try:
     from ase import Atoms
 except Exception:  # pragma: no cover
     Atoms = object  # type: ignore
-
-try:
-    from .config import DEFAULT_THETA_BIN_DEG
-    from .config import DEFAULT_WATER_OH_CUTOFF_A
-    from .config import DEFAULT_Z_BIN_WIDTH_A
-    from .config import WATER_MOLAR_MASS_G_PER_MOL
-except Exception:  # pragma: no cover
-    from config import DEFAULT_THETA_BIN_DEG  # type: ignore
-    from config import DEFAULT_WATER_OH_CUTOFF_A  # type: ignore
-    from config import DEFAULT_Z_BIN_WIDTH_A  # type: ignore
-    from config import WATER_MOLAR_MASS_G_PER_MOL  # type: ignore
 
 
 AVOGADRO_NUMBER = 6.022_140_76e23
@@ -127,6 +121,67 @@ def _oxygen_to_hydrogen_map(water_molecule_indices: np.ndarray) -> dict[int, tup
             raise ValueError(f"duplicate oxygen index found in water_molecule_indices: {o_idx}")
         mapping[o_idx] = (h1_idx, h2_idx)
     return mapping
+
+
+def _compute_bisector_cos_theta_vec(
+    atoms: Atoms,
+    oxygen_indices: np.ndarray,
+    o_to_h: dict[int, tuple[int, int]],
+    c_unit: np.ndarray,
+) -> np.ndarray:
+    """
+    Vectorized batch computation of cos(theta) for water molecules.
+
+    theta is the angle between the H-O-H bisector direction and c_unit.
+
+    Parameters
+    ----------
+    atoms
+        ASE Atoms frame (must have cell and pbc set).
+    oxygen_indices
+        1-D integer array of oxygen atom indices, shape (n,).
+    o_to_h
+        Mapping from oxygen index to (H1_index, H2_index).
+    c_unit
+        Unit vector of the reference direction, shape (3,).
+
+    Returns
+    -------
+    cos_theta : np.ndarray, shape (n,)
+    """
+    from ase.geometry import find_mic
+
+    n = oxygen_indices.size
+    if n == 0:
+        return np.empty(0, dtype=float)
+
+    pos = np.asarray(atoms.get_positions(), dtype=float)
+    cell = np.asarray(atoms.cell.array, dtype=float)
+    pbc = np.asarray(atoms.pbc, dtype=bool)
+
+    h1_idx = np.fromiter((o_to_h[int(o)][0] for o in oxygen_indices), dtype=int, count=n)
+    h2_idx = np.fromiter((o_to_h[int(o)][1] for o in oxygen_indices), dtype=int, count=n)
+
+    o_pos = pos[oxygen_indices]  # (n, 3)
+    h1_pos = pos[h1_idx]         # (n, 3)
+    h2_pos = pos[h2_idx]         # (n, 3)
+
+    dr1_mic, _ = find_mic(h1_pos - o_pos, cell=cell, pbc=pbc)  # (n, 3)
+    dr2_mic, _ = find_mic(h2_pos - o_pos, cell=cell, pbc=pbc)  # (n, 3)
+
+    n1 = np.linalg.norm(dr1_mic, axis=1)  # (n,)
+    n2 = np.linalg.norm(dr2_mic, axis=1)  # (n,)
+
+    if np.any(n1 == 0.0) or np.any(n2 == 0.0):
+        raise WaterTopologyError("Zero O-H vector norm in batch bisector computation")
+
+    bisector = dr1_mic / n1[:, None] + dr2_mic / n2[:, None]  # (n, 3)
+    nb = np.linalg.norm(bisector, axis=1)  # (n,)
+
+    if np.any(nb == 0.0):
+        raise WaterTopologyError("Degenerate H-O-H bisector in batch bisector computation")
+
+    return (bisector @ c_unit / nb).astype(float, copy=False)  # (n,)
 
 
 def detect_water_molecule_indices(
@@ -271,24 +326,7 @@ def compute_water_orientation_weighted_density_z_distribution(
     z_oxygen_A = z_all_A[oxygen_indices]
     bin_ids = _assign_z_bins(z_oxygen_A, z_edges_A)
 
-    cos_theta_values = np.empty(oxygen_indices.size, dtype=float)
-    for i, o_idx in enumerate(oxygen_indices):
-        h1_idx, h2_idx = o_to_h[int(o_idx)]
-        vecs = np.asarray(atoms.get_distances(int(o_idx), [int(h1_idx), int(h2_idx)], vector=True, mic=True), dtype=float)
-        v1 = vecs[0]
-        v2 = vecs[1]
-
-        n1 = float(np.linalg.norm(v1))
-        n2 = float(np.linalg.norm(v2))
-        if n1 == 0.0 or n2 == 0.0:
-            raise WaterTopologyError(f"Zero O-H vector norm for oxygen index {int(o_idx)}")
-
-        bisector = v1 / n1 + v2 / n2
-        nb = float(np.linalg.norm(bisector))
-        if nb == 0.0:
-            raise WaterTopologyError(f"Degenerate H-O-H bisector for oxygen index {int(o_idx)}")
-
-        cos_theta_values[i] = float(np.dot(bisector, c_unit) / nb)
+    cos_theta_values = _compute_bisector_cos_theta_vec(atoms, oxygen_indices, o_to_h, c_unit)
 
     cos_sum_per_bin = np.bincount(bin_ids, weights=cos_theta_values, minlength=bin_volumes_A3.size).astype(float)
     weighted_orientation_density = cos_sum_per_bin / bin_volumes_A3
@@ -345,26 +383,9 @@ def compute_water_orientation_theta_pdf_in_c_fraction_window(
     if selected_oxygen.size == 0:
         return np.zeros(n_theta_bins, dtype=float)
 
-    theta_deg_values = np.empty(selected_oxygen.size, dtype=float)
-    for i, o_idx in enumerate(selected_oxygen):
-        h1_idx, h2_idx = o_to_h[int(o_idx)]
-        vecs = np.asarray(atoms.get_distances(int(o_idx), [int(h1_idx), int(h2_idx)], vector=True, mic=True), dtype=float)
-        v1 = vecs[0]
-        v2 = vecs[1]
-
-        n1 = float(np.linalg.norm(v1))
-        n2 = float(np.linalg.norm(v2))
-        if n1 == 0.0 or n2 == 0.0:
-            raise WaterTopologyError(f"Zero O-H vector norm for oxygen index {int(o_idx)}")
-
-        bisector = v1 / n1 + v2 / n2
-        nb = float(np.linalg.norm(bisector))
-        if nb == 0.0:
-            raise WaterTopologyError(f"Degenerate H-O-H bisector for oxygen index {int(o_idx)}")
-
-        cos_theta = float(np.dot(bisector, c_unit) / nb)
-        cos_theta = float(np.clip(cos_theta, -1.0, 1.0))
-        theta_deg_values[i] = float(np.degrees(np.arccos(cos_theta)))
+    cos_theta_values = _compute_bisector_cos_theta_vec(atoms, selected_oxygen, o_to_h, c_unit)
+    cos_theta_clipped = np.clip(cos_theta_values, -1.0, 1.0)
+    theta_deg_values = np.degrees(np.arccos(cos_theta_clipped))
 
     theta_edges_deg = np.linspace(0.0, 180.0, n_theta_bins + 1, dtype=float)
     theta_pdf, _ = np.histogram(theta_deg_values, bins=theta_edges_deg, density=True)

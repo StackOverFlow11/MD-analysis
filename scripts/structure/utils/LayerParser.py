@@ -29,10 +29,7 @@ try:
 except Exception:  # pragma: no cover
     Atoms = object  # type: ignore
 
-try:
-    from .config import DEFAULT_METAL_SYMBOLS
-except Exception:  # pragma: no cover
-    from config import DEFAULT_METAL_SYMBOLS  # type: ignore
+from .config import DEFAULT_METAL_SYMBOLS
 
 
 NormalSpec = Literal["a", "b", "c"] | Sequence[float]

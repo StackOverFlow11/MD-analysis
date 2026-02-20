@@ -5,9 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-# Default output directory:
-# for future CLI usage, default to the caller's current working directory.
-DEFAULT_OUTPUT_DIR: Path = Path.cwd()
+# Default output directory sentinel.
+# None means "resolve to Path.cwd() at call time", avoiding import-time evaluation.
+DEFAULT_OUTPUT_DIR: Path | None = None
 
 # Which metal interface to use as the profile start point along c.
 # - "low_c": interface with smaller c fractional coordinate
