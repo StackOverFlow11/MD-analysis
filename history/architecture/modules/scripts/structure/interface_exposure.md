@@ -43,10 +43,25 @@
 
 ### 2.5 Analysis 子包（Stable，子包路径）
 
+- `scripts.structure.Analysis.plot_water_three_panel_analysis(...)`
+  - 当前实现文件：`scripts/structure/Analysis/Water.py`
+  - 输出：三联图 PNG + 相关 CSV/TXT（见 `data_contract.md`）
 - `scripts.structure.Analysis.water_mass_density_z_distribution_analysis(...)`
   - 当前实现文件：`scripts/structure/Analysis/WaterAnalysis/WaterDensity.py`
   - 统计口径：A 口径（逐帧等权系综平均）
   - 默认参数来源：`scripts/structure/Analysis/config.py`
+- `scripts.structure.Analysis.water_orientation_weighted_density_z_distribution_analysis(...)`
+  - 当前实现文件：`scripts/structure/Analysis/WaterAnalysis/WaterOrientation.py`
+  - 统计口径：A 口径（逐帧等权系综平均）
+- `scripts.structure.Analysis.ad_water_orientation_analysis(...)`
+  - 当前实现文件：`scripts/structure/Analysis/WaterAnalysis/AdWaterOrientation.py`
+  - 输出：吸附层 profile CSV + range TXT（见 `data_contract.md`）
+- `scripts.structure.Analysis.compute_adsorbed_water_theta_distribution(...)`
+  - 当前实现文件：`scripts/structure/Analysis/WaterAnalysis/AdWaterOrientation.py`
+  - 输出：吸附层 `$\\theta$` 分布 CSV（见 `data_contract.md`）
+- `scripts.structure.Analysis.detect_adsorbed_layer_range_from_density_profile(...)`
+  - 当前实现文件：`scripts/structure/Analysis/WaterAnalysis/AdWaterOrientation.py`
+  - 说明：从密度剖面中推断吸附层距离范围
 
 接口语义说明：
 
@@ -60,6 +75,7 @@
 - `from scripts.structure import compute_water_orientation_theta_pdf_in_c_fraction_window`
 - `from scripts.structure import DEFAULT_THETA_BIN_DEG`
 - `from scripts.structure.Analysis import water_mass_density_z_distribution_analysis`
+- `from scripts.structure.Analysis import plot_water_three_panel_analysis`
 
 ## 4. 非公开接口边界
 

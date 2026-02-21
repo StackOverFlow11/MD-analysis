@@ -113,6 +113,30 @@ $$
 - 角域：`0-180` degree
 - 输出 CSV：`theta_degree,pdf_degree_inv`
 
+### `plot_water_three_panel_analysis(...)` 输出契约
+
+- 入口定位：集成三联图的推荐入口（同时落盘各中间结果，便于复现）
+- 输出目录：`output_dir`（默认 `Path.cwd()`）
+- 输出文件（默认命名来自：`scripts/structure/Analysis/config.py`；PNG 名可覆盖）：
+  - PNG：`DEFAULT_WATER_THREE_PANEL_PLOT_PNG_NAME`（参数 `output_png_name` 可覆盖）
+  - density CSV：`DEFAULT_WATER_MASS_DENSITY_CSV_NAME`
+  - orientation CSV：`DEFAULT_WATER_ORIENTATION_WEIGHTED_DENSITY_CSV_NAME`
+  - adsorbed profile CSV：`DEFAULT_ADSORBED_WATER_PROFILE_CSV_NAME`
+  - adsorbed range TXT：`DEFAULT_ADSORBED_WATER_RANGE_TXT_NAME`
+  - theta distribution CSV：`DEFAULT_ADSORBED_WATER_THETA_DISTRIBUTION_CSV_NAME`
+- CSV 列（header 与顺序固定）：
+  - density CSV：`path_fraction_center,distance_A,rho_ensemble_avg_g_cm3`
+  - orientation CSV：`path_fraction_center,distance_A,orientation_ensemble_avg_1_A3`
+  - adsorbed profile CSV：`distance_A,rho_ensemble_avg_g_cm3,orientation_ensemble_avg_1_A3,is_adsorbed_layer_bin`
+  - theta distribution CSV：`theta_degree,pdf_degree_inv`
+- range TXT 键（key 固定，value 为数值）：
+  - `adsorbed_layer_start_A=...`
+  - `adsorbed_layer_end_A=...`
+  - `main_peak_distance_A=...`
+  - `near_zero_ratio=...`
+  - `smoothing_window_bins=...`
+- 轨迹读取次数：2（第一次密度+取向；第二次吸附层 `theta` 分布）
+
 ### 系综平均口径（A）
 
 - 每帧独立计算从选定界面到中点的单帧 profile

@@ -5,11 +5,13 @@
 > - `scripts/structure/Analysis/WaterAnalysis/WaterDensity.py`
 > - `scripts/structure/Analysis/WaterAnalysis/WaterOrientation.py`
 > - `scripts/structure/Analysis/WaterAnalysis/AdWaterOrientation.py`
+> - `scripts/structure/Analysis/WaterAnalysis/_common.py`（私有实现，不属于对外契约）
 
 ## 1. 接口角色定义
 
 - `WaterAnalysis` 是 `Analysis` 子层中“水相关分析”的聚合目录。
 - 本层负责暴露水分析入口函数，不暴露内部 helper。
+- 多帧遍历/界面检测/系综平均等公共实现集中在私有模块 `_common.py` 中（外部不得依赖）。
 
 ## 2. 当前公开接口清单
 
@@ -33,9 +35,9 @@
 
 ### 2.2 非公开接口（Non-public）
 
-- `WaterDensity.py` 中 `_` 前缀函数（如 `_single_frame_*`）均为非公开。
-- `WaterOrientation.py` 中 `_` 前缀函数（如 `_single_frame_*`）均为非公开。
-- `AdWaterOrientation.py` 中 `_` 前缀函数均为非公开。
+- `WaterAnalysis/_common.py` **整个模块**均为非公开（包含轨迹读取、cell 解析、界面检测、单帧计算与系综平均等细节）。
+- 任意 `_` 前缀符号（函数/常量/模块）均为非公开。
+- 未在 `WaterAnalysis/__init__.py` 的 `__all__` 中声明的符号，均不属于公开接口。
 
 ## 3. 推荐导入方式
 
