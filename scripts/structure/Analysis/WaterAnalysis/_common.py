@@ -78,7 +78,6 @@ def _detect_low_high_interface_fractions(
         atoms,
         normal="c",
         metal_symbols=metal_symbols,
-        n_interface_layers=1,
     )
     interface_layers = detection.interface_layers()
     if len(interface_layers) < 2:
@@ -152,8 +151,8 @@ def _single_frame_density_and_orientation(
         Bin center positions from interface (Å).
     rho_g_cm3 : np.ndarray, shape (nbins,)
         Water mass density per bin (g/cm³).
-    orient_1_A3 : np.ndarray, shape (nbins,)
-        Orientation-weighted density per bin (1/Å³).
+    orient_g_cm3 : np.ndarray, shape (nbins,)
+        Orientation-weighted mass density per bin (g/cm³).
     path_length_A : float
         Physical half-path length from interface to midpoint (Å).
     """
@@ -218,13 +217,13 @@ def _single_frame_density_and_orientation(
 
     # --- Orientation (vectorized) ---
     if selected_oxygen.size == 0:
-        orient_1_A3 = np.zeros_like(centers_A, dtype=float)
+        orient_g_cm3 = np.zeros_like(centers_A, dtype=float)
     else:
         cos_theta = _compute_bisector_cos_theta_vec(atoms, selected_oxygen, o_to_h, c_unit)
         cos_sum = np.histogram(selected_delta_A, bins=edges_A, weights=cos_theta)[0].astype(float)
-        orient_1_A3 = cos_sum / bin_volumes_A3
+        orient_g_cm3 = cos_sum * mass_per_water_g / (bin_volumes_A3 * ANGSTROM3_TO_CM3)
 
-    return centers_A, rho_g_cm3, orient_1_A3, path_length_A
+    return centers_A, rho_g_cm3, orient_g_cm3, path_length_A
 
 
 # ---------------------------------------------------------------------------
@@ -251,7 +250,7 @@ def _compute_density_orientation_ensemble(
     rho_ensemble : np.ndarray, shape (nbins,)
         Equal-weight ensemble-averaged water mass density (g/cm³).
     orient_ensemble : np.ndarray, shape (nbins,)
-        Equal-weight ensemble-averaged orientation-weighted density (1/Å³).
+        Equal-weight ensemble-averaged orientation-weighted mass density (g/cm³).
     """
     a_A, b_A, c_A = _parse_abc_from_md_inp(md_inp_path)
 
@@ -276,10 +275,10 @@ def _compute_density_orientation_ensemble(
 
     interp_rho: list[np.ndarray] = []
     interp_orient: list[np.ndarray] = []
-    for centers_A, rho_g_cm3, orient_1_A3, path_length_A in per_frame:
+    for centers_A, rho_g_cm3, orient_g_cm3, path_length_A in per_frame:
         centers_u = centers_A / path_length_A
         interp_rho.append(np.interp(common_centers_u, centers_u, rho_g_cm3, left=0.0, right=0.0))
-        interp_orient.append(np.interp(common_centers_u, centers_u, orient_1_A3, left=0.0, right=0.0))
+        interp_orient.append(np.interp(common_centers_u, centers_u, orient_g_cm3, left=0.0, right=0.0))
 
     rho_ensemble = np.mean(np.asarray(interp_rho, dtype=float), axis=0)
     orient_ensemble = np.mean(np.asarray(interp_orient, dtype=float), axis=0)

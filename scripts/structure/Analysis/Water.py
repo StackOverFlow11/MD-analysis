@@ -85,7 +85,7 @@ def plot_water_three_panel_analysis(
         orientation_csv_path,
         np.column_stack([common_centers_u, distance_A, orient_ensemble]),
         delimiter=",",
-        header="path_fraction_center,distance_A,orientation_ensemble_avg_1_A3",
+        header="path_fraction_center,distance_A,orientation_ensemble_avg_g_cm3",
         comments="",
     )
 
@@ -101,7 +101,7 @@ def plot_water_three_panel_analysis(
         adsorbed_profile_path,
         np.column_stack([distance_A, rho_ensemble, orient_ensemble, in_adsorbed.astype(int)]),
         delimiter=",",
-        header="distance_A,rho_ensemble_avg_g_cm3,orientation_ensemble_avg_1_A3,is_adsorbed_layer_bin",
+        header="distance_A,rho_ensemble_avg_g_cm3,orientation_ensemble_avg_g_cm3,is_adsorbed_layer_bin",
         comments="",
     )
 
@@ -155,7 +155,7 @@ def plot_water_three_panel_analysis(
 
         # Panel 2: orientation-weighted profile.
         ax2.plot(distance_A, orient_smooth, color="tab:orange", lw=1.5)
-        ax2.set_ylabel(r"$\rho_\mathrm{{H_2O}}\cdot cos \varphi\ \mathrm{(a.u.)}$", fontsize=18)
+        ax2.set_ylabel(r"$\rho_\mathrm{{H_2O}}\cdot\cos\varphi\ \mathrm{(g\cdot cm^{-3})}$", fontsize=18)
         ax2.set_xlabel(r"$\mathrm{distance(\AA)}$", fontsize=18)
         ax2.set_title("Water dipole", fontsize=18)
         ax2.set_yticks([0.0])

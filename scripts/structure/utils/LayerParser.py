@@ -153,7 +153,6 @@ def detect_interface_layers(
     metal_symbols: Iterable[str] | None = None,
     normal: NormalSpec = "c",
     layer_tol_A: float = 0.6,
-    n_interface_layers: int = 2,
     nonmetal_symbols_hint: Iterable[str] | None = None,
 ) -> SurfaceDetectionResult:
     """
@@ -161,10 +160,11 @@ def detect_interface_layers(
 
     Notes
     -----
-    In your (user-confirmed) periodic water–metal–water setting, there are
-    typically **two** interfaces in one frame. This function marks only the
-    two metal layers that directly face the non-metal region (one on each side),
-    and assigns `Layer.normal_unit` for those layers (metal -> water).
+    In the periodic water–metal–water setting, there are exactly **two** interfaces
+    per frame. This function always marks exactly one directly water-facing layer per
+    side (two interface layers total), and assigns `Layer.normal_unit` for those
+    layers pointing metal -> water. The interface selection strategy is fixed and
+    not configurable.
 
     Parameters
     ----------
@@ -180,9 +180,6 @@ def detect_interface_layers(
     layer_tol_A
         1D clustering tolerance (Å) when grouping metal atoms into layers
         along the normal projection coordinate.
-    n_interface_layers
-        Kept for backward compatibility. Interface marking now always keeps only
-        one directly water-facing layer per side.
     nonmetal_symbols_hint
         Optional hint for which symbols represent "environment" (water/ions/etc.).
         If omitted, we use all atoms not in `metal_symbols` as non-metal for deciding
@@ -192,9 +189,6 @@ def detect_interface_layers(
     -------
     SurfaceDetectionResult
     """
-    if n_interface_layers <= 0:
-        raise ValueError("n_interface_layers must be >= 1")
-
     metal_symbols_iter = DEFAULT_METAL_SYMBOLS if metal_symbols is None else metal_symbols
     metal_symbols_set = {str(s) for s in metal_symbols_iter}
     if not metal_symbols_set:

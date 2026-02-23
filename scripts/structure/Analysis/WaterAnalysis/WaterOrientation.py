@@ -32,7 +32,7 @@ def water_orientation_weighted_density_z_distribution_analysis(
     Output CSV columns:
     - path_fraction_center: normalized distance in [0, 1] along interface->midpoint
     - distance_A: path_fraction_center * mean_path_length_A
-    - orientation_ensemble_avg_1_A3: ensemble-averaged orientation-weighted density
+    - orientation_ensemble_avg_g_cm3: ensemble-averaged orientation-weighted mass density
     """
     xyz_path = Path(xyz_path)
     md_inp_path = Path(md_inp_path)
@@ -53,7 +53,7 @@ def water_orientation_weighted_density_z_distribution_analysis(
         out_csv_path,
         np.column_stack([common_centers_u, distance_A, orient_ensemble]),
         delimiter=",",
-        header="path_fraction_center,distance_A,orientation_ensemble_avg_1_A3",
+        header="path_fraction_center,distance_A,orientation_ensemble_avg_g_cm3",
         comments="",
     )
     return out_csv_path

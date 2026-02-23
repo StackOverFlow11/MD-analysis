@@ -271,7 +271,7 @@ def ad_water_orientation_analysis(
         profile_csv_path,
         np.column_stack([distance_A, rho_ensemble, orient_ensemble, in_adsorbed.astype(int)]),
         delimiter=",",
-        header="distance_A,rho_ensemble_avg_g_cm3,orientation_ensemble_avg_1_A3,is_adsorbed_layer_bin",
+        header="distance_A,rho_ensemble_avg_g_cm3,orientation_ensemble_avg_g_cm3,is_adsorbed_layer_bin",
         comments="",
     )
 
