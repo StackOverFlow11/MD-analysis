@@ -7,7 +7,7 @@
 ## 1. 接口角色定义
 
 - `scripts.structure` 是结构分析能力的统一入口（facade）。
-- 本层负责“对外暴露稳定符号”，不负责实现算法本体。
+- 本层负责"对外暴露稳定符号"，不负责实现算法本体。
 - 算法实现位于 `scripts.structure.utils`；本层做聚合与重导出。
 - 面向分析工作流的高层 I/O 能力位于子包 `scripts.structure.Analysis`（不要求全部通过 facade 重导出）。
 
@@ -58,7 +58,7 @@
   - 输出：吸附层 profile CSV + range TXT（见 `data_contract.md`）
 - `scripts.structure.Analysis.compute_adsorbed_water_theta_distribution(...)`
   - 当前实现文件：`scripts/structure/Analysis/WaterAnalysis/AdWaterOrientation.py`
-  - 输出：吸附层 `$\\theta$` 分布 CSV（见 `data_contract.md`）
+  - 输出：吸附层 $\theta$ 分布 CSV（见 `data_contract.md`）
 - `scripts.structure.Analysis.detect_adsorbed_layer_range_from_density_profile(...)`
   - 当前实现文件：`scripts/structure/Analysis/WaterAnalysis/AdWaterOrientation.py`
   - 说明：从密度剖面中推断吸附层距离范围
@@ -128,5 +128,5 @@
 
 - [ ] 公开符号是否全部在 `__all__` 中
 - [ ] 非公开符号是否未意外暴露
-- [ ] 导出层是否仍保持“薄层聚合”定位
+- [ ] 导出层是否仍保持"薄层聚合"定位
 - [ ] 文档与测试是否同步完成

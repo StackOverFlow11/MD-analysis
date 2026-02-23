@@ -1,70 +1,94 @@
 # MD Analysis
 
-Lightweight analysis utilities for periodic metal-water interfaces, focused on:
+Lightweight analysis utilities for periodic metal-water interfaces from CP2K MD simulations.
 
-- water mass-density profile along interface distance
-- water orientation-weighted profile along interface distance
-- adsorbed-layer detection and orientation-angle distribution
-- integrated three-panel visualization output
+Core outputs:
 
-## Who This Is For
+- Water mass-density profile along interface-to-midpoint distance
+- Orientation-weighted density profile ρ·⟨cosφ⟩ (g/cm³) along the same axis
+- Adsorbed-layer auto-detection and orientation-angle distribution
+- Integrated three-panel PNG visualization
 
-- New contributors who want a minimal, working entrypoint
-- Users who just cloned the repo and want to run one end-to-end example
+## Quick Start
 
-## Quick Start (5 minutes)
+### 1) Set up environment
 
-### 1) Prepare environment
+```bash
+conda activate env_md_an   # numpy, matplotlib, ase, pytest included
+```
 
-Install required dependencies in your Python environment (at least `numpy`, `matplotlib`, `ase`, `pytest`).
+Or install manually:
 
-### 2) Run one end-to-end plot generation
+```bash
+pip install numpy matplotlib ase pytest
+```
 
-From repo root:
+### 2) Run end-to-end plot generation
+
+From the repo root:
 
 ```bash
 python test/integration/structure/Analysis/test_water_three_panel_plot.py
 ```
 
-Generated figure:
+Outputs written to `test/_tmp_preview/`:
 
-- `test/_tmp_preview/water_three_panel_analysis.png`
+- `water_three_panel_analysis.png` — three-panel figure
+- `water_mass_density_z_distribution_analysis.csv`
+- `water_orientation_weighted_density_z_distribution_analysis.csv`
+- `adsorbed_water_orientation_profile.csv`
+- `adsorbed_water_layer_range.txt`
+- `adsorbed_water_theta_distribution_0_180.csv`
 
 ### 3) Example input data
 
-Current integration examples use:
+- `data_example/potential/md-pos-1.xyz` — trajectory frames
+- `data_example/potential/md.inp` — cell parameters (`ABC [angstrom] a b c`)
 
-- `data_example/potential/md-pos-1.xyz`
-- `data_example/potential/md.inp`
+## Recommended Entry Point
 
-## Recommended Entry Function
+```python
+from scripts.structure.Analysis import plot_water_three_panel_analysis
 
-Primary integrated plotting entry:
+plot_water_three_panel_analysis(
+    xyz_path="data_example/potential/md-pos-1.xyz",
+    md_inp_path="data_example/potential/md.inp",
+    output_dir="output/",
+)
+```
 
-- `scripts.structure.Analysis.plot_water_three_panel_analysis(...)`
+This single call produces:
 
-This function integrates:
+1. Panel 1 — water mass density (g/cm³)
+2. Panel 2 — orientation-weighted density ρ·⟨cosφ⟩ (g/cm³)
+3. Panel 3 — adsorbed-layer θ probability distribution (degree⁻¹)
 
-1. water density profile
-2. orientation-weighted profile
-3. adsorbed-layer theta distribution
+## Project Layout
 
-## Project Layout (Practical View)
+```
+scripts/structure/utils/     # single-frame, low-level (LayerParser, WaterParser, config)
+scripts/structure/Analysis/  # multi-frame workflows and plot composition
+test/unit/                   # unit tests
+test/integration/            # end-to-end runnable scripts
+data_example/                # minimal reproducible input data
+history/                     # architecture contracts, decisions, requirements
+```
 
-- `scripts/structure/utils/`
-  - low-level geometry and water parsing/statistics
-- `scripts/structure/Analysis/`
-  - workflow-level analysis and plotting composition
-- `test/integration/structure/Analysis/`
-  - runnable integration scripts and plot-generation tests
-- `history/`
-  - architecture, contracts, and implementation rules
+## Running Tests
 
-## Notes For Contributors
+```bash
+# All tests
+python -m pytest test/ -v
 
-- Public interface and behavior contracts are documented under:
-  - `history/architecture/modules/scripts/**/interface_exposure.md`
-  - `history/architecture/modules/scripts/**/implementation_guidelines.md`
-- Global cross-module contracts are centralized in:
-  - `history/architecture/modules/data_contract.md`
-  - `history/architecture/modules/glossary_units.md`
+# Single unit test file
+python -m pytest test/unit/structure/utils/test_water_parser.py -v
+```
+
+## For Contributors
+
+Architecture contracts and implementation rules:
+
+- `history/architecture/modules/data_contract.md` — output shapes, units, CSV headers
+- `history/architecture/modules/glossary_units.md` — terminology and unit definitions
+- `history/architecture/modules/scripts/**/interface_exposure.md` — public API per module
+- `history/architecture/modules/scripts/**/implementation_guidelines.md` — implementation rules

@@ -6,7 +6,7 @@
 
 ## 1. 接口角色定义
 
-- `scripts.structure.utils` 是“底层实现能力的公开导出层”。
+- `scripts.structure.utils` 是"底层实现能力的公开导出层"。
 - 本层暴露的符号允许被上层（`scripts.structure`）和外部调用方直接导入。
 - 本层不自动暴露模块内私有 helper；公开范围由 `__all__` 严格定义。
 
@@ -42,7 +42,7 @@
 - `detect_interface_layers(...)`
   - 输入：单帧 `ase.Atoms` + 金属符号/法向/聚类参数
   - 输出：`SurfaceDetectionResult`
-  - 语义：仅标记直接面向非金属环境的两层界面层（每侧一层）
+  - 语义：仅标记直接面向非金属环境的两层界面层（每侧固定 1 层，不可配置）
 - `format_detection_summary(...)`
   - 输入：`SurfaceDetectionResult`
   - 输出：可读文本摘要 `str`
@@ -62,7 +62,7 @@
 - `compute_water_mass_density_z_distribution(...)`
   - 输出：`(nbins, 1)`，单位 `g/cm^3`
 - `compute_water_orientation_weighted_density_z_distribution(...)`
-  - 输出：`(nbins, 1)`，单位 `1/Angstrom^3`
+  - 输出：`(nbins, 1)`，单位 `g/cm^3`
 - `compute_water_orientation_theta_pdf_in_c_fraction_window(...)`
   - 输出：`(180 / ndeg,)`，单位 `degree^-1`
 
@@ -81,7 +81,7 @@
   - 模块内部中间计算函数
   - 仅用于局部复用的工具函数
 
-调用方不得依赖非公开符号路径（包括“可导入但未导出”的实现细节）。
+调用方不得依赖非公开符号路径（包括"可导入但未导出"的实现细节）。
 
 ## 5. 稳定性与兼容策略
 

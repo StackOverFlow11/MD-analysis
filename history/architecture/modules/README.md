@@ -40,7 +40,7 @@
 - 全局性约束仅允许写入：
   - `history/architecture/modules/data_contract.md`
   - `history/architecture/modules/glossary_units.md`
-- 除上述两份全局文档外，其他所有记录（模型上下文补充、目录级约定、实现细节）必须写入
+- 除上述两份全局文档外，其他所有记录（模块上下文补充、目录级约定、实现细节）必须写入
   与项目架构镜像一致的：
   - `**/interface_exposure.md`
   - `**/implementation_guidelines.md`
@@ -52,7 +52,7 @@
 ```md
 ### 落位自检清单
 
-- [ ] 本次是否涉及“全局契约/单位术语”变更？
+- [ ] 本次是否涉及"全局契约/单位术语"变更？
   - 若是：仅更新 `data_contract.md` 与/或 `glossary_units.md`
 - [ ] 本次是否涉及某个 `scripts/**` 子目录的接口或实现行为变化？
   - 若是：已同步更新该镜像目录下
@@ -65,12 +65,12 @@
 - [ ] 目录粒度是否达到 `scripts/structure/utils/` 参考水平？
   - 至少包含：公开清单、边界、依赖方向、变更流程、检查项
 - [ ] `history/architecture/README.md` 索引是否需要同步更新？
-- [ ] 本次约定是否均为“已协商确认”内容（无未确认硬写）？
+- [ ] 本次约定是否均为"已协商确认"内容（无未确认硬写）？
 ```
 
 ## 8. 可移植性提示（工具包发布）
 
-- 本地 Python 解释器路径（如 `D:\...`）属于机器私有配置，不应作为项目契约写入仓库。
+- 本地 Python 解释器路径（如 `/home/user/...`）属于机器私有配置，不应作为项目契约写入仓库。
 - 面向 `git clone` 的可扩展工具包，应优先依赖：
   - 环境创建说明（README/requirements）
   - 相对路径与参数化配置

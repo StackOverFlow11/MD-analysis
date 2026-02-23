@@ -48,8 +48,8 @@
   - 功能：统计吸附层内 `0-180` 度取向分布（PDF）
 - `plot_water_three_panel_analysis(...)`
   - 文件位置：`scripts/structure/Analysis/Water.py`
-  - 功能：集成三联图（密度、取向、吸附层 `$\\theta$` 分布）并输出 PNG，同时落盘相关 CSV/TXT
-  - 轨迹读取：固定两次（第一次密度+取向；第二次吸附层 `$\\theta$` 分布）
+  - 功能：集成三联图（密度、取向、吸附层 $\theta$ 分布）并输出 PNG，同时落盘相关 CSV/TXT
+  - 轨迹读取：固定两次（第一次密度+取向；第二次吸附层 $\theta$ 分布）
 
 ## 3. 推荐导入方式
 

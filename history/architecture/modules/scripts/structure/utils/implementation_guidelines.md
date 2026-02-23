@@ -55,7 +55,7 @@
 
 - `metal_symbols=None` 时，必须回退到 `DEFAULT_METAL_SYMBOLS`
 - `normal` 支持 `"a" / "b" / "c"` 与显式向量
-- `n_interface_layers <= 0` 必须抛错
+- 界面层策略固定为每侧 1 层（共 2 层），不提供 `n_interface_layers` 配置参数
 
 ### 3.2 分层与界面判定
 
@@ -73,7 +73,7 @@
 ### 4.1 水分子标记
 
 - O-H 连通判据基于 MIC 距离与 `oh_cutoff_A`
-- 分配策略为“按距离排序的贪心匹配”
+- 分配策略为"按距离排序的贪心匹配"
 - 每个 H 在最终分配中最多归属一个 O
 
 ### 4.2 质量密度 z 分布
@@ -86,7 +86,7 @@
 
 - 角度向量为 H-O-H 角平分线（O 为起点）
 - `cos(theta)` 必须按 `dot(bisector, c_unit) / |bisector|`
-- 结果单位固定为 `1/Angstrom^3`
+- 结果单位固定为 `g/cm^3`（公式：$\sum_i \cos\theta_i \cdot m_{\mathrm{H_2O}} / V_{\mathrm{bin,cm^3}}$）
 
 ### 4.4 c 窗口角度 PDF
 
