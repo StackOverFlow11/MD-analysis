@@ -26,8 +26,8 @@ import numpy as np
 
 try:
     from ase import Atoms
-except Exception:  # pragma: no cover
-    Atoms = object  # type: ignore
+except ImportError:  # pragma: no cover
+    Atoms = object  # type: ignore[misc]
 
 from .config import DEFAULT_METAL_SYMBOLS
 

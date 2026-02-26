@@ -7,7 +7,7 @@ from typing import Iterable
 
 import numpy as np
 
-from ...utils.WaterParser import (
+from ...utils import (
     _compute_bisector_cos_theta_vec,
     _oxygen_to_hydrogen_map,
     _theta_bin_count_from_ndeg,

@@ -1,0 +1,6 @@
+numpy
+ase
+matplotlib
+
+[test]
+pytest

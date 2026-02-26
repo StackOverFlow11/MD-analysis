@@ -23,17 +23,21 @@ import numpy as np
 try:
     from ase import Atoms
     from ase.io import iread
-except Exception:  # pragma: no cover
-    Atoms = object  # type: ignore
-    iread = None  # type: ignore
+except ImportError:  # pragma: no cover
+    Atoms = object  # type: ignore[misc]
+    iread = None  # type: ignore[assignment]
 
-from ...utils.LayerParser import SurfaceGeometryError, _circular_mean_fractional, detect_interface_layers
+from ...utils import (
+    SurfaceGeometryError,
+    detect_interface_layers,
+    _circular_mean_fractional,
+    _compute_bisector_cos_theta_vec,
+    _oxygen_to_hydrogen_map,
+)
 from ...utils.WaterParser import (
     AVOGADRO_NUMBER,
     ANGSTROM3_TO_CM3,
     WaterTopologyError,
-    _compute_bisector_cos_theta_vec,
-    _oxygen_to_hydrogen_map,
     detect_water_molecule_indices,
     get_water_oxygen_indices_array,
 )
@@ -141,6 +145,7 @@ def _single_frame_density_and_orientation(
     start_interface: StartInterface,
     dz_A: float,
     metal_symbols: Iterable[str] | None,
+    compute_orientation: bool = True,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, float]:
     """
     Compute both density and orientation profiles for a single frame.
@@ -215,13 +220,13 @@ def _single_frame_density_and_orientation(
     mass_per_water_g = WATER_MOLAR_MASS_G_PER_MOL / AVOGADRO_NUMBER
     rho_g_cm3 = counts * mass_per_water_g / (bin_volumes_A3 * ANGSTROM3_TO_CM3)
 
-    # --- Orientation (vectorized) ---
-    if selected_oxygen.size == 0:
-        orient_g_cm3 = np.zeros_like(centers_A, dtype=float)
-    else:
+    # --- Orientation (vectorized, skipped when compute_orientation=False) ---
+    if compute_orientation and selected_oxygen.size > 0:
         cos_theta = _compute_bisector_cos_theta_vec(atoms, selected_oxygen, o_to_h, c_unit)
         cos_sum = np.histogram(selected_delta_A, bins=edges_A, weights=cos_theta)[0].astype(float)
         orient_g_cm3 = cos_sum * mass_per_water_g / (bin_volumes_A3 * ANGSTROM3_TO_CM3)
+    else:
+        orient_g_cm3 = np.zeros_like(centers_A, dtype=float)
 
     return centers_A, rho_g_cm3, orient_g_cm3, path_length_A
 
@@ -237,6 +242,7 @@ def _compute_density_orientation_ensemble(
     start_interface: StartInterface = "low_c",
     dz_A: float = DEFAULT_Z_BIN_WIDTH_A,
     metal_symbols: Iterable[str] | None = None,
+    compute_orientation: bool = True,
 ) -> tuple[np.ndarray, float, np.ndarray, np.ndarray]:
     """
     Read the trajectory **once** and compute ensemble-averaged density and orientation.
@@ -262,6 +268,7 @@ def _compute_density_orientation_ensemble(
                 start_interface=start_interface,
                 dz_A=dz_A,
                 metal_symbols=metal_symbols,
+                compute_orientation=compute_orientation,
             )
         )
 

@@ -17,7 +17,7 @@ from .config import DEFAULT_WATER_ORIENTATION_WEIGHTED_DENSITY_CSV_NAME
 from .config import DEFAULT_WATER_THREE_PANEL_PLOT_PNG_NAME
 from .WaterAnalysis import compute_adsorbed_water_theta_distribution
 from .WaterAnalysis import detect_adsorbed_layer_range_from_density_profile
-from .WaterAnalysis._common import StartInterface, _compute_density_orientation_ensemble
+from .WaterAnalysis import StartInterface, _compute_density_orientation_ensemble
 from ..utils.config import DEFAULT_THETA_BIN_DEG, DEFAULT_Z_BIN_WIDTH_A
 
 
@@ -158,7 +158,7 @@ def plot_water_three_panel_analysis(
         ax2.set_ylabel(r"$\rho_\mathrm{{H_2O}}\cdot\cos\varphi\ \mathrm{(g\cdot cm^{-3})}$", fontsize=18)
         ax2.set_xlabel(r"$\mathrm{distance(\AA)}$", fontsize=18)
         ax2.set_title("Water dipole", fontsize=18)
-        ax2.set_yticks([0.0])
+        ax2.yaxis.set_major_locator(MultipleLocator(1.0))
         ax2.tick_params(axis="both", which="major", labelsize=16)
 
         x_max = float(np.max(distance_A))

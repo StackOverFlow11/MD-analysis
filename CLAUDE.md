@@ -12,7 +12,11 @@ Lightweight analysis utilities for periodic metal-water interfaces from CP2K MD 
 pip install numpy matplotlib ase pytest
 ```
 
-No `pyproject.toml` or `setup.py` — the package is used via `sys.path` manipulation in tests.
+Install in development mode (required before running tests):
+
+```bash
+pip install -e .
+```
 
 ## Running Tests
 
@@ -28,19 +32,19 @@ python test/integration/structure/Analysis/test_water_three_panel_plot.py
 # Output: test/_tmp_preview/water_three_panel_analysis.png
 ```
 
-Integration tests are also runnable as standalone scripts (they add `REPO_ROOT` to `sys.path` themselves via `conftest.py`).
+Integration tests are also runnable as standalone scripts (requires `pip install -e .` from repo root).
 
 ## Architecture
 
-Two-layer design under `scripts/structure/`:
+Two-layer design under `src/structure/`:
 
-**Layer 1: `scripts.structure.utils` — Single-frame, low-level**
+**Layer 1: `src.structure.utils` — Single-frame, low-level**
 - Input: a single ASE `Atoms` object
 - `LayerParser.py`: Detects metal layers, identifies the two interface layers (metal surfaces facing water), returns `Layer` dataclasses with `is_interface=True` and a `normal_unit` vector pointing metal→water
 - `WaterParser.py`: Builds water topology (O-H bonds), computes density/orientation profiles, angle PDF
 - `config.py`: Global constants (`TRANSITION_METAL_SYMBOLS`, `DEFAULT_Z_BIN_WIDTH_A=0.1`, `DEFAULT_THETA_BIN_DEG=5.0`, `DEFAULT_WATER_OH_CUTOFF_A=1.25`)
 
-**Layer 2: `scripts.structure.Analysis` — Multi-frame workflows**
+**Layer 2: `src.structure.Analysis` — Multi-frame workflows**
 - Input: xyz trajectory path + CP2K `md.inp` path
 - `WaterAnalysis/_common.py` (private): Trajectory I/O, per-frame layer/water detection, resampling to uniform normalized grid, ensemble averaging
 - `WaterAnalysis/WaterDensity.py`, `WaterOrientation.py`, `AdWaterOrientation.py`: Individual analysis workflows

@@ -48,7 +48,7 @@ Outputs written to `test/_tmp_preview/`:
 ## Recommended Entry Point
 
 ```python
-from scripts.structure.Analysis import plot_water_three_panel_analysis
+from src.structure.Analysis import plot_water_three_panel_analysis
 
 plot_water_three_panel_analysis(
     xyz_path="data_example/potential/md-pos-1.xyz",
@@ -66,12 +66,12 @@ This single call produces:
 ## Project Layout
 
 ```
-scripts/structure/utils/     # single-frame, low-level (LayerParser, WaterParser, config)
-scripts/structure/Analysis/  # multi-frame workflows and plot composition
-test/unit/                   # unit tests
-test/integration/            # end-to-end runnable scripts
-data_example/                # minimal reproducible input data
-history/                     # architecture contracts, decisions, requirements
+src/structure/utils/     # single-frame, low-level (LayerParser, WaterParser, config)
+src/structure/Analysis/  # multi-frame workflows and plot composition
+test/unit/               # unit tests
+test/integration/        # end-to-end runnable scripts
+data_example/            # minimal reproducible input data
+history/                 # architecture contracts, decisions, requirements
 ```
 
 ## Running Tests

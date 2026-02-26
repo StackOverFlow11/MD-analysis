@@ -1,6 +1,15 @@
-"""Public package interface for `scripts.structure.utils`."""
+"""Public package interface for `src.structure.utils`."""
 
 from __future__ import annotations
+
+# --- Internal shared helpers (used by Analysis layer, NOT part of public API) ---
+# Intentionally excluded from __all__ but explicitly collected here to centralise
+# cross-layer internal dependencies.  If a private function is renamed or moved,
+# only this file needs updating.
+from .LayerParser import _circular_mean_fractional
+from .WaterParser import _compute_bisector_cos_theta_vec
+from .WaterParser import _oxygen_to_hydrogen_map
+from .WaterParser import _theta_bin_count_from_ndeg
 
 from .config import DEFAULT_METAL_SYMBOLS
 from .config import DEFAULT_THETA_BIN_DEG
@@ -14,9 +23,6 @@ from .LayerParser import SurfaceGeometryError
 from .LayerParser import detect_interface_layers
 from .LayerParser import format_detection_summary
 from .WaterParser import WaterTopologyError
-from .WaterParser import compute_water_mass_density_z_distribution
-from .WaterParser import compute_water_orientation_theta_pdf_in_c_fraction_window
-from .WaterParser import compute_water_orientation_weighted_density_z_distribution
 from .WaterParser import detect_water_molecule_indices
 from .WaterParser import get_water_oxygen_indices_array
 
@@ -35,7 +41,4 @@ __all__ = [
     "WaterTopologyError",
     "detect_water_molecule_indices",
     "get_water_oxygen_indices_array",
-    "compute_water_mass_density_z_distribution",
-    "compute_water_orientation_weighted_density_z_distribution",
-    "compute_water_orientation_theta_pdf_in_c_fraction_window",
 ]

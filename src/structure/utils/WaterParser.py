@@ -20,8 +20,8 @@ from .config import WATER_MOLAR_MASS_G_PER_MOL
 
 try:
     from ase import Atoms
-except Exception:  # pragma: no cover
-    Atoms = object  # type: ignore
+except ImportError:  # pragma: no cover
+    Atoms = object  # type: ignore[misc]
 
 
 AVOGADRO_NUMBER = 6.022_140_76e23
@@ -256,7 +256,7 @@ def get_water_oxygen_indices_array(water_molecule_indices: np.ndarray) -> np.nda
     return water_molecule_indices[:, 0:1]
 
 
-def compute_water_mass_density_z_distribution(
+def _compute_water_mass_density_z_distribution(
     atoms: Atoms,
     oxygen_indices: Sequence[int] | np.ndarray,
     *,
@@ -285,7 +285,7 @@ def compute_water_mass_density_z_distribution(
     return density_g_cm3.reshape(-1, 1)
 
 
-def compute_water_orientation_weighted_density_z_distribution(
+def _compute_water_orientation_weighted_density_z_distribution(
     atoms: Atoms,
     oxygen_indices: Sequence[int] | np.ndarray,
     *,
@@ -333,7 +333,7 @@ def compute_water_orientation_weighted_density_z_distribution(
     return weighted_orientation_density.reshape(-1, 1)
 
 
-def compute_water_orientation_theta_pdf_in_c_fraction_window(
+def _compute_water_orientation_theta_pdf_in_c_fraction_window(
     atoms: Atoms,
     oxygen_indices: Sequence[int] | np.ndarray,
     c_fraction_range: Sequence[float],

@@ -8,7 +8,7 @@ import pytest
 ase = pytest.importorskip("ase")
 from ase import Atoms
 
-from scripts.structure.utils.LayerParser import detect_interface_layers
+from src.structure.utils.LayerParser import detect_interface_layers
 
 
 @pytest.fixture

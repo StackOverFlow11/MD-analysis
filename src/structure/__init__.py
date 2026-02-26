@@ -1,4 +1,4 @@
-"""Public package interface for `scripts.structure`."""
+"""Public package interface for `src.structure`."""
 
 from __future__ import annotations
 
@@ -11,9 +11,6 @@ from .utils import Layer
 from .utils import SurfaceDetectionResult
 from .utils import SurfaceGeometryError
 from .utils import WaterTopologyError
-from .utils import compute_water_mass_density_z_distribution
-from .utils import compute_water_orientation_theta_pdf_in_c_fraction_window
-from .utils import compute_water_orientation_weighted_density_z_distribution
 from .utils import detect_interface_layers
 from .utils import detect_water_molecule_indices
 from .utils import format_detection_summary
@@ -28,9 +25,6 @@ __all__ = [
     "format_detection_summary",
     "detect_water_molecule_indices",
     "get_water_oxygen_indices_array",
-    "compute_water_mass_density_z_distribution",
-    "compute_water_orientation_weighted_density_z_distribution",
-    "compute_water_orientation_theta_pdf_in_c_fraction_window",
     "DEFAULT_METAL_SYMBOLS",
     "DEFAULT_Z_BIN_WIDTH_A",
     "DEFAULT_THETA_BIN_DEG",

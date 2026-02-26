@@ -51,6 +51,7 @@ def water_mass_density_z_distribution_analysis(
         start_interface=start_interface,
         dz_A=dz_A,
         metal_symbols=metal_symbols,
+        compute_orientation=False,
     )
     distance_A = common_centers_u * mean_path_A
 

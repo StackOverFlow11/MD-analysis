@@ -1,6 +1,10 @@
-"""Public interface for `scripts.structure.Analysis.WaterAnalysis`."""
+"""Public interface for `src.structure.Analysis.WaterAnalysis`."""
 
 from __future__ import annotations
+
+# --- Internal re-exports from _common (used by Water.py, NOT part of public API) ---
+from ._common import StartInterface
+from ._common import _compute_density_orientation_ensemble
 
 from .AdWaterOrientation import ad_water_orientation_analysis
 from .AdWaterOrientation import compute_adsorbed_water_theta_distribution
