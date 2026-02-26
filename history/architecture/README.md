@@ -10,15 +10,15 @@
 
 ## 仓库根目录结构（当前）
 
-- `scripts/`：可导入的 Python 包（当前主实现都在这里）
+- `src/`：可导入的 Python 包（当前主实现都在这里）
 - `test/`：pytest 单元/集成测试与可运行示例脚本
 - `data_example/`：最小可复现实例数据（当前主要用 `data_example/potential/`）
 - `history/`：架构/契约/决策/需求上下文（本目录）
 - `README.md`：快速入口与最小跑通方式
 
-## `scripts/` 包内分层（当前）
+## `src/` 包内分层（当前）
 
-### 1) `scripts.structure.utils`（单帧/底层）
+### 1) `src.structure.utils`（单帧/底层）
 
 输入：单帧 `ase.Atoms`
 
@@ -35,7 +35,7 @@
 
 > 低层 shape/单位/窗口规则以 `history/architecture/modules/data_contract.md` 为准。
 
-### 2) `scripts.structure.Analysis`（多帧/工作流）
+### 2) `src.structure.Analysis`（多帧/工作流）
 
 输入：`md-pos-*.xyz` 轨迹 + `md.inp`（用于解析正交盒长）
 
@@ -68,6 +68,6 @@
 
 ## 文档镜像与落位
 
-- `history/architecture/modules/scripts/` 必须镜像 `scripts/` 的目录结构，并在每个镜像目录维护：
+- `history/architecture/modules/src/` 必须镜像 `src/` 的目录结构，并在每个镜像目录维护：
   - `interface_exposure.md`：对外公开符号/导入方式/兼容承诺
   - `implementation_guidelines.md`：职责边界/依赖方向/契约同步要求

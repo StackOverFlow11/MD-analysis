@@ -1,13 +1,13 @@
-# `scripts/structure/utils/` 接口暴露约定（当前实现）
+# `src/structure/utils/` 接口暴露约定（当前实现）
 
-> 对应代码：`scripts/structure/utils/__init__.py`
+> 对应代码：`src/structure/utils/__init__.py`
 >
-> 本文档定义 `scripts.structure.utils` 的符号级公开接口与暴露边界。
+> 本文档定义 `src.structure.utils` 的符号级公开接口与暴露边界。
 
 ## 1. 接口角色定义
 
-- `scripts.structure.utils` 是"底层实现能力的公开导出层"。
-- 本层暴露的符号允许被上层（`scripts.structure`）和外部调用方直接导入。
+- `src.structure.utils` 是"底层实现能力的公开导出层"。
+- 本层暴露的符号允许被上层（`src.structure`）和外部调用方直接导入。
 - 本层不自动暴露模块内私有 helper；公开范围由 `__all__` 严格定义。
 
 ## 2. 当前公开接口清单（按模块）
@@ -24,7 +24,7 @@
 说明：
 
 - 以上常量为默认行为来源；默认值变化属于接口行为变化。
-- 当前默认值（与 `scripts/structure/utils/config.py` 对齐）：
+- 当前默认值（与 `src/structure/utils/config.py` 对齐）：
   - `DEFAULT_Z_BIN_WIDTH_A = 0.1` Angstrom
   - `DEFAULT_THETA_BIN_DEG = 5.0` degree
   - `DEFAULT_WATER_OH_CUTOFF_A = 1.25` Angstrom
@@ -59,23 +59,21 @@
   - 输出：`(n_water, 3)`，每行为 `[O_idx, H1_idx, H2_idx]`
 - `get_water_oxygen_indices_array(...)`
   - 输出：`(n_water, 1)` 氧索引数组
-- `compute_water_mass_density_z_distribution(...)`
-  - 输出：`(nbins, 1)`，单位 `g/cm^3`
-- `compute_water_orientation_weighted_density_z_distribution(...)`
-  - 输出：`(nbins, 1)`，单位 `g/cm^3`
-- `compute_water_orientation_theta_pdf_in_c_fraction_window(...)`
-  - 输出：`(180 / ndeg,)`，单位 `degree^-1`
+
+> **注**：`_compute_water_mass_density_z_distribution`、`_compute_water_orientation_weighted_density_z_distribution`、
+> `_compute_water_orientation_theta_pdf_in_c_fraction_window` 三个函数已降级为内部（`_` 前缀），不再属于公开 API。
+> 它们针对全 cell z 轴分箱，与 `Analysis` 层的界面-到-中点分析语义不同，不适合作为公开接口暴露。
 
 ## 3. 推荐导入方式
 
-- `from scripts.structure.utils import detect_interface_layers`
-- `from scripts.structure.utils import detect_water_molecule_indices`
-- `from scripts.structure.utils import compute_water_orientation_theta_pdf_in_c_fraction_window`
-- `from scripts.structure.utils import DEFAULT_Z_BIN_WIDTH_A, DEFAULT_THETA_BIN_DEG`
+- `from src.structure.utils import detect_interface_layers`
+- `from src.structure.utils import detect_water_molecule_indices`
+- `from src.structure.utils import get_water_oxygen_indices_array`
+- `from src.structure.utils import DEFAULT_Z_BIN_WIDTH_A, DEFAULT_THETA_BIN_DEG`
 
 ## 4. 非公开边界（必须遵守）
 
-- 未出现在 `scripts/structure/utils/__init__.py` 的 `__all__` 中的符号，不属于公开接口。
+- 未出现在 `src/structure/utils/__init__.py` 的 `__all__` 中的符号，不属于公开接口。
 - 以下类别默认非公开：
   - `_` 前缀 helper
   - 模块内部中间计算函数
@@ -92,7 +90,7 @@
 ### 5.2 兼容策略
 
 - 默认不破坏现有导入路径：
-  - `from scripts.structure.utils import <symbol>`
+  - `from src.structure.utils import <symbol>`
 - 若需要替换接口：
   - 先新增新符号并保留旧符号兼容期
   - 再进行分阶段迁移
@@ -109,7 +107,7 @@
 
 ## 7. 接口变更流程（必须执行）
 
-1. 更新 `scripts/structure/utils/__init__.py` 的导出与 `__all__`
+1. 更新 `src/structure/utils/__init__.py` 的导出与 `__all__`
 2. 更新本文档公开接口清单
 3. 若涉及契约变化，同步更新：
    - `history/architecture/modules/data_contract.md`

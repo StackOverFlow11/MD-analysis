@@ -14,8 +14,8 @@
 ## 术语与统计口径索引（当前实现）
 
 - 跨模块统计数据形状、单位、公式口径：`data_contract.md`
-- `scripts` 层级接口暴露约定：`modules/scripts/**/interface_exposure.md`
-- `scripts` 层级内部实现准则：`modules/scripts/**/implementation_guidelines.md`
+- `src` 层级接口暴露约定：`modules/src/**/interface_exposure.md`
+- `src` 层级内部实现准则：`modules/src/**/implementation_guidelines.md`
 
 ## 体系前提（已确认）
 

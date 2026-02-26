@@ -1,14 +1,14 @@
-# `scripts/structure/` 内部实现准则（当前实现口径）
+# `src/structure/` 内部实现准则（当前实现口径）
 
-> 适用范围：`scripts/structure/` 层（当前核心为 `scripts/structure/__init__.py`）。
+> 适用范围：`src/structure/` 层（当前核心为 `src/structure/__init__.py`）。
 >
 > 目标：作为"结构分析"统一入口层，向外提供稳定 API，向内屏蔽实现细节。
 
 ## 1. 角色定位与边界
 
-- `scripts/structure/` 是**领域入口层（facade）**：
+- `src/structure/` 是**领域入口层（facade）**：
   - 面向调用方提供稳定导入路径
-  - 向下聚合 `scripts/structure/utils/` 与 `scripts/structure/Analysis/` 子包能力
+  - 向下聚合 `src/structure/utils/` 与 `src/structure/Analysis/` 子包能力
 - 本层不应承载复杂算法实现，算法必须留在 `utils` 子层。
 - 面向"多帧统计 + 文件输出"的分析流程实现应放在 `Analysis` 子包，不应放在 facade 的 `__init__.py`。
 
@@ -28,7 +28,7 @@
 - 仅导出"跨调用方复用"的稳定符号
 - 仅内部使用的工具函数不得上浮到本层
 
-## 3. `scripts/structure/__init__.py` 实现准则
+## 3. `src/structure/__init__.py` 实现准则
 
 - 必须显式维护 `__all__`，使公开 API 可审计
 - 导出命名应与实现语义一致，避免别名漂移
@@ -39,9 +39,9 @@
 
 ## 4. 依赖方向约束
 
-- 允许方向：`scripts.structure` -> `scripts.structure.utils`
-- 允许方向：`scripts.structure.Analysis` -> `scripts.structure.utils`
-- 禁止方向：`scripts.structure.utils` 反向依赖 `scripts.structure` 入口
+- 允许方向：`src.structure` -> `src.structure.utils`
+- 允许方向：`src.structure.Analysis` -> `src.structure.utils`
+- 禁止方向：`src.structure.utils` 反向依赖 `src.structure` 入口
 - 目标：避免导入环，保持"入口层薄、实现层厚"
 
 ## 5. 命名与语义一致性
@@ -67,7 +67,7 @@
 
 ## 7. 兼容性策略
 
-- 默认保持导入路径稳定（`from scripts.structure import ...`）
+- 默认保持导入路径稳定（`from src.structure import ...`）
 - 若需替换接口：
   - 优先新增而非直接覆盖
   - 先保留旧接口并提供迁移窗口
@@ -78,7 +78,7 @@
 每次入口层导出变更，至少完成：
 
 1. 导入烟雾测试：
-   - `import scripts.structure`
+   - `import src.structure`
    - 关键导出 `hasattr(...)` 检查
 2. 相关单元/集成测试回归
 3. 文档一致性检查（导出列表与文档一致）

@@ -1,6 +1,6 @@
-# `scripts/structure/utils/` 内部实现准则（当前实现口径）
+# `src/structure/utils/` 内部实现准则（当前实现口径）
 
-> 适用范围：`scripts/structure/utils/`（`config.py`、`LayerParser.py`、`WaterParser.py`）。
+> 适用范围：`src/structure/utils/`（`config.py`、`LayerParser.py`、`WaterParser.py`）。
 >
 > 目标：在明确物理口径与输入输出契约的前提下，提供可复用、可测试、可维护的底层实现。
 

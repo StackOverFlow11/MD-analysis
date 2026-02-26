@@ -1,11 +1,11 @@
-# `scripts/structure/Analysis/WaterAnalysis/` 接口暴露约定（当前实现）
+# `src/structure/Analysis/WaterAnalysis/` 接口暴露约定（当前实现）
 
 > 对应代码：
-> - `scripts/structure/Analysis/WaterAnalysis/__init__.py`
-> - `scripts/structure/Analysis/WaterAnalysis/WaterDensity.py`
-> - `scripts/structure/Analysis/WaterAnalysis/WaterOrientation.py`
-> - `scripts/structure/Analysis/WaterAnalysis/AdWaterOrientation.py`
-> - `scripts/structure/Analysis/WaterAnalysis/_common.py`（私有实现，不属于对外契约）
+> - `src/structure/Analysis/WaterAnalysis/__init__.py`
+> - `src/structure/Analysis/WaterAnalysis/WaterDensity.py`
+> - `src/structure/Analysis/WaterAnalysis/WaterOrientation.py`
+> - `src/structure/Analysis/WaterAnalysis/AdWaterOrientation.py`
+> - `src/structure/Analysis/WaterAnalysis/_common.py`（私有实现，不属于对外契约）
 
 ## 1. 接口角色定义
 
@@ -41,14 +41,14 @@
 
 ## 3. 推荐导入方式
 
-- `from scripts.structure.Analysis.WaterAnalysis import water_mass_density_z_distribution_analysis`
-- `from scripts.structure.Analysis.WaterAnalysis import water_orientation_weighted_density_z_distribution_analysis`
-- `from scripts.structure.Analysis.WaterAnalysis import detect_adsorbed_layer_range_from_density_profile`
-- `from scripts.structure.Analysis.WaterAnalysis import ad_water_orientation_analysis`
-- `from scripts.structure.Analysis import water_mass_density_z_distribution_analysis`
-- `from scripts.structure.Analysis import water_orientation_weighted_density_z_distribution_analysis`
-- `from scripts.structure.Analysis import detect_adsorbed_layer_range_from_density_profile`
-- `from scripts.structure.Analysis import ad_water_orientation_analysis`
+- `from src.structure.Analysis.WaterAnalysis import water_mass_density_z_distribution_analysis`
+- `from src.structure.Analysis.WaterAnalysis import water_orientation_weighted_density_z_distribution_analysis`
+- `from src.structure.Analysis.WaterAnalysis import detect_adsorbed_layer_range_from_density_profile`
+- `from src.structure.Analysis.WaterAnalysis import ad_water_orientation_analysis`
+- `from src.structure.Analysis import water_mass_density_z_distribution_analysis`
+- `from src.structure.Analysis import water_orientation_weighted_density_z_distribution_analysis`
+- `from src.structure.Analysis import detect_adsorbed_layer_range_from_density_profile`
+- `from src.structure.Analysis import ad_water_orientation_analysis`
 
 ## 4. 兼容承诺与变更流程
 

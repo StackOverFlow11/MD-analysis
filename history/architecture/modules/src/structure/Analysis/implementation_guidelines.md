@@ -1,6 +1,6 @@
-# `scripts/structure/Analysis/` 内部实现准则（当前实现口径）
+# `src/structure/Analysis/` 内部实现准则（当前实现口径）
 
-> 适用范围：`scripts/structure/Analysis/`。
+> 适用范围：`src/structure/Analysis/`。
 >
 > 目标：承载"多帧统计 + 结果导出"流程，同时保持与 `utils` 契约一致。
 
@@ -25,8 +25,8 @@
 - `Analysis/WaterAnalysis/__init__.py`：子模块公开导出
 - `Analysis/__init__.py`：子包聚合导出
 - `Analysis/WaterAnalysis/` 对应文档必须位于：
-  - `history/architecture/modules/scripts/structure/Analysis/WaterAnalysis/interface_exposure.md`
-  - `history/architecture/modules/scripts/structure/Analysis/WaterAnalysis/implementation_guidelines.md`
+  - `history/architecture/modules/src/structure/Analysis/WaterAnalysis/interface_exposure.md`
+  - `history/architecture/modules/src/structure/Analysis/WaterAnalysis/implementation_guidelines.md`
 
 ## 3. 系综平均口径约定
 
@@ -48,7 +48,7 @@
 
 - 允许：`Analysis` -> `utils`
 - 禁止：`utils` -> `Analysis`
-- 禁止在 `Analysis` 中反向依赖 `scripts.structure` facade
+- 禁止在 `Analysis` 中反向依赖 `src.structure` facade
 
 ## 5. 契约同步要求
 

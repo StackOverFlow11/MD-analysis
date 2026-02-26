@@ -5,7 +5,7 @@
 ## 当前阶段目标（与仓库现状对齐）
 
 - **目标**：围绕"周期性金属-水界面"体系，提供可复现的水相关剖面分析（CSV/PNG）与可复用 API。
-- **当前已覆盖**（对应 `scripts/structure/**`）：
+- **当前已覆盖**（对应 `src/structure/**`）：
   - 单帧：金属界面层识别、H2O 拓扑识别、密度/取向/角度 PDF 等统计
   - 多帧：从选定界面到两界面中点的系综平均（A 口径）、吸附层自动识别、吸附层角度分布、三联图输出
 - **当前未覆盖**：电势（cube）与电荷（Mulliken）等分析仍未实现（仅保留数据样例与测试脚本命名）。
@@ -19,7 +19,7 @@
 ## 当前已实现能力（按"可跑通的入口"）
 
 - **推荐一键入口**：
-  - `scripts.structure.Analysis.plot_water_three_panel_analysis(xyz_path, md_inp_path, ...)`
+  - `src.structure.Analysis.plot_water_three_panel_analysis(xyz_path, md_inp_path, ...)`
     - 输出：密度/取向 CSV、吸附层 profile CSV、吸附层 range TXT、吸附层角度分布 CSV、三联图 PNG
 - **基础分析入口**：
   - `water_mass_density_z_distribution_analysis(...)`

@@ -3,9 +3,9 @@
 > 仅记录跨模块共享、且会影响结果可比性的核心数据契约。
 >
 > 接口暴露清单与实现细则请查看：
-> - `history/architecture/modules/scripts/structure/interface_exposure.md`
-> - `history/architecture/modules/scripts/structure/utils/interface_exposure.md`
-> - `history/architecture/modules/scripts/structure/utils/implementation_guidelines.md`
+> - `history/architecture/modules/src/structure/interface_exposure.md`
+> - `history/architecture/modules/src/structure/utils/interface_exposure.md`
+> - `history/architecture/modules/src/structure/utils/implementation_guidelines.md`
 >
 > 记录落位硬约束：本文件仅承载"全局契约"；非全局目录级记录不得写入本文件，
 > 必须写入对应目录的 `interface_exposure.md` / `implementation_guidelines.md`。
@@ -72,7 +72,7 @@ $$
 
 ## 默认参数来源
 
-- 默认值统一来自：`scripts/structure/utils/config.py`
+- 默认值统一来自：`src/structure/utils/config.py`
 - 常用项包括：`DEFAULT_Z_BIN_WIDTH_A`、`DEFAULT_THETA_BIN_DEG`、`DEFAULT_WATER_OH_CUTOFF_A`
 - 当前默认值（与代码同步）：
   - `DEFAULT_Z_BIN_WIDTH_A = 0.1` Angstrom
@@ -83,7 +83,7 @@ $$
 
 ### `water_mass_density_z_distribution_analysis(...)` CSV
 
-- 输出文件默认参数来自：`scripts/structure/Analysis/config.py`
+- 输出文件默认参数来自：`src/structure/Analysis/config.py`
 - 界面定义：使用直接面向非金属环境的 interface 对（每侧一层）
 - CSV 列定义：
   - `path_fraction_center`：界面 -> 两界面中点路径的归一化坐标（`[0, 1]`）
@@ -92,7 +92,7 @@ $$
 
 ### `water_orientation_weighted_density_z_distribution_analysis(...)` CSV
 
-- 输出文件默认参数来自：`scripts/structure/Analysis/config.py`
+- 输出文件默认参数来自：`src/structure/Analysis/config.py`
 - 界面定义：使用直接面向非金属环境的 interface 对（每侧一层）
 - CSV 列定义：
   - `path_fraction_center`：界面 -> 两界面中点路径的归一化坐标（`[0, 1]`）
@@ -101,7 +101,7 @@ $$
 
 ### `ad_water_orientation_analysis(...)` 输出契约
 
-- 输出文件默认参数来自：`scripts/structure/Analysis/config.py`
+- 输出文件默认参数来自：`src/structure/Analysis/config.py`
 - 吸附层主峰定义：密度分布最高 bin 的距离位置
 - 吸附层区间：
   - 下界：主峰前最后一个近零点
@@ -120,7 +120,7 @@ $$
 
 - 入口定位：集成三联图的推荐入口（同时落盘各中间结果，便于复现）
 - 输出目录：`output_dir`（默认 `Path.cwd()`）
-- 输出文件（默认命名来自：`scripts/structure/Analysis/config.py`；PNG 名可覆盖）：
+- 输出文件（默认命名来自：`src/structure/Analysis/config.py`；PNG 名可覆盖）：
   - PNG：`DEFAULT_WATER_THREE_PANEL_PLOT_PNG_NAME`（参数 `output_png_name` 可覆盖）
   - density CSV：`DEFAULT_WATER_MASS_DENSITY_CSV_NAME`
   - orientation CSV：`DEFAULT_WATER_ORIENTATION_WEIGHTED_DENSITY_CSV_NAME`

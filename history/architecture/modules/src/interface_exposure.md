@@ -1,14 +1,14 @@
-# `scripts/` 接口暴露约定（当前实现）
+# `src/` 接口暴露约定（当前实现）
 
-> 对应代码：`scripts/__init__.py`
+> 对应代码：`src/__init__.py`
 >
-> 本文档定义 `scripts` 顶层包的公开接口边界与兼容规则。
+> 本文档定义 `src` 顶层包的公开接口边界与兼容规则。
 
 ## 1. 接口角色定义
 
-- `scripts/` 是顶层命名空间入口，只负责暴露子包。
-- `scripts/` 不直接暴露业务算法函数、数据结构或配置常量。
-- 业务能力统一通过 `scripts.structure` 向下访问。
+- `src/` 是顶层命名空间入口，只负责暴露子包。
+- `src/` 不直接暴露业务算法函数、数据结构或配置常量。
+- 业务能力统一通过 `src.structure` 向下访问。
 - 目录治理硬约束见：`history/architecture/modules/README.md`（镜像对齐 + 双文档）。
 
 ## 2. 当前公开接口清单
@@ -19,7 +19,7 @@
 
 与代码一致性基线：
 
-- `scripts/__init__.py` 中已导入并写入 `__all__` 的符号，视为顶层稳定接口。
+- `src/__init__.py` 中已导入并写入 `__all__` 的符号，视为顶层稳定接口。
 
 ### 2.2 非公开符号（Non-public）
 
@@ -28,18 +28,18 @@
 
 ## 3. 推荐导入方式
 
-- `import scripts`
-- `from scripts import structure`
+- `import src`
+- `from src import structure`
 
 不推荐：
 
-- 从 `scripts` 顶层直接期待细粒度函数（应转到 `scripts.structure`）。
+- 从 `src` 顶层直接期待细粒度函数（应转到 `src.structure`）。
 
 ## 4. 稳定性级别与兼容承诺
 
 ### 4.1 顶层稳定性级别
 
-- `scripts.structure`：**稳定（Stable）**
+- `src.structure`：**稳定（Stable）**
   - 正常迭代中默认保持导入路径不变。
 
 ### 4.2 兼容承诺
@@ -58,18 +58,18 @@
 
 ## 6. 顶层接口变更流程（必须执行）
 
-1. 更新 `scripts/__init__.py` 的导出与 `__all__`
+1. 更新 `src/__init__.py` 的导出与 `__all__`
 2. 更新本文档公开接口清单
-3. 更新 `history/architecture/modules/scripts/implementation_guidelines.md`（若规则被触发）
+3. 更新 `history/architecture/modules/src/implementation_guidelines.md`（若规则被触发）
 4. 执行导入烟雾测试：
-   - `import scripts`
-   - `from scripts import <symbol>`
+   - `import src`
+   - `from src import <symbol>`
 5. 运行回归测试确认无导入层回归
 
 ## 7. 反模式（禁止）
 
 - 在顶层暴露实现层私有函数
-- 把 `scripts` 当作业务函数大杂烩入口
+- 把 `src` 当作业务函数大杂烩入口
 - 修改导出但不更新 `__all__` 与文档
 - 未做导入验证即提交顶层导出变更
 

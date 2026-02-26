@@ -19,7 +19,7 @@
   - `README.md`：诉求拆分原则与维护说明
 - `architecture/`
   - `README.md`：代码架构总览（目录/模块职责/数据流）
-  - `modules/`：子模块说明（含 `scripts/` 目录层级对应的接口暴露/实现准则文档）
+  - `modules/`：子模块说明（含 `src/` 目录层级对应的接口暴露/实现准则文档）
     - `modules/README.md`：模块文档治理硬约束（目录镜像与双文档）
     - `modules/data_contract.md`：跨模块核心数据契约（形状/单位/CSV 列头）
     - `modules/glossary_units.md`：术语与单位约定汇总
