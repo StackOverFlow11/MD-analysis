@@ -80,6 +80,5 @@ Cell parsing from `md.inp` expects the line: `ABC [angstrom] a b c`.
 Detailed contracts, module interface specs, and implementation rules live in `history/`:
 - `history/architecture/modules/data_contract.md` — output shapes, units, CSV headers
 - `history/architecture/modules/glossary_units.md` — terminology and unit definitions
-- `history/architecture/modules/scripts/**/interface_exposure.md` — per-module public API
-- `history/architecture/modules/scripts/**/implementation_guidelines.md` — per-module rules
-- `temp.md` — known pending issues (unit label consistency, API semantic clarifications)
+- `history/architecture/modules/src/**/interface_exposure.md` — per-module public API
+- `history/architecture/modules/src/**/implementation_guidelines.md` — per-module rules
