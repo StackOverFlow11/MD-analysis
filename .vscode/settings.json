@@ -1,0 +1,7 @@
+{
+    "python.defaultInterpreterPath": "D:\\Development_Tools\\Anaconda\\envs\\MD_analysis_env\\python.exe",
+    "diffEditor.ignoreTrimWhitespace": false,
+    "[python]": {
+        "editor.defaultColorDecorators": "never"
+    }
+}

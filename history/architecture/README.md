@@ -1,52 +1,73 @@
-# 代码架构（目录与数据流）
+# 代码架构（当前仓库结构与数据流）
 
-用途：记录“包打算怎么拆模块、数据怎么流动、每个目录放什么”，避免边写边变导致混乱。
+用途：记录"仓库现在是什么样、模块怎么分、数据怎么流动"，用于协作对齐与避免口径漂移。
 
-## 适用体系前提（已与用户确认）
+## 适用体系前提（当前实现依赖的假设）
 
-- 三基矢**正交**的周期性体系
+- 三基矢**正交**的周期性体系（`md.inp` 中通过 `ABC [angstrom] a b c` 提供正交盒长）
 - 始终包含**金属/水界面**
-- 由于周期性边界条件，体系中总会存在**两个表面**（两个界面）
+- 由于周期性边界条件，体系中存在**两个界面**（两侧表面）
 
-## 建议的顶层目录（将来在仓库根目录体现）
+## 仓库根目录结构（当前）
 
-> 下面是建议结构，实际以你后续实现为准。
+- `src/`：可导入的 Python 包（当前主实现都在这里）
+- `test/`：pytest 单元/集成测试与可运行示例脚本
+- `data_example/`：最小可复现实例数据（当前主要用 `data_example/potential/`）
+- `history/`：架构/契约/决策/需求上下文（本目录）
+- `README.md`：快速入口与最小跑通方式
 
-- `scripts/`：一次性脚本、实验脚本（可被后续代码替代）
-- `src/` 或包目录（例如 `md_analysis/`）：正式库代码
-- `tests/`：单元测试与样例数据最小子集
-- `history/`：上下文与决策记录（本目录）
-- `data_example/`：示例数据（用于开发/演示；如体积大，后续考虑只保留最小样例）
+## `src/` 包内分层（当前）
 
-## 模块分层（建议）
+### 1) `src.structure.utils`（单帧/底层）
 
-- **I/O 层**：解析 CP2K 输出（ener/xyz/mulliken/cube），形成统一的内存数据结构
-- **Core 数据模型**：Trajectory、Frame、System、Groups、Profiles（带单位/元数据）
-- **Analysis 层**：密度/取向 profile、电势 profile、分组电荷统计、时间相关统计
-- **Export 层**：csv/png + 元数据（json/yaml），保证可复现
+输入：单帧 `ase.Atoms`
 
-## 数据流（建议）
+- `LayerParser.py`
+  - 金属原子筛选 → 沿法向投影做 1D 聚类成"层"
+  - 在周期水–金属–水体系下标记**两侧**直接面向环境的界面层（每侧固定 1 层，共 2 层）
+  - 给界面层附带 `normal_unit`（从金属指向环境一侧）
+- `WaterParser.py`
+  - 以 MIC 距离 + O–H 截断推断水分子拓扑，输出 `(n_water, 3)` 的 `[O, H1, H2]`
+  - 基于氧索引计算：
+    - 水质量密度 $\rho(z)$（`g/cm^3`）
+    - 取向加权密度（`g/cm^3`，按 $\sum_i \cos\theta_i \cdot m_{\mathrm{H_2O}} / V_{\mathrm{bin}}$）
+    - 指定 c 分数窗口内的 $\theta$ PDF（`degree^-1`）
 
-1. 读取原始文件 → 2. 标准化与校验（单位/时间轴/缺失值）→ 3. 计算分析量 → 4. 导出结果与元数据
+> 低层 shape/单位/窗口规则以 `history/architecture/modules/data_contract.md` 为准。
 
-## 本目录子内容
+### 2) `src.structure.Analysis`（多帧/工作流）
 
-- `modules/`：各模块的详细设计与接口草案
-  - `README.md`：`modules/` 维护硬约束（目录镜像 + 双文档 + 颗粒度）
-  - `glossary_units.md`：术语、单位与符号约定
-  - `data_contract.md`：`scripts/structure/utils` 的输入输出与计算口径约定
-  - 记录落位规则：全局约束仅写在 `data_contract.md` 与 `glossary_units.md`；
-    其余记录统一写入各镜像目录下的 `interface_exposure.md` 与 `implementation_guidelines.md`
-  - `scripts/`：与代码目录 `scripts/` 对齐的接口/实现文档
-    - `scripts/interface_exposure.md`
-    - `scripts/implementation_guidelines.md`
-    - `scripts/structure/interface_exposure.md`
-    - `scripts/structure/implementation_guidelines.md`
-    - `scripts/structure/Analysis/interface_exposure.md`
-    - `scripts/structure/Analysis/implementation_guidelines.md`
-    - `scripts/structure/Analysis/WaterAnalysis/interface_exposure.md`
-    - `scripts/structure/Analysis/WaterAnalysis/implementation_guidelines.md`
-    - `scripts/structure/utils/interface_exposure.md`
-    - `scripts/structure/utils/implementation_guidelines.md`
-- `decisions/`：架构/技术决策（ADR），每条决策一份 md
+输入：`md-pos-*.xyz` 轨迹 + `md.inp`（用于解析正交盒长）
 
+- `Analysis/WaterAnalysis/_common.py`（私有）
+  - 从 `md.inp` 解析 `ABC [angstrom]`
+  - 用 ASE `iread` 逐帧读取 xyz，并为每帧设置 cell + PBC
+  - 每帧自动检测两侧界面位置（沿 c 分数坐标）
+  - 计算"选定界面 → 两界面中点"的**半路径**上的密度/取向剖面
+  - 将不同帧的剖面重采样到统一归一化网格后做等权系综平均（A 口径）
+- `Analysis/WaterAnalysis/WaterDensity.py`
+  - 调用 `_common` 计算系综平均密度，并导出 CSV
+- `Analysis/WaterAnalysis/WaterOrientation.py`
+  - 调用 `_common` 计算系综平均取向加权密度，并导出 CSV
+- `Analysis/WaterAnalysis/AdWaterOrientation.py`
+  - 从密度剖面自动识别吸附层区间
+  - 导出吸附层 profile（密度/取向/掩码）与区间文本
+  - 二次遍历轨迹统计吸附层内的 $\theta$ 分布并导出 CSV
+- `Analysis/Water.py`
+  - 集成三联图入口 `plot_water_three_panel_analysis(...)`
+  - 将密度、取向、吸附层与 $\theta$ PDF 组合输出 PNG
+
+## 核心数据流（当前端到端）
+
+1. 解析 `md.inp` 获取正交盒长 $a,b,c$
+2. 逐帧读取 xyz → 设置 cell + PBC
+3. 逐帧检测两侧界面 c 分数坐标（来自金属界面层）
+4. 逐帧识别水分子 → 选定一侧界面起点 → 在半路径上分箱统计
+5. 将每帧剖面映射到统一归一化坐标并等权平均
+6. 导出 CSV；若走三联图入口，再额外计算吸附层与 $\theta$ 分布并输出 PNG
+
+## 文档镜像与落位
+
+- `history/architecture/modules/src/` 必须镜像 `src/` 的目录结构，并在每个镜像目录维护：
+  - `interface_exposure.md`：对外公开符号/导入方式/兼容承诺
+  - `implementation_guidelines.md`：职责边界/依赖方向/契约同步要求

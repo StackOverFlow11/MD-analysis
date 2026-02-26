@@ -13,10 +13,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
 
-from scripts.structure.Analysis import water_mass_density_z_distribution_analysis
+from src.structure.Analysis import water_mass_density_z_distribution_analysis
 
 
 def test_water_density_analysis_and_plot_from_potential_data() -> None:

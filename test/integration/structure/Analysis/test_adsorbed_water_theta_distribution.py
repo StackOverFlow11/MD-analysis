@@ -14,12 +14,10 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
 
-from scripts.structure.Analysis import ad_water_orientation_analysis
-from scripts.structure.Analysis import compute_adsorbed_water_theta_distribution
-from scripts.structure.Analysis import DEFAULT_START_INTERFACE
+from src.structure.Analysis import ad_water_orientation_analysis
+from src.structure.Analysis import compute_adsorbed_water_theta_distribution
+from src.structure.Analysis import DEFAULT_START_INTERFACE
 
 
 def _parse_range_txt(range_txt_path: Path) -> tuple[float, float]:

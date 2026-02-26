@@ -8,7 +8,7 @@ import pytest
 ase = pytest.importorskip("ase")
 from ase import Atoms
 
-from scripts.structure.utils.LayerParser import detect_interface_layers
+from src.structure.utils.LayerParser import detect_interface_layers
 
 
 @pytest.fixture
@@ -55,7 +55,6 @@ def test_detect_interface_layers_marks_two_sides(simple_slab_with_environment: A
         metal_symbols={"Cu"},
         normal="c",
         layer_tol_A=0.6,
-        n_interface_layers=1,
     )
     assert len(result.metal_indices) == 8
     assert len(result.metal_layers_sorted) == 2

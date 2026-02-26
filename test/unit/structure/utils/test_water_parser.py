@@ -10,13 +10,13 @@ import pytest
 ase = pytest.importorskip("ase")
 from ase import Atoms
 
-from scripts.structure.utils.WaterParser import compute_water_mass_density_z_distribution
-from scripts.structure.utils.WaterParser import compute_water_orientation_theta_pdf_in_c_fraction_window
-from scripts.structure.utils.WaterParser import compute_water_orientation_weighted_density_z_distribution
-from scripts.structure.utils.WaterParser import detect_water_molecule_indices
-from scripts.structure.utils.WaterParser import get_water_oxygen_indices_array
-from scripts.structure.utils.config import DEFAULT_THETA_BIN_DEG
-from scripts.structure.utils.config import DEFAULT_Z_BIN_WIDTH_A
+from src.structure.utils.WaterParser import _compute_water_mass_density_z_distribution as compute_water_mass_density_z_distribution
+from src.structure.utils.WaterParser import _compute_water_orientation_theta_pdf_in_c_fraction_window as compute_water_orientation_theta_pdf_in_c_fraction_window
+from src.structure.utils.WaterParser import _compute_water_orientation_weighted_density_z_distribution as compute_water_orientation_weighted_density_z_distribution
+from src.structure.utils.WaterParser import detect_water_molecule_indices
+from src.structure.utils.WaterParser import get_water_oxygen_indices_array
+from src.structure.utils.config import DEFAULT_THETA_BIN_DEG
+from src.structure.utils.config import DEFAULT_Z_BIN_WIDTH_A
 
 
 @pytest.fixture
