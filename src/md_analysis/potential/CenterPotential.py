@@ -673,7 +673,7 @@ def thickness_sensitivity_analysis(
 
     rows: list[dict] = []
     means: list[float] = []
-    stds: list[float] = []
+    spatial_stds: list[float] = []
 
     thick_iter: Iterable = thicknesses
     if verbose:
@@ -682,28 +682,32 @@ def thickness_sensitivity_analysis(
 
     for thick in thick_iter:
         thick = float(thick)
-        frame_vals: list[float] = []
+        frame_u_vals: list[float] = []
+        frame_phi_stds: list[float] = []
         for hdr, vals, zc, ef_ev in frame_cache:
-            phi_ev, _ = slab_average_potential_ev(
+            phi_ev, info = slab_average_potential_ev(
                 hdr, vals, thickness_ang=thick, z_center_ang=zc,
             )
             u_v = -ef_ev + phi_ev + cSHE_offset
-            frame_vals.append(u_v)
-        arr = np.array(frame_vals, dtype=float)
-        m = float(np.mean(arr))
-        s = float(np.std(arr))
+            frame_u_vals.append(u_v)
+            frame_phi_stds.append(info["phi_z_std_ev"])
+        u_arr = np.array(frame_u_vals, dtype=float)
+        m = float(np.mean(u_arr))
+        spatial_std = float(np.mean(frame_phi_stds))
         means.append(m)
-        stds.append(s)
+        spatial_stds.append(spatial_std)
         rows.append({
             "thickness_ang": round(thick, 4),
             "mean_U_vs_SHE_V": m,
-            "std_U_vs_SHE_V": s,
-            "n_frames": len(frame_vals),
+            "mean_phi_z_spatial_std_eV": spatial_std,
+            "n_frames": len(frame_u_vals),
         })
 
     # --- Write CSV ---
     csv_path = outdir / DEFAULT_THICKNESS_SENSITIVITY_CSV_NAME
-    _write_csv(csv_path, rows, ["thickness_ang", "mean_U_vs_SHE_V", "std_U_vs_SHE_V", "n_frames"])
+    _write_csv(csv_path, rows, [
+        "thickness_ang", "mean_U_vs_SHE_V", "mean_phi_z_spatial_std_eV", "n_frames",
+    ])
 
     # --- Dual-axis plot ---
     png_path = outdir / DEFAULT_THICKNESS_SENSITIVITY_PNG_NAME
@@ -715,15 +719,16 @@ def thickness_sensitivity_analysis(
 
     fig, ax1 = plt.subplots(figsize=(9, 4.8), dpi=160)
     color_mean = "tab:blue"
-    ax1.plot(thicknesses, means, "o-", color=color_mean, lw=1.5, markersize=4, label="mean U")
+    ax1.plot(thicknesses, means, "o-", color=color_mean, lw=1.5, markersize=4, label="mean U vs SHE")
     ax1.set_xlabel("Slab thickness (Å)")
     ax1.set_ylabel("Mean U vs SHE (V)", color=color_mean)
     ax1.tick_params(axis="y", labelcolor=color_mean)
 
     ax2 = ax1.twinx()
     color_std = "tab:red"
-    ax2.plot(thicknesses, stds, "s--", color=color_std, lw=1.5, markersize=4, label="std U")
-    ax2.set_ylabel("Std U vs SHE (V)", color=color_std)
+    ax2.plot(thicknesses, spatial_stds, "s--", color=color_std, lw=1.5, markersize=4,
+             label="spatial std φ(z)")
+    ax2.set_ylabel("Spatial std of φ(z) in slab (eV)", color=color_std)
     ax2.tick_params(axis="y", labelcolor=color_std)
 
     ax1.set_title("Electrode potential U vs SHE — thickness sensitivity")

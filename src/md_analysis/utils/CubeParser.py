@@ -153,6 +153,7 @@ def slab_average_potential_ev(
 
     phi_center_ha = float(phi_z_ha[mask].mean())
     phi_center_ev = phi_center_ha * HA_TO_EV
+    phi_std_ev = float(phi_z_ha[mask].std()) * HA_TO_EV
 
     info = {
         "nx": header.nx,
@@ -163,6 +164,7 @@ def slab_average_potential_ev(
         "z_center_source": z_center_source,
         "z_center_rel_bohr": z_center_rel,
         "thickness_ang": thickness_ang,
+        "phi_z_std_ev": phi_std_ev,
     }
     return phi_center_ev, info
 
