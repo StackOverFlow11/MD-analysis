@@ -145,3 +145,38 @@ $$
 - 每帧独立计算从选定界面到中点的单帧 profile
 - 若各帧 `nbins` 不一致，先重采样到统一归一化坐标网格
 - 最后按帧等权平均（equal-weight over frames）
+
+## Potential 层输出契约
+
+### `center_slab_potential_analysis(...)` 输出
+
+- CSV：`step,phi_center_ev,phi_center_cumavg_ev`
+- 附加 CSV（`slab_center_and_interfaces.csv`）：`step,center_source,z_center_ang,z_iface_lower_ang,z_iface_upper_ang,z_iface_mid_ang,water_gap_ang,n_metal_layers,Lz_ang`
+- PNG：逐帧 + 累积平均曲线
+
+### `fermi_energy_analysis(...)` 输出
+
+- CSV：`step,time_fs,fermi_raw,fermi_ev,fermi_cumavg_ev`
+- PNG：逐帧 + 累积平均曲线
+
+### `electrode_potential_analysis(...)` 输出
+
+- 内部调用 `center_slab_potential_analysis` + `fermi_energy_analysis`
+- 合并公式：`U = -E_Fermi + φ_center + ΔΨ_a(H₃O⁺/w) - μ(H⁺,g⁰) - ΔE_ZP`
+- CSV：`step,U_vs_SHE_V,U_cumavg_V`
+- PNG：逐帧 + 累积平均曲线
+
+### `phi_z_planeavg_analysis(...)` 输出
+
+- CSV：`z_ang,phi_mean_ev,phi_std_ev,phi_min_ev,phi_max_ev`
+- PNG：所有帧的 φ(z) overlay + 系综平均 ± std 带
+
+### `thickness_sensitivity_analysis(...)` 输出
+
+- 扫描 thickness 范围：`[thickness_start, thickness_end]`（默认 3.5–15.0 Å，步长 0.5 Å）
+- 每个 thickness 计算所有帧的 `U vs SHE`，取系综平均
+- CSV：`thickness_ang,mean_U_vs_SHE_V,mean_phi_z_spatial_std_eV,n_frames`
+- PNG 双轴图：
+  - 左轴：`mean U vs SHE (V)` — 系综平均电极电势
+  - 右轴：`spatial std of φ(z) in slab (eV)` — slab 区间内 Hartree 势沿 z 的空间标准差（帧系综平均）
+- 需要 `md.out`（Fermi 能级）；无 `md.out` 时跳过

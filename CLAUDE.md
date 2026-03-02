@@ -43,8 +43,11 @@ Integration tests are also runnable as standalone scripts (requires `pip install
 ```bash
 md-analysis water --xyz md-pos-1.xyz --md-inp md.inp
 md-analysis potential --cube-pattern "md-POTENTIAL-v_hartree-1_*.cube"
+md-analysis potential --cube-pattern "..." --thickness-end 20.0   # extend sweep range
 md-analysis all --xyz md-pos-1.xyz --md-inp md.inp
 ```
+
+Key potential flags: `--thickness` (slab thickness, default 7 Å), `--thickness-end` (sweep upper limit, default 15 Å), `--center-mode` (interface|cell), `--fermi-unit` (au|ev), `--no-compute-u`, `--no-phi-z`.
 
 ## Architecture
 
@@ -66,8 +69,9 @@ Three-package design under `src/md_analysis/` (standard src-layout):
 
 **`md_analysis.potential` — Potential analysis workflows (multi-frame)**
 - Input: cube file glob pattern + CP2K `md.out` + optional xyz trajectory
-- `CenterPotential.py`: `center_slab_potential_analysis()`, `fermi_energy_analysis()`, `electrode_potential_analysis()`
-- `PhiZProfile.py`: `phi_z_planeavg_analysis()` — φ(z) heatmap + overlay visualization
+- `config.py`: Default output filenames (CSV/PNG) for all potential workflows
+- `CenterPotential.py`: `center_slab_potential_analysis()`, `fermi_energy_analysis()`, `electrode_potential_analysis()`, `thickness_sensitivity_analysis()`
+- `PhiZProfile.py`: `phi_z_planeavg_analysis()` — φ(z) overlay visualization
 
 **`md_analysis.main` / `md_analysis.CLI` — Integration entry points**
 - `main.py`: `run_water_analysis()`, `run_potential_analysis()`, `run_all()`
@@ -79,8 +83,19 @@ Physical units (enforced in `history/architecture/modules/data_contract.md`):
 - Density: `g/cm³`
 - Orientation-weighted density: `1/Å³`
 - Potential: `eV` (Hartree converted via `HA_TO_EV`)
+- Electrode potential: `V vs SHE` via `U = -E_Fermi + φ_center + ΔΨ - μ(H⁺) - ΔE_ZP`
 - Position: Å or fractional cell coordinate depending on context
 - Angle: degrees
+
+### Potential analysis outputs
+
+| Workflow                         | CSV columns                                                        | PNG                              |
+|----------------------------------|--------------------------------------------------------------------|----------------------------------|
+| `center_slab_potential_analysis` | `step, phi_center_ev, phi_center_cumavg_ev`                        | instantaneous + cumavg           |
+| `fermi_energy_analysis`          | `step, time_fs, fermi_raw, fermi_ev, fermi_cumavg_ev`              | instantaneous + cumavg           |
+| `electrode_potential_analysis`   | `step, U_vs_SHE_V, U_cumavg_V`                                    | instantaneous + cumavg           |
+| `phi_z_planeavg_analysis`        | `z_ang, phi_mean_ev, phi_std_ev, phi_min_ev, phi_max_ev`           | all-frame overlay + mean ± std   |
+| `thickness_sensitivity_analysis` | `thickness_ang, mean_U_vs_SHE_V, mean_phi_z_spatial_std_eV, n_frames` | dual-axis (left=U, right=spatial std φ) |
 
 Water molecule indices returned as `(n_water, 3)` array with column order `[O_idx, H1_idx, H2_idx]`.
 
