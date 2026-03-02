@@ -31,7 +31,6 @@ class TestPhiZPlaneavgAnalysis:
             png_path = phi_z_planeavg_analysis(
                 "md-POTENTIAL-v_hartree-1_*.cube",
                 output_dir=tmp_path,
-                z_mavg_window_ang=7.0,
             )
         finally:
             os.chdir(old_cwd)
@@ -40,7 +39,6 @@ class TestPhiZPlaneavgAnalysis:
         assert png_path.suffix == ".png"
         # Should also produce stats CSV
         assert (tmp_path / "phi_z_planeavg_stats.csv").exists()
-        assert (tmp_path / "phi_z_planeavg_mavg_7A_stats.csv").exists()
 
 
 # ---------------------------------------------------------------------------

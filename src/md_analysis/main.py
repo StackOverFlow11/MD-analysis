@@ -78,7 +78,6 @@ def run_potential_analysis(
     fermi_unit: str = "au",
     compute_u: bool = True,
     compute_phi_z: bool = True,
-    z_mavg_window_ang: float = 7.0,
     max_curves: int = 0,
     frame_start: int | None = None,
     frame_end: int | None = None,
@@ -160,7 +159,6 @@ def run_potential_analysis(
         phi_z_png = phi_z_planeavg_analysis(
             cube_pattern,
             output_dir=phi_z_dir,
-            z_mavg_window_ang=z_mavg_window_ang,
             max_curves=max_curves,
             frame_start=frame_start,
             frame_end=frame_end,
@@ -202,7 +200,7 @@ def run_all(
         if k in {
             "thickness_ang", "center_mode", "metal_elements",
             "layer_tol_ang", "fermi_unit", "compute_u",
-            "compute_phi_z", "z_mavg_window_ang", "max_curves",
+            "compute_phi_z", "max_curves",
         }
     }
     results.update(run_potential_analysis(

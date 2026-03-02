@@ -34,7 +34,6 @@ def _add_potential_args(parser: argparse.ArgumentParser, *, skip_xyz: bool = Fal
     parser.add_argument("--layer-tol", type=float, default=0.6, help="Metal layer clustering tolerance in Å (default: 0.6).")
     parser.add_argument("--no-compute-u", action="store_true", help="Skip U vs SHE computation.")
     parser.add_argument("--no-phi-z", action="store_true", help="Skip φ(z) visualization.")
-    parser.add_argument("--z-mavg-window", type=float, default=7.0, help="Moving average window for φ(z) in Å (default: 7).")
     parser.add_argument("--max-curves", type=int, default=0, help="Max curves on φ(z) overlay (0=all).")
 
 
@@ -83,7 +82,6 @@ def _cmd_potential(args: argparse.Namespace) -> int:
         fermi_unit=args.fermi_unit,
         compute_u=not args.no_compute_u,
         compute_phi_z=not args.no_phi_z,
-        z_mavg_window_ang=args.z_mavg_window,
         max_curves=args.max_curves,
         frame_start=args.frame_start,
         frame_end=args.frame_end,
@@ -126,7 +124,6 @@ def _cmd_all(args: argparse.Namespace) -> int:
         fermi_unit=args.fermi_unit,
         compute_u=not args.no_compute_u,
         compute_phi_z=not args.no_phi_z,
-        z_mavg_window_ang=args.z_mavg_window,
         max_curves=args.max_curves,
     )
 

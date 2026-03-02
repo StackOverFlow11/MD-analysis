@@ -22,44 +22,6 @@ from ..utils.CubeParser import (
 from .config import DEFAULT_PHI_Z_PNG_NAME, DEFAULT_PHI_Z_STATS_CSV_NAME
 
 
-# ---------------------------------------------------------------------------
-# Private helpers
-# ---------------------------------------------------------------------------
-
-def _moving_slab_average_z_periodic(
-    phi_z: np.ndarray,
-    z_ang: np.ndarray,
-    window_ang: float,
-) -> np.ndarray:
-    """Moving average along z with periodic boundary conditions.
-
-    For each z position, averages φ within ±window_ang/2 using periodic distance.
-    Assumes a uniform grid (typical for CP2K cube files).
-    """
-    phi_z = np.asarray(phi_z, dtype=float)
-    z_ang = np.asarray(z_ang, dtype=float)
-    if phi_z.ndim != 1 or z_ang.ndim != 1 or phi_z.shape != z_ang.shape:
-        raise ValueError("phi_z and z_ang must be 1D arrays of the same shape")
-    if window_ang <= 0:
-        return phi_z.copy()
-
-    dz = float(np.mean(np.diff(z_ang)))
-    if not np.isfinite(dz) or dz <= 0:
-        raise ValueError(f"Invalid dz from z grid: {dz}")
-    lz = dz * float(z_ang.size)
-
-    z_rel = (z_ang - float(z_ang[0])) % lz
-    half = 0.5 * float(window_ang)
-
-    out = np.empty_like(phi_z, dtype=float)
-    for i, zi in enumerate(z_rel):
-        dist = np.abs(z_rel - zi)
-        dist = np.minimum(dist, lz - dist)
-        m = dist <= half
-        out[i] = float(phi_z[m].mean())
-    return out
-
-
 def _write_phi_z_csv(
     path: Path,
     z_ang: np.ndarray,
@@ -84,7 +46,6 @@ def phi_z_planeavg_analysis(
     cube_pattern: str,
     *,
     output_dir: Path | None = None,
-    z_mavg_window_ang: float = 7.0,
     max_curves: int = 0,
     frame_start: int | None = None,
     frame_end: int | None = None,
@@ -97,8 +58,7 @@ def phi_z_planeavg_analysis(
     xy plane-average at each z-slice, and produces:
 
     - ``phi_z_planeavg_stats.csv`` (mean/std/min/max over frames)
-    - ``phi_z_planeavg_all_frames.png`` (heatmap + overlay plot)
-    - ``phi_z_planeavg_mavg_{window}A_stats.csv`` (if window > 0)
+    - ``phi_z_planeavg_all_frames.png`` (overlay plot)
 
     Returns the PNG path.
     """
@@ -150,18 +110,6 @@ def phi_z_planeavg_analysis(
     phi_max = phi_mat.max(axis=0)
 
     _write_phi_z_csv(outdir / DEFAULT_PHI_Z_STATS_CSV_NAME, z_ang_ref, phi_mean, phi_std, phi_min, phi_max)
-
-    # Moving average along z
-    z_mavg = float(z_mavg_window_ang)
-    phi_mat_mavg = np.vstack([_moving_slab_average_z_periodic(row, z_ang_ref, z_mavg) for row in phi_mat])
-    phi_mean_mavg = phi_mat_mavg.mean(axis=0)
-    phi_std_mavg = phi_mat_mavg.std(axis=0, ddof=1) if phi_mat_mavg.shape[0] > 1 else np.zeros_like(phi_mean_mavg)
-    phi_min_mavg = phi_mat_mavg.min(axis=0)
-    phi_max_mavg = phi_mat_mavg.max(axis=0)
-    _write_phi_z_csv(
-        outdir / f"phi_z_planeavg_mavg_{z_mavg:g}A_stats.csv",
-        z_ang_ref, phi_mean_mavg, phi_std_mavg, phi_min_mavg, phi_max_mavg,
-    )
 
     # --- Plotting ---
     import matplotlib
