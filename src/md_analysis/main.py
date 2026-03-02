@@ -169,23 +169,26 @@ def run_potential_analysis(
         )
         results["phi_z_png"] = phi_z_png
 
-    # Thickness sensitivity sweep
-    ts_dir = pot_dir / "thickness_sensitivity"
-    ts_dir.mkdir(parents=True, exist_ok=True)
-    ts_csv = thickness_sensitivity_analysis(
-        cube_pattern,
-        output_dir=ts_dir,
-        thickness_end=thickness_end,
-        center_mode=center_mode,
-        xyz_path=xyz_path,
-        metal_elements=metal_elements,
-        layer_tol_ang=layer_tol_ang,
-        frame_start=frame_start,
-        frame_end=frame_end,
-        frame_step=frame_step,
-        verbose=verbose,
-    )
-    results["thickness_sensitivity_csv"] = ts_csv
+    # Thickness sensitivity sweep (requires Fermi energies from md.out)
+    if md_out_path is not None:
+        ts_dir = pot_dir / "thickness_sensitivity"
+        ts_dir.mkdir(parents=True, exist_ok=True)
+        ts_csv = thickness_sensitivity_analysis(
+            cube_pattern,
+            md_out_path,
+            output_dir=ts_dir,
+            thickness_end=thickness_end,
+            center_mode=center_mode,
+            xyz_path=xyz_path,
+            metal_elements=metal_elements,
+            layer_tol_ang=layer_tol_ang,
+            fermi_unit=fermi_unit,
+            frame_start=frame_start,
+            frame_end=frame_end,
+            frame_step=frame_step,
+            verbose=verbose,
+        )
+        results["thickness_sensitivity_csv"] = ts_csv
 
     return results
 

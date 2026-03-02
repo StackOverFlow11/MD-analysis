@@ -559,6 +559,7 @@ def electrode_potential_analysis(
 
 def thickness_sensitivity_analysis(
     cube_pattern: str,
+    md_out_path: Path,
     *,
     output_dir: Path | None = None,
     thickness_start: float = 3.5,
@@ -568,20 +569,22 @@ def thickness_sensitivity_analysis(
     xyz_path: Path | None = None,
     metal_elements: set[str] | None = None,
     layer_tol_ang: float = 0.6,
+    fermi_unit: str = "au",
     frame_start: int | None = None,
     frame_end: int | None = None,
     frame_step: int | None = None,
     verbose: bool = False,
 ) -> Path:
-    """Sweep slab-averaging thickness and report mean/std of center potential.
+    """Sweep slab-averaging thickness and report mean/std of U vs SHE.
 
     For each thickness in ``[thickness_start, thickness_end]`` (step
-    ``thickness_step``), computes the slab-averaged potential for every
+    ``thickness_step``), computes the electrode potential
+    ``U = -E_Fermi + φ_center + ΔΨ - μ(H⁺) - ΔE_ZP`` for every
     cube frame, then reports the ensemble mean and standard deviation.
 
     Outputs:
     - ``thickness_sensitivity.csv``
-    - ``thickness_sensitivity.png`` (dual-axis: left=mean, right=std)
+    - ``thickness_sensitivity.png`` (dual-axis: left=mean U, right=std U)
 
     Returns the CSV path.
     """
@@ -593,6 +596,18 @@ def thickness_sensitivity_analysis(
     if not cube_paths:
         raise FileNotFoundError(f"No cube files matched pattern: {cube_pattern!r} in {workdir}")
     cube_paths = cube_paths[frame_start:frame_end:frame_step]
+
+    # --- Parse Fermi energies from md.out ---
+    md_out_path = Path(md_out_path).resolve()
+    if not md_out_path.exists():
+        raise FileNotFoundError(f"md.out not found: {md_out_path}")
+    fermi_records = _parse_md_out_fermi(md_out_path)
+    if not fermi_records:
+        raise RuntimeError(f"No Fermi energy records parsed from: {md_out_path}")
+    fermi_records = fermi_records[frame_start:frame_end:frame_step]
+    fermi_raw_by_step: dict[int, float] = {
+        int(r["step"]): float(r["fermi_raw"]) for r in fermi_records
+    }
 
     # --- Interface detection (same logic as center_slab_potential_analysis) ---
     use_interface_center = center_mode == "interface"
@@ -619,12 +634,19 @@ def thickness_sensitivity_analysis(
                 "Specify metal_elements explicitly."
             )
 
-    # --- Cache per-frame cube data + z_center ---
-    frame_cache: list[tuple] = []  # (header, values, z_center_ang)
+    # --- Cache per-frame cube data + z_center + fermi_ev ---
+    frame_cache: list[tuple] = []  # (header, values, z_center_ang, fermi_ev)
     for cp in cube_paths:
         step = extract_step_from_cube_filename(cp)
         if step is None:
             step = len(frame_cache)
+
+        # Skip frames without matching Fermi energy
+        if int(step) not in fermi_raw_by_step:
+            continue
+
+        fermi_raw = fermi_raw_by_step[int(step)]
+        fermi_ev = fermi_raw * HA_TO_EV if fermi_unit == "au" else fermi_raw
 
         header, values = read_cube_header_and_values(cp)
         dz_bohr = float(np.linalg.norm(header.vz_bohr))
@@ -640,9 +662,13 @@ def thickness_sensitivity_analysis(
             )
             z_center_ang = origin_z_ang + float(iface["z_mid_ang"])
 
-        frame_cache.append((header, values, z_center_ang))
+        frame_cache.append((header, values, z_center_ang, fermi_ev))
+
+    if not frame_cache:
+        raise RuntimeError("No frames with matching cube + Fermi energy data.")
 
     # --- Sweep thickness values ---
+    cSHE_offset = DP_A_H3O_W_EV - MU_HPLUS_G0_EV - DELTA_E_ZP_EV
     thicknesses = np.arange(thickness_start, thickness_end + thickness_step * 0.5, thickness_step)
 
     rows: list[dict] = []
@@ -657,11 +683,12 @@ def thickness_sensitivity_analysis(
     for thick in thick_iter:
         thick = float(thick)
         frame_vals: list[float] = []
-        for hdr, vals, zc in frame_cache:
+        for hdr, vals, zc, ef_ev in frame_cache:
             phi_ev, _ = slab_average_potential_ev(
                 hdr, vals, thickness_ang=thick, z_center_ang=zc,
             )
-            frame_vals.append(float(phi_ev))
+            u_v = -ef_ev + phi_ev + cSHE_offset
+            frame_vals.append(u_v)
         arr = np.array(frame_vals, dtype=float)
         m = float(np.mean(arr))
         s = float(np.std(arr))
@@ -669,14 +696,14 @@ def thickness_sensitivity_analysis(
         stds.append(s)
         rows.append({
             "thickness_ang": round(thick, 4),
-            "mean_phi_ev": m,
-            "std_phi_ev": s,
+            "mean_U_vs_SHE_V": m,
+            "std_U_vs_SHE_V": s,
             "n_frames": len(frame_vals),
         })
 
     # --- Write CSV ---
     csv_path = outdir / DEFAULT_THICKNESS_SENSITIVITY_CSV_NAME
-    _write_csv(csv_path, rows, ["thickness_ang", "mean_phi_ev", "std_phi_ev", "n_frames"])
+    _write_csv(csv_path, rows, ["thickness_ang", "mean_U_vs_SHE_V", "std_U_vs_SHE_V", "n_frames"])
 
     # --- Dual-axis plot ---
     png_path = outdir / DEFAULT_THICKNESS_SENSITIVITY_PNG_NAME
@@ -688,18 +715,18 @@ def thickness_sensitivity_analysis(
 
     fig, ax1 = plt.subplots(figsize=(9, 4.8), dpi=160)
     color_mean = "tab:blue"
-    ax1.plot(thicknesses, means, "o-", color=color_mean, lw=1.5, markersize=4, label="mean φ")
+    ax1.plot(thicknesses, means, "o-", color=color_mean, lw=1.5, markersize=4, label="mean U")
     ax1.set_xlabel("Slab thickness (Å)")
-    ax1.set_ylabel("Mean center potential (eV)", color=color_mean)
+    ax1.set_ylabel("Mean U vs SHE (V)", color=color_mean)
     ax1.tick_params(axis="y", labelcolor=color_mean)
 
     ax2 = ax1.twinx()
     color_std = "tab:red"
-    ax2.plot(thicknesses, stds, "s--", color=color_std, lw=1.5, markersize=4, label="std φ")
-    ax2.set_ylabel("Std center potential (eV)", color=color_std)
+    ax2.plot(thicknesses, stds, "s--", color=color_std, lw=1.5, markersize=4, label="std U")
+    ax2.set_ylabel("Std U vs SHE (V)", color=color_std)
     ax2.tick_params(axis="y", labelcolor=color_std)
 
-    ax1.set_title("Center slab potential vs. averaging thickness")
+    ax1.set_title("Electrode potential U vs SHE — thickness sensitivity")
     ax1.grid(True, alpha=0.25)
 
     lines1, labels1 = ax1.get_legend_handles_labels()
