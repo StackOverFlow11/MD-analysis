@@ -1,4 +1,4 @@
-"""Default configuration for structure analysis utilities."""
+"""Default configuration for water analysis utilities."""
 
 from __future__ import annotations
 

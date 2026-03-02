@@ -9,13 +9,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 from ase.io import read
 
-REPO_ROOT = Path(__file__).resolve().parents[4]
+REPO_ROOT = Path(__file__).resolve().parents[3]
 
-from src.structure.utils.WaterParser import _compute_water_mass_density_z_distribution as compute_water_mass_density_z_distribution
-from src.structure.utils.WaterParser import _compute_water_orientation_weighted_density_z_distribution as compute_water_orientation_weighted_density_z_distribution
-from src.structure.utils.WaterParser import detect_water_molecule_indices
-from src.structure.utils.WaterParser import get_water_oxygen_indices_array
-from src.structure.utils.config import DEFAULT_Z_BIN_WIDTH_A
+from src.utils.WaterParser import _compute_water_mass_density_z_distribution as compute_water_mass_density_z_distribution
+from src.utils.WaterParser import _compute_water_orientation_weighted_density_z_distribution as compute_water_orientation_weighted_density_z_distribution
+from src.utils.WaterParser import detect_water_molecule_indices
+from src.utils.WaterParser import get_water_oxygen_indices_array
+from src.utils.config import DEFAULT_Z_BIN_WIDTH_A
 
 
 def _parse_abc_from_md_inp(md_inp_path: Path) -> tuple[float, float, float]:

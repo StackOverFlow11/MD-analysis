@@ -1,4 +1,4 @@
-"""Public interface for `src.structure.Analysis.WaterAnalysis`."""
+"""Public interface for `src.water.WaterAnalysis`."""
 
 from __future__ import annotations
 

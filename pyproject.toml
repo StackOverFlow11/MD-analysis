@@ -16,6 +16,9 @@ dependencies = [
 [project.optional-dependencies]
 test = ["pytest"]
 
+[project.scripts]
+md-analysis = "src.CLI:main"
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["src*"]

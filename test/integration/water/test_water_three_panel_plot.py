@@ -18,16 +18,16 @@ matplotlib = pytest.importorskip("matplotlib")
 matplotlib.use("Agg")
 pytest.importorskip("ase")
 
-REPO_ROOT = Path(__file__).resolve().parents[4]
+REPO_ROOT = Path(__file__).resolve().parents[3]
 
-from src.structure import DEFAULT_THETA_BIN_DEG
-from src.structure.Analysis import DEFAULT_ADSORBED_WATER_PROFILE_CSV_NAME
-from src.structure.Analysis import DEFAULT_ADSORBED_WATER_RANGE_TXT_NAME
-from src.structure.Analysis import DEFAULT_ADSORBED_WATER_THETA_DISTRIBUTION_CSV_NAME
-from src.structure.Analysis import DEFAULT_WATER_THREE_PANEL_PLOT_PNG_NAME
-from src.structure.Analysis import DEFAULT_WATER_MASS_DENSITY_CSV_NAME
-from src.structure.Analysis import DEFAULT_WATER_ORIENTATION_WEIGHTED_DENSITY_CSV_NAME
-from src.structure.Analysis import plot_water_three_panel_analysis
+from src.water import DEFAULT_THETA_BIN_DEG
+from src.water import DEFAULT_ADSORBED_WATER_PROFILE_CSV_NAME
+from src.water import DEFAULT_ADSORBED_WATER_RANGE_TXT_NAME
+from src.water import DEFAULT_ADSORBED_WATER_THETA_DISTRIBUTION_CSV_NAME
+from src.water import DEFAULT_WATER_THREE_PANEL_PLOT_PNG_NAME
+from src.water import DEFAULT_WATER_MASS_DENSITY_CSV_NAME
+from src.water import DEFAULT_WATER_ORIENTATION_WEIGHTED_DENSITY_CSV_NAME
+from src.water import plot_water_three_panel_analysis
 
 
 def _as_2d(data: np.ndarray) -> np.ndarray:

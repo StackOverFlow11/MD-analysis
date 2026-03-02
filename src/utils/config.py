@@ -1,4 +1,4 @@
-"""Configuration for structure-layer analysis."""
+"""Shared configuration constants for structure-layer and potential analysis."""
 
 from __future__ import annotations
 
@@ -63,3 +63,26 @@ DEFAULT_WATER_OH_CUTOFF_A: float = 1.25
 
 # Water molar mass (g/mol), used for converting water counts to mass density.
 WATER_MOLAR_MASS_G_PER_MOL: float = 18.01528
+
+# --------------------------------------------------------------------------
+# Unit conversion constants (potential analysis)
+# --------------------------------------------------------------------------
+
+# Hartree to electron-volt (CODATA 2018).
+HA_TO_EV: float = 27.211386245988
+
+# Bohr radius to Angstrom.
+BOHR_TO_ANG: float = 0.529177210903
+
+# --------------------------------------------------------------------------
+# Computational SHE constants (eV) — from method_intro/*
+# --------------------------------------------------------------------------
+
+# Deprotonation free energy of H3O+(aq) in water (eV).
+DP_A_H3O_W_EV: float = 15.35
+
+# Chemical potential of H+ in the gas-phase standard state (eV).
+MU_HPLUS_G0_EV: float = 15.81
+
+# Zero-point energy correction (eV).
+DELTA_E_ZP_EV: float = 0.35

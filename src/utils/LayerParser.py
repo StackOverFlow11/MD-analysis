@@ -30,6 +30,7 @@ except ImportError:  # pragma: no cover
     Atoms = object  # type: ignore[misc]
 
 from .config import DEFAULT_METAL_SYMBOLS
+from .ClusterUtils import cluster_1d_periodic, find_largest_gap_periodic
 
 
 NormalSpec = Literal["a", "b", "c"] | Sequence[float]
@@ -270,18 +271,11 @@ def detect_interface_layers(
         else:
             layer_frac_sorted = sorted(layer_frac, key=lambda x: x[1])
             ids = [item[0] for item in layer_frac_sorted]
-            fracs = [item[1] for item in layer_frac_sorted]
+            fracs_arr = np.array([item[1] for item in layer_frac_sorted], dtype=float)
 
-            gaps = []
-            for k in range(len(fracs)):
-                f0 = fracs[k]
-                f1 = fracs[(k + 1) % len(fracs)]
-                gap = (f1 - f0) % 1.0
-                gaps.append(gap)
-
-            k_max = int(np.argmax(np.asarray(gaps, dtype=float)))
-            low_side_id = ids[k_max]
-            high_side_id = ids[(k_max + 1) % len(ids)]
+            low_k, high_k, _ = find_largest_gap_periodic(fracs_arr, period=1.0)
+            low_side_id = ids[low_k]
+            high_side_id = ids[high_k]
             interface_layer_ids = {low_side_id, high_side_id}
             # Moving forward (increasing fractional coordinate) through the largest gap
             # points from low-side interface toward the non-metal region.

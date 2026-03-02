@@ -12,9 +12,9 @@ matplotlib = pytest.importorskip("matplotlib")
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-REPO_ROOT = Path(__file__).resolve().parents[4]
+REPO_ROOT = Path(__file__).resolve().parents[3]
 
-from src.structure.Analysis import water_orientation_weighted_density_z_distribution_analysis
+from src.water import water_orientation_weighted_density_z_distribution_analysis
 
 
 def test_water_orientation_analysis_and_plot_from_potential_data() -> None:

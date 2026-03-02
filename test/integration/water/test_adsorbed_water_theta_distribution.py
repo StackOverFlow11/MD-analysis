@@ -13,11 +13,11 @@ matplotlib = pytest.importorskip("matplotlib")
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-REPO_ROOT = Path(__file__).resolve().parents[4]
+REPO_ROOT = Path(__file__).resolve().parents[3]
 
-from src.structure.Analysis import ad_water_orientation_analysis
-from src.structure.Analysis import compute_adsorbed_water_theta_distribution
-from src.structure.Analysis import DEFAULT_START_INTERFACE
+from src.water import ad_water_orientation_analysis
+from src.water import compute_adsorbed_water_theta_distribution
+from src.water import DEFAULT_START_INTERFACE
 
 
 def _parse_range_txt(range_txt_path: Path) -> tuple[float, float]:
