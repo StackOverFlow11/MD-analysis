@@ -5,6 +5,7 @@ Public API
 - ``center_slab_potential_analysis``
 - ``fermi_energy_analysis``
 - ``electrode_potential_analysis``
+- ``thickness_sensitivity_analysis``
 """
 
 from __future__ import annotations
@@ -39,6 +40,8 @@ from .config import (
     DEFAULT_FERMI_ENERGY_CSV_NAME,
     DEFAULT_FERMI_ENERGY_PNG_NAME,
     DEFAULT_SLAB_CENTER_CSV_NAME,
+    DEFAULT_THICKNESS_SENSITIVITY_CSV_NAME,
+    DEFAULT_THICKNESS_SENSITIVITY_PNG_NAME,
 )
 
 
@@ -552,3 +555,159 @@ def electrode_potential_analysis(
         )
 
     return u_csv_path
+
+
+def thickness_sensitivity_analysis(
+    cube_pattern: str,
+    *,
+    output_dir: Path | None = None,
+    thickness_start: float = 3.5,
+    thickness_end: float = 15.0,
+    thickness_step: float = 0.5,
+    center_mode: str = "interface",
+    xyz_path: Path | None = None,
+    metal_elements: set[str] | None = None,
+    layer_tol_ang: float = 0.6,
+    frame_start: int | None = None,
+    frame_end: int | None = None,
+    frame_step: int | None = None,
+    verbose: bool = False,
+) -> Path:
+    """Sweep slab-averaging thickness and report mean/std of center potential.
+
+    For each thickness in ``[thickness_start, thickness_end]`` (step
+    ``thickness_step``), computes the slab-averaged potential for every
+    cube frame, then reports the ensemble mean and standard deviation.
+
+    Outputs:
+    - ``thickness_sensitivity.csv``
+    - ``thickness_sensitivity.png`` (dual-axis: left=mean, right=std)
+
+    Returns the CSV path.
+    """
+    workdir = Path(".").resolve()
+    outdir = (output_dir or workdir).resolve()
+    outdir.mkdir(parents=True, exist_ok=True)
+
+    cube_paths = [Path(p) for p in sorted(workdir.glob(cube_pattern))]
+    if not cube_paths:
+        raise FileNotFoundError(f"No cube files matched pattern: {cube_pattern!r} in {workdir}")
+    cube_paths = cube_paths[frame_start:frame_end:frame_step]
+
+    # --- Interface detection (same logic as center_slab_potential_analysis) ---
+    use_interface_center = center_mode == "interface"
+    metal_z_by_step: dict[int, np.ndarray] = {}
+
+    if use_interface_center:
+        if xyz_path is None:
+            xyz_path = workdir / "md-pos-1.xyz"
+        xyz_path = Path(xyz_path).resolve()
+        if not xyz_path.exists():
+            raise FileNotFoundError(
+                f"Interface center requested but xyz not found: {xyz_path}"
+            )
+        needed_steps = {
+            s for s in (extract_step_from_cube_filename(cp) for cp in cube_paths) if s is not None
+        }
+        metal_z_by_step, inferred_metal = _read_xyz_metal_z_for_steps(
+            xyz_path, needed_steps, metal_elements=metal_elements,
+        )
+        metal_elements_used = metal_elements or inferred_metal
+        if not metal_elements_used:
+            raise RuntimeError(
+                "Interface detection failed: no transition metals inferred from xyz. "
+                "Specify metal_elements explicitly."
+            )
+
+    # --- Cache per-frame cube data + z_center ---
+    frame_cache: list[tuple] = []  # (header, values, z_center_ang)
+    for cp in cube_paths:
+        step = extract_step_from_cube_filename(cp)
+        if step is None:
+            step = len(frame_cache)
+
+        header, values = read_cube_header_and_values(cp)
+        dz_bohr = float(np.linalg.norm(header.vz_bohr))
+        lz_ang = header.nz * dz_bohr * BOHR_TO_ANG
+        origin_z_ang = float(header.origin_bohr[2]) * BOHR_TO_ANG
+
+        z_center_ang: Optional[float] = None
+        if use_interface_center and int(step) in metal_z_by_step:
+            iface = _detect_metal_water_interfaces_z_ang(
+                metal_z_by_step[int(step)],
+                lz_ang,
+                layer_tol_ang=layer_tol_ang,
+            )
+            z_center_ang = origin_z_ang + float(iface["z_mid_ang"])
+
+        frame_cache.append((header, values, z_center_ang))
+
+    # --- Sweep thickness values ---
+    thicknesses = np.arange(thickness_start, thickness_end + thickness_step * 0.5, thickness_step)
+
+    rows: list[dict] = []
+    means: list[float] = []
+    stds: list[float] = []
+
+    thick_iter: Iterable = thicknesses
+    if verbose:
+        from tqdm import tqdm
+        thick_iter = tqdm(thicknesses, desc="Thickness sweep", unit="t")
+
+    for thick in thick_iter:
+        thick = float(thick)
+        frame_vals: list[float] = []
+        for hdr, vals, zc in frame_cache:
+            phi_ev, _ = slab_average_potential_ev(
+                hdr, vals, thickness_ang=thick, z_center_ang=zc,
+            )
+            frame_vals.append(float(phi_ev))
+        arr = np.array(frame_vals, dtype=float)
+        m = float(np.mean(arr))
+        s = float(np.std(arr))
+        means.append(m)
+        stds.append(s)
+        rows.append({
+            "thickness_ang": round(thick, 4),
+            "mean_phi_ev": m,
+            "std_phi_ev": s,
+            "n_frames": len(frame_vals),
+        })
+
+    # --- Write CSV ---
+    csv_path = outdir / DEFAULT_THICKNESS_SENSITIVITY_CSV_NAME
+    _write_csv(csv_path, rows, ["thickness_ang", "mean_phi_ev", "std_phi_ev", "n_frames"])
+
+    # --- Dual-axis plot ---
+    png_path = outdir / DEFAULT_THICKNESS_SENSITIVITY_PNG_NAME
+    png_path.parent.mkdir(parents=True, exist_ok=True)
+
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    fig, ax1 = plt.subplots(figsize=(9, 4.8), dpi=160)
+    color_mean = "tab:blue"
+    ax1.plot(thicknesses, means, "o-", color=color_mean, lw=1.5, markersize=4, label="mean φ")
+    ax1.set_xlabel("Slab thickness (Å)")
+    ax1.set_ylabel("Mean center potential (eV)", color=color_mean)
+    ax1.tick_params(axis="y", labelcolor=color_mean)
+
+    ax2 = ax1.twinx()
+    color_std = "tab:red"
+    ax2.plot(thicknesses, stds, "s--", color=color_std, lw=1.5, markersize=4, label="std φ")
+    ax2.set_ylabel("Std center potential (eV)", color=color_std)
+    ax2.tick_params(axis="y", labelcolor=color_std)
+
+    ax1.set_title("Center slab potential vs. averaging thickness")
+    ax1.grid(True, alpha=0.25)
+
+    lines1, labels1 = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines1 + lines2, labels1 + labels2, loc="best")
+
+    fig.tight_layout()
+    fig.savefig(png_path)
+    plt.close(fig)
+
+    return csv_path

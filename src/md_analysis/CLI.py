@@ -35,6 +35,7 @@ def _add_potential_args(parser: argparse.ArgumentParser, *, skip_xyz: bool = Fal
     parser.add_argument("--no-compute-u", action="store_true", help="Skip U vs SHE computation.")
     parser.add_argument("--no-phi-z", action="store_true", help="Skip φ(z) visualization.")
     parser.add_argument("--max-curves", type=int, default=0, help="Max curves on φ(z) overlay (0=all).")
+    parser.add_argument("--thickness-end", type=float, default=15.0, help="Upper limit for thickness sensitivity sweep in Å (default: 15).")
 
 
 def _parse_metal_elements(s: str | None) -> set[str] | None:
@@ -83,6 +84,7 @@ def _cmd_potential(args: argparse.Namespace) -> int:
         compute_u=not args.no_compute_u,
         compute_phi_z=not args.no_phi_z,
         max_curves=args.max_curves,
+        thickness_end=args.thickness_end,
         frame_start=args.frame_start,
         frame_end=args.frame_end,
         frame_step=args.frame_step,
@@ -125,6 +127,7 @@ def _cmd_all(args: argparse.Namespace) -> int:
         compute_u=not args.no_compute_u,
         compute_phi_z=not args.no_phi_z,
         max_curves=args.max_curves,
+        thickness_end=args.thickness_end,
     )
 
     print("All analyses complete. Outputs:")

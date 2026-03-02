@@ -79,6 +79,7 @@ def run_potential_analysis(
     compute_u: bool = True,
     compute_phi_z: bool = True,
     max_curves: int = 0,
+    thickness_end: float = 15.0,
     frame_start: int | None = None,
     frame_end: int | None = None,
     frame_step: int | None = None,
@@ -96,6 +97,7 @@ def run_potential_analysis(
         fermi_energy_analysis,
         electrode_potential_analysis,
         phi_z_planeavg_analysis,
+        thickness_sensitivity_analysis,
     )
 
     pot_dir = Path(output_dir) / "potential"
@@ -167,6 +169,24 @@ def run_potential_analysis(
         )
         results["phi_z_png"] = phi_z_png
 
+    # Thickness sensitivity sweep
+    ts_dir = pot_dir / "thickness_sensitivity"
+    ts_dir.mkdir(parents=True, exist_ok=True)
+    ts_csv = thickness_sensitivity_analysis(
+        cube_pattern,
+        output_dir=ts_dir,
+        thickness_end=thickness_end,
+        center_mode=center_mode,
+        xyz_path=xyz_path,
+        metal_elements=metal_elements,
+        layer_tol_ang=layer_tol_ang,
+        frame_start=frame_start,
+        frame_end=frame_end,
+        frame_step=frame_step,
+        verbose=verbose,
+    )
+    results["thickness_sensitivity_csv"] = ts_csv
+
     return results
 
 
@@ -200,7 +220,7 @@ def run_all(
         if k in {
             "thickness_ang", "center_mode", "metal_elements",
             "layer_tol_ang", "fermi_unit", "compute_u",
-            "compute_phi_z", "max_curves",
+            "compute_phi_z", "max_curves", "thickness_end",
         }
     }
     results.update(run_potential_analysis(
