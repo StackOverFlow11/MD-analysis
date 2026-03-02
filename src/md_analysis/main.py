@@ -21,6 +21,7 @@ def run_water_analysis(
     frame_start: int | None = None,
     frame_end: int | None = None,
     frame_step: int | None = None,
+    verbose: bool = False,
     **kwargs: Any,
 ) -> dict[str, Path]:
     """Run water analysis (three-panel plot + CSVs).
@@ -50,6 +51,7 @@ def run_water_analysis(
         frame_start=frame_start,
         frame_end=frame_end,
         frame_step=frame_step,
+        verbose=verbose,
         **kwargs,
     )
 
@@ -81,6 +83,7 @@ def run_potential_analysis(
     frame_start: int | None = None,
     frame_end: int | None = None,
     frame_step: int | None = None,
+    verbose: bool = False,
 ) -> dict[str, Path]:
     """Run all potential analysis workflows.
 
@@ -116,6 +119,7 @@ def run_potential_analysis(
             frame_start=frame_start,
             frame_end=frame_end,
             frame_step=frame_step,
+            verbose=verbose,
         )
         results["electrode_csv"] = u_csv
     else:
@@ -133,6 +137,7 @@ def run_potential_analysis(
             frame_start=frame_start,
             frame_end=frame_end,
             frame_step=frame_step,
+            verbose=verbose,
         )
         results["center_csv"] = center_csv
 
@@ -160,6 +165,7 @@ def run_potential_analysis(
             frame_start=frame_start,
             frame_end=frame_end,
             frame_step=frame_step,
+            verbose=verbose,
         )
         results["phi_z_png"] = phi_z_png
 
@@ -176,6 +182,7 @@ def run_all(
     frame_start: int | None = None,
     frame_end: int | None = None,
     frame_step: int | None = None,
+    verbose: bool = False,
     **kwargs: Any,
 ) -> dict[str, Path]:
     """Run all analysis workflows (water + potential).
@@ -187,6 +194,7 @@ def run_all(
     results.update(run_water_analysis(
         xyz_path, md_inp_path, output_dir=output_dir,
         frame_start=frame_start, frame_end=frame_end, frame_step=frame_step,
+        verbose=verbose,
     ))
 
     pot_kwargs = {
@@ -205,6 +213,7 @@ def run_all(
         frame_start=frame_start,
         frame_end=frame_end,
         frame_step=frame_step,
+        verbose=verbose,
         **pot_kwargs,
     ))
 

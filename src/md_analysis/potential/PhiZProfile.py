@@ -89,6 +89,7 @@ def phi_z_planeavg_analysis(
     frame_start: int | None = None,
     frame_end: int | None = None,
     frame_step: int | None = None,
+    verbose: bool = False,
 ) -> Path:
     """Full-frame φ(z) plane-averaged potential profile analysis.
 
@@ -114,7 +115,12 @@ def phi_z_planeavg_analysis(
     phi_list: list[np.ndarray] = []
     z_ang_ref: Optional[np.ndarray] = None
 
-    for cp in cube_paths:
+    cube_iter = cube_paths
+    if verbose:
+        from tqdm import tqdm
+        cube_iter = tqdm(cube_paths, desc="φ(z) plane-avg", unit="cube")
+
+    for cp in cube_iter:
         header, values = read_cube_header_and_values(cp)
         z = z_coords_ang(header)
         phi_z_ev = plane_avg_phi_z_ev(header, values)
@@ -162,27 +168,8 @@ def phi_z_planeavg_analysis(
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    fig = plt.figure(figsize=(11, 8.5), dpi=160)
-    gs = fig.add_gridspec(2, 1, height_ratios=[1.2, 1.0], hspace=0.22)
+    fig, ax1 = plt.subplots(figsize=(11, 4.8), dpi=160)
 
-    # Heatmap panel
-    ax0 = fig.add_subplot(gs[0, 0])
-    im = ax0.imshow(
-        phi_mat,
-        aspect="auto",
-        origin="lower",
-        interpolation="nearest",
-        extent=[float(z_ang_ref[0]), float(z_ang_ref[-1]), float(steps_arr[0]), float(steps_arr[-1])],
-        cmap="RdBu_r",
-    )
-    ax0.set_title("Plane-averaged Hartree potential φ(z) over snapshots")
-    ax0.set_xlabel("z (Å)")
-    ax0.set_ylabel("MD step (cube snapshots)")
-    cbar = fig.colorbar(im, ax=ax0, pad=0.012)
-    cbar.set_label("φ(z) (eV)  [plane-avg Hartree potential]")
-
-    # Overlay panel
-    ax1 = fig.add_subplot(gs[1, 0])
     if max_curves > 0 and phi_mat.shape[0] > max_curves:
         rng = np.random.default_rng(0)
         idx = np.sort(rng.choice(phi_mat.shape[0], size=max_curves, replace=False))
@@ -199,17 +186,6 @@ def phi_z_planeavg_analysis(
     ax1.plot(z_ang_ref, phi_mean, color="k", lw=2.0, label=f"mean {label_suffix}")
     ax1.plot(z_ang_ref, phi_min, color="k", lw=1.0, ls="--", alpha=0.45, label="min/max envelope")
     ax1.plot(z_ang_ref, phi_max, color="k", lw=1.0, ls="--", alpha=0.45)
-
-    if z_mavg > 0:
-        ax1.fill_between(
-            z_ang_ref,
-            phi_mean_mavg - phi_std_mavg,
-            phi_mean_mavg + phi_std_mavg,
-            color="#d62728",
-            alpha=0.12,
-            label=f"moving avg ({z_mavg:g} Å) mean ± 1σ",
-        )
-        ax1.plot(z_ang_ref, phi_mean_mavg, color="#d62728", lw=2.2, label=f"moving avg ({z_mavg:g} Å) mean")
 
     ax1.set_xlabel("z (Å)")
     ax1.set_ylabel("φ(z) (eV)")

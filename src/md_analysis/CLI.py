@@ -55,6 +55,7 @@ def _cmd_water(args: argparse.Namespace) -> int:
         frame_start=args.frame_start,
         frame_end=args.frame_end,
         frame_step=args.frame_step,
+        verbose=True,
     )
 
     print("Water analysis complete. Outputs:")
@@ -87,6 +88,7 @@ def _cmd_potential(args: argparse.Namespace) -> int:
         frame_start=args.frame_start,
         frame_end=args.frame_end,
         frame_step=args.frame_step,
+        verbose=True,
     )
 
     print("Potential analysis complete. Outputs:")
@@ -116,6 +118,7 @@ def _cmd_all(args: argparse.Namespace) -> int:
         frame_start=args.frame_start,
         frame_end=args.frame_end,
         frame_step=args.frame_step,
+        verbose=True,
         thickness_ang=args.thickness,
         center_mode=args.center_mode,
         metal_elements=_parse_metal_elements(args.metal_elements),

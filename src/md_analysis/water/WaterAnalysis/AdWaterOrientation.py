@@ -134,6 +134,7 @@ def compute_adsorbed_water_theta_distribution(
     frame_start: int | None = None,
     frame_end: int | None = None,
     frame_step: int | None = None,
+    verbose: bool = False,
 ) -> tuple[np.ndarray, np.ndarray, Path]:
     """
     Compute theta distribution (0-180 degree) for waters in adsorbed layer.
@@ -174,10 +175,15 @@ def compute_adsorbed_water_theta_distribution(
     n_bins = _theta_bin_count_from_ndeg(float(ndeg))
     theta_values_deg: list[np.ndarray] = []
 
-    for atoms in _iter_trajectory(
+    iterator = _iter_trajectory(
         xyz_path, a_A, b_A, c_A,
         frame_start=frame_start, frame_end=frame_end, frame_step=frame_step,
-    ):
+    )
+    if verbose:
+        from tqdm import tqdm
+        iterator = tqdm(iterator, desc="Adsorbed water theta", unit="frame")
+
+    for atoms in iterator:
         low_c, high_c = _detect_low_high_interface_fractions(atoms)
         water_idx = detect_water_molecule_indices(atoms)
         oxygen_indices = get_water_oxygen_indices_array(water_idx).reshape(-1)

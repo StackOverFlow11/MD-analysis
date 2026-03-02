@@ -272,6 +272,7 @@ def center_slab_potential_analysis(
     frame_start: int | None = None,
     frame_end: int | None = None,
     frame_step: int | None = None,
+    verbose: bool = False,
 ) -> Path:
     """Multi-frame center-slab potential analysis.
 
@@ -325,7 +326,12 @@ def center_slab_potential_analysis(
     slab_info_first: Optional[dict] = None
     center_rows: list[dict] = []
 
-    for cp in cube_paths:
+    cube_iter: Iterable[Path] = cube_paths
+    if verbose:
+        from tqdm import tqdm
+        cube_iter = tqdm(cube_paths, desc="Center slab potential", unit="cube")
+
+    for cp in cube_iter:
         step = extract_step_from_cube_filename(cp)
         if step is None:
             step = len(cube_steps)
@@ -475,6 +481,7 @@ def electrode_potential_analysis(
     frame_start: int | None = None,
     frame_end: int | None = None,
     frame_step: int | None = None,
+    verbose: bool = False,
 ) -> Path:
     """Full electrode potential analysis (φ_center + E_Fermi → U vs SHE).
 
@@ -498,6 +505,7 @@ def electrode_potential_analysis(
         frame_start=frame_start,
         frame_end=frame_end,
         frame_step=frame_step,
+        verbose=verbose,
     )
     fermi_csv = fermi_energy_analysis(
         md_out_path,

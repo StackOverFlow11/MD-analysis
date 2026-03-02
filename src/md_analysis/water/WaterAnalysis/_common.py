@@ -268,6 +268,7 @@ def _compute_density_orientation_ensemble(
     frame_start: int | None = None,
     frame_end: int | None = None,
     frame_step: int | None = None,
+    verbose: bool = False,
 ) -> tuple[np.ndarray, float, np.ndarray, np.ndarray]:
     """
     Read the trajectory **once** and compute ensemble-averaged density and orientation.
@@ -285,11 +286,16 @@ def _compute_density_orientation_ensemble(
     """
     a_A, b_A, c_A = _parse_abc_from_md_inp(md_inp_path)
 
-    per_frame: list[tuple[np.ndarray, np.ndarray, np.ndarray, float]] = []
-    for atoms in _iter_trajectory(
+    iterator = _iter_trajectory(
         xyz_path, a_A, b_A, c_A,
         frame_start=frame_start, frame_end=frame_end, frame_step=frame_step,
-    ):
+    )
+    if verbose:
+        from tqdm import tqdm
+        iterator = tqdm(iterator, desc="Water density+orientation", unit="frame")
+
+    per_frame: list[tuple[np.ndarray, np.ndarray, np.ndarray, float]] = []
+    for atoms in iterator:
         per_frame.append(
             _single_frame_density_and_orientation(
                 atoms,

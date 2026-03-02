@@ -47,6 +47,7 @@ def plot_water_three_panel_analysis(
     frame_start: int | None = None,
     frame_end: int | None = None,
     frame_step: int | None = None,
+    verbose: bool = False,
 ) -> Path:
     """
     Create an integrated three-panel figure:
@@ -72,6 +73,7 @@ def plot_water_three_panel_analysis(
         frame_start=frame_start,
         frame_end=frame_end,
         frame_step=frame_step,
+        verbose=verbose,
     )
     distance_A = common_centers_u * mean_path_A
 
@@ -135,6 +137,7 @@ def plot_water_three_panel_analysis(
         frame_start=frame_start,
         frame_end=frame_end,
         frame_step=frame_step,
+        verbose=verbose,
     )
 
     # --- Smooth and plot ---
