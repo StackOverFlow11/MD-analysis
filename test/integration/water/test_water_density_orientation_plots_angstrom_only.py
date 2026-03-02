@@ -16,8 +16,8 @@ from matplotlib.ticker import MultipleLocator
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
-from src.water import water_mass_density_z_distribution_analysis
-from src.water import water_orientation_weighted_density_z_distribution_analysis
+from md_analysis.water import water_mass_density_z_distribution_analysis
+from md_analysis.water import water_orientation_weighted_density_z_distribution_analysis
 
 
 def test_water_density_and_orientation_plots_angstrom_only() -> None:

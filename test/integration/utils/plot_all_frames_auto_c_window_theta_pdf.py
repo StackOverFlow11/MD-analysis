@@ -12,13 +12,13 @@ from ase.io import iread
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
-from src.utils.WaterParser import _compute_water_mass_density_z_distribution as compute_water_mass_density_z_distribution
-from src.utils.WaterParser import _compute_water_orientation_theta_pdf_in_c_fraction_window as compute_water_orientation_theta_pdf_in_c_fraction_window
-from src.utils.WaterParser import _compute_water_orientation_weighted_density_z_distribution as compute_water_orientation_weighted_density_z_distribution
-from src.utils.WaterParser import detect_water_molecule_indices
-from src.utils.WaterParser import get_water_oxygen_indices_array
-from src.utils.config import DEFAULT_THETA_BIN_DEG
-from src.utils.config import DEFAULT_Z_BIN_WIDTH_A
+from md_analysis.utils.WaterParser import _compute_water_mass_density_z_distribution as compute_water_mass_density_z_distribution
+from md_analysis.utils.WaterParser import _compute_water_orientation_theta_pdf_in_c_fraction_window as compute_water_orientation_theta_pdf_in_c_fraction_window
+from md_analysis.utils.WaterParser import _compute_water_orientation_weighted_density_z_distribution as compute_water_orientation_weighted_density_z_distribution
+from md_analysis.utils.WaterParser import detect_water_molecule_indices
+from md_analysis.utils.WaterParser import get_water_oxygen_indices_array
+from md_analysis.utils.config import DEFAULT_THETA_BIN_DEG
+from md_analysis.utils.config import DEFAULT_Z_BIN_WIDTH_A
 
 ANGSTROM3_TO_CM3 = 1.0e-24
 

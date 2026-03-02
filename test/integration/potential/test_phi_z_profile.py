@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from src.potential import phi_z_planeavg_analysis
+from md_analysis.potential import phi_z_planeavg_analysis
 
 # Resolve data directory relative to this file
 _DATA_DIR = Path(__file__).resolve().parents[3] / "data_example" / "potential"

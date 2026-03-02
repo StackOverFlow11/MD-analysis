@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
-from src.water import water_orientation_weighted_density_z_distribution_analysis
+from md_analysis.water import water_orientation_weighted_density_z_distribution_analysis
 
 
 def test_water_orientation_analysis_and_plot_from_potential_data() -> None:

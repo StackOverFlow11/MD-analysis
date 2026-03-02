@@ -15,9 +15,9 @@ import matplotlib.pyplot as plt
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
-from src.water import ad_water_orientation_analysis
-from src.water import compute_adsorbed_water_theta_distribution
-from src.water import DEFAULT_START_INTERFACE
+from md_analysis.water import ad_water_orientation_analysis
+from md_analysis.water import compute_adsorbed_water_theta_distribution
+from md_analysis.water import DEFAULT_START_INTERFACE
 
 
 def _parse_range_txt(range_txt_path: Path) -> tuple[float, float]:

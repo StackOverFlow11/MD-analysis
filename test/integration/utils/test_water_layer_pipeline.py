@@ -9,12 +9,12 @@ import pytest
 
 ase_io = pytest.importorskip("ase.io")
 
-from src.water.WaterAnalysis._common import _parse_abc_from_md_inp
-from src.utils.LayerParser import detect_interface_layers
-from src.utils.WaterParser import _compute_water_mass_density_z_distribution as compute_water_mass_density_z_distribution
-from src.utils.WaterParser import _compute_water_orientation_weighted_density_z_distribution as compute_water_orientation_weighted_density_z_distribution
-from src.utils.WaterParser import detect_water_molecule_indices
-from src.utils.WaterParser import get_water_oxygen_indices_array
+from md_analysis.water.WaterAnalysis._common import _parse_abc_from_md_inp
+from md_analysis.utils.LayerParser import detect_interface_layers
+from md_analysis.utils.WaterParser import _compute_water_mass_density_z_distribution as compute_water_mass_density_z_distribution
+from md_analysis.utils.WaterParser import _compute_water_orientation_weighted_density_z_distribution as compute_water_orientation_weighted_density_z_distribution
+from md_analysis.utils.WaterParser import detect_water_molecule_indices
+from md_analysis.utils.WaterParser import get_water_oxygen_indices_array
 
 
 def test_last_frame_pipeline_outputs_have_consistent_shapes() -> None:

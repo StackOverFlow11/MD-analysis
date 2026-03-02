@@ -48,9 +48,9 @@ md-analysis all --xyz md-pos-1.xyz --md-inp md.inp
 
 ## Architecture
 
-Three-package design under `src/`:
+Three-package design under `src/md_analysis/` (standard src-layout):
 
-**`src.utils` — Shared low-level tools (single-frame)**
+**`md_analysis.utils` — Shared low-level tools (single-frame)**
 - Input: a single ASE `Atoms` object, cube file, or raw arrays
 - `config.py`: Global constants (`TRANSITION_METAL_SYMBOLS`, `HA_TO_EV`, `BOHR_TO_ANG`, cSHE constants, bin widths)
 - `ClusterUtils.py`: 1D periodic clustering + largest-gap detection
@@ -58,18 +58,18 @@ Three-package design under `src/`:
 - `LayerParser.py`: Metal layer detection, interface identification (uses ClusterUtils)
 - `WaterParser.py`: Water topology (O-H bonds), density/orientation profiles, angle PDF
 
-**`src.water` — Water analysis workflows (multi-frame)**
+**`md_analysis.water` — Water analysis workflows (multi-frame)**
 - Input: xyz trajectory path + CP2K `md.inp` path
 - `WaterAnalysis/_common.py` (private): Trajectory I/O, per-frame layer/water detection, ensemble averaging
 - `WaterAnalysis/WaterDensity.py`, `WaterOrientation.py`, `AdWaterOrientation.py`: Individual workflows
 - `Water.py`: `plot_water_three_panel_analysis()` — primary water entry point; produces 5 CSVs + 1 TXT + 1 PNG
 
-**`src.potential` — Potential analysis workflows (multi-frame)**
+**`md_analysis.potential` — Potential analysis workflows (multi-frame)**
 - Input: cube file glob pattern + CP2K `md.out` + optional xyz trajectory
 - `CenterPotential.py`: `center_slab_potential_analysis()`, `fermi_energy_analysis()`, `electrode_potential_analysis()`
 - `PhiZProfile.py`: `phi_z_planeavg_analysis()` — φ(z) heatmap + overlay visualization
 
-**`src.main` / `src.CLI` — Integration entry points**
+**`md_analysis.main` / `md_analysis.CLI` — Integration entry points**
 - `main.py`: `run_water_analysis()`, `run_potential_analysis()`, `run_all()`
 - `CLI.py`: argparse-based CLI registered as `md-analysis` console script
 

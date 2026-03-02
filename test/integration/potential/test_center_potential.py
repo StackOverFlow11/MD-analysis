@@ -13,7 +13,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from src.potential import (
+from md_analysis.potential import (
     center_slab_potential_analysis,
     fermi_energy_analysis,
     electrode_potential_analysis,
