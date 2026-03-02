@@ -44,6 +44,9 @@ def plot_water_three_panel_analysis(
     start_interface: StartInterface = DEFAULT_START_INTERFACE,
     dz_A: float = DEFAULT_Z_BIN_WIDTH_A,
     ndeg: float = DEFAULT_THETA_BIN_DEG,
+    frame_start: int | None = None,
+    frame_end: int | None = None,
+    frame_step: int | None = None,
 ) -> Path:
     """
     Create an integrated three-panel figure:
@@ -66,6 +69,9 @@ def plot_water_three_panel_analysis(
         md_inp_path,
         start_interface=start_interface,
         dz_A=dz_A,
+        frame_start=frame_start,
+        frame_end=frame_end,
+        frame_step=frame_step,
     )
     distance_A = common_centers_u * mean_path_A
 
@@ -126,6 +132,9 @@ def plot_water_three_panel_analysis(
         start_interface=start_interface,
         dz_A=dz_A,
         ndeg=ndeg,
+        frame_start=frame_start,
+        frame_end=frame_end,
+        frame_step=frame_step,
     )
 
     # --- Smooth and plot ---

@@ -131,6 +131,9 @@ def compute_adsorbed_water_theta_distribution(
     ndeg: float = DEFAULT_THETA_BIN_DEG,
     near_zero_ratio: float = 0.05,
     smoothing_window_bins: int = 5,
+    frame_start: int | None = None,
+    frame_end: int | None = None,
+    frame_step: int | None = None,
 ) -> tuple[np.ndarray, np.ndarray, Path]:
     """
     Compute theta distribution (0-180 degree) for waters in adsorbed layer.
@@ -150,6 +153,9 @@ def compute_adsorbed_water_theta_distribution(
             md_inp_path,
             start_interface=start_interface,
             dz_A=dz_A,
+            frame_start=frame_start,
+            frame_end=frame_end,
+            frame_step=frame_step,
         )
         distance_A_tmp = common_centers_u * mean_path_A
         d_start_A, d_end_A, _ = detect_adsorbed_layer_range_from_density_profile(
@@ -168,7 +174,10 @@ def compute_adsorbed_water_theta_distribution(
     n_bins = _theta_bin_count_from_ndeg(float(ndeg))
     theta_values_deg: list[np.ndarray] = []
 
-    for atoms in _iter_trajectory(xyz_path, a_A, b_A, c_A):
+    for atoms in _iter_trajectory(
+        xyz_path, a_A, b_A, c_A,
+        frame_start=frame_start, frame_end=frame_end, frame_step=frame_step,
+    ):
         low_c, high_c = _detect_low_high_interface_fractions(atoms)
         water_idx = detect_water_molecule_indices(atoms)
         oxygen_indices = get_water_oxygen_indices_array(water_idx).reshape(-1)

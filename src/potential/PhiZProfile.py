@@ -86,6 +86,9 @@ def phi_z_planeavg_analysis(
     output_dir: Path | None = None,
     z_mavg_window_ang: float = 7.0,
     max_curves: int = 0,
+    frame_start: int | None = None,
+    frame_end: int | None = None,
+    frame_step: int | None = None,
 ) -> Path:
     """Full-frame φ(z) plane-averaged potential profile analysis.
 
@@ -105,6 +108,7 @@ def phi_z_planeavg_analysis(
     cube_paths = [Path(p) for p in sorted(workdir.glob(cube_pattern))]
     if not cube_paths:
         raise FileNotFoundError(f"No cube files matched pattern: {cube_pattern!r} in {workdir}")
+    cube_paths = cube_paths[frame_start:frame_end:frame_step]
 
     steps: list[int] = []
     phi_list: list[np.ndarray] = []

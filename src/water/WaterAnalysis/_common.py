@@ -125,14 +125,36 @@ def _iter_trajectory(
     a_A: float,
     b_A: float,
     c_A: float,
+    *,
+    frame_start: int | None = None,
+    frame_end: int | None = None,
+    frame_step: int | None = None,
 ) -> Generator[Atoms, None, None]:
-    """Yield ASE Atoms frames with orthogonal cell set and PBC enabled."""
+    """Yield ASE Atoms frames with orthogonal cell set and PBC enabled.
+
+    Parameters
+    ----------
+    frame_start : int | None
+        0-based index of first frame to yield (default: 0).
+    frame_end : int | None
+        0-based exclusive upper bound (default: no limit).
+    frame_step : int | None
+        Step between yielded frames (default: 1).
+    """
     if iread is None:  # pragma: no cover
         raise RuntimeError("ASE is required: please install `ase` to read trajectory frames.")
-    for atoms in iread(str(xyz_path), index=":"):
-        atoms.set_cell([a_A, b_A, c_A])
-        atoms.set_pbc([True, True, True])
-        yield atoms
+    start = frame_start or 0
+    stop = frame_end  # None = no upper bound
+    step = frame_step or 1
+    next_yield = start
+    for idx, atoms in enumerate(iread(str(xyz_path), index=":")):
+        if stop is not None and idx >= stop:
+            break
+        if idx == next_yield:
+            atoms.set_cell([a_A, b_A, c_A])
+            atoms.set_pbc([True, True, True])
+            yield atoms
+            next_yield += step
 
 
 # ---------------------------------------------------------------------------
@@ -243,6 +265,9 @@ def _compute_density_orientation_ensemble(
     dz_A: float = DEFAULT_Z_BIN_WIDTH_A,
     metal_symbols: Iterable[str] | None = None,
     compute_orientation: bool = True,
+    frame_start: int | None = None,
+    frame_end: int | None = None,
+    frame_step: int | None = None,
 ) -> tuple[np.ndarray, float, np.ndarray, np.ndarray]:
     """
     Read the trajectory **once** and compute ensemble-averaged density and orientation.
@@ -261,7 +286,10 @@ def _compute_density_orientation_ensemble(
     a_A, b_A, c_A = _parse_abc_from_md_inp(md_inp_path)
 
     per_frame: list[tuple[np.ndarray, np.ndarray, np.ndarray, float]] = []
-    for atoms in _iter_trajectory(xyz_path, a_A, b_A, c_A):
+    for atoms in _iter_trajectory(
+        xyz_path, a_A, b_A, c_A,
+        frame_start=frame_start, frame_end=frame_end, frame_step=frame_step,
+    ):
         per_frame.append(
             _single_frame_density_and_orientation(
                 atoms,

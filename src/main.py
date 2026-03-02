@@ -18,6 +18,9 @@ def run_water_analysis(
     md_inp_path: Path,
     *,
     output_dir: Path,
+    frame_start: int | None = None,
+    frame_end: int | None = None,
+    frame_step: int | None = None,
     **kwargs: Any,
 ) -> dict[str, Path]:
     """Run water analysis (three-panel plot + CSVs).
@@ -44,6 +47,9 @@ def run_water_analysis(
         xyz_path=xyz_path,
         md_inp_path=md_inp_path,
         output_dir=water_dir,
+        frame_start=frame_start,
+        frame_end=frame_end,
+        frame_step=frame_step,
         **kwargs,
     )
 
@@ -72,6 +78,9 @@ def run_potential_analysis(
     compute_phi_z: bool = True,
     z_mavg_window_ang: float = 7.0,
     max_curves: int = 0,
+    frame_start: int | None = None,
+    frame_end: int | None = None,
+    frame_step: int | None = None,
 ) -> dict[str, Path]:
     """Run all potential analysis workflows.
 
@@ -104,6 +113,9 @@ def run_potential_analysis(
             metal_elements=metal_elements,
             layer_tol_ang=layer_tol_ang,
             fermi_unit=fermi_unit,
+            frame_start=frame_start,
+            frame_end=frame_end,
+            frame_step=frame_step,
         )
         results["electrode_csv"] = u_csv
     else:
@@ -118,6 +130,9 @@ def run_potential_analysis(
             xyz_path=xyz_path,
             metal_elements=metal_elements,
             layer_tol_ang=layer_tol_ang,
+            frame_start=frame_start,
+            frame_end=frame_end,
+            frame_step=frame_step,
         )
         results["center_csv"] = center_csv
 
@@ -128,6 +143,9 @@ def run_potential_analysis(
                 md_out_path,
                 output_dir=fermi_dir,
                 fermi_unit=fermi_unit,
+                frame_start=frame_start,
+                frame_end=frame_end,
+                frame_step=frame_step,
             )
             results["fermi_csv"] = fermi_csv
 
@@ -139,6 +157,9 @@ def run_potential_analysis(
             output_dir=phi_z_dir,
             z_mavg_window_ang=z_mavg_window_ang,
             max_curves=max_curves,
+            frame_start=frame_start,
+            frame_end=frame_end,
+            frame_step=frame_step,
         )
         results["phi_z_png"] = phi_z_png
 
@@ -152,6 +173,9 @@ def run_all(
     output_dir: Path,
     cube_pattern: str = "md-POTENTIAL-v_hartree-1_*.cube",
     md_out_path: Path | None = None,
+    frame_start: int | None = None,
+    frame_end: int | None = None,
+    frame_step: int | None = None,
     **kwargs: Any,
 ) -> dict[str, Path]:
     """Run all analysis workflows (water + potential).
@@ -162,6 +186,7 @@ def run_all(
 
     results.update(run_water_analysis(
         xyz_path, md_inp_path, output_dir=output_dir,
+        frame_start=frame_start, frame_end=frame_end, frame_step=frame_step,
     ))
 
     pot_kwargs = {
@@ -177,6 +202,9 @@ def run_all(
         cube_pattern=cube_pattern,
         md_out_path=md_out_path,
         xyz_path=xyz_path,
+        frame_start=frame_start,
+        frame_end=frame_end,
+        frame_step=frame_step,
         **pot_kwargs,
     ))
 

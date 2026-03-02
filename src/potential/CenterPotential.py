@@ -269,6 +269,9 @@ def center_slab_potential_analysis(
     xyz_path: Path | None = None,
     metal_elements: set[str] | None = None,
     layer_tol_ang: float = 0.6,
+    frame_start: int | None = None,
+    frame_end: int | None = None,
+    frame_step: int | None = None,
 ) -> Path:
     """Multi-frame center-slab potential analysis.
 
@@ -288,6 +291,7 @@ def center_slab_potential_analysis(
     cube_paths = [Path(p) for p in sorted(workdir.glob(cube_pattern))]
     if not cube_paths:
         raise FileNotFoundError(f"No cube files matched pattern: {cube_pattern!r} in {workdir}")
+    cube_paths = cube_paths[frame_start:frame_end:frame_step]
 
     # Optional interface detection from xyz
     use_interface_center = center_mode == "interface"
@@ -404,6 +408,9 @@ def fermi_energy_analysis(
     *,
     output_dir: Path | None = None,
     fermi_unit: str = "au",
+    frame_start: int | None = None,
+    frame_end: int | None = None,
+    frame_step: int | None = None,
 ) -> Path:
     """Fermi energy time-series analysis from CP2K md.out.
 
@@ -420,6 +427,7 @@ def fermi_energy_analysis(
     fermi_records = _parse_md_out_fermi(md_out_path)
     if not fermi_records:
         raise RuntimeError(f"No (step, Fermi energy) records parsed from: {md_out_path}")
+    fermi_records = fermi_records[frame_start:frame_end:frame_step]
 
     f_steps = np.array([r["step"] for r in fermi_records], dtype=int)
     f_time = np.array([r["time_fs"] if r["time_fs"] is not None else math.nan for r in fermi_records], dtype=float)
@@ -464,6 +472,9 @@ def electrode_potential_analysis(
     metal_elements: set[str] | None = None,
     layer_tol_ang: float = 0.6,
     fermi_unit: str = "au",
+    frame_start: int | None = None,
+    frame_end: int | None = None,
+    frame_step: int | None = None,
 ) -> Path:
     """Full electrode potential analysis (φ_center + E_Fermi → U vs SHE).
 
@@ -484,11 +495,17 @@ def electrode_potential_analysis(
         xyz_path=xyz_path,
         metal_elements=metal_elements,
         layer_tol_ang=layer_tol_ang,
+        frame_start=frame_start,
+        frame_end=frame_end,
+        frame_step=frame_step,
     )
     fermi_csv = fermi_energy_analysis(
         md_out_path,
         output_dir=outdir,
         fermi_unit=fermi_unit,
+        frame_start=frame_start,
+        frame_end=frame_end,
+        frame_step=frame_step,
     )
 
     # Read back CSVs to merge

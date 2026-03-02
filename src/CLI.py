@@ -52,6 +52,9 @@ def _cmd_water(args: argparse.Namespace) -> int:
         xyz_path=Path(args.xyz),
         md_inp_path=Path(args.md_inp),
         output_dir=Path(args.outdir),
+        frame_start=args.frame_start,
+        frame_end=args.frame_end,
+        frame_step=args.frame_step,
     )
 
     print("Water analysis complete. Outputs:")
@@ -81,6 +84,9 @@ def _cmd_potential(args: argparse.Namespace) -> int:
         compute_phi_z=not args.no_phi_z,
         z_mavg_window_ang=args.z_mavg_window,
         max_curves=args.max_curves,
+        frame_start=args.frame_start,
+        frame_end=args.frame_end,
+        frame_step=args.frame_step,
     )
 
     print("Potential analysis complete. Outputs:")
@@ -107,6 +113,9 @@ def _cmd_all(args: argparse.Namespace) -> int:
         output_dir=Path(args.outdir),
         cube_pattern=args.cube_pattern,
         md_out_path=md_out_path,
+        frame_start=args.frame_start,
+        frame_end=args.frame_end,
+        frame_step=args.frame_step,
         thickness_ang=args.thickness,
         center_mode=args.center_mode,
         metal_elements=_parse_metal_elements(args.metal_elements),
@@ -132,6 +141,18 @@ def main() -> int:
     parser.add_argument(
         "--outdir", type=str, default="analysis",
         help="Output root directory (default: ./analysis).",
+    )
+    parser.add_argument(
+        "--frame-start", type=int, default=None,
+        help="Start frame index, 0-based (default: 0, i.e. first frame).",
+    )
+    parser.add_argument(
+        "--frame-end", type=int, default=None,
+        help="End frame index, exclusive (default: no limit, i.e. all frames).",
+    )
+    parser.add_argument(
+        "--frame-step", type=int, default=None,
+        help="Frame step (default: 1).",
     )
     subparsers = parser.add_subparsers(dest="command", help="Analysis sub-commands")
 
