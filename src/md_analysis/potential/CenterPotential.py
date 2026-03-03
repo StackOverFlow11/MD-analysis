@@ -719,24 +719,19 @@ def thickness_sensitivity_analysis(
 
     fig, ax1 = plt.subplots(figsize=(9, 4.8), dpi=160)
     color_mean = "tab:blue"
-    ax1.plot(thicknesses, means, "o-", color=color_mean, lw=1.5, markersize=4, label="mean U vs SHE")
+    ax1.plot(thicknesses, means, "o-", color=color_mean, lw=1.5, markersize=4)
     ax1.set_xlabel("Slab thickness (Å)")
     ax1.set_ylabel("Mean U vs SHE (V)", color=color_mean)
     ax1.tick_params(axis="y", labelcolor=color_mean)
 
     ax2 = ax1.twinx()
     color_std = "tab:red"
-    ax2.plot(thicknesses, spatial_stds, "s--", color=color_std, lw=1.5, markersize=4,
-             label="spatial std φ(z)")
+    ax2.plot(thicknesses, spatial_stds, "s--", color=color_std, lw=1.5, markersize=4)
     ax2.set_ylabel("Spatial std of φ(z) in slab (eV)", color=color_std)
     ax2.tick_params(axis="y", labelcolor=color_std)
 
     ax1.set_title("Electrode potential U vs SHE — thickness sensitivity")
     ax1.grid(True, alpha=0.25)
-
-    lines1, labels1 = ax1.get_legend_handles_labels()
-    lines2, labels2 = ax2.get_legend_handles_labels()
-    ax1.legend(lines1 + lines2, labels1 + labels2, loc="best")
 
     fig.tight_layout()
     fig.savefig(png_path)
