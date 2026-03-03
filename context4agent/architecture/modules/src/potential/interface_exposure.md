@@ -27,3 +27,4 @@ All default output filenames are defined in `config.py`:
 | `DEFAULT_PHI_Z_PNG_NAME`                  | `phi_z_planeavg_all_frames.png`       |
 | `DEFAULT_THICKNESS_SENSITIVITY_CSV_NAME`  | `thickness_sensitivity.csv`           |
 | `DEFAULT_THICKNESS_SENSITIVITY_PNG_NAME`  | `thickness_sensitivity.png`           |
+| `DEFAULT_THICKNESS_ANG`                  | `7.5`                                 |

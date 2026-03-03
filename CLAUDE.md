@@ -22,7 +22,7 @@ md-analysis potential --cube-pattern "md-POTENTIAL-v_hartree-1_*.cube"
 md-analysis all --xyz md-pos-1.xyz --md-inp md.inp
 ```
 
-Key flags: `--thickness` (default 7 Å), `--thickness-end` (sweep limit, default 15 Å), `--center-mode` (interface|cell), `--fermi-unit` (au|ev), `--no-compute-u`, `--no-phi-z`.
+Key flags: `--thickness` (default 7.5 Å), `--thickness-end` (sweep limit, default 15 Å), `--center-mode` (interface|cell), `--fermi-unit` (au|ev), `--no-compute-u`, `--no-phi-z`.
 
 ## Architecture
 
