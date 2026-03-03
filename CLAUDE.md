@@ -81,7 +81,7 @@ Three-package design under `src/md_analysis/` (standard src-layout):
 
 Physical units (enforced in `history/architecture/modules/data_contract.md`):
 - Density: `g/cm³`
-- Orientation-weighted density: `1/Å³`
+- Orientation-weighted density: `g/cm³`
 - Potential: `eV` (Hartree converted via `HA_TO_EV`)
 - Electrode potential: `V vs SHE` via `U = -E_Fermi + φ_center + ΔΨ - μ(H⁺) - ΔE_ZP`
 - Position: Å or fractional cell coordinate depending on context

@@ -160,7 +160,7 @@ def plot_water_three_panel_analysis(
 
         # Panel 1: density profile.
         ax1.plot(distance_A, rho_smooth, color="tab:blue", lw=1.5)
-        ax1.set_ylabel(r"$\rho_\mathrm{{H_2O}}\ \mathrm{(g\cdot cm^3)}$", fontsize=18)
+        ax1.set_ylabel(r"$\rho_\mathrm{{H_2O}}\ \mathrm{(g\cdot cm^{-3})}$", fontsize=18)
         ax1.set_xlabel(r"$\mathrm{distance(\AA)}$", fontsize=18)
         ax1.set_title("Water density distribution", fontsize=18)
         ax1.tick_params(axis="both", which="major", labelsize=16)

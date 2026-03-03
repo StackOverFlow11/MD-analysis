@@ -7,7 +7,7 @@ Lightweight analysis utilities for periodic metal-water interfaces from CP2K MD 
 **Water analysis** — density and orientation profiles along the interface-to-midpoint direction:
 
 - Water mass-density profile (g/cm³)
-- Orientation-weighted density profile (1/Å³)
+- Orientation-weighted density profile (g/cm³)
 - Adsorbed-layer auto-detection and orientation-angle distribution
 - Integrated three-panel PNG visualization
 

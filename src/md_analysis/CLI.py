@@ -69,6 +69,9 @@ def _cmd_potential(args: argparse.Namespace) -> int:
 
     md_out_path = Path(args.md_out) if hasattr(args, "md_out") else None
     if md_out_path is not None and not md_out_path.exists():
+        print(f"WARNING: {md_out_path} not found, skipping: "
+              "Fermi energy, electrode potential (U vs SHE), thickness sensitivity.\n"
+              "  Provide a valid path with --md-out <path> to enable these analyses.")
         md_out_path = None
 
     results = run_potential_analysis(
@@ -107,6 +110,9 @@ def _cmd_all(args: argparse.Namespace) -> int:
 
     md_out_path = Path(args.md_out) if hasattr(args, "md_out") else None
     if md_out_path is not None and not md_out_path.exists():
+        print(f"WARNING: {md_out_path} not found, skipping: "
+              "Fermi energy, electrode potential (U vs SHE), thickness sensitivity.\n"
+              "  Provide a valid path with --md-out <path> to enable these analyses.")
         md_out_path = None
 
     results = run_all(

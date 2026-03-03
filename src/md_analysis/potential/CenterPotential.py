@@ -519,9 +519,9 @@ def electrode_potential_analysis(
         frame_step=frame_step,
     )
 
-    # Read back CSVs to merge
-    center_data = np.genfromtxt(center_csv, delimiter=",", names=True, dtype=None, encoding="utf-8")
-    fermi_data = np.genfromtxt(fermi_csv, delimiter=",", names=True, dtype=None, encoding="utf-8")
+    # Read back CSVs to merge (atleast_1d guards against 0-d arrays from single-row CSV)
+    center_data = np.atleast_1d(np.genfromtxt(center_csv, delimiter=",", names=True, dtype=None, encoding="utf-8"))
+    fermi_data = np.atleast_1d(np.genfromtxt(fermi_csv, delimiter=",", names=True, dtype=None, encoding="utf-8"))
 
     fermi_by_step = {int(r["step"]): float(r["fermi_ev"]) for r in fermi_data}
 
