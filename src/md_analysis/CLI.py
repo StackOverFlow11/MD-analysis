@@ -13,6 +13,8 @@ import argparse
 import sys
 from pathlib import Path
 
+from .potential.config import DEFAULT_THICKNESS_ANG
+
 
 def _add_water_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--xyz", type=str, required=True, help="XYZ trajectory file.")
@@ -27,7 +29,7 @@ def _add_potential_args(parser: argparse.ArgumentParser, *, skip_xyz: bool = Fal
     parser.add_argument("--md-out", type=str, default="md.out", help="CP2K md.out file (default: md.out).")
     if not skip_xyz:
         parser.add_argument("--xyz", type=str, default="md-pos-1.xyz", help="XYZ trajectory for interface detection (default: md-pos-1.xyz).")
-    parser.add_argument("--thickness", type=float, default=7.0, help="Slab averaging thickness in Å (default: 7).")
+    parser.add_argument("--thickness", type=float, default=DEFAULT_THICKNESS_ANG, help=f"Slab averaging thickness in Å (default: {DEFAULT_THICKNESS_ANG}).")
     parser.add_argument("--center-mode", choices=["interface", "cell"], default="interface", help="Slab center mode (default: interface).")
     parser.add_argument("--fermi-unit", choices=["au", "ev"], default="au", help="Fermi energy unit in md.out (default: au).")
     parser.add_argument("--metal-elements", type=str, default=None, help="Comma-separated metal element symbols (e.g., Cu,Ag).")

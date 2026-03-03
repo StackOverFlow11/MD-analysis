@@ -12,6 +12,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from .potential.config import DEFAULT_THICKNESS_ANG
+
 
 def run_water_analysis(
     xyz_path: Path,
@@ -71,7 +73,7 @@ def run_potential_analysis(
     cube_pattern: str = "md-POTENTIAL-v_hartree-1_*.cube",
     md_out_path: Path | None = None,
     xyz_path: Path | None = None,
-    thickness_ang: float = 7.0,
+    thickness_ang: float = DEFAULT_THICKNESS_ANG,
     center_mode: str = "interface",
     metal_elements: set[str] | None = None,
     layer_tol_ang: float = 0.6,

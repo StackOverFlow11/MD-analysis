@@ -42,6 +42,7 @@ from .config import (
     DEFAULT_SLAB_CENTER_CSV_NAME,
     DEFAULT_THICKNESS_SENSITIVITY_CSV_NAME,
     DEFAULT_THICKNESS_SENSITIVITY_PNG_NAME,
+    DEFAULT_THICKNESS_ANG,
 )
 
 
@@ -267,7 +268,7 @@ def center_slab_potential_analysis(
     cube_pattern: str,
     *,
     output_dir: Path | None = None,
-    thickness_ang: float = 7.0,
+    thickness_ang: float = DEFAULT_THICKNESS_ANG,
     center_mode: str = "interface",
     xyz_path: Path | None = None,
     metal_elements: set[str] | None = None,
@@ -475,7 +476,7 @@ def electrode_potential_analysis(
     md_out_path: Path,
     *,
     output_dir: Path | None = None,
-    thickness_ang: float = 7.0,
+    thickness_ang: float = DEFAULT_THICKNESS_ANG,
     center_mode: str = "interface",
     xyz_path: Path | None = None,
     metal_elements: set[str] | None = None,
