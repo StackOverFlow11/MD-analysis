@@ -147,8 +147,8 @@
 1. 更新 `src/md_analysis/utils/__init__.py` 的导出与 `__all__`
 2. 更新本文档公开接口清单
 3. 若涉及契约变化，同步更新：
-   - `history/architecture/modules/data_contract.md`
-   - `history/architecture/modules/glossary_units.md`（若涉及术语/单位）
+   - `context4agent/architecture/modules/data_contract.md`
+   - `context4agent/architecture/modules/glossary_units.md`（若涉及术语/单位）
 4. 运行导入烟雾测试与回归测试
 
 ## 8. 反模式（禁止）

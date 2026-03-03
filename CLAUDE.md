@@ -79,7 +79,7 @@ Three-package design under `src/md_analysis/` (standard src-layout):
 
 ## Key Data Contracts
 
-Physical units (enforced in `history/architecture/modules/data_contract.md`):
+Physical units (enforced in `context4agent/architecture/modules/data_contract.md`):
 - Density: `g/cm³`
 - Orientation-weighted density: `g/cm³`
 - Potential: `eV` (Hartree converted via `HA_TO_EV`)
@@ -119,8 +119,8 @@ Cell parsing from `md.inp` expects the line: `ABC [angstrom] a b c`.
 
 ## Architecture Documentation
 
-Detailed contracts, module interface specs, and implementation rules live in `history/`:
-- `history/architecture/modules/data_contract.md` — output shapes, units, CSV headers
-- `history/architecture/modules/glossary_units.md` — terminology and unit definitions
-- `history/architecture/modules/src/**/interface_exposure.md` — per-module public API
-- `history/architecture/modules/src/**/implementation_guidelines.md` — per-module rules
+Detailed contracts, module interface specs, and implementation rules live in `context4agent/`:
+- `context4agent/architecture/modules/data_contract.md` — output shapes, units, CSV headers
+- `context4agent/architecture/modules/glossary_units.md` — terminology and unit definitions
+- `context4agent/architecture/modules/src/**/interface_exposure.md` — per-module public API
+- `context4agent/architecture/modules/src/**/implementation_guidelines.md` — per-module rules

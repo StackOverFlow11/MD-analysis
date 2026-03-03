@@ -99,7 +99,7 @@ test/
     └── potential/          # end-to-end potential analysis scripts
 
 data_example/               # minimal reproducible input data
-history/                    # architecture contracts, decisions, requirements
+context4agent/                    # architecture contracts, decisions, requirements
 ```
 
 ## Running Tests
@@ -129,7 +129,7 @@ python test/integration/potential/test_phi_z_profile.py
 
 Architecture contracts and implementation rules:
 
-- `history/architecture/modules/data_contract.md` — output shapes, units, CSV headers
-- `history/architecture/modules/glossary_units.md` — terminology and unit definitions
-- `history/architecture/modules/src/**/interface_exposure.md` — public API per module
-- `history/architecture/modules/src/**/implementation_guidelines.md` — implementation rules
+- `context4agent/architecture/modules/data_contract.md` — output shapes, units, CSV headers
+- `context4agent/architecture/modules/glossary_units.md` — terminology and unit definitions
+- `context4agent/architecture/modules/src/**/interface_exposure.md` — public API per module
+- `context4agent/architecture/modules/src/**/implementation_guidelines.md` — implementation rules

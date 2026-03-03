@@ -13,7 +13,7 @@
   - `md_analysis.water`：水分析多帧工作流
   - `md_analysis.potential`：电势分析多帧工作流
 - 编程入口 `main.py` 和 CLI 入口 `CLI.py` 位于顶层，负责协调子包调用。
-- 目录文档治理采用硬约束：`history/architecture/modules/src/` 必须镜像 `src/md_analysis/`，且每个子目录都需维护
+- 目录文档治理采用硬约束：`context4agent/architecture/modules/src/` 必须镜像 `src/md_analysis/`，且每个子目录都需维护
   `interface_exposure.md` 与 `implementation_guidelines.md`。
 
 ## 2. 导出稳定性等级
@@ -49,7 +49,7 @@
 当新增/删除/重命名顶层导出时，必须同步完成：
 
 1. 更新 `src/md_analysis/__init__.py` 中的导入与 `__all__`
-2. 更新接口文档 `history/architecture/modules/src/interface_exposure.md`
+2. 更新接口文档 `context4agent/architecture/modules/src/interface_exposure.md`
 3. 运行导入烟雾测试（至少覆盖 `import md_analysis` 与 `from md_analysis import ...`）
 4. 运行回归测试，确认无破坏性影响
 

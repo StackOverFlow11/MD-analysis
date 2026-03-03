@@ -3,9 +3,9 @@
 > 仅记录跨模块共享、且会影响结果可比性的核心数据契约。
 >
 > 接口暴露清单与实现细则请查看：
-> - `history/architecture/modules/src/interface_exposure.md`
-> - `history/architecture/modules/src/utils/interface_exposure.md`
-> - `history/architecture/modules/src/utils/implementation_guidelines.md`
+> - `context4agent/architecture/modules/src/interface_exposure.md`
+> - `context4agent/architecture/modules/src/utils/interface_exposure.md`
+> - `context4agent/architecture/modules/src/utils/implementation_guidelines.md`
 >
 > 记录落位硬约束：本文件仅承载"全局契约"；非全局目录级记录不得写入本文件，
 > 必须写入对应目录的 `interface_exposure.md` / `implementation_guidelines.md`。

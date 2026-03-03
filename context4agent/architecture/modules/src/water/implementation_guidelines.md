@@ -25,8 +25,8 @@
 - `water/WaterAnalysis/__init__.py`：子模块公开导出
 - `water/__init__.py`：子包聚合导出
 - `water/WaterAnalysis/` 对应文档必须位于：
-  - `history/architecture/modules/src/water/WaterAnalysis/interface_exposure.md`
-  - `history/architecture/modules/src/water/WaterAnalysis/implementation_guidelines.md`
+  - `context4agent/architecture/modules/src/water/WaterAnalysis/interface_exposure.md`
+  - `context4agent/architecture/modules/src/water/WaterAnalysis/implementation_guidelines.md`
 
 ## 3. 系综平均口径约定
 

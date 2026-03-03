@@ -68,5 +68,5 @@
 1. 更新 `src/md_analysis/water/**/__init__.py` 导出与 `__all__`
 2. 更新本文档公开接口清单
 3. 若涉及统计口径变化，同步更新：
-   - `history/architecture/modules/data_contract.md`
+   - `context4agent/architecture/modules/data_contract.md`
 4. 运行导入烟雾测试与相关回归测试

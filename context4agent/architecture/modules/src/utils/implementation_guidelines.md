@@ -156,8 +156,8 @@
 
 - `test/unit/utils/`
 - `test/integration/utils/`
-- `history/architecture/modules/data_contract.md`
-- `history/architecture/modules/glossary_units.md`（若涉及术语/单位）
+- `context4agent/architecture/modules/data_contract.md`
+- `context4agent/architecture/modules/glossary_units.md`（若涉及术语/单位）
 
 ## 10. 提交前检查清单
 

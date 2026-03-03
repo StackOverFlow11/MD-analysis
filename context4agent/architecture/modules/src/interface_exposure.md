@@ -11,7 +11,7 @@
 - 业务能力通过 `md_analysis.utils`、`md_analysis.water`、`md_analysis.potential` 向下访问。
 - CLI 入口通过 `md_analysis.CLI:main` 注册为 `md-analysis` console script。
 - 编程入口通过 `md_analysis.main` 提供 `run_water_analysis`、`run_potential_analysis`、`run_all`。
-- 目录治理硬约束见：`history/architecture/modules/README.md`（镜像对齐 + 双文档）。
+- 目录治理硬约束见：`context4agent/architecture/modules/README.md`（镜像对齐 + 双文档）。
 
 ## 2. 当前公开接口清单
 
@@ -68,7 +68,7 @@
 
 1. 更新 `src/md_analysis/__init__.py` 的导出与 `__all__`
 2. 更新本文档公开接口清单
-3. 更新 `history/architecture/modules/src/implementation_guidelines.md`（若规则被触发）
+3. 更新 `context4agent/architecture/modules/src/implementation_guidelines.md`（若规则被触发）
 4. 执行导入烟雾测试：
    - `import md_analysis`
    - `from md_analysis import <symbol>`

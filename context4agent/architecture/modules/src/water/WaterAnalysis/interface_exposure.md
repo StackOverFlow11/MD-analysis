@@ -54,4 +54,4 @@
 - 变更流程：
   1. 更新 `WaterAnalysis/__init__.py` 导出与 `__all__`
   2. 更新本文档公开清单
-  3. 若统计口径变化，同步 `history/architecture/modules/data_contract.md`
+  3. 若统计口径变化，同步 `context4agent/architecture/modules/data_contract.md`

@@ -13,7 +13,7 @@
 - `src/`：标准 src-layout，可安装包 `md_analysis`（`pip install .`）
 - `test/`：pytest 单元/集成测试
 - `data_example/`：最小可复现实例数据（`data_example/potential/`）
-- `history/`：架构/契约/决策/需求上下文（本目录）
+- `context4agent/`：架构/契约/决策/需求上下文（本目录）
 - `README.md`：快速入口与最小跑通方式
 - `CLAUDE.md`：Claude Code 协作指引
 
@@ -42,7 +42,7 @@
     - 取向加权密度（`g/cm^3`，按 $\sum_i \cos\theta_i \cdot m_{\mathrm{H_2O}} / V_{\mathrm{bin}}$）
     - 指定 c 分数窗口内的 $\theta$ PDF（`degree^-1`）
 
-> 低层 shape/单位/窗口规则以 `history/architecture/modules/data_contract.md` 为准。
+> 低层 shape/单位/窗口规则以 `context4agent/architecture/modules/data_contract.md` 为准。
 
 ### 2) `md_analysis.water`（多帧/水分析工作流）
 
@@ -106,6 +106,6 @@
 
 ## 文档镜像与落位
 
-- `history/architecture/modules/src/` 必须镜像 `src/md_analysis/` 的目录结构，并在每个镜像目录维护：
+- `context4agent/architecture/modules/src/` 必须镜像 `src/md_analysis/` 的目录结构，并在每个镜像目录维护：
   - `interface_exposure.md`：对外公开符号/导入方式/兼容承诺
   - `implementation_guidelines.md`：职责边界/依赖方向/契约同步要求
