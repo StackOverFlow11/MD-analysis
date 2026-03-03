@@ -2,53 +2,51 @@
 
 Lightweight analysis utilities for periodic metal-water interfaces from CP2K MD simulations.
 
-Core outputs:
+## Features
 
-- Water mass-density profile along interface-to-midpoint distance
-- Orientation-weighted density profile ρ·⟨cosφ⟩ (g/cm³) along the same axis
+**Water analysis** — density and orientation profiles along the interface-to-midpoint direction:
+
+- Water mass-density profile (g/cm³)
+- Orientation-weighted density profile (1/Å³)
 - Adsorbed-layer auto-detection and orientation-angle distribution
 - Integrated three-panel PNG visualization
 
+**Potential analysis** — Hartree potential and electrode potential from cube files:
+
+- Center-slab Hartree potential time series
+- Fermi energy extraction from `md.out`
+- Electrode potential U vs SHE (computational SHE)
+- Plane-averaged φ(z) profile overlay across frames
+- Thickness sensitivity sweep (dual-axis: U vs SHE + spatial std of φ(z))
+
 ## Quick Start
 
-### 1) Set up environment
-
-```bash
-conda activate env_md_an   # numpy, matplotlib, ase, pytest included
-```
-
-Or install manually:
+### Install
 
 ```bash
 pip install numpy matplotlib ase pytest
+pip install .
 ```
 
-### 2) Run end-to-end plot generation
-
-From the repo root:
+### CLI
 
 ```bash
-python test/integration/structure/Analysis/test_water_three_panel_plot.py
+# Water analysis
+md-analysis water --xyz md-pos-1.xyz --md-inp md.inp
+
+# Potential analysis
+md-analysis potential --cube-pattern "md-POTENTIAL-v_hartree-1_*.cube"
+
+# All analyses (water + potential)
+md-analysis all --xyz md-pos-1.xyz --md-inp md.inp
 ```
 
-Outputs written to `test/_tmp_preview/`:
+Key potential flags: `--thickness`, `--thickness-end`, `--center-mode`, `--fermi-unit`, `--no-compute-u`, `--no-phi-z`.
 
-- `water_three_panel_analysis.png` — three-panel figure
-- `water_mass_density_z_distribution_analysis.csv`
-- `water_orientation_weighted_density_z_distribution_analysis.csv`
-- `adsorbed_water_orientation_profile.csv`
-- `adsorbed_water_layer_range.txt`
-- `adsorbed_water_theta_distribution_0_180.csv`
-
-### 3) Example input data
-
-- `data_example/potential/md-pos-1.xyz` — trajectory frames
-- `data_example/potential/md.inp` — cell parameters (`ABC [angstrom] a b c`)
-
-## Recommended Entry Point
+### Python API
 
 ```python
-from src.structure.Analysis import plot_water_three_panel_analysis
+from md_analysis.water import plot_water_three_panel_analysis
 
 plot_water_three_panel_analysis(
     xyz_path="data_example/potential/md-pos-1.xyz",
@@ -57,32 +55,75 @@ plot_water_three_panel_analysis(
 )
 ```
 
-This single call produces:
+Or use the programmatic entry points:
 
-1. Panel 1 — water mass density (g/cm³)
-2. Panel 2 — orientation-weighted density ρ·⟨cosφ⟩ (g/cm³)
-3. Panel 3 — adsorbed-layer θ probability distribution (degree⁻¹)
+```python
+from md_analysis.main import run_water_analysis, run_potential_analysis, run_all
+```
+
+### Example input data
+
+- `data_example/potential/md-pos-1.xyz` — trajectory frames
+- `data_example/potential/md.inp` — cell parameters (`ABC [angstrom] a b c`)
+- `data_example/potential/md.out` — CP2K output with Fermi energies
+- `data_example/potential/md-POTENTIAL-v_hartree-1_*.cube` — Hartree potential cube snapshots
 
 ## Project Layout
 
 ```
-src/structure/utils/     # single-frame, low-level (LayerParser, WaterParser, config)
-src/structure/Analysis/  # multi-frame workflows and plot composition
-test/unit/               # unit tests
-test/integration/        # end-to-end runnable scripts
-data_example/            # minimal reproducible input data
-history/                 # architecture contracts, decisions, requirements
+src/md_analysis/
+├── CLI.py                  # argparse CLI (md-analysis console script)
+├── main.py                 # programmatic entry points
+├── utils/                  # single-frame low-level tools
+│   ├── config.py           #   constants, unit conversions, cSHE parameters
+│   ├── ClusterUtils.py     #   1D periodic clustering + gap detection
+│   ├── CubeParser.py       #   cube file I/O, plane-averaged φ(z), slab-averaged potential
+│   ├── LayerParser.py      #   metal layer detection, interface identification
+│   └── WaterParser.py      #   water topology, density/orientation/angle profiles
+├── water/                  # multi-frame water analysis workflows
+│   ├── Water.py            #   plot_water_three_panel_analysis() — primary entry point
+│   └── WaterAnalysis/      #   density, orientation, adsorbed-layer sub-workflows
+│       ├── _common.py      #     trajectory I/O, per-frame computation, ensemble averaging
+│       ├── WaterDensity.py
+│       ├── WaterOrientation.py
+│       └── AdWaterOrientation.py
+└── potential/              # multi-frame potential analysis workflows
+    ├── config.py           #   output filename constants
+    ├── CenterPotential.py  #   center-slab, Fermi, electrode potential, thickness sweep
+    └── PhiZProfile.py      #   φ(z) overlay visualization
+
+test/
+├── unit/utils/             # pytest unit tests (ClusterUtils, LayerParser, WaterParser)
+└── integration/
+    ├── water/              # end-to-end water analysis scripts
+    └── potential/          # end-to-end potential analysis scripts
+
+data_example/               # minimal reproducible input data
+history/                    # architecture contracts, decisions, requirements
 ```
 
 ## Running Tests
 
 ```bash
 # All tests
-python -m pytest test/ -v
+pytest test/
 
 # Single unit test file
-python -m pytest test/unit/structure/utils/test_water_parser.py -v
+pytest test/unit/utils/test_water_parser.py
+
+# Integration tests (standalone scripts, require pip install first)
+python test/integration/water/test_water_three_panel_plot.py
+python test/integration/potential/test_center_potential.py
+python test/integration/potential/test_phi_z_profile.py
 ```
+
+## Architecture Notes
+
+- **Three-layer design**: `utils` (single-frame primitives) → `water` / `potential` (multi-frame workflows) → `main` / `CLI` (integration entry points)
+- **Interface detection**: 1D periodic clustering on metal z-coordinates, largest gap = water region, two bounding layers = interfaces
+- **Water profiles**: computed from selected interface toward the cell midpoint, normalized to [0, 1], then ensemble-averaged across frames
+- **Electrode potential**: U = -E_Fermi + φ_center + ΔΨ_a(H₃O⁺/w) - μ(H⁺,g⁰) - ΔE_ZP (computational SHE)
+- **Frame selection**: `--frame-start`, `--frame-end`, `--frame-step` supported across all workflows
 
 ## For Contributors
 
@@ -90,5 +131,5 @@ Architecture contracts and implementation rules:
 
 - `history/architecture/modules/data_contract.md` — output shapes, units, CSV headers
 - `history/architecture/modules/glossary_units.md` — terminology and unit definitions
-- `history/architecture/modules/scripts/**/interface_exposure.md` — public API per module
-- `history/architecture/modules/scripts/**/implementation_guidelines.md` — implementation rules
+- `history/architecture/modules/src/**/interface_exposure.md` — public API per module
+- `history/architecture/modules/src/**/implementation_guidelines.md` — implementation rules
