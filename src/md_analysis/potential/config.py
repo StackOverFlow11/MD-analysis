@@ -14,4 +14,4 @@ DEFAULT_PHI_Z_PNG_NAME: str = "phi_z_planeavg_all_frames.png"
 DEFAULT_THICKNESS_SENSITIVITY_CSV_NAME: str = "thickness_sensitivity.csv"
 DEFAULT_THICKNESS_SENSITIVITY_PNG_NAME: str = "thickness_sensitivity.png"
 
-DEFAULT_THICKNESS_ANG: float = 7.0
+DEFAULT_THICKNESS_ANG: float = 7.5
