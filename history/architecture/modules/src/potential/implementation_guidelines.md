@@ -1,9 +1,9 @@
-# src.potential — Implementation Guidelines
+# md_analysis.potential — Implementation Guidelines
 
 ## Layer dependency
 
-- `src.potential` depends on `src.utils` (CubeParser, ClusterUtils, config)
-- `src.potential` does NOT depend on `src.water`
+- `md_analysis.potential` depends on `md_analysis.utils` (CubeParser, ClusterUtils, config)
+- `md_analysis.potential` does NOT depend on `md_analysis.water`
 
 ## Module layout
 
@@ -16,7 +16,7 @@ Flat structure (no sub-packages):
 
 - CP2K V_HARTREE_CUBE: z is the fastest-running index → reshape as `(nx, ny, nz)`
 - Units in cube files: Bohr (positions) and Hartree (values)
-- Conversion constants are in `src.utils.config`
+- Conversion constants are in `md_analysis.utils.config`
 
 ## Interface detection for slab centering
 
@@ -30,7 +30,7 @@ $$
 U_{\mathrm{SHE}} = -E_{\mathrm{Fermi}} + \varphi_{\mathrm{center}} + \Delta\Psi_{a}(\mathrm{H_3O^+/w}) - \mu(\mathrm{H^+, g^0}) - \Delta E_{\mathrm{ZP}}
 $$
 
-Constants from `src.utils.config`:
+Constants from `md_analysis.utils.config`:
 - `DP_A_H3O_W_EV = 15.35`
 - `MU_HPLUS_G0_EV = 15.81`
 - `DELTA_E_ZP_EV = 0.35`

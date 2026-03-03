@@ -1,4 +1,4 @@
-# src.potential — Interface Exposure
+# md_analysis.potential — Interface Exposure
 
 ## Public API
 

@@ -1,6 +1,6 @@
-# `src/structure/utils/` 内部实现准则（当前实现口径）
+# `md_analysis.utils` 内部实现准则（当前实现口径）
 
-> 适用范围：`src/structure/utils/`（`config.py`、`LayerParser.py`、`WaterParser.py`）。
+> 适用范围：`src/md_analysis/utils/`（`config.py`、`ClusterUtils.py`、`CubeParser.py`、`LayerParser.py`、`WaterParser.py`）。
 >
 > 目标：在明确物理口径与输入输出契约的前提下，提供可复用、可测试、可维护的底层实现。
 
@@ -12,8 +12,23 @@
   - 元素集合
   - 分箱步长
   - 几何阈值
-  - 单位换算相关常量
+  - 单位换算相关常量（`HA_TO_EV`、`BOHR_TO_ANG`、cSHE 常量）
 - 禁止写任何业务计算逻辑。
+
+### `ClusterUtils.py`
+
+- 负责 1D 周期性聚类、最大间隙检测、间隙中点计算。
+- 被 `LayerParser.py` 和 `md_analysis.potential.CenterPotential` 调用。
+- 不依赖 ASE 或其他上层模块。
+
+### `CubeParser.py`
+
+- 负责 Gaussian cube 文件的读取与解析。
+- 负责 plane-averaged φ(z) 计算和 slab-averaged potential 计算。
+- 输入：cube 文件路径或已解析的 header + values。
+- 输出：`CubeHeader` 数据结构、φ(z) 数组、`(phi_center_ev, info)` 等。
+- CP2K cube 文件约定：z 为 fastest-running index，reshape 为 `(nx, ny, nz)`。
+- 单位：cube 内部为 Bohr/Hartree，输出转为 Angstrom/eV。
 
 ### `LayerParser.py`
 
@@ -139,8 +154,8 @@
 
 同步范围至少包括：
 
-- `test/unit/structure/utils/`
-- `test/integration/structure/utils/`
+- `test/unit/utils/`
+- `test/integration/utils/`
 - `history/architecture/modules/data_contract.md`
 - `history/architecture/modules/glossary_units.md`（若涉及术语/单位）
 

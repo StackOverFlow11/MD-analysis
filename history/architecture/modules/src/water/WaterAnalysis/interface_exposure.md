@@ -1,15 +1,15 @@
-# `src/structure/Analysis/WaterAnalysis/` 接口暴露约定（当前实现）
+# `md_analysis.water.WaterAnalysis` 接口暴露约定（当前实现）
 
 > 对应代码：
-> - `src/structure/Analysis/WaterAnalysis/__init__.py`
-> - `src/structure/Analysis/WaterAnalysis/WaterDensity.py`
-> - `src/structure/Analysis/WaterAnalysis/WaterOrientation.py`
-> - `src/structure/Analysis/WaterAnalysis/AdWaterOrientation.py`
-> - `src/structure/Analysis/WaterAnalysis/_common.py`（私有实现，不属于对外契约）
+> - `src/md_analysis/water/WaterAnalysis/__init__.py`
+> - `src/md_analysis/water/WaterAnalysis/WaterDensity.py`
+> - `src/md_analysis/water/WaterAnalysis/WaterOrientation.py`
+> - `src/md_analysis/water/WaterAnalysis/AdWaterOrientation.py`
+> - `src/md_analysis/water/WaterAnalysis/_common.py`（私有实现，不属于对外契约）
 
 ## 1. 接口角色定义
 
-- `WaterAnalysis` 是 `Analysis` 子层中"水相关分析"的聚合目录。
+- `WaterAnalysis` 是 `water` 子层中"水相关分析"的聚合目录。
 - 本层负责暴露水分析入口函数，不暴露内部 helper。
 - 多帧遍历/界面检测/系综平均等公共实现集中在私有模块 `_common.py` 中（外部不得依赖）。
 
@@ -41,14 +41,12 @@
 
 ## 3. 推荐导入方式
 
-- `from src.structure.Analysis.WaterAnalysis import water_mass_density_z_distribution_analysis`
-- `from src.structure.Analysis.WaterAnalysis import water_orientation_weighted_density_z_distribution_analysis`
-- `from src.structure.Analysis.WaterAnalysis import detect_adsorbed_layer_range_from_density_profile`
-- `from src.structure.Analysis.WaterAnalysis import ad_water_orientation_analysis`
-- `from src.structure.Analysis import water_mass_density_z_distribution_analysis`
-- `from src.structure.Analysis import water_orientation_weighted_density_z_distribution_analysis`
-- `from src.structure.Analysis import detect_adsorbed_layer_range_from_density_profile`
-- `from src.structure.Analysis import ad_water_orientation_analysis`
+- `from md_analysis.water.WaterAnalysis import water_mass_density_z_distribution_analysis`
+- `from md_analysis.water.WaterAnalysis import water_orientation_weighted_density_z_distribution_analysis`
+- `from md_analysis.water.WaterAnalysis import detect_adsorbed_layer_range_from_density_profile`
+- `from md_analysis.water.WaterAnalysis import ad_water_orientation_analysis`
+- `from md_analysis.water import water_mass_density_z_distribution_analysis`
+- `from md_analysis.water import plot_water_three_panel_analysis`
 
 ## 4. 兼容承诺与变更流程
 

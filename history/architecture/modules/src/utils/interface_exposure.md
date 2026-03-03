@@ -1,13 +1,13 @@
-# `src/structure/utils/` 接口暴露约定（当前实现）
+# `md_analysis.utils` 接口暴露约定（当前实现）
 
-> 对应代码：`src/structure/utils/__init__.py`
+> 对应代码：`src/md_analysis/utils/__init__.py`
 >
-> 本文档定义 `src.structure.utils` 的符号级公开接口与暴露边界。
+> 本文档定义 `md_analysis.utils` 的符号级公开接口与暴露边界。
 
 ## 1. 接口角色定义
 
-- `src.structure.utils` 是"底层实现能力的公开导出层"。
-- 本层暴露的符号允许被上层（`src.structure`）和外部调用方直接导入。
+- `md_analysis.utils` 是"底层实现能力的公开导出层"。
+- 本层暴露的符号允许被上层（`md_analysis.water`、`md_analysis.potential`）和外部调用方直接导入。
 - 本层不自动暴露模块内私有 helper；公开范围由 `__all__` 严格定义。
 
 ## 2. 当前公开接口清单（按模块）
@@ -20,16 +20,51 @@
 - `DEFAULT_THETA_BIN_DEG`
 - `DEFAULT_WATER_OH_CUTOFF_A`
 - `WATER_MOLAR_MASS_G_PER_MOL`
+- `HA_TO_EV`
+- `BOHR_TO_ANG`
+- `DP_A_H3O_W_EV`
+- `MU_HPLUS_G0_EV`
+- `DELTA_E_ZP_EV`
 
 说明：
 
 - 以上常量为默认行为来源；默认值变化属于接口行为变化。
-- 当前默认值（与 `src/structure/utils/config.py` 对齐）：
+- 当前默认值（与 `src/md_analysis/utils/config.py` 对齐）：
   - `DEFAULT_Z_BIN_WIDTH_A = 0.1` Angstrom
   - `DEFAULT_THETA_BIN_DEG = 5.0` degree
   - `DEFAULT_WATER_OH_CUTOFF_A = 1.25` Angstrom
 
-### 2.2 `LayerParser.py` 导出（Stable）
+### 2.2 `ClusterUtils.py` 导出（Stable）
+
+函数：
+
+- `cluster_1d_periodic(...)`
+  - 1D 周期性聚类
+- `find_largest_gap_periodic(...)`
+  - 在周期排列中找到最大间隙
+- `gap_midpoint_periodic(...)`
+  - 计算间隙中点
+
+### 2.3 `CubeParser.py` 导出（Stable）
+
+数据结构：
+
+- `CubeHeader`
+
+函数：
+
+- `read_cube_header_and_values(...)`
+  - 读取 Gaussian cube 文件
+- `slab_average_potential_ev(...)`
+  - slab 区间平均电势，返回 `(phi_center_ev, info_dict)`
+- `plane_avg_phi_z_ev(...)`
+  - xy 平面平均的 φ(z) profile
+- `z_coords_ang(...)`
+  - z 轴网格坐标（Angstrom）
+- `extract_step_from_cube_filename(...)`
+  - 从 cube 文件名提取 step 编号
+
+### 2.4 `LayerParser.py` 导出（Stable）
 
 数据结构与异常：
 
@@ -47,7 +82,7 @@
   - 输入：`SurfaceDetectionResult`
   - 输出：可读文本摘要 `str`
 
-### 2.3 `WaterParser.py` 导出（Stable）
+### 2.5 `WaterParser.py` 导出（Stable）
 
 异常：
 
@@ -62,18 +97,20 @@
 
 > **注**：`_compute_water_mass_density_z_distribution`、`_compute_water_orientation_weighted_density_z_distribution`、
 > `_compute_water_orientation_theta_pdf_in_c_fraction_window` 三个函数已降级为内部（`_` 前缀），不再属于公开 API。
-> 它们针对全 cell z 轴分箱，与 `Analysis` 层的界面-到-中点分析语义不同，不适合作为公开接口暴露。
+> 它们针对全 cell z 轴分箱，与 `water` 层的界面-到-中点分析语义不同，不适合作为公开接口暴露。
 
 ## 3. 推荐导入方式
 
-- `from src.structure.utils import detect_interface_layers`
-- `from src.structure.utils import detect_water_molecule_indices`
-- `from src.structure.utils import get_water_oxygen_indices_array`
-- `from src.structure.utils import DEFAULT_Z_BIN_WIDTH_A, DEFAULT_THETA_BIN_DEG`
+- `from md_analysis.utils import detect_interface_layers`
+- `from md_analysis.utils import detect_water_molecule_indices`
+- `from md_analysis.utils import get_water_oxygen_indices_array`
+- `from md_analysis.utils import DEFAULT_Z_BIN_WIDTH_A, DEFAULT_THETA_BIN_DEG`
+- `from md_analysis.utils import read_cube_header_and_values, slab_average_potential_ev`
+- `from md_analysis.utils import HA_TO_EV, BOHR_TO_ANG`
 
 ## 4. 非公开边界（必须遵守）
 
-- 未出现在 `src/structure/utils/__init__.py` 的 `__all__` 中的符号，不属于公开接口。
+- 未出现在 `src/md_analysis/utils/__init__.py` 的 `__all__` 中的符号，不属于公开接口。
 - 以下类别默认非公开：
   - `_` 前缀 helper
   - 模块内部中间计算函数
@@ -90,7 +127,7 @@
 ### 5.2 兼容策略
 
 - 默认不破坏现有导入路径：
-  - `from src.structure.utils import <symbol>`
+  - `from md_analysis.utils import <symbol>`
 - 若需要替换接口：
   - 先新增新符号并保留旧符号兼容期
   - 再进行分阶段迁移
@@ -107,7 +144,7 @@
 
 ## 7. 接口变更流程（必须执行）
 
-1. 更新 `src/structure/utils/__init__.py` 的导出与 `__all__`
+1. 更新 `src/md_analysis/utils/__init__.py` 的导出与 `__all__`
 2. 更新本文档公开接口清单
 3. 若涉及契约变化，同步更新：
    - `history/architecture/modules/data_contract.md`

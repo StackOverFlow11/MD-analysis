@@ -1,46 +1,54 @@
-# `src/` 接口暴露约定（当前实现）
+# `md_analysis` 接口暴露约定（当前实现）
 
-> 对应代码：`src/__init__.py`
+> 对应代码：`src/md_analysis/__init__.py`
 >
-> 本文档定义 `src` 顶层包的公开接口边界与兼容规则。
+> 本文档定义 `md_analysis` 顶层包的公开接口边界与兼容规则。
 
 ## 1. 接口角色定义
 
-- `src/` 是顶层命名空间入口，只负责暴露子包。
-- `src/` 不直接暴露业务算法函数、数据结构或配置常量。
-- 业务能力统一通过 `src.structure` 向下访问。
+- `md_analysis` 是顶层命名空间入口，只负责暴露子包。
+- `md_analysis` 不直接暴露业务算法函数、数据结构或配置常量。
+- 业务能力通过 `md_analysis.utils`、`md_analysis.water`、`md_analysis.potential` 向下访问。
+- CLI 入口通过 `md_analysis.CLI:main` 注册为 `md-analysis` console script。
+- 编程入口通过 `md_analysis.main` 提供 `run_water_analysis`、`run_potential_analysis`、`run_all`。
 - 目录治理硬约束见：`history/architecture/modules/README.md`（镜像对齐 + 双文档）。
 
 ## 2. 当前公开接口清单
 
 ### 2.1 稳定导出（Stable）
 
-- `structure`
+- `utils`
+- `water`
+- `potential`
 
 与代码一致性基线：
 
-- `src/__init__.py` 中已导入并写入 `__all__` 的符号，视为顶层稳定接口。
+- `src/md_analysis/__init__.py` 中已导入并写入 `__all__` 的符号，视为顶层稳定接口。
+- 当前 `__all__ = ["utils", "water", "potential"]`。
 
 ### 2.2 非公开符号（Non-public）
 
+- `CLI` 和 `main` 未在 `__all__` 中声明，作为内部入口模块使用。
 - 未在 `__all__` 中声明的任何名字，均不视为公开契约。
-- 调用方不得依赖非公开符号名称或存在性。
 
 ## 3. 推荐导入方式
 
-- `import src`
-- `from src import structure`
+- `import md_analysis`
+- `from md_analysis import utils`
+- `from md_analysis import water`
+- `from md_analysis import potential`
 
 不推荐：
 
-- 从 `src` 顶层直接期待细粒度函数（应转到 `src.structure`）。
+- 从 `md_analysis` 顶层直接期待细粒度函数（应转到对应子包）。
 
 ## 4. 稳定性级别与兼容承诺
 
 ### 4.1 顶层稳定性级别
 
-- `src.structure`：**稳定（Stable）**
-  - 正常迭代中默认保持导入路径不变。
+- `md_analysis.utils`：**稳定（Stable）**
+- `md_analysis.water`：**稳定（Stable）**
+- `md_analysis.potential`：**稳定（Stable）**
 
 ### 4.2 兼容承诺
 
@@ -58,18 +66,18 @@
 
 ## 6. 顶层接口变更流程（必须执行）
 
-1. 更新 `src/__init__.py` 的导出与 `__all__`
+1. 更新 `src/md_analysis/__init__.py` 的导出与 `__all__`
 2. 更新本文档公开接口清单
 3. 更新 `history/architecture/modules/src/implementation_guidelines.md`（若规则被触发）
 4. 执行导入烟雾测试：
-   - `import src`
-   - `from src import <symbol>`
+   - `import md_analysis`
+   - `from md_analysis import <symbol>`
 5. 运行回归测试确认无导入层回归
 
 ## 7. 反模式（禁止）
 
 - 在顶层暴露实现层私有函数
-- 把 `src` 当作业务函数大杂烩入口
+- 把 `md_analysis` 当作业务函数大杂烩入口
 - 修改导出但不更新 `__all__` 与文档
 - 未做导入验证即提交顶层导出变更
 

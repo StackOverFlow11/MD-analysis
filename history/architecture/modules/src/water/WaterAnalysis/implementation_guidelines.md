@@ -1,6 +1,6 @@
-# `src/structure/Analysis/WaterAnalysis/` 内部实现准则（当前实现口径）
+# `md_analysis.water.WaterAnalysis` 内部实现准则（当前实现口径）
 
-> 适用范围：`src/structure/Analysis/WaterAnalysis/`。
+> 适用范围：`src/md_analysis/water/WaterAnalysis/`。
 
 ## 1. 职责边界
 
@@ -42,8 +42,8 @@
 
 ## 4. 依赖方向约束
 
-- 允许：`WaterAnalysis` -> `src.structure.utils`
-- 禁止：`src.structure.utils` -> `WaterAnalysis`
+- 允许：`WaterAnalysis` -> `md_analysis.utils`
+- 禁止：`md_analysis.utils` -> `WaterAnalysis`
 - 禁止引入与分析无关的上层耦合。
 
 ## 5. 变更同步要求

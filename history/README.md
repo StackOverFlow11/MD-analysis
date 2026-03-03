@@ -25,7 +25,6 @@
     - `modules/glossary_units.md`：术语与单位约定汇总
   - `decisions/`：架构/技术决策记录（ADR）
 - `temp/`：重要上下文临时寄存区
-  - `2026-03-03_project_review_findings.md`：项目问题清单（按用户要求排除两项争议点）
 
 ## 约定
 
