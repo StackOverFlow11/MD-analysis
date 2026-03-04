@@ -2,10 +2,6 @@
 
 from __future__ import annotations
 
-import csv
-import warnings
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
@@ -18,67 +14,12 @@ from .config import (
     DEFAULT_ACF_FILENAME,
     DEFAULT_DIR_PATTERN,
     DEFAULT_POTCAR_FILENAME,
-    DEFAULT_SELECTED_ATOM_CHARGES_CSV_NAME,
     DEFAULT_STRUCTURE_FILENAME,
-    DEFAULT_SURFACE_CHARGE_CSV_NAME,
     E_PER_A2_TO_UC_PER_CM2,
 )
 
-
-# ---------------------------------------------------------------------------
-# Atom selectors
-# ---------------------------------------------------------------------------
-
-class AtomSelector(ABC):
-    """Abstract base class for selecting atoms of interest."""
-
-    @abstractmethod
-    def select(self, atoms: Atoms) -> np.ndarray:
-        """Return 0-based indices of selected atoms. May return an empty array."""
-        ...
-
-
-class ElementSelector(AtomSelector):
-    """Select atoms by element symbol(s)."""
-
-    def __init__(self, symbols: Iterable[str]) -> None:
-        self._symbols = frozenset(symbols)
-        if not self._symbols:
-            raise ValueError("symbols must be non-empty")
-
-    def select(self, atoms: Atoms) -> np.ndarray:
-        sym = np.asarray(atoms.get_chemical_symbols())
-        mask = np.isin(sym, list(self._symbols))
-        return np.where(mask)[0]
-
-
-class IndexSelector(AtomSelector):
-    """Select atoms by fixed 0-based indices."""
-
-    def __init__(self, indices: Iterable[int]) -> None:
-        self._indices = np.asarray(sorted(set(indices)), dtype=int)
-
-    def select(self, atoms: Atoms) -> np.ndarray:
-        n = len(atoms)
-        valid = self._indices[(self._indices >= 0) & (self._indices < n)]
-        return valid
-
-
-# ---------------------------------------------------------------------------
-# Trajectory result dataclass
-# ---------------------------------------------------------------------------
-
-@dataclass(frozen=True)
-class TrajectoryChargeResult:
-    """Aggregated results from multi-frame charge analysis."""
-
-    frame_labels: tuple[str, ...]
-    surface_charge_density_uC_cm2: np.ndarray       # (n_frames, 2) [bottom, top]
-    mean_surface_charge_density_uC_cm2: np.ndarray   # (2,)
-    std_surface_charge_density_uC_cm2: np.ndarray    # (2,)
-    selected_atom_net_charges: np.ndarray             # (n_frames, n_selected) or empty
-    mean_selected_atom_net_charges: np.ndarray        # (n_selected,) or empty
-    selected_atom_indices: tuple[int, ...]            # empty tuple if no selector
+# Map normal axis to the two cell-vector indices spanning the surface plane
+_AREA_VECTORS = {"a": (1, 2), "b": (0, 2), "c": (0, 1)}
 
 
 # ---------------------------------------------------------------------------
@@ -88,7 +29,6 @@ class TrajectoryChargeResult:
 def compute_frame_surface_charge(
     atoms: Atoms,
     *,
-    atom_selector: AtomSelector | None = None,
     metal_symbols: Iterable[str] | None = None,
     normal: str = "c",
 ) -> Atoms:
@@ -100,25 +40,26 @@ def compute_frame_surface_charge(
     Results are stored in-place on the returned Atoms:
     - ``atoms.info["surface_charge_density_e_A2"]`` — [σ_bottom, σ_top] in e/Å²
     - ``atoms.info["surface_charge_density_uC_cm2"]`` — same in μC/cm²
-    - ``atoms.info["selected_atom_indices"]`` — (if selector provided)
-    - ``atoms.info["selected_atom_net_charges"]`` — (if selector provided)
 
     Parameters
     ----------
     atoms
         ASE Atoms with ``"bader_net_charge"`` per-atom array.
-    atom_selector
-        Optional selector for atoms of interest.
     metal_symbols
         Override default metal symbols for layer detection.
     normal
-        Cell axis for layer detection (default ``"c"``).
+        Cell axis perpendicular to the surface (``"a"``, ``"b"``, or ``"c"``).
 
     Returns
     -------
     Atoms
         The same object, mutated with results in ``atoms.info``.
     """
+    if normal not in _AREA_VECTORS:
+        raise ValueError(
+            f"normal must be one of {set(_AREA_VECTORS)}, got {normal!r}"
+        )
+
     if "bader_net_charge" not in atoms.arrays:
         raise ValueError(
             "atoms.arrays must contain 'bader_net_charge'. "
@@ -135,11 +76,10 @@ def compute_frame_surface_charge(
             f"Expected exactly 2 interface layers, got {len(iface_layers)}"
         )
 
-    # Surface area from cell vectors a × b (orthogonal cell, normal="c")
+    # Surface area from the two cell vectors spanning the surface plane
+    i0, i1 = _AREA_VECTORS[normal]
     cell = np.asarray(atoms.cell.array, dtype=float)
-    a_vec = cell[0]
-    b_vec = cell[1]
-    area_A2 = float(np.linalg.norm(np.cross(a_vec, b_vec)))
+    area_A2 = float(np.linalg.norm(np.cross(cell[i0], cell[i1])))
 
     # Sort interface layers by center_s (bottom first)
     sorted_iface = sorted(iface_layers, key=lambda L: L.center_s)
@@ -154,45 +94,31 @@ def compute_frame_surface_charge(
     atoms.info["surface_charge_density_e_A2"] = sigma_e_A2.tolist()
     atoms.info["surface_charge_density_uC_cm2"] = sigma_uC_cm2.tolist()
 
-    # Optional atom selection
-    if atom_selector is not None:
-        sel_idx = atom_selector.select(atoms)
-        atoms.info["selected_atom_indices"] = sel_idx.tolist()
-        atoms.info["selected_atom_net_charges"] = net_charge[sel_idx].tolist()
-
     return atoms
 
 
 # ---------------------------------------------------------------------------
-# Trajectory analysis
+# Trajectory indexed atom charges
 # ---------------------------------------------------------------------------
 
-def trajectory_charge_analysis(
+def trajectory_indexed_atom_charges(
     root_dir: str | Path,
+    atom_index_matrix: np.ndarray,
     *,
-    atom_selector: AtomSelector | None = None,
-    metal_symbols: Iterable[str] | None = None,
-    normal: str = "c",
     dir_pattern: str = DEFAULT_DIR_PATTERN,
     structure_filename: str = DEFAULT_STRUCTURE_FILENAME,
     acf_filename: str = DEFAULT_ACF_FILENAME,
     potcar_filename: str = DEFAULT_POTCAR_FILENAME,
-    output_dir: str | Path | None = None,
-    surface_charge_csv_name: str = DEFAULT_SURFACE_CHARGE_CSV_NAME,
-    selected_atom_charges_csv_name: str = DEFAULT_SELECTED_ATOM_CHARGES_CSV_NAME,
-) -> TrajectoryChargeResult:
-    """Run charge analysis over a trajectory of Bader calculation directories.
+) -> np.ndarray:
+    """Extract net charges for specified atom indices across trajectory frames.
 
     Parameters
     ----------
     root_dir
         Parent directory containing per-frame subdirectories.
-    atom_selector
-        Optional selector for tracking specific atom charges across frames.
-    metal_symbols
-        Override default metal symbols for layer detection.
-    normal
-        Cell axis for layer detection.
+    atom_index_matrix
+        2-D integer array of shape ``(t, N)`` with 0-based atom indices.
+        Row *i* lists the atom indices to query in frame *i*.
     dir_pattern
         Glob pattern for discovering frame subdirectories.
     structure_filename
@@ -201,17 +127,27 @@ def trajectory_charge_analysis(
         Name of the ACF.dat file in each subdirectory.
     potcar_filename
         Name of the POTCAR file in each subdirectory.
-    output_dir
-        Directory for CSV output. Defaults to *root_dir*.
-    surface_charge_csv_name
-        Filename for the surface charge density CSV.
-    selected_atom_charges_csv_name
-        Filename for the selected-atom charges CSV.
 
     Returns
     -------
-    TrajectoryChargeResult
+    np.ndarray
+        Array of shape ``(t, N, 2)`` where ``[:, :, 0]`` contains the
+        (echoed-back) atom indices and ``[:, :, 1]`` contains the
+        corresponding Bader net charges.
     """
+    # --- Validate atom_index_matrix ---
+    arr = np.asarray(atom_index_matrix)
+    if arr.ndim != 2:
+        raise ValueError(
+            f"atom_index_matrix must be 2-D, got {arr.ndim}-D"
+        )
+    if not np.issubdtype(arr.dtype, np.integer):
+        raise ValueError(
+            f"atom_index_matrix must have integer dtype, got {arr.dtype}"
+        )
+    if np.any(arr < 0):
+        raise ValueError("atom_index_matrix contains negative indices")
+
     root = Path(root_dir)
     if not root.is_dir():
         raise FileNotFoundError(f"root_dir does not exist: {root}")
@@ -222,128 +158,43 @@ def trajectory_charge_analysis(
             f"No subdirectories matching '{dir_pattern}' in {root}"
         )
 
-    out_dir = Path(output_dir) if output_dir is not None else root
-    out_dir.mkdir(parents=True, exist_ok=True)
+    t_expected = arr.shape[0]
+    if t_expected != len(frame_dirs):
+        raise ValueError(
+            f"atom_index_matrix has {t_expected} rows but found "
+            f"{len(frame_dirs)} frame directories"
+        )
 
-    labels: list[str] = []
-    sigma_list: list[np.ndarray] = []
-    sel_charges_list: list[np.ndarray] = []
-    sel_indices: np.ndarray | None = None
+    t, n = arr.shape
+    result = np.empty((t, n, 2), dtype=float)
 
-    for frame_dir in frame_dirs:
-        acf_path = frame_dir / acf_filename
-        if not acf_path.exists():
-            warnings.warn(
-                f"Skipping {frame_dir.name}: {acf_filename} not found",
-                stacklevel=2,
+    for i, frame_dir in enumerate(frame_dirs):
+        fname = frame_dir.name
+        poscar = frame_dir / structure_filename
+        acf = frame_dir / acf_filename
+        potcar = frame_dir / potcar_filename
+
+        for path, label in [(poscar, structure_filename),
+                            (acf, acf_filename),
+                            (potcar, potcar_filename)]:
+            if not path.exists():
+                raise FileNotFoundError(
+                    f"{label} not found in frame {fname}: {path}"
+                )
+
+        atoms = load_bader_atoms(poscar, acf, potcar)
+        net_charge = atoms.arrays["bader_net_charge"]
+        n_atoms = len(atoms)
+
+        indices_row = arr[i]
+        oob = indices_row[indices_row >= n_atoms]
+        if oob.size > 0:
+            raise IndexError(
+                f"Atom index {int(oob[0])} out of bounds for frame {fname} "
+                f"with {n_atoms} atoms"
             )
-            continue
 
-        atoms = load_bader_atoms(
-            frame_dir / structure_filename,
-            acf_path,
-            frame_dir / potcar_filename,
-        )
-        compute_frame_surface_charge(
-            atoms,
-            atom_selector=atom_selector,
-            metal_symbols=metal_symbols,
-            normal=normal,
-        )
+        result[i, :, 0] = indices_row.astype(float)
+        result[i, :, 1] = net_charge[indices_row]
 
-        labels.append(frame_dir.name)
-        sigma_list.append(
-            np.array(atoms.info["surface_charge_density_uC_cm2"])
-        )
-
-        if atom_selector is not None:
-            frame_sel_idx = np.array(atoms.info["selected_atom_indices"])
-            frame_sel_q = np.array(atoms.info["selected_atom_net_charges"])
-
-            if sel_indices is None:
-                sel_indices = frame_sel_idx
-            else:
-                if not np.array_equal(sel_indices, frame_sel_idx):
-                    raise ValueError(
-                        f"Selected atom indices changed between frames: "
-                        f"first frame {sel_indices.tolist()}, "
-                        f"frame {frame_dir.name} {frame_sel_idx.tolist()}"
-                    )
-            sel_charges_list.append(frame_sel_q)
-
-    if not labels:
-        raise RuntimeError("No valid frames found in trajectory")
-
-    sigma_arr = np.stack(sigma_list)  # (n_frames, 2)
-    mean_sigma = sigma_arr.mean(axis=0)
-    std_sigma = sigma_arr.std(axis=0)
-
-    if sel_charges_list:
-        sel_arr = np.stack(sel_charges_list)  # (n_frames, n_selected)
-        mean_sel = sel_arr.mean(axis=0)
-        final_sel_indices = tuple(int(i) for i in sel_indices)  # type: ignore[union-attr]
-    else:
-        sel_arr = np.empty((len(labels), 0))
-        mean_sel = np.empty(0)
-        final_sel_indices = ()
-
-    # Write surface charge CSV
-    _write_surface_charge_csv(
-        out_dir / surface_charge_csv_name, labels, sigma_arr, mean_sigma, std_sigma
-    )
-
-    # Write selected atom charges CSV (if applicable)
-    if final_sel_indices:
-        _write_selected_atom_charges_csv(
-            out_dir / selected_atom_charges_csv_name,
-            labels,
-            final_sel_indices,
-            sel_arr,
-            mean_sel,
-        )
-
-    return TrajectoryChargeResult(
-        frame_labels=tuple(labels),
-        surface_charge_density_uC_cm2=sigma_arr,
-        mean_surface_charge_density_uC_cm2=mean_sigma,
-        std_surface_charge_density_uC_cm2=std_sigma,
-        selected_atom_net_charges=sel_arr,
-        mean_selected_atom_net_charges=mean_sel,
-        selected_atom_indices=final_sel_indices,
-    )
-
-
-# ---------------------------------------------------------------------------
-# CSV writers
-# ---------------------------------------------------------------------------
-
-def _write_surface_charge_csv(
-    path: Path,
-    labels: list[str],
-    sigma_arr: np.ndarray,
-    mean_sigma: np.ndarray,
-    std_sigma: np.ndarray,
-) -> None:
-    with open(path, "w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(["frame", "sigma_bottom_uC_cm2", "sigma_top_uC_cm2"])
-        for i, label in enumerate(labels):
-            writer.writerow([label, f"{sigma_arr[i, 0]:.6f}", f"{sigma_arr[i, 1]:.6f}"])
-        writer.writerow(["mean", f"{mean_sigma[0]:.6f}", f"{mean_sigma[1]:.6f}"])
-        writer.writerow(["std", f"{std_sigma[0]:.6f}", f"{std_sigma[1]:.6f}"])
-
-
-def _write_selected_atom_charges_csv(
-    path: Path,
-    labels: list[str],
-    indices: tuple[int, ...],
-    sel_arr: np.ndarray,
-    mean_sel: np.ndarray,
-) -> None:
-    header = ["frame"] + [f"atom_{idx}" for idx in indices]
-    with open(path, "w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(header)
-        for i, label in enumerate(labels):
-            writer.writerow([label] + [f"{v:.6f}" for v in sel_arr[i]])
-        writer.writerow(["mean"] + [f"{v:.6f}" for v in mean_sel])
+    return result

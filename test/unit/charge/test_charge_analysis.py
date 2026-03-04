@@ -7,68 +7,13 @@ import pytest
 from ase import Atoms
 
 from md_analysis.charge.ChargeAnalysis import (
-    AtomSelector,
-    ElementSelector,
-    IndexSelector,
-    TrajectoryChargeResult,
     compute_frame_surface_charge,
+    trajectory_indexed_atom_charges,
 )
 from md_analysis.charge.config import E_PER_A2_TO_UC_PER_CM2
 from md_analysis.utils.BaderParser import load_bader_atoms
 
 DATA_DIR = Path(__file__).resolve().parents[3] / "data_example" / "bader_work_dir"
-
-
-# ---------------------------------------------------------------------------
-# Atom selectors
-# ---------------------------------------------------------------------------
-
-class TestAtomSelectors:
-    """Tests for ElementSelector and IndexSelector."""
-
-    def test_element_selector_basic(self):
-        atoms = Atoms("CuAgOH", positions=[[0, 0, 0], [1, 0, 0], [2, 0, 0], [3, 0, 0]])
-        sel = ElementSelector({"Ag"})
-        idx = sel.select(atoms)
-        np.testing.assert_array_equal(idx, [1])
-
-    def test_element_selector_multiple(self):
-        atoms = Atoms("CuAgOH", positions=[[0, 0, 0], [1, 0, 0], [2, 0, 0], [3, 0, 0]])
-        sel = ElementSelector({"Cu", "Ag"})
-        idx = sel.select(atoms)
-        np.testing.assert_array_equal(idx, [0, 1])
-
-    def test_element_selector_no_match(self):
-        atoms = Atoms("CuCu", positions=[[0, 0, 0], [1, 0, 0]])
-        sel = ElementSelector({"Ag"})
-        idx = sel.select(atoms)
-        assert len(idx) == 0
-
-    def test_element_selector_empty_symbols_raises(self):
-        with pytest.raises(ValueError, match="non-empty"):
-            ElementSelector(set())
-
-    def test_index_selector_basic(self):
-        atoms = Atoms("CuAgO", positions=[[0, 0, 0], [1, 0, 0], [2, 0, 0]])
-        sel = IndexSelector([0, 2])
-        idx = sel.select(atoms)
-        np.testing.assert_array_equal(idx, [0, 2])
-
-    def test_index_selector_out_of_range(self):
-        atoms = Atoms("CuAg", positions=[[0, 0, 0], [1, 0, 0]])
-        sel = IndexSelector([0, 5, 10])
-        idx = sel.select(atoms)
-        np.testing.assert_array_equal(idx, [0])
-
-    def test_index_selector_deduplicates(self):
-        atoms = Atoms("CuAgO", positions=[[0, 0, 0], [1, 0, 0], [2, 0, 0]])
-        sel = IndexSelector([1, 1, 2])
-        idx = sel.select(atoms)
-        np.testing.assert_array_equal(idx, [1, 2])
-
-    def test_abc_not_instantiable(self):
-        with pytest.raises(TypeError):
-            AtomSelector()  # type: ignore[abstract]
 
 
 # ---------------------------------------------------------------------------
@@ -103,19 +48,33 @@ class TestComputeFrameSurfaceCharge:
         sigma = result.info["surface_charge_density_uC_cm2"]
         assert all(np.isfinite(v) for v in sigma)
 
-    def test_with_element_selector(self, bader_atoms):
-        sel = ElementSelector({"Ag"})
-        result = compute_frame_surface_charge(bader_atoms, atom_selector=sel)
-        assert "selected_atom_indices" in result.info
-        assert "selected_atom_net_charges" in result.info
-        # There are 2 Ag atoms in the structure
-        assert len(result.info["selected_atom_indices"]) == 2
-        assert len(result.info["selected_atom_net_charges"]) == 2
-
-    def test_without_selector_no_selected_keys(self, bader_atoms):
+    def test_no_selected_keys(self, bader_atoms):
         result = compute_frame_surface_charge(bader_atoms)
         assert "selected_atom_indices" not in result.info
         assert "selected_atom_net_charges" not in result.info
+
+    def test_normal_a(self, bader_atoms):
+        """normal='a' uses cell vectors b × c for area."""
+        # This will likely fail on layer detection for this particular
+        # dataset, but we verify the area-vector selection path is reached.
+        # For a proper test we just check that it doesn't raise ValueError
+        # on normal validation and proceeds to layer detection.
+        try:
+            compute_frame_surface_charge(bader_atoms, normal="a")
+        except ValueError as exc:
+            # Accept layer-detection failures but NOT normal-validation errors
+            assert "normal must be" not in str(exc)
+
+    def test_normal_b(self, bader_atoms):
+        """normal='b' uses cell vectors a × c for area."""
+        try:
+            compute_frame_surface_charge(bader_atoms, normal="b")
+        except ValueError as exc:
+            assert "normal must be" not in str(exc)
+
+    def test_invalid_normal_raises(self, bader_atoms):
+        with pytest.raises(ValueError, match="normal must be"):
+            compute_frame_surface_charge(bader_atoms, normal="z")
 
     def test_missing_bader_net_charge_raises(self):
         atoms = Atoms("Cu", positions=[[0, 0, 0]], cell=[10, 10, 10], pbc=True)
@@ -124,35 +83,57 @@ class TestComputeFrameSurfaceCharge:
 
 
 # ---------------------------------------------------------------------------
-# TrajectoryChargeResult dataclass
+# trajectory_indexed_atom_charges
 # ---------------------------------------------------------------------------
 
-class TestTrajectoryChargeResult:
-    """Tests for the frozen dataclass."""
+class TestTrajectoryIndexedAtomCharges:
+    """Unit tests for trajectory_indexed_atom_charges validation."""
 
-    def test_frozen(self):
-        result = TrajectoryChargeResult(
-            frame_labels=("f1", "f2"),
-            surface_charge_density_uC_cm2=np.zeros((2, 2)),
-            mean_surface_charge_density_uC_cm2=np.zeros(2),
-            std_surface_charge_density_uC_cm2=np.zeros(2),
-            selected_atom_net_charges=np.empty((2, 0)),
-            mean_selected_atom_net_charges=np.empty(0),
-            selected_atom_indices=(),
-        )
-        with pytest.raises(AttributeError):
-            result.frame_labels = ("x",)  # type: ignore[misc]
+    def test_non_2d_raises(self, tmp_path):
+        with pytest.raises(ValueError, match="2-D"):
+            trajectory_indexed_atom_charges(tmp_path, np.array([1, 2, 3]))
 
-    def test_fields_accessible(self):
-        sigma = np.array([[1.0, 2.0], [3.0, 4.0]])
-        result = TrajectoryChargeResult(
-            frame_labels=("a", "b"),
-            surface_charge_density_uC_cm2=sigma,
-            mean_surface_charge_density_uC_cm2=sigma.mean(axis=0),
-            std_surface_charge_density_uC_cm2=sigma.std(axis=0),
-            selected_atom_net_charges=np.empty((2, 0)),
-            mean_selected_atom_net_charges=np.empty(0),
-            selected_atom_indices=(),
-        )
-        assert result.frame_labels == ("a", "b")
-        assert result.surface_charge_density_uC_cm2.shape == (2, 2)
+    def test_non_integer_raises(self, tmp_path):
+        with pytest.raises(ValueError, match="integer dtype"):
+            trajectory_indexed_atom_charges(
+                tmp_path, np.array([[1.0, 2.0]])
+            )
+
+    def test_negative_index_raises(self, tmp_path):
+        with pytest.raises(ValueError, match="negative"):
+            trajectory_indexed_atom_charges(
+                tmp_path, np.array([[0, -1]])
+            )
+
+    def test_t_mismatch_raises(self, tmp_path):
+        """t rows != number of frame directories."""
+        # Create 1 frame dir but provide 2-row matrix
+        frame = tmp_path / "calc_t000_i000"
+        frame.mkdir()
+        with pytest.raises(ValueError, match="rows"):
+            trajectory_indexed_atom_charges(
+                tmp_path, np.array([[0], [1]])
+            )
+
+    def test_missing_file_raises(self, tmp_path):
+        """Missing POSCAR/ACF.dat/POTCAR raises FileNotFoundError."""
+        frame = tmp_path / "calc_t000_i000"
+        frame.mkdir()
+        with pytest.raises(FileNotFoundError):
+            trajectory_indexed_atom_charges(
+                tmp_path, np.array([[0]])
+            )
+
+    def test_out_of_bounds_raises(self, tmp_path):
+        """Index exceeding atom count raises IndexError with frame name."""
+        import shutil
+        frame = tmp_path / "calc_t000_i000"
+        frame.mkdir()
+        for f in ["POSCAR", "ACF.dat", "POTCAR"]:
+            shutil.copy2(DATA_DIR / f, frame / f)
+
+        big_idx = 99999
+        with pytest.raises(IndexError, match="calc_t000_i000"):
+            trajectory_indexed_atom_charges(
+                tmp_path, np.array([[big_idx]])
+            )

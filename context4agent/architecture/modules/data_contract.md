@@ -154,18 +154,14 @@ $$
 - 结果存入 `atoms.info`（原地修改）
 - `atoms.info["surface_charge_density_e_A2"]`：`[σ_bottom, σ_top]`，单位 e/Å²
 - `atoms.info["surface_charge_density_uC_cm2"]`：`[σ_bottom, σ_top]`，单位 μC/cm²
-- 可选（当提供 `atom_selector` 时）：
-  - `atoms.info["selected_atom_indices"]`：`list[int]`
-  - `atoms.info["selected_atom_net_charges"]`：`list[float]`
+- `normal` 参数控制面积计算：`_AREA_VECTORS = {"a": (1,2), "b": (0,2), "c": (0,1)}`
 
-### `trajectory_charge_analysis(root_dir, ...)` 输出
+### `trajectory_indexed_atom_charges(root_dir, atom_index_matrix, ...)` 输出
 
-- 返回 `TrajectoryChargeResult`（frozen dataclass）
-- CSV（surface_charge_density.csv）：`frame,sigma_bottom_uC_cm2,sigma_top_uC_cm2`
-  - 含 `mean` 和 `std` 汇总行
-- CSV（selected_atom_charges.csv，可选）：`frame,atom_<idx>,...`
-  - 含 `mean` 汇总行
-- 单位：μC/cm²（表面电荷密度）、e（净电荷）
+- 输入 `atom_index_matrix`：`(t, N)` 0-based 整型数组
+- 返回 `np.ndarray`：`(t, N, 2)`
+  - `[:, :, 0]`：回显的原子索引
+  - `[:, :, 1]`：对应的 Bader 净电荷（单位 e）
 
 ## Potential 层输出契约
 
