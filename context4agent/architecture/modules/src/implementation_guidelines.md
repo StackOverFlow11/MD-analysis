@@ -8,10 +8,11 @@
 
 - `md_analysis` 是**顶层命名空间与聚合入口**，不是业务计算层。
 - 顶层负责"把子包暴露出来"，不负责"执行分析逻辑"。
-- 业务实现下沉到三个子包：
+- 业务实现下沉到四个子包：
   - `md_analysis.utils`：单帧底层工具
   - `md_analysis.water`：水分析多帧工作流
   - `md_analysis.potential`：电势分析多帧工作流
+  - `md_analysis.charge`：电荷分析多帧工作流
 - 编程入口 `main.py` 和 CLI 入口 `CLI.py` 位于顶层，负责协调子包调用。
 - 目录文档治理采用硬约束：`context4agent/architecture/modules/src/` 必须镜像 `src/md_analysis/`，且每个子目录都需维护
   `interface_exposure.md` 与 `implementation_guidelines.md`。
@@ -21,7 +22,7 @@
 - 顶层导出按"稳定接口"管理：
   - 已进入 `src/md_analysis/__init__.py` 且在 `__all__` 中声明的符号，视为对外契约。
   - 未进入 `__all__` 的符号，不承诺稳定性。
-- 当前顶层仅暴露三个子包：`utils`、`water`、`potential`。
+- 当前顶层暴露四个子包：`utils`、`water`、`potential`、`charge`。
 
 ## 3. `__init__.py` 实现准则
 
@@ -36,12 +37,13 @@
 
 ## 4. 依赖方向约束
 
-- 允许方向：`md_analysis` -> `md_analysis.utils` / `md_analysis.water` / `md_analysis.potential`
+- 允许方向：`md_analysis` -> `md_analysis.utils` / `md_analysis.water` / `md_analysis.potential` / `md_analysis.charge`
 - 允许方向：`md_analysis.water` -> `md_analysis.utils`
 - 允许方向：`md_analysis.potential` -> `md_analysis.utils`
+- 允许方向：`md_analysis.charge` -> `md_analysis.utils`
 - 禁止反向依赖：子包不应依赖 `md_analysis` 顶层内部状态
 - 禁止跨层耦合：
-  - `md_analysis.water` 与 `md_analysis.potential` 之间不互相依赖
+  - `md_analysis.water`、`md_analysis.potential`、`md_analysis.charge` 之间不互相依赖
   - 顶层不得感知具体实现文件（如 `WaterParser.py`）
 
 ## 5. 导出变更规则

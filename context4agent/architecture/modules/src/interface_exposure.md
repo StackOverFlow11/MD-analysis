@@ -8,7 +8,7 @@
 
 - `md_analysis` 是顶层命名空间入口，只负责暴露子包。
 - `md_analysis` 不直接暴露业务算法函数、数据结构或配置常量。
-- 业务能力通过 `md_analysis.utils`、`md_analysis.water`、`md_analysis.potential` 向下访问。
+- 业务能力通过 `md_analysis.utils`、`md_analysis.water`、`md_analysis.potential`、`md_analysis.charge` 向下访问。
 - CLI 入口通过 `md_analysis.CLI:main` 注册为 `md-analysis` console script。
 - 编程入口通过 `md_analysis.main` 提供 `run_water_analysis`、`run_potential_analysis`、`run_all`。
 - 目录治理硬约束见：`context4agent/architecture/modules/README.md`（镜像对齐 + 双文档）。
@@ -20,11 +20,12 @@
 - `utils`
 - `water`
 - `potential`
+- `charge`
 
 与代码一致性基线：
 
 - `src/md_analysis/__init__.py` 中已导入并写入 `__all__` 的符号，视为顶层稳定接口。
-- 当前 `__all__ = ["utils", "water", "potential"]`。
+- 当前 `__all__ = ["utils", "water", "potential", "charge"]`。
 
 ### 2.2 非公开符号（Non-public）
 
@@ -37,6 +38,7 @@
 - `from md_analysis import utils`
 - `from md_analysis import water`
 - `from md_analysis import potential`
+- `from md_analysis import charge`
 
 不推荐：
 
@@ -49,6 +51,7 @@
 - `md_analysis.utils`：**稳定（Stable）**
 - `md_analysis.water`：**稳定（Stable）**
 - `md_analysis.potential`：**稳定（Stable）**
+- `md_analysis.charge`：**稳定（Stable）**
 
 ### 4.2 兼容承诺
 

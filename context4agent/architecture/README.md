@@ -67,7 +67,17 @@
   - 导出吸附层 profile（密度/取向/掩码）与区间文本
   - 二次遍历轨迹统计吸附层内的 $\theta$ 分布并导出 CSV
 
-### 3) `md_analysis.potential`（多帧/电势分析工作流）
+### 3) `md_analysis.charge`（多帧/电荷分析工作流）
+
+输入：根目录下 `calc_t*_i*` 子目录，每帧各含 POSCAR + ACF.dat + POTCAR
+
+- `charge/config.py`：单位换算常量（`E_PER_A2_TO_UC_PER_CM2`）、默认文件名
+- `charge/ChargeAnalysis.py`
+  - `AtomSelector`（ABC）/ `ElementSelector` / `IndexSelector`：原子选择器
+  - `compute_frame_surface_charge()`：单帧表面电荷密度（结果存入 `atoms.info`）
+  - `trajectory_charge_analysis()`：多帧轨迹分析 → `TrajectoryChargeResult` + CSV 输出
+
+### 4) `md_analysis.potential`（多帧/电势分析工作流）
 
 输入：cube 文件 glob pattern + CP2K `md.out` + 可选 xyz 轨迹
 
@@ -80,7 +90,7 @@
 - `potential/PhiZProfile.py`
   - `phi_z_planeavg_analysis()`：所有帧的 φ(z) overlay 可视化
 
-### 4) `md_analysis.main` / `md_analysis.CLI`（集成入口）
+### 5) `md_analysis.main` / `md_analysis.CLI`（集成入口）
 
 - `main.py`：编程入口 `run_water_analysis()`、`run_potential_analysis()`、`run_all()`
 - `CLI.py`：argparse CLI，注册为 `md-analysis` console script

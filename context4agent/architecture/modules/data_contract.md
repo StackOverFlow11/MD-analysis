@@ -5,6 +5,7 @@
 > 接口暴露清单与实现细则请查看：
 > - `context4agent/architecture/modules/src/interface_exposure.md`
 > - `context4agent/architecture/modules/src/utils/interface_exposure.md`
+> - `context4agent/architecture/modules/src/charge/interface_exposure.md`
 > - `context4agent/architecture/modules/src/utils/implementation_guidelines.md`
 >
 > 记录落位硬约束：本文件仅承载"全局契约"；非全局目录级记录不得写入本文件，
@@ -145,6 +146,26 @@ $$
 - 每帧独立计算从选定界面到中点的单帧 profile
 - 若各帧 `nbins` 不一致，先重采样到统一归一化坐标网格
 - 最后按帧等权平均（equal-weight over frames）
+
+## Charge 层输出契约
+
+### `compute_frame_surface_charge(atoms, ...)` 输出
+
+- 结果存入 `atoms.info`（原地修改）
+- `atoms.info["surface_charge_density_e_A2"]`：`[σ_bottom, σ_top]`，单位 e/Å²
+- `atoms.info["surface_charge_density_uC_cm2"]`：`[σ_bottom, σ_top]`，单位 μC/cm²
+- 可选（当提供 `atom_selector` 时）：
+  - `atoms.info["selected_atom_indices"]`：`list[int]`
+  - `atoms.info["selected_atom_net_charges"]`：`list[float]`
+
+### `trajectory_charge_analysis(root_dir, ...)` 输出
+
+- 返回 `TrajectoryChargeResult`（frozen dataclass）
+- CSV（surface_charge_density.csv）：`frame,sigma_bottom_uC_cm2,sigma_top_uC_cm2`
+  - 含 `mean` 和 `std` 汇总行
+- CSV（selected_atom_charges.csv，可选）：`frame,atom_<idx>,...`
+  - 含 `mean` 汇总行
+- 单位：μC/cm²（表面电荷密度）、e（净电荷）
 
 ## Potential 层输出契约
 
