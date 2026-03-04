@@ -15,7 +15,7 @@
 - **输出语言**：中文为主；代码注释/变量命名倾向英文
 - **节奏偏好**：先跑通最小可用流程（MVP）→ 再扩展功能
 - **可接受的依赖**：允许 ASE，技术栈主要采用 Python
-- **Python 环境**：`md_an_env`（位于 `~/Development/env_tools/envs/md_an_env/`，Python 3.10，含 numpy/matplotlib/ase/pytest）
+- **Python 环境**：`md_an_env`（Python 3.10，含 numpy/matplotlib/ase/pytest）
 
 ## 当前已掌握的样例数据（来自仓库）
 

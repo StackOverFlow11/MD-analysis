@@ -23,7 +23,6 @@
     - `modules/README.md`：模块文档治理硬约束（目录镜像与双文档）
     - `modules/data_contract.md`：跨模块核心数据契约（形状/单位/CSV 列头）
     - `modules/glossary_units.md`：术语与单位约定汇总
-  - `decisions/`：架构/技术决策记录（ADR）
 - `temp/`：重要上下文临时寄存区
 
 ## 约定
