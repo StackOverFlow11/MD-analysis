@@ -73,9 +73,8 @@
 
 - `charge/config.py`：单位换算常量（`E_PER_A2_TO_UC_PER_CM2`）、默认文件名
 - `charge/ChargeAnalysis.py`
-  - `AtomSelector`（ABC）/ `ElementSelector` / `IndexSelector`：原子选择器
-  - `compute_frame_surface_charge()`：单帧表面电荷密度（结果存入 `atoms.info`）
-  - `trajectory_charge_analysis()`：多帧轨迹分析 → `TrajectoryChargeResult` + CSV 输出
+  - `compute_frame_surface_charge()`：单帧表面电荷密度（结果存入 `atoms.info`；`normal` 参数控制面积向量对）
+  - `trajectory_indexed_atom_charges()`：按帧指定原子索引提取净电荷 → `(t, N, 2)` ndarray
 
 ### 4) `md_analysis.potential`（多帧/电势分析工作流）
 
