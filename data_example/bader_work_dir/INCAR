@@ -1,0 +1,86 @@
+SYSTEM = bader #Type your job name here!    
+
+###############################  start setting  ##############################
+ISTART = 0        #startjob: 1-continue 2-samecut                       #
+ICHARG = 2        #charge:1-file 2-atom 10-const                             #
+IVDW = 12         #DFT-D3
+INIWAV = 1        #initial electr wf.:0-lowe 1-rand                          #
+##############################################################################
+
+######################  spin polarized calculation  ##########################
+ISPIN  = 2        #spin polarized calculation:2-yes 1-no                     #
+###MAGMOM =       #initial mag moment:NIONS*1                                #
+##############################################################################
+
+#############################  lda+u method  #################################
+###LDAU = .FALSE.                                                            #
+###LDAUTYPE=2     #type of lda+u, 2-lsda+u                                   #  
+###LDAUL=-1 2 -1  #-1 nonU, 2-U for d states                                 #
+###LDAUU=0 3.3 0  #                                                          #
+###LDAUJ=0 0 0    #                                                          #
+##############################################################################
+
+#########################  electronic relaxation  ############################
+ENCUT  = 450      #                                                          #
+NELM   = 200      #max. number of electronic steps                           #
+NELMIN = 4        #min. number of electronic steps                           #
+EDIFF  = 1E-06    #stopping-criterion for electronic update                  #
+#GGA    = PE      #PE/PB/LM/P1/PW/RP                                          #
+PREC   = Normal   #normal/accurate                                           # 
+LREAL  = Auto     #false-reciprocal space,                                   #
+                  #ture-real space:for more than 20 atoms, auto              #
+#NBANDS = 300	    #0.5*atoms+0.5*electrons                     	     #
+##############################################################################
+
+#######################   dipole correction ##################################
+#LDIPOL = .TRUE.                                                              #
+#IDIPOL = 3                                                                   #
+##############################################################################
+
+#######################   frequency cal ######################################
+#NFREE = 2                                                                   #
+##############################################################################
+
+#######################  ionic relaxation  ###################################
+EDIFFG = -0.01    #stopping-criterion for ionic update                       #
+NSW    = 0     #number of steps for ionic update                          #  
+IBRION = -1        #ionic relaxation method:                                  #
+                  #-1:single point energy cal.                               # 
+		        #0:MD simulation                                     #
+		        #1:quasi-Newton method.                              #
+		        #2:cg for bad initial structure                      #
+		        #3:damped MD                                         #
+		        #5:calculated the vibrational frequencies NFREE = 2  #
+ISIF   = 2        #what to relax. 2-unchange cell 3-change everything        #
+ISYM   = 0        #symmetry: 0-non symmetry, 1-use symmetry for ultrasoft,   #
+                  #2-fast symmetry for PAW potential                         #
+POTIM  = 0.1      #time-step for ionic-motion                                #
+##############################################################################
+
+############################  smearing method  ###############################
+ISMEAR = 1        #-1-fermi-smearing,0-gaussian smearing,-2..-5              #
+                  #dos and total energy in bulk materials-no metals:-5       #
+		        #phonon frequence:>0                                 #
+		        #semiconductors and insulators:0-large cell- or -5   #
+	                #metals relaxation:=1,=2                             #
+SIGMA  = 0.2      #ISMEAR = 0, SIGMA  = 0.05                                 #
+                  #metals:0.2                                                #
+##############################################################################
+
+############################  mixing method  ##################################
+#ADDGRID = .TRUE.                                                            #
+ALGO = VeryFast      #set the algorithm here Fast = DAV+RMM                      #
+                                    # VeryFast = RMM-DIIS                    #
+                                    # Normal = DAV                           #
+#AMIX=0.1                                                                    #
+#BMIX=0.001                                                                  #
+#AMIX_MAG=0.4                                                                #
+#BMIX_MAG=0.001                                                              #
+##############################################################################
+
+################################# out put ####################################
+LWAVE  = .FALSE.  #WAVECAR                                                   #
+LCHARG = .TRUE.  #CHGCAR  CHG                                               #
+LVTOT  = .FALSE.  #LOCPOT local potential                                    #
+LELF   = .FALSE.  #ELFCAR                                                    #
+############################################################################## 	 
