@@ -95,6 +95,20 @@
 - `get_water_oxygen_indices_array(...)`
   - 输出：`(n_water, 1)` 氧索引数组
 
+### 2.6 `BaderParser.py` 导出（Stable）
+
+异常：
+
+- `BaderParseError`
+  - ACF 文件格式错误或原子数不匹配时抛出
+
+函数：
+
+- `load_bader_atoms(structure_path, acf_path, potcar_path) -> Atoms`
+  - 输入：POSCAR/CONTCAR 路径、ACF.dat 路径、POTCAR 路径
+  - 输出：增强的 `ase.Atoms`，附加 `atoms.arrays["bader_charge"]`（原始电子数）和 `atoms.arrays["bader_net_charge"]`（ZVAL - bader_charge，正值 = 失去电子）
+  - 语义：解析 VASP Bader 电荷分析结果，与结构信息合并
+
 > **注**：`_compute_water_mass_density_z_distribution`、`_compute_water_orientation_weighted_density_z_distribution`、
 > `_compute_water_orientation_theta_pdf_in_c_fraction_window` 三个函数已降级为内部（`_` 前缀），不再属于公开 API。
 > 它们针对全 cell z 轴分箱，与 `water` 层的界面-到-中点分析语义不同，不适合作为公开接口暴露。

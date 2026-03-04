@@ -28,7 +28,7 @@ Key flags: `--thickness` (default 7.5 Å), `--thickness-end` (sweep limit, defau
 
 Standard src-layout under `src/md_analysis/` with three sub-packages:
 
-- **`utils`** — Single-frame tools: metal layer detection, water topology, cube I/O, density/orientation profiles, constants
+- **`utils`** — Single-frame tools: metal layer detection, water topology, cube I/O, density/orientation profiles, Bader charge parsing, constants
 - **`water`** — Multi-frame water workflows: ensemble-averaged density/orientation, adsorbed-layer detection, three-panel PNG
 - **`potential`** — Multi-frame potential workflows: center slab potential, Fermi energy, U vs SHE, φ(z) overlay, thickness sensitivity
 - **`main.py` / `CLI.py`** — Programmatic entry points and `md-analysis` console script
