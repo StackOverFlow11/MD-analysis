@@ -1,4 +1,4 @@
-"""Integration tests for trajectory_indexed_atom_charges."""
+"""Integration tests for trajectory charge functions."""
 
 import shutil
 from pathlib import Path
@@ -6,7 +6,12 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from md_analysis.charge.ChargeAnalysis import trajectory_indexed_atom_charges
+from md_analysis.charge.ChargeAnalysis import (
+    compute_frame_surface_charge,
+    trajectory_indexed_atom_charges,
+    trajectory_surface_charge,
+)
+from md_analysis.utils.BaderParser import load_bader_atoms
 
 DATA_DIR = Path(__file__).resolve().parents[3] / "data_example" / "bader_work_dir"
 
@@ -65,3 +70,36 @@ class TestTrajectoryIndexedAtomCharges:
             trajectory_indexed_atom_charges(
                 tmp_path, np.array([[0]])
             )
+
+
+class TestTrajectorySurfaceCharge:
+    """Integration tests for trajectory_surface_charge."""
+
+    def test_basic_shape_and_values(self, tmp_path):
+        root = _build_fake_trajectory(tmp_path, n_frames=2)
+        result = trajectory_surface_charge(root)
+
+        assert result.shape == (2, 2)
+        assert np.all(np.isfinite(result))
+
+    def test_identical_frames_same_sigma(self, tmp_path):
+        root = _build_fake_trajectory(tmp_path, n_frames=2)
+        result = trajectory_surface_charge(root)
+
+        np.testing.assert_allclose(result[0], result[1], atol=1e-10)
+
+    def test_consistent_with_single_frame(self, tmp_path):
+        """trajectory_surface_charge matches per-frame compute_frame_surface_charge."""
+        root = _build_fake_trajectory(tmp_path, n_frames=2)
+        traj_result = trajectory_surface_charge(root)
+
+        # Manually compute for each frame
+        for i, frame_dir in enumerate(sorted(root.glob("calc_t*_i*"))):
+            atoms = load_bader_atoms(
+                frame_dir / "POSCAR",
+                frame_dir / "ACF.dat",
+                frame_dir / "POTCAR",
+            )
+            compute_frame_surface_charge(atoms)
+            expected = atoms.info["surface_charge_density_uC_cm2"]
+            np.testing.assert_allclose(traj_result[i], expected, atol=1e-10)

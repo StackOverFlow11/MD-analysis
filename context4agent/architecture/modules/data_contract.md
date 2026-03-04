@@ -156,12 +156,27 @@ $$
 - `atoms.info["surface_charge_density_uC_cm2"]`：`[σ_bottom, σ_top]`，单位 μC/cm²
 - `normal` 参数控制面积计算：`_AREA_VECTORS = {"a": (1,2), "b": (0,2), "c": (0,1)}`
 
+### `frame_indexed_atom_charges(atoms, atom_indices)` 输出
+
+- 输入 `atom_indices`：`(N,)` 0-based 整型数组
+- 返回 `np.ndarray`：`(N, 2)`
+  - `[:, 0]`：回显的原子索引
+  - `[:, 1]`：对应的 Bader 净电荷（单位 e）
+
 ### `trajectory_indexed_atom_charges(root_dir, atom_index_matrix, ...)` 输出
 
 - 输入 `atom_index_matrix`：`(t, N)` 0-based 整型数组
 - 返回 `np.ndarray`：`(t, N, 2)`
   - `[:, :, 0]`：回显的原子索引
   - `[:, :, 1]`：对应的 Bader 净电荷（单位 e）
+- 内部逐帧调用 `frame_indexed_atom_charges`
+
+### `trajectory_surface_charge(root_dir, ...)` 输出
+
+- 返回 `np.ndarray`：`(t, 2)`
+  - `[:, 0]`：σ_bottom（μC/cm²）
+  - `[:, 1]`：σ_top（μC/cm²）
+- 逐帧调用 `load_bader_atoms` + `compute_frame_surface_charge`，收集 `surface_charge_density_uC_cm2`
 
 ## Potential 层输出契约
 

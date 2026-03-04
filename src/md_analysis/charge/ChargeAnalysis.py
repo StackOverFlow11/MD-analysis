@@ -98,6 +98,64 @@ def compute_frame_surface_charge(
 
 
 # ---------------------------------------------------------------------------
+# Single-frame indexed atom charges
+# ---------------------------------------------------------------------------
+
+def frame_indexed_atom_charges(
+    atoms: Atoms,
+    atom_indices: np.ndarray,
+) -> np.ndarray:
+    """Extract net charges for specified atom indices from a single frame.
+
+    Parameters
+    ----------
+    atoms
+        ASE Atoms with ``"bader_net_charge"`` per-atom array.
+    atom_indices
+        1-D integer array of 0-based atom indices.
+
+    Returns
+    -------
+    np.ndarray
+        Array of shape ``(N, 2)`` where ``[:, 0]`` contains the
+        (echoed-back) atom indices and ``[:, 1]`` contains the
+        corresponding Bader net charges.
+    """
+    idx = np.asarray(atom_indices)
+    if idx.ndim != 1:
+        raise ValueError(
+            f"atom_indices must be 1-D, got {idx.ndim}-D"
+        )
+    if not np.issubdtype(idx.dtype, np.integer):
+        raise ValueError(
+            f"atom_indices must have integer dtype, got {idx.dtype}"
+        )
+    if np.any(idx < 0):
+        raise ValueError("atom_indices contains negative indices")
+
+    if "bader_net_charge" not in atoms.arrays:
+        raise ValueError(
+            "atoms.arrays must contain 'bader_net_charge'. "
+            "Use load_bader_atoms() first."
+        )
+
+    net_charge = atoms.arrays["bader_net_charge"]
+    n_atoms = len(atoms)
+
+    oob = idx[idx >= n_atoms]
+    if oob.size > 0:
+        raise IndexError(
+            f"Atom index {int(oob[0])} out of bounds for frame "
+            f"with {n_atoms} atoms"
+        )
+
+    result = np.empty((len(idx), 2), dtype=float)
+    result[:, 0] = idx.astype(float)
+    result[:, 1] = net_charge[idx]
+    return result
+
+
+# ---------------------------------------------------------------------------
 # Trajectory indexed atom charges
 # ---------------------------------------------------------------------------
 
@@ -183,18 +241,96 @@ def trajectory_indexed_atom_charges(
                 )
 
         atoms = load_bader_atoms(poscar, acf, potcar)
-        net_charge = atoms.arrays["bader_net_charge"]
-        n_atoms = len(atoms)
 
-        indices_row = arr[i]
-        oob = indices_row[indices_row >= n_atoms]
-        if oob.size > 0:
+        try:
+            frame_result = frame_indexed_atom_charges(atoms, arr[i])
+        except IndexError as exc:
+            # Re-raise with frame name for context
             raise IndexError(
-                f"Atom index {int(oob[0])} out of bounds for frame {fname} "
-                f"with {n_atoms} atoms"
-            )
+                f"Atom index {int(arr[i][arr[i] >= len(atoms)][0])} "
+                f"out of bounds for frame {fname} "
+                f"with {len(atoms)} atoms"
+            ) from exc
 
-        result[i, :, 0] = indices_row.astype(float)
-        result[i, :, 1] = net_charge[indices_row]
+        result[i] = frame_result
 
     return result
+
+
+# ---------------------------------------------------------------------------
+# Trajectory surface charge density
+# ---------------------------------------------------------------------------
+
+def trajectory_surface_charge(
+    root_dir: str | Path,
+    *,
+    metal_symbols: Iterable[str] | None = None,
+    normal: str = "c",
+    dir_pattern: str = DEFAULT_DIR_PATTERN,
+    structure_filename: str = DEFAULT_STRUCTURE_FILENAME,
+    acf_filename: str = DEFAULT_ACF_FILENAME,
+    potcar_filename: str = DEFAULT_POTCAR_FILENAME,
+) -> np.ndarray:
+    """Compute surface charge density across trajectory frames.
+
+    Parameters
+    ----------
+    root_dir
+        Parent directory containing per-frame subdirectories.
+    metal_symbols
+        Override default metal symbols for layer detection.
+    normal
+        Cell axis perpendicular to the surface (``"a"``, ``"b"``, or ``"c"``).
+    dir_pattern
+        Glob pattern for discovering frame subdirectories.
+    structure_filename
+        Name of the structure file (POSCAR) in each subdirectory.
+    acf_filename
+        Name of the ACF.dat file in each subdirectory.
+    potcar_filename
+        Name of the POTCAR file in each subdirectory.
+
+    Returns
+    -------
+    np.ndarray
+        Array of shape ``(t, 2)`` where ``[:, 0]`` is σ_bottom and
+        ``[:, 1]`` is σ_top, in μC/cm².
+    """
+    if normal not in _AREA_VECTORS:
+        raise ValueError(
+            f"normal must be one of {set(_AREA_VECTORS)}, got {normal!r}"
+        )
+
+    root = Path(root_dir)
+    if not root.is_dir():
+        raise FileNotFoundError(f"root_dir does not exist: {root}")
+
+    frame_dirs = sorted(root.glob(dir_pattern))
+    if not frame_dirs:
+        raise FileNotFoundError(
+            f"No subdirectories matching '{dir_pattern}' in {root}"
+        )
+
+    rows = []
+    for frame_dir in frame_dirs:
+        fname = frame_dir.name
+        poscar = frame_dir / structure_filename
+        acf = frame_dir / acf_filename
+        potcar = frame_dir / potcar_filename
+
+        for path, label in [(poscar, structure_filename),
+                            (acf, acf_filename),
+                            (potcar, potcar_filename)]:
+            if not path.exists():
+                raise FileNotFoundError(
+                    f"{label} not found in frame {fname}: {path}"
+                )
+
+        atoms = load_bader_atoms(poscar, acf, potcar)
+        compute_frame_surface_charge(
+            atoms, metal_symbols=metal_symbols, normal=normal
+        )
+        sigma = atoms.info["surface_charge_density_uC_cm2"]
+        rows.append(sigma)
+
+    return np.array(rows, dtype=float)

@@ -51,7 +51,9 @@
 - **Analysis（扩展分析量）**
   - Bader 电荷下游分析（已实现表面电荷密度，`charge/` 子包）：
     - ✅ 表面电荷密度：结合 `detect_interface_layers` 识别表面层，计算每层净电荷密度；内部计算用 e/Å²，最终输出转换为 μC/cm²（与实验量纲对齐）；支持 `normal` 参数（a/b/c）选择法向轴
-    - ✅ 轨迹原子净电荷提取：`trajectory_indexed_atom_charges` 按帧传入 `(t, N)` 索引矩阵，返回 `(t, N, 2)` 的索引+净电荷数组
+    - ✅ 单帧原子净电荷提取：`frame_indexed_atom_charges` 传入 `(N,)` 索引，返回 `(N, 2)` 的索引+净电荷数组
+    - ✅ 轨迹原子净电荷提取：`trajectory_indexed_atom_charges` 按帧传入 `(t, N)` 索引矩阵，返回 `(t, N, 2)` 的索引+净电荷数组（内部调用 `frame_indexed_atom_charges`）
+    - ✅ 轨迹表面电荷密度时序：`trajectory_surface_charge` 逐帧计算表面电荷密度，返回 `(t, 2)` 的 μC/cm² 数组
     - 按层/按元素电荷转移统计：分层聚合 `bader_net_charge`，输出每层各元素的平均净电荷（待实现）
     - 典型工作流：CP2K MD → 提取结构帧 → VASP 单点 → Bader 分析 → `load_bader_atoms` → 表面电荷/电荷转移
   - Mulliken 电荷：按元素/分组/分层统计（优先级低于 Bader，待后续明确需求）

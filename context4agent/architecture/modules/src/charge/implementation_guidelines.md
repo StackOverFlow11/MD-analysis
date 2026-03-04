@@ -9,7 +9,7 @@
 
 Flat structure (no sub-packages):
 - `config.py` — unit conversion constant + default filenames
-- `ChargeAnalysis.py` — single-frame surface charge, trajectory indexed atom charges
+- `ChargeAnalysis.py` — single-frame surface charge, single-frame indexed atom charges, trajectory indexed atom charges, trajectory surface charge
 
 ## Data flow
 
@@ -24,6 +24,13 @@ Flat structure (no sub-packages):
 6. Convert e/Å² → μC/cm² via `E_PER_A2_TO_UC_PER_CM2`
 7. Store in `atoms.info["surface_charge_density_e_A2"]` and `atoms.info["surface_charge_density_uC_cm2"]`
 
+### Single frame indexed (`frame_indexed_atom_charges`)
+
+1. Validate `atom_indices`: must be 1-D, integer, non-negative → `ValueError`
+2. Validate `"bader_net_charge" in atoms.arrays` → `ValueError`
+3. Validate indices < n_atoms → `IndexError`
+4. Return `(N, 2)` ndarray: `[:,0]=index`, `[:,1]=net_charge`
+
 ### Trajectory (`trajectory_indexed_atom_charges`)
 
 1. Validate `atom_index_matrix`: must be 2-D, integer, non-negative → `ValueError`
@@ -31,10 +38,21 @@ Flat structure (no sub-packages):
 3. Validate `t == len(frame_dirs)` → `ValueError`
 4. Per frame:
    - Check POSCAR/ACF.dat/POTCAR exist → `FileNotFoundError` (includes frame name)
-   - `load_bader_atoms()` → read `bader_net_charge`
-   - Validate indices < n_atoms → `IndexError` (includes frame name + index value)
-   - Fill `result[i, :, 0] = indices`, `result[i, :, 1] = net_charge[indices]`
+   - `load_bader_atoms()` → call `frame_indexed_atom_charges(atoms, arr[i])`
+   - Re-raise `IndexError` with frame name context
+   - Fill `result[i] = frame_result`
 5. Return `(t, N, 2)` ndarray
+
+### Trajectory surface charge (`trajectory_surface_charge`)
+
+1. Validate `normal` ∈ `{"a", "b", "c"}` → `ValueError`
+2. Validate `root_dir` exists → `FileNotFoundError`
+3. Discover `calc_t*_i*` subdirectories → `FileNotFoundError` if none
+4. Per frame:
+   - Check POSCAR/ACF.dat/POTCAR exist → `FileNotFoundError` (includes frame name)
+   - `load_bader_atoms()` → `compute_frame_surface_charge(atoms, ...)`
+   - Collect `atoms.info["surface_charge_density_uC_cm2"]`
+5. Stack → return `(t, 2)` ndarray (μC/cm²)
 
 ## Unit convention
 

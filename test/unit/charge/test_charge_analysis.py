@@ -8,7 +8,9 @@ from ase import Atoms
 
 from md_analysis.charge.ChargeAnalysis import (
     compute_frame_surface_charge,
+    frame_indexed_atom_charges,
     trajectory_indexed_atom_charges,
+    trajectory_surface_charge,
 )
 from md_analysis.charge.config import E_PER_A2_TO_UC_PER_CM2
 from md_analysis.utils.BaderParser import load_bader_atoms
@@ -137,3 +139,61 @@ class TestTrajectoryIndexedAtomCharges:
             trajectory_indexed_atom_charges(
                 tmp_path, np.array([[big_idx]])
             )
+
+
+# ---------------------------------------------------------------------------
+# frame_indexed_atom_charges
+# ---------------------------------------------------------------------------
+
+class TestFrameIndexedAtomCharges:
+    """Tests for single-frame indexed atom charge extraction."""
+
+    @pytest.fixture()
+    def bader_atoms(self):
+        return load_bader_atoms(
+            DATA_DIR / "POSCAR", DATA_DIR / "ACF.dat", DATA_DIR / "POTCAR"
+        )
+
+    def test_basic_shape_and_values(self, bader_atoms):
+        idx = np.array([0, 1])
+        result = frame_indexed_atom_charges(bader_atoms, idx)
+        assert result.shape == (2, 2)
+        np.testing.assert_array_equal(result[:, 0], idx)
+
+    def test_missing_bader_raises(self):
+        atoms = Atoms("Cu", positions=[[0, 0, 0]], cell=[10, 10, 10], pbc=True)
+        with pytest.raises(ValueError, match="bader_net_charge"):
+            frame_indexed_atom_charges(atoms, np.array([0]))
+
+    def test_non_1d_raises(self, bader_atoms):
+        with pytest.raises(ValueError, match="1-D"):
+            frame_indexed_atom_charges(bader_atoms, np.array([[0, 1]]))
+
+    def test_non_integer_raises(self, bader_atoms):
+        with pytest.raises(ValueError, match="integer dtype"):
+            frame_indexed_atom_charges(bader_atoms, np.array([0.0, 1.0]))
+
+    def test_negative_raises(self, bader_atoms):
+        with pytest.raises(ValueError, match="negative"):
+            frame_indexed_atom_charges(bader_atoms, np.array([0, -1]))
+
+    def test_out_of_bounds_raises(self, bader_atoms):
+        with pytest.raises(IndexError, match="out of bounds"):
+            frame_indexed_atom_charges(bader_atoms, np.array([99999]))
+
+
+# ---------------------------------------------------------------------------
+# trajectory_surface_charge (unit-level error paths)
+# ---------------------------------------------------------------------------
+
+class TestTrajectorySurfaceCharge:
+    """Unit tests for trajectory_surface_charge validation."""
+
+    def test_missing_dir_raises(self, tmp_path):
+        fake = tmp_path / "nonexistent"
+        with pytest.raises(FileNotFoundError, match="root_dir does not exist"):
+            trajectory_surface_charge(fake)
+
+    def test_invalid_normal_raises(self, tmp_path):
+        with pytest.raises(ValueError, match="normal must be"):
+            trajectory_surface_charge(tmp_path, normal="z")
