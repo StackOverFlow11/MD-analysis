@@ -10,7 +10,8 @@
   - 水分析（`water/`）：从选定界面到两界面中点的系综平均（A 口径）、吸附层自动识别、吸附层角度分布、三联图输出
   - 电势分析（`potential/`）：center slab potential、Fermi energy、electrode potential U vs SHE、φ(z) overlay、thickness sensitivity
   - 集成入口：CLI（`md-analysis` 命令）、编程入口（`main.py`）
-- **当前未覆盖**：电荷（Mulliken/Bader）分析仍未实现。
+- Bader 电荷解析（`utils/BaderParser.py`）：从 VASP Bader 输出（ACF.dat + POTCAR）读取原始电子数与净电荷，附加到 ASE Atoms
+- **当前未覆盖**：基于 Bader 电荷的表面电荷密度分析、按层/按元素电荷转移统计；Mulliken 电荷分析仍未实现。
 
 ## 已确认的体系前提（用户声明，值得记录）
 
@@ -47,7 +48,11 @@
 - **I/O（读取与标准化）**
   - 统一记录单位、时间步、采样间隔等元数据（当前仅解析 `md.inp` 的 `ABC [angstrom]`）
 - **Analysis（扩展分析量）**
-  - 电荷相关：按元素/分组/分层统计 Mulliken 电荷（明确"输出什么"和"局限性说明"）
+  - Bader 电荷下游分析（近期重点）：
+    - 表面电荷密度：结合 `detect_interface_layers` 识别表面层，计算每层净电荷密度（e/Å²）
+    - 按层/按元素电荷转移统计：分层聚合 `bader_net_charge`，输出每层各元素的平均净电荷
+    - 典型工作流：CP2K MD → 提取结构帧 → VASP 单点 → Bader 分析 → `load_bader_atoms` → 表面电荷/电荷转移
+  - Mulliken 电荷：按元素/分组/分层统计（优先级低于 Bader，待后续明确需求）
 - **工程化（可复现与易用性）**
   - 依赖与环境说明（固定最小依赖集合与安装方式）
 
