@@ -11,7 +11,8 @@
   - 电势分析（`potential/`）：center slab potential、Fermi energy、electrode potential U vs SHE、φ(z) overlay、thickness sensitivity
   - 集成入口：CLI（`md-analysis` 命令）、编程入口（`main.py`）
 - Bader 电荷解析（`utils/BaderParser.py`）：从 VASP Bader 输出（ACF.dat + POTCAR）读取原始电子数与净电荷，附加到 ASE Atoms
-- **当前未覆盖**：基于 Bader 电荷的表面电荷密度分析、按层/按元素电荷转移统计；Mulliken 电荷分析仍未实现。
+  - Bader 电荷下游分析（`charge/`）：单帧表面电荷密度（`compute_frame_surface_charge`）、多帧轨迹分析（`trajectory_charge_analysis`）、原子选择器（`ElementSelector` / `IndexSelector`）、CSV 输出
+- **当前未覆盖**：按层/按元素电荷转移统计；Mulliken 电荷分析仍未实现。
 
 ## 已确认的体系前提（用户声明，值得记录）
 
@@ -48,9 +49,9 @@
 - **I/O（读取与标准化）**
   - 统一记录单位、时间步、采样间隔等元数据（当前仅解析 `md.inp` 的 `ABC [angstrom]`）
 - **Analysis（扩展分析量）**
-  - Bader 电荷下游分析（近期重点）：
-    - 表面电荷密度：结合 `detect_interface_layers` 识别表面层，计算每层净电荷密度；内部计算用 e/Å²，最终输出转换为 μC/cm²（与实验量纲对齐）
-    - 按层/按元素电荷转移统计：分层聚合 `bader_net_charge`，输出每层各元素的平均净电荷
+  - Bader 电荷下游分析（已实现表面电荷密度，`charge/` 子包）：
+    - ✅ 表面电荷密度：结合 `detect_interface_layers` 识别表面层，计算每层净电荷密度；内部计算用 e/Å²，最终输出转换为 μC/cm²（与实验量纲对齐）
+    - 按层/按元素电荷转移统计：分层聚合 `bader_net_charge`，输出每层各元素的平均净电荷（待实现）
     - 典型工作流：CP2K MD → 提取结构帧 → VASP 单点 → Bader 分析 → `load_bader_atoms` → 表面电荷/电荷转移
   - Mulliken 电荷：按元素/分组/分层统计（优先级低于 Bader，待后续明确需求）
 - **工程化（可复现与易用性）**
