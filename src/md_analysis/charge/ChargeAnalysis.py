@@ -488,21 +488,35 @@ def surface_charge_analysis(
         sigma_top_list.append(sigma[1])
 
         if verbose:
-            # Diagnostic: interface layer fractional coords & atom counts
+            # Diagnostic: interface layer fractional coords, atom counts, per-element charge
             axis_idx = {"a": 0, "b": 1, "c": 2}[normal]
-            det = detect_interface_layers(atoms, metal_symbols=metal_symbols, normal=normal)
+            det = detect_interface_layers(
+                atoms, metal_symbols=metal_symbols, normal=normal,
+            )
             iface = sorted(det.interface_layers(), key=lambda L: L.center_s)
             scaled = np.asarray(atoms.get_scaled_positions(wrap=True), dtype=float)
-            diag_parts = []
-            for k, layer in enumerate(iface):
-                frac_vals = scaled[list(layer.atom_indices), axis_idx]
-                label = "bot" if k == 0 else "top"
-                diag_parts.append(f"{label}: n={len(layer.atom_indices)}, "
-                                  f"frac_c={float(np.mean(frac_vals)):.4f}")
-            diag = " | ".join(diag_parts)
+            symbols = np.array(atoms.get_chemical_symbols())
+            net_charge = atoms.arrays["bader_net_charge"]
+
             print(f"  [{idx + 1}/{len(frame_dirs)}] {fname}: "
-                  f"σ_bottom={sigma[0]:.4f}, σ_top={sigma[1]:.4f} μC/cm²  "
-                  f"[{diag}]")
+                  f"σ_bottom={sigma[0]:.4f}, σ_top={sigma[1]:.4f} μC/cm²")
+
+            for k, layer in enumerate(iface):
+                indices = list(layer.atom_indices)
+                frac_vals = scaled[indices, axis_idx]
+                label = "bot" if k == 0 else "top"
+                layer_symbols = symbols[indices]
+                layer_charges = net_charge[indices]
+                elem_parts = []
+                for elem in sorted(set(layer_symbols)):
+                    mask = layer_symbols == elem
+                    elem_parts.append(
+                        f"{elem}({int(mask.sum())}): "
+                        f"Σq={layer_charges[mask].sum():.4f}e"
+                    )
+                elem_str = " | ".join(elem_parts)
+                print(f"    {label}: n={len(indices)}, "
+                      f"frac_c={float(np.mean(frac_vals)):.4f} | {elem_str}")
 
     steps = np.array(steps_list)
     sigma_bottom = np.array(sigma_bottom_list)
