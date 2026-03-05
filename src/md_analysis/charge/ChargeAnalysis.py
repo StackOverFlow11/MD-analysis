@@ -59,11 +59,6 @@ def compute_frame_surface_charge(
     The input ``atoms`` must already carry ``"bader_net_charge"`` in
     ``atoms.arrays`` (as produced by :func:`load_bader_atoms`).
 
-    The surface charge is computed by partitioning **all** metal atoms
-    into bottom-half and top-half at the slab midplane (circular mean
-    of all metal fractional coordinates along *normal*), then summing
-    Bader net charges in each half.
-
     Results are stored in-place on the returned Atoms:
     - ``atoms.info["surface_charge_density_e_A2"]`` — [σ_bottom, σ_top] in e/Å²
     - ``atoms.info["surface_charge_density_uC_cm2"]`` — same in μC/cm²
@@ -95,7 +90,7 @@ def compute_frame_surface_charge(
 
     net_charge = atoms.arrays["bader_net_charge"]
 
-    # Detect interface layers (for midplane and metal indices)
+    # Detect interface layers
     det = detect_interface_layers(atoms, metal_symbols=metal_symbols, normal=normal)
     iface_layers = det.interface_layers()
     if len(iface_layers) != 2:
@@ -108,46 +103,14 @@ def compute_frame_surface_charge(
     cell = np.asarray(atoms.cell.array, dtype=float)
     area_A2 = float(np.linalg.norm(np.cross(cell[i0], cell[i1])))
 
-    # --- Partition ALL metal atoms at slab midplane (PBC-aware) ---
-    axis_map = {"a": 0, "b": 1, "c": 2}
-    axis_idx = axis_map[normal]
-
-    metal_indices = np.array(det.metal_indices, dtype=int)
-    scaled = np.asarray(atoms.get_scaled_positions(wrap=True), dtype=float)
-    metal_frac = scaled[metal_indices, axis_idx]  # fractional coords
-
-    # Circular mean of all metal atoms → slab midplane
-    angles = 2.0 * np.pi * metal_frac
-    z_mean = np.mean(np.cos(angles)) + 1j * np.mean(np.sin(angles))
-    if z_mean == 0:
-        mid_frac = float(np.mean(metal_frac) % 1.0)
-    else:
-        mid_angle = np.angle(z_mean)
-        if mid_angle < 0:
-            mid_angle += 2.0 * np.pi
-        mid_frac = float(mid_angle / (2.0 * np.pi))
-
-    # MIC delta from midplane for each metal atom
-    delta = (metal_frac - mid_frac + 0.5) % 1.0 - 0.5  # in [-0.5, 0.5)
-    bottom_mask = delta < 0
-    top_mask = ~bottom_mask
-
-    # Identify which side is "bottom" (lower fractional coord interface)
-    # The interface layer with normal pointing -axis is the bottom surface.
+    # Sort interface layers by center_s (bottom first)
     sorted_iface = sorted(iface_layers, key=lambda L: L.center_s)
-    iface0_frac = scaled[list(sorted_iface[0].atom_indices), axis_idx]
-    iface0_delta = float(np.mean((iface0_frac - mid_frac + 0.5) % 1.0 - 0.5))
 
-    if iface0_delta < 0:
-        # sorted_iface[0] is on the bottom side → bottom_mask is correct
-        sigma_bottom_q = net_charge[metal_indices[bottom_mask]].sum()
-        sigma_top_q = net_charge[metal_indices[top_mask]].sum()
-    else:
-        # sorted_iface[0] is on the top side → swap
-        sigma_bottom_q = net_charge[metal_indices[top_mask]].sum()
-        sigma_top_q = net_charge[metal_indices[bottom_mask]].sum()
+    sigma_e_A2 = np.empty(2)
+    for i, layer in enumerate(sorted_iface):
+        idx = np.array(layer.atom_indices)
+        sigma_e_A2[i] = net_charge[idx].sum() / area_A2
 
-    sigma_e_A2 = np.array([sigma_bottom_q / area_A2, sigma_top_q / area_A2])
     sigma_uC_cm2 = sigma_e_A2 * E_PER_A2_TO_UC_PER_CM2
 
     atoms.info["surface_charge_density_e_A2"] = sigma_e_A2.tolist()
