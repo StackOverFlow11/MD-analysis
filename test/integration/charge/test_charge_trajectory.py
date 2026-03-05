@@ -1,5 +1,6 @@
 """Integration tests for trajectory charge functions."""
 
+import csv
 import shutil
 from pathlib import Path
 
@@ -8,6 +9,7 @@ import pytest
 
 from md_analysis.charge.ChargeAnalysis import (
     compute_frame_surface_charge,
+    surface_charge_analysis,
     trajectory_indexed_atom_charges,
     trajectory_surface_charge,
 )
@@ -103,3 +105,53 @@ class TestTrajectorySurfaceCharge:
             compute_frame_surface_charge(atoms)
             expected = atoms.info["surface_charge_density_uC_cm2"]
             np.testing.assert_allclose(traj_result[i], expected, atol=1e-10)
+
+    def test_numeric_sort_non_zero_padded(self, tmp_path):
+        """Non-zero-padded directory names are sorted numerically."""
+        for t in [50, 1000, 200, 5]:
+            frame_dir = tmp_path / f"calc_t{t}_i0"
+            frame_dir.mkdir()
+            for fname in _FRAME_FILES:
+                shutil.copy2(DATA_DIR / fname, frame_dir / fname)
+        result = trajectory_surface_charge(tmp_path, dir_pattern="calc_t*_i*")
+        assert result.shape == (4, 2)
+        # All frames are identical data, so values should match
+        np.testing.assert_allclose(result[0], result[3], atol=1e-10)
+
+
+class TestSurfaceChargeAnalysis:
+    """Integration tests for surface_charge_analysis end-to-end."""
+
+    def test_end_to_end(self, tmp_path):
+        root = _build_fake_trajectory(tmp_path, n_frames=3)
+        out = tmp_path / "output"
+        csv_path = surface_charge_analysis(root, output_dir=out)
+
+        assert csv_path.exists()
+        assert (out / "surface_charge.png").exists()
+
+        with csv_path.open(encoding="utf-8") as f:
+            rows = list(csv.DictReader(f))
+        assert len(rows) == 3
+
+        # All frames identical → cumulative average converges to inst. value
+        bot_0 = float(rows[0]["sigma_bottom_uC_cm2"])
+        bot_cum_2 = float(rows[2]["sigma_bottom_cumavg_uC_cm2"])
+        assert bot_cum_2 == pytest.approx(bot_0, rel=1e-10)
+
+    def test_numeric_sort_in_analysis(self, tmp_path):
+        """surface_charge_analysis uses numeric sort for non-zero-padded dirs."""
+        for t in [1000, 50]:
+            frame_dir = tmp_path / f"calc_t{t}_i0"
+            frame_dir.mkdir()
+            for fname in _FRAME_FILES:
+                shutil.copy2(DATA_DIR / fname, frame_dir / fname)
+        out = tmp_path / "output"
+        csv_path = surface_charge_analysis(
+            tmp_path, output_dir=out, dir_pattern="calc_t*_i*",
+        )
+        with csv_path.open(encoding="utf-8") as f:
+            rows = list(csv.DictReader(f))
+        # First row should be t=50, second t=1000
+        assert int(rows[0]["step"]) == 50
+        assert int(rows[1]["step"]) == 1000

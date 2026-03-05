@@ -8,8 +8,8 @@
 ## Module layout
 
 Flat structure (no sub-packages):
-- `config.py` — unit conversion constant + default filenames
-- `ChargeAnalysis.py` — single-frame surface charge, single-frame indexed atom charges, trajectory indexed atom charges, trajectory surface charge
+- `config.py` — unit conversion constant + default filenames + output file name constants
+- `ChargeAnalysis.py` — single-frame surface charge, single-frame indexed atom charges, trajectory indexed atom charges, trajectory surface charge, end-to-end surface charge analysis
 
 ## Data flow
 
@@ -34,7 +34,7 @@ Flat structure (no sub-packages):
 ### Trajectory (`trajectory_indexed_atom_charges`)
 
 1. Validate `atom_index_matrix`: must be 2-D, integer, non-negative → `ValueError`
-2. Discover `calc_t*_i*` subdirectories via `sorted(root.glob(dir_pattern))`
+2. Discover `calc_t*_i*` subdirectories via `_sorted_frame_dirs(root, dir_pattern)` (numeric sort by t value)
 3. Validate `t == len(frame_dirs)` → `ValueError`
 4. Per frame:
    - Check POSCAR/ACF.dat/POTCAR exist → `FileNotFoundError` (includes frame name)
@@ -47,12 +47,26 @@ Flat structure (no sub-packages):
 
 1. Validate `normal` ∈ `{"a", "b", "c"}` → `ValueError`
 2. Validate `root_dir` exists → `FileNotFoundError`
-3. Discover `calc_t*_i*` subdirectories → `FileNotFoundError` if none
+3. Discover `calc_t*_i*` subdirectories via `_sorted_frame_dirs` (numeric sort) → `FileNotFoundError` if none
 4. Per frame:
    - Check POSCAR/ACF.dat/POTCAR exist → `FileNotFoundError` (includes frame name)
    - `load_bader_atoms()` → `compute_frame_surface_charge(atoms, ...)`
    - Collect `atoms.info["surface_charge_density_uC_cm2"]`
 5. Stack → return `(t, 2)` ndarray (μC/cm²)
+
+### End-to-end analysis (`surface_charge_analysis`)
+
+1. Validate `normal`, `root_dir`
+2. `_sorted_frame_dirs(root, dir_pattern)` → numeric sort by t value
+3. Apply `frame_dirs[frame_start:frame_end:frame_step]` slice
+4. Per frame: `load_bader_atoms` → `compute_frame_surface_charge` → collect `(step, σ_bottom, σ_top)`
+5. Compute cumulative average for both surfaces
+6. Write CSV (`_write_csv`) + PNG (`_plot_surface_charge`)
+7. Return CSV path
+
+## Directory sorting
+
+All trajectory functions use `_sorted_frame_dirs()` which sorts by the numeric value of `_t(\d+)` in the directory name, avoiding lexicographic mis-ordering of non-zero-padded names (e.g., `calc_t1000` before `calc_t50`).
 
 ## Unit convention
 

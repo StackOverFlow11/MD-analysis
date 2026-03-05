@@ -4,13 +4,14 @@ Public API
 ----------
 - ``run_water_analysis``  — water density/orientation/adsorbed-layer analysis
 - ``run_potential_analysis`` — Hartree potential / Fermi / electrode potential analysis
+- ``run_charge_analysis`` — Bader surface charge density time series
 - ``run_all`` — both water + potential
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 from .potential.config import DEFAULT_THICKNESS_ANG
 
@@ -193,6 +194,50 @@ def run_potential_analysis(
         results["thickness_sensitivity_csv"] = ts_csv
 
     return results
+
+
+def run_charge_analysis(
+    *,
+    output_dir: Path,
+    root_dir: str | Path = ".",
+    metal_symbols: Iterable[str] | None = None,
+    normal: str = "c",
+    dir_pattern: str = "calc_t*_i*",
+    frame_start: int | None = None,
+    frame_end: int | None = None,
+    frame_step: int | None = None,
+    verbose: bool = False,
+) -> dict[str, Path]:
+    """Run surface charge density analysis (CSV + PNG).
+
+    Outputs are written under ``output_dir/charge/``.
+    Returns a dict mapping output names to file paths.
+    """
+    from .charge import surface_charge_analysis
+    from .charge.config import (
+        DEFAULT_SURFACE_CHARGE_CSV_NAME,
+        DEFAULT_SURFACE_CHARGE_PNG_NAME,
+    )
+
+    charge_dir = Path(output_dir) / "charge"
+    charge_dir.mkdir(parents=True, exist_ok=True)
+
+    csv_path = surface_charge_analysis(
+        root_dir,
+        metal_symbols=metal_symbols,
+        normal=normal,
+        dir_pattern=dir_pattern,
+        output_dir=charge_dir,
+        frame_start=frame_start,
+        frame_end=frame_end,
+        frame_step=frame_step,
+        verbose=verbose,
+    )
+
+    return {
+        "charge_csv": csv_path,
+        "charge_png": csv_path.parent / DEFAULT_SURFACE_CHARGE_PNG_NAME,
+    }
 
 
 def run_all(

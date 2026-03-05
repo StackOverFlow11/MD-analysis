@@ -1,5 +1,6 @@
 """Unit tests for md_analysis.charge.ChargeAnalysis."""
 
+import shutil
 from pathlib import Path
 
 import numpy as np
@@ -7,8 +8,11 @@ import pytest
 from ase import Atoms
 
 from md_analysis.charge.ChargeAnalysis import (
+    _extract_t_value,
+    _sorted_frame_dirs,
     compute_frame_surface_charge,
     frame_indexed_atom_charges,
+    surface_charge_analysis,
     trajectory_indexed_atom_charges,
     trajectory_surface_charge,
 )
@@ -197,3 +201,90 @@ class TestTrajectorySurfaceCharge:
     def test_invalid_normal_raises(self, tmp_path):
         with pytest.raises(ValueError, match="normal must be"):
             trajectory_surface_charge(tmp_path, normal="z")
+
+
+# ---------------------------------------------------------------------------
+# _extract_t_value / _sorted_frame_dirs
+# ---------------------------------------------------------------------------
+
+class TestSortedFrameDirs:
+    """Tests for numeric sorting of frame directories."""
+
+    def test_extract_t_value_basic(self):
+        assert _extract_t_value("calc_t50_i0") == 50
+        assert _extract_t_value("calc_t1000_i0") == 1000
+        assert _extract_t_value("calc_t0_i0") == 0
+
+    def test_extract_t_value_no_match(self):
+        assert _extract_t_value("no_match") == 0
+
+    def test_sorted_frame_dirs_numeric_order(self, tmp_path):
+        """Non-zero-padded directory names sort numerically, not lexically."""
+        for t in [50, 1000, 200, 5]:
+            (tmp_path / f"calc_t{t}_i0").mkdir()
+        result = _sorted_frame_dirs(tmp_path, "calc_t*_i*")
+        names = [p.name for p in result]
+        assert names == ["calc_t5_i0", "calc_t50_i0", "calc_t200_i0", "calc_t1000_i0"]
+
+    def test_sorted_frame_dirs_empty_raises(self, tmp_path):
+        with pytest.raises(FileNotFoundError, match="No subdirectories"):
+            _sorted_frame_dirs(tmp_path, "calc_t*_i*")
+
+
+# ---------------------------------------------------------------------------
+# surface_charge_analysis
+# ---------------------------------------------------------------------------
+
+_FRAME_FILES = ["POSCAR", "ACF.dat", "POTCAR"]
+
+
+def _build_fake_trajectory(tmp_path: Path, n_frames: int = 2) -> Path:
+    for i in range(n_frames):
+        frame_dir = tmp_path / f"calc_t{i:03d}_i000"
+        frame_dir.mkdir()
+        for fname in _FRAME_FILES:
+            shutil.copy2(DATA_DIR / fname, frame_dir / fname)
+    return tmp_path
+
+
+class TestSurfaceChargeAnalysis:
+    """Unit tests for surface_charge_analysis."""
+
+    def test_csv_and_png_created(self, tmp_path):
+        root = _build_fake_trajectory(tmp_path, n_frames=2)
+        out = tmp_path / "output"
+        csv_path = surface_charge_analysis(root, output_dir=out)
+        assert csv_path.exists()
+        png_path = out / "surface_charge.png"
+        assert png_path.exists()
+
+    def test_csv_columns(self, tmp_path):
+        import csv
+        root = _build_fake_trajectory(tmp_path, n_frames=2)
+        out = tmp_path / "output"
+        csv_path = surface_charge_analysis(root, output_dir=out)
+        with csv_path.open(encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+        assert len(rows) == 2
+        expected_cols = {
+            "step", "sigma_bottom_uC_cm2", "sigma_top_uC_cm2",
+            "sigma_bottom_cumavg_uC_cm2", "sigma_top_cumavg_uC_cm2",
+        }
+        assert set(rows[0].keys()) == expected_cols
+
+    def test_frame_slicing(self, tmp_path):
+        import csv
+        root = _build_fake_trajectory(tmp_path, n_frames=4)
+        out = tmp_path / "output"
+        csv_path = surface_charge_analysis(
+            root, output_dir=out, frame_start=1, frame_end=3,
+        )
+        with csv_path.open(encoding="utf-8") as f:
+            rows = list(csv.DictReader(f))
+        assert len(rows) == 2
+
+    def test_invalid_normal_raises(self, tmp_path):
+        root = _build_fake_trajectory(tmp_path, n_frames=1)
+        with pytest.raises(ValueError, match="normal must be"):
+            surface_charge_analysis(root, normal="z")

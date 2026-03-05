@@ -77,6 +77,7 @@
   - `frame_indexed_atom_charges()`：单帧指定原子索引提取净电荷 → `(N, 2)` ndarray
   - `trajectory_indexed_atom_charges()`：按帧指定原子索引提取净电荷 → `(t, N, 2)` ndarray（内部调用 `frame_indexed_atom_charges`）
   - `trajectory_surface_charge()`：多帧表面电荷密度时序 → `(t, 2)` ndarray（逐帧调用 `compute_frame_surface_charge`）
+  - `surface_charge_analysis()`：端到端表面电荷密度分析（CSV + PNG 输出，含累积平均）
 
 ### 4) `md_analysis.potential`（多帧/电势分析工作流）
 
@@ -93,8 +94,8 @@
 
 ### 5) `md_analysis.main` / `md_analysis.CLI`（集成入口）
 
-- `main.py`：编程入口 `run_water_analysis()`、`run_potential_analysis()`、`run_all()`
-- `CLI.py`：argparse CLI，注册为 `md-analysis` console script
+- `main.py`：编程入口 `run_water_analysis()`、`run_potential_analysis()`、`run_charge_analysis()`、`run_all()`
+- `CLI.py`：argparse CLI，注册为 `md-analysis` console script（子命令：`water`、`potential`、`charge`、`all`）
 
 ## 核心数据流（当前端到端）
 

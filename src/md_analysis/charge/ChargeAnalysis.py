@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import csv
+import re
 from pathlib import Path
 from typing import Iterable
 
@@ -15,11 +17,31 @@ from .config import (
     DEFAULT_DIR_PATTERN,
     DEFAULT_POTCAR_FILENAME,
     DEFAULT_STRUCTURE_FILENAME,
+    DEFAULT_SURFACE_CHARGE_CSV_NAME,
+    DEFAULT_SURFACE_CHARGE_PNG_NAME,
     E_PER_A2_TO_UC_PER_CM2,
 )
 
 # Map normal axis to the two cell-vector indices spanning the surface plane
 _AREA_VECTORS = {"a": (1, 2), "b": (0, 2), "c": (0, 1)}
+
+_T_VALUE_RE = re.compile(r"_t(\d+)")
+
+
+def _extract_t_value(dirname: str) -> int:
+    """Extract numeric t value from a directory name like ``calc_t50_i0``."""
+    m = _T_VALUE_RE.search(dirname)
+    return int(m.group(1)) if m else 0
+
+
+def _sorted_frame_dirs(root: Path, dir_pattern: str) -> list[Path]:
+    """Discover and numerically sort frame subdirectories by t value."""
+    frame_dirs = sorted(root.glob(dir_pattern), key=lambda p: _extract_t_value(p.name))
+    if not frame_dirs:
+        raise FileNotFoundError(
+            f"No subdirectories matching '{dir_pattern}' in {root}"
+        )
+    return frame_dirs
 
 
 # ---------------------------------------------------------------------------
@@ -210,11 +232,7 @@ def trajectory_indexed_atom_charges(
     if not root.is_dir():
         raise FileNotFoundError(f"root_dir does not exist: {root}")
 
-    frame_dirs = sorted(root.glob(dir_pattern))
-    if not frame_dirs:
-        raise FileNotFoundError(
-            f"No subdirectories matching '{dir_pattern}' in {root}"
-        )
+    frame_dirs = _sorted_frame_dirs(root, dir_pattern)
 
     t_expected = arr.shape[0]
     if t_expected != len(frame_dirs):
@@ -305,11 +323,7 @@ def trajectory_surface_charge(
     if not root.is_dir():
         raise FileNotFoundError(f"root_dir does not exist: {root}")
 
-    frame_dirs = sorted(root.glob(dir_pattern))
-    if not frame_dirs:
-        raise FileNotFoundError(
-            f"No subdirectories matching '{dir_pattern}' in {root}"
-        )
+    frame_dirs = _sorted_frame_dirs(root, dir_pattern)
 
     rows = []
     for frame_dir in frame_dirs:
@@ -334,3 +348,178 @@ def trajectory_surface_charge(
         rows.append(sigma)
 
     return np.array(rows, dtype=float)
+
+
+# ---------------------------------------------------------------------------
+# Private helpers for analysis output
+# ---------------------------------------------------------------------------
+
+def _cumulative_average(values: np.ndarray) -> np.ndarray:
+    csum = np.cumsum(values, dtype=float)
+    return csum / np.arange(1, values.size + 1, dtype=float)
+
+
+def _write_csv(path: Path, rows: Iterable[dict], fieldnames: list[str]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=fieldnames)
+        w.writeheader()
+        w.writerows(rows)
+
+
+def _plot_surface_charge(
+    png_path: Path,
+    steps: np.ndarray,
+    sigma_bottom: np.ndarray,
+    sigma_top: np.ndarray,
+    sigma_bottom_cum: np.ndarray,
+    sigma_top_cum: np.ndarray,
+) -> None:
+    png_path.parent.mkdir(parents=True, exist_ok=True)
+
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(figsize=(9, 4.8), dpi=160)
+    ax.plot(steps, sigma_bottom, lw=1.0, alpha=0.65, color="tab:blue", label="bottom (inst.)")
+    ax.plot(steps, sigma_bottom_cum, lw=2.0, color="tab:blue", ls="--", label="bottom (cum. avg)")
+    ax.plot(steps, sigma_top, lw=1.0, alpha=0.65, color="tab:orange", label="top (inst.)")
+    ax.plot(steps, sigma_top_cum, lw=2.0, color="tab:orange", ls="--", label="top (cum. avg)")
+    ax.set_xlabel("MD step")
+    ax.set_ylabel(r"$\sigma$ ($\mu$C/cm$^2$)")
+    ax.set_title("Surface charge density")
+    ax.grid(True, alpha=0.25)
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(png_path)
+    plt.close(fig)
+
+
+# ---------------------------------------------------------------------------
+# End-to-end surface charge analysis
+# ---------------------------------------------------------------------------
+
+def surface_charge_analysis(
+    root_dir: str | Path = ".",
+    *,
+    metal_symbols: Iterable[str] | None = None,
+    normal: str = "c",
+    dir_pattern: str = DEFAULT_DIR_PATTERN,
+    structure_filename: str = DEFAULT_STRUCTURE_FILENAME,
+    acf_filename: str = DEFAULT_ACF_FILENAME,
+    potcar_filename: str = DEFAULT_POTCAR_FILENAME,
+    output_dir: Path | None = None,
+    frame_start: int | None = None,
+    frame_end: int | None = None,
+    frame_step: int | None = None,
+    verbose: bool = False,
+) -> Path:
+    """End-to-end surface charge density analysis with CSV + PNG output.
+
+    Parameters
+    ----------
+    root_dir
+        Parent directory containing per-frame subdirectories.
+    metal_symbols
+        Override default metal symbols for layer detection.
+    normal
+        Cell axis perpendicular to the surface (``"a"``, ``"b"``, or ``"c"``).
+    dir_pattern
+        Glob pattern for discovering frame subdirectories.
+    structure_filename, acf_filename, potcar_filename
+        Per-frame file names.
+    output_dir
+        Where to write CSV and PNG. Defaults to *root_dir*.
+    frame_start, frame_end, frame_step
+        Slice parameters applied to the sorted frame list.
+    verbose
+        Print progress.
+
+    Returns
+    -------
+    Path
+        Path to the written CSV file.
+    """
+    if normal not in _AREA_VECTORS:
+        raise ValueError(
+            f"normal must be one of {set(_AREA_VECTORS)}, got {normal!r}"
+        )
+
+    root = Path(root_dir)
+    if not root.is_dir():
+        raise FileNotFoundError(f"root_dir does not exist: {root}")
+
+    frame_dirs = _sorted_frame_dirs(root, dir_pattern)
+    frame_dirs = frame_dirs[frame_start:frame_end:frame_step]
+    if not frame_dirs:
+        raise FileNotFoundError("No frame directories after slicing")
+
+    if output_dir is None:
+        output_dir = root
+    output_dir = Path(output_dir)
+
+    steps_list: list[int] = []
+    sigma_bottom_list: list[float] = []
+    sigma_top_list: list[float] = []
+
+    for idx, frame_dir in enumerate(frame_dirs):
+        fname = frame_dir.name
+        poscar = frame_dir / structure_filename
+        acf = frame_dir / acf_filename
+        potcar = frame_dir / potcar_filename
+
+        for path, label in [(poscar, structure_filename),
+                            (acf, acf_filename),
+                            (potcar, potcar_filename)]:
+            if not path.exists():
+                raise FileNotFoundError(
+                    f"{label} not found in frame {fname}: {path}"
+                )
+
+        atoms = load_bader_atoms(poscar, acf, potcar)
+        compute_frame_surface_charge(
+            atoms, metal_symbols=metal_symbols, normal=normal,
+        )
+        sigma = atoms.info["surface_charge_density_uC_cm2"]
+        step = _extract_t_value(fname)
+        steps_list.append(step)
+        sigma_bottom_list.append(sigma[0])
+        sigma_top_list.append(sigma[1])
+
+        if verbose:
+            print(f"  [{idx + 1}/{len(frame_dirs)}] {fname}: "
+                  f"σ_bottom={sigma[0]:.4f}, σ_top={sigma[1]:.4f} μC/cm²")
+
+    steps = np.array(steps_list)
+    sigma_bottom = np.array(sigma_bottom_list)
+    sigma_top = np.array(sigma_top_list)
+    sigma_bottom_cum = _cumulative_average(sigma_bottom)
+    sigma_top_cum = _cumulative_average(sigma_top)
+
+    # CSV
+    fieldnames = [
+        "step",
+        "sigma_bottom_uC_cm2",
+        "sigma_top_uC_cm2",
+        "sigma_bottom_cumavg_uC_cm2",
+        "sigma_top_cumavg_uC_cm2",
+    ]
+    csv_rows: list[dict] = []
+    for i in range(len(steps)):
+        csv_rows.append({
+            "step": int(steps[i]),
+            "sigma_bottom_uC_cm2": float(sigma_bottom[i]),
+            "sigma_top_uC_cm2": float(sigma_top[i]),
+            "sigma_bottom_cumavg_uC_cm2": float(sigma_bottom_cum[i]),
+            "sigma_top_cumavg_uC_cm2": float(sigma_top_cum[i]),
+        })
+    csv_path = output_dir / DEFAULT_SURFACE_CHARGE_CSV_NAME
+    _write_csv(csv_path, csv_rows, fieldnames)
+
+    # PNG
+    png_path = output_dir / DEFAULT_SURFACE_CHARGE_PNG_NAME
+    _plot_surface_charge(png_path, steps, sigma_bottom, sigma_top,
+                         sigma_bottom_cum, sigma_top_cum)
+
+    return csv_path

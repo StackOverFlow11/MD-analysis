@@ -25,10 +25,12 @@
 - **CLI 入口**：
   - `md-analysis water --xyz md-pos-1.xyz --md-inp md.inp`
   - `md-analysis potential --cube-pattern "md-POTENTIAL-*.cube"`
+  - `md-analysis charge --root-dir .` （Bader 表面电荷密度时序分析，CSV + PNG 输出）
   - `md-analysis all --xyz ... --md-inp ... --cube-pattern ...`
 - **编程入口**：
   - `md_analysis.main.run_water_analysis(xyz_path, md_inp_path, ...)`
   - `md_analysis.main.run_potential_analysis(cube_pattern=..., md_out_path=..., ...)`
+  - `md_analysis.main.run_charge_analysis(output_dir=..., root_dir=..., ...)`
   - `md_analysis.main.run_all(...)`
 - **水分析**：
   - `plot_water_three_panel_analysis(xyz_path, md_inp_path, ...)`
@@ -54,6 +56,7 @@
     - ✅ 单帧原子净电荷提取：`frame_indexed_atom_charges` 传入 `(N,)` 索引，返回 `(N, 2)` 的索引+净电荷数组
     - ✅ 轨迹原子净电荷提取：`trajectory_indexed_atom_charges` 按帧传入 `(t, N)` 索引矩阵，返回 `(t, N, 2)` 的索引+净电荷数组（内部调用 `frame_indexed_atom_charges`）
     - ✅ 轨迹表面电荷密度时序：`trajectory_surface_charge` 逐帧计算表面电荷密度，返回 `(t, 2)` 的 μC/cm² 数组
+    - ✅ 端到端表面电荷分析：`surface_charge_analysis` 输出 CSV（含累积平均）+ PNG，CLI 子命令 `md-analysis charge`
     - 按层/按元素电荷转移统计：分层聚合 `bader_net_charge`，输出每层各元素的平均净电荷（待实现）
     - 典型工作流：CP2K MD → 提取结构帧 → VASP 单点 → Bader 分析 → `load_bader_atoms` → 表面电荷/电荷转移
   - Mulliken 电荷：按元素/分组/分层统计（优先级低于 Bader，待后续明确需求）

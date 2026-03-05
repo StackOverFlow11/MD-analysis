@@ -102,6 +102,50 @@ def _cmd_potential(args: argparse.Namespace) -> int:
     return 0
 
 
+def _add_charge_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--root-dir", type=str, default=".", help="Root directory containing calc_t*_i* subdirectories (default: .).")
+    parser.add_argument("--dir-pattern", type=str, default="calc_t*_i*", help="Glob pattern for frame subdirectories (default: calc_t*_i*).")
+    parser.add_argument("--normal", choices=["a", "b", "c"], default="c", help="Cell axis perpendicular to the surface (default: c).")
+    parser.add_argument("--metal-elements", type=str, default=None, help="Comma-separated metal element symbols (e.g., Cu,Ag).")
+
+
+def _cmd_charge(args: argparse.Namespace) -> int:
+    import csv as _csv
+
+    from .main import run_charge_analysis
+
+    results = run_charge_analysis(
+        output_dir=Path(args.outdir),
+        root_dir=args.root_dir,
+        metal_symbols=_parse_metal_elements(args.metal_elements),
+        normal=args.normal,
+        dir_pattern=args.dir_pattern,
+        frame_start=args.frame_start,
+        frame_end=args.frame_end,
+        frame_step=args.frame_step,
+        verbose=True,
+    )
+
+    print("Charge analysis complete. Outputs:")
+    for name, path in results.items():
+        print(f"  {name}: {path}")
+
+    # Print ensemble average summary from CSV
+    csv_path = results["charge_csv"]
+    with csv_path.open(encoding="utf-8") as f:
+        reader = _csv.DictReader(f)
+        rows = list(reader)
+    if rows:
+        import numpy as _np
+        bot = _np.array([float(r["sigma_bottom_uC_cm2"]) for r in rows])
+        top = _np.array([float(r["sigma_top_uC_cm2"]) for r in rows])
+        print(f"Ensemble average ({len(rows)} frames):")
+        print(f"  sigma_bottom: {bot.mean():8.4f} +/- {bot.std():.4f} uC/cm^2")
+        print(f"  sigma_top:    {top.mean():8.4f} +/- {top.std():.4f} uC/cm^2")
+
+    return 0
+
+
 def _cmd_all(args: argparse.Namespace) -> int:
     confirm = input("Will run all analyses. Enter 'yes' to confirm: ")
     if confirm.strip().lower() != "yes":
@@ -175,6 +219,10 @@ def main() -> int:
     potential_parser = subparsers.add_parser("potential", help="Potential analysis (center + fermi + electrode + phi_z).")
     _add_potential_args(potential_parser)
 
+    # charge subcommand
+    charge_parser = subparsers.add_parser("charge", help="Charge analysis (surface charge density time series).")
+    _add_charge_args(charge_parser)
+
     # all subcommand (--xyz is shared between water and potential, so add it via water only)
     all_parser = subparsers.add_parser("all", help="Run all analyses (water + potential). Requires confirmation.")
     _add_water_args(all_parser)
@@ -190,6 +238,8 @@ def main() -> int:
         return _cmd_water(args)
     elif args.command == "potential":
         return _cmd_potential(args)
+    elif args.command == "charge":
+        return _cmd_charge(args)
     elif args.command == "all":
         return _cmd_all(args)
     else:
