@@ -17,12 +17,16 @@ Flat structure (no sub-packages):
 
 1. Validate `normal` ∈ `{"a", "b", "c"}` → `ValueError`
 2. Validate `"bader_net_charge" in atoms.arrays`
-3. `detect_interface_layers(atoms)` → 2 interface layers
+3. `detect_interface_layers(atoms)` → 2 interface layers + `metal_indices`
 4. Surface area: `|cell[i] × cell[j]|` where `(i, j) = _AREA_VECTORS[normal]`
    - `_AREA_VECTORS = {"a": (1, 2), "b": (0, 2), "c": (0, 1)}`
-5. Per interface layer: `σ = Σ net_charge[layer_indices] / area`
-6. Convert e/Å² → μC/cm² via `E_PER_A2_TO_UC_PER_CM2`
-7. Store in `atoms.info["surface_charge_density_e_A2"]` and `atoms.info["surface_charge_density_uC_cm2"]`
+5. Compute slab midplane: circular mean of all metal fractional coordinates along `normal` (PBC-safe)
+6. Partition **all** metal atoms into bottom-half / top-half via MIC delta from midplane
+7. Per half: `σ = Σ net_charge[half_indices] / area`
+8. Convert e/Å² → μC/cm² via `E_PER_A2_TO_UC_PER_CM2`
+9. Store in `atoms.info["surface_charge_density_e_A2"]` and `atoms.info["surface_charge_density_uC_cm2"]`
+
+Note: the surface charge is the total Bader net charge of all metal atoms on each side of the slab (split at midplane), not just the outermost interface layer. This ensures correct results for symmetric slabs and avoids sensitivity to layer-detection details.
 
 ### Single frame indexed (`frame_indexed_atom_charges`)
 
