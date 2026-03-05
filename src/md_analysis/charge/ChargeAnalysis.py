@@ -488,8 +488,21 @@ def surface_charge_analysis(
         sigma_top_list.append(sigma[1])
 
         if verbose:
+            # Diagnostic: interface layer fractional coords & atom counts
+            axis_idx = {"a": 0, "b": 1, "c": 2}[normal]
+            det = detect_interface_layers(atoms, metal_symbols=metal_symbols, normal=normal)
+            iface = sorted(det.interface_layers(), key=lambda L: L.center_s)
+            scaled = np.asarray(atoms.get_scaled_positions(wrap=True), dtype=float)
+            diag_parts = []
+            for k, layer in enumerate(iface):
+                frac_vals = scaled[list(layer.atom_indices), axis_idx]
+                label = "bot" if k == 0 else "top"
+                diag_parts.append(f"{label}: n={len(layer.atom_indices)}, "
+                                  f"frac_c={float(np.mean(frac_vals)):.4f}")
+            diag = " | ".join(diag_parts)
             print(f"  [{idx + 1}/{len(frame_dirs)}] {fname}: "
-                  f"σ_bottom={sigma[0]:.4f}, σ_top={sigma[1]:.4f} μC/cm²")
+                  f"σ_bottom={sigma[0]:.4f}, σ_top={sigma[1]:.4f} μC/cm²  "
+                  f"[{diag}]")
 
     steps = np.array(steps_list)
     sigma_bottom = np.array(sigma_bottom_list)
