@@ -36,6 +36,7 @@ class TestComputeFrameSurfaceCharge:
         )
 
     def test_basic_sigma(self, bader_atoms):
+        """Test data has no counterions → σ must be [0, 0]."""
         result = compute_frame_surface_charge(bader_atoms)
         assert "surface_charge_density_e_A2" in result.info
         assert "surface_charge_density_uC_cm2" in result.info
@@ -43,28 +44,86 @@ class TestComputeFrameSurfaceCharge:
         sigma_uc = result.info["surface_charge_density_uC_cm2"]
         assert len(sigma_e) == 2
         assert len(sigma_uc) == 2
-        # Verify unit conversion
+        # No counterions → zero
         for i in range(2):
-            assert sigma_uc[i] == pytest.approx(
-                sigma_e[i] * E_PER_A2_TO_UC_PER_CM2, rel=1e-10
-            )
+            assert sigma_e[i] == 0.0
+            assert sigma_uc[i] == 0.0
 
     def test_sigma_is_finite(self, bader_atoms):
         result = compute_frame_surface_charge(bader_atoms)
         sigma = result.info["surface_charge_density_uC_cm2"]
         assert all(np.isfinite(v) for v in sigma)
 
-    def test_no_selected_keys(self, bader_atoms):
+    def test_no_counterions_gives_zero(self, bader_atoms):
+        """Explicit test: Cu+Ag+O+H system without counterions → σ = 0."""
         result = compute_frame_surface_charge(bader_atoms)
-        assert "selected_atom_indices" not in result.info
-        assert "selected_atom_net_charges" not in result.info
+        sigma = result.info["surface_charge_density_uC_cm2"]
+        assert sigma == [0.0, 0.0]
+        n_ci = result.info["n_counterions_per_surface"]
+        assert n_ci == [0, 0]
+
+    def test_with_synthetic_counterion(self):
+        """Build a mock slab + one K atom near bottom surface → σ_bottom ≠ 0."""
+        # 4-layer Cu slab along c with 10 Å vacuum
+        cell_c = 30.0
+        cell_a = 5.0
+        # Place 4 Cu layers at frac c = 0.1, 0.2, 0.3, 0.4 (3–12 Å)
+        n_per_layer = 4
+        positions = []
+        symbols = []
+        for layer_frac in [0.1, 0.2, 0.3, 0.4]:
+            z = layer_frac * cell_c
+            for ix in range(2):
+                for iy in range(2):
+                    positions.append([ix * cell_a / 2, iy * cell_a / 2, z])
+                    symbols.append("Cu")
+        # Add one O + two H (water) at frac c = 0.6 (18 Å, in water region)
+        positions.append([2.5, 2.5, 0.6 * cell_c])
+        symbols.append("O")
+        positions.append([2.5, 3.2, 0.6 * cell_c + 0.5])
+        symbols.append("H")
+        positions.append([2.5, 1.8, 0.6 * cell_c + 0.5])
+        symbols.append("H")
+        # Add one K counterion near bottom surface (frac c = 0.05, distance 1.5 Å)
+        positions.append([2.5, 2.5, 0.05 * cell_c])
+        symbols.append("K")
+
+        atoms = Atoms(
+            symbols=symbols,
+            positions=positions,
+            cell=[cell_a, cell_a, cell_c],
+            pbc=True,
+        )
+        # Assign fake Bader net charges
+        net_charge = np.zeros(len(atoms))
+        # Cu atoms: small positive charge
+        for i in range(n_per_layer * 4):
+            net_charge[i] = 0.01
+        # O: slightly negative
+        net_charge[-4] = -0.1
+        # H: slightly positive
+        net_charge[-3] = 0.05
+        net_charge[-2] = 0.05
+        # K counterion: +0.8e (lost electron to surface)
+        net_charge[-1] = 0.8
+        atoms.arrays["bader_net_charge"] = net_charge
+
+        result = compute_frame_surface_charge(
+            atoms, metal_symbols={"Cu"}, normal="c", cutoff_A=7.0,
+        )
+
+        sigma = result.info["surface_charge_density_uC_cm2"]
+        n_ci = result.info["n_counterions_per_surface"]
+        # K is near bottom surface → σ_bottom ≠ 0
+        assert n_ci[0] == 1
+        assert sigma[0] != 0.0
+        assert sigma[0] > 0.0  # positive K charge → positive σ
+        # No counterion near top → σ_top = 0
+        assert n_ci[1] == 0
+        assert sigma[1] == 0.0
 
     def test_normal_a(self, bader_atoms):
         """normal='a' uses cell vectors b × c for area."""
-        # This will likely fail on layer detection for this particular
-        # dataset, but we verify the area-vector selection path is reached.
-        # For a proper test we just check that it doesn't raise ValueError
-        # on normal validation and proceeds to layer detection.
         try:
             compute_frame_surface_charge(bader_atoms, normal="a")
         except ValueError as exc:

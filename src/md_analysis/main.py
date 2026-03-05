@@ -202,6 +202,7 @@ def run_charge_analysis(
     root_dir: str | Path = ".",
     metal_symbols: Iterable[str] | None = None,
     normal: str = "c",
+    cutoff_A: float | None = None,
     dir_pattern: str = "calc_t*_i*",
     frame_start: int | None = None,
     frame_end: int | None = None,
@@ -215,6 +216,7 @@ def run_charge_analysis(
     """
     from .charge import surface_charge_analysis
     from .charge.config import (
+        DEFAULT_CUTOFF_A,
         DEFAULT_SURFACE_CHARGE_CSV_NAME,
         DEFAULT_SURFACE_CHARGE_PNG_NAME,
     )
@@ -226,6 +228,7 @@ def run_charge_analysis(
         root_dir,
         metal_symbols=metal_symbols,
         normal=normal,
+        cutoff_A=cutoff_A if cutoff_A is not None else DEFAULT_CUTOFF_A,
         dir_pattern=dir_pattern,
         output_dir=charge_dir,
         frame_start=frame_start,
