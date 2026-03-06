@@ -18,6 +18,7 @@ from md_analysis.charge.BaderAnalysis import (
 )
 from md_analysis.charge.config import E_PER_A2_TO_UC_PER_CM2
 from md_analysis.utils.BaderParser import load_bader_atoms
+from md_analysis.utils.LayerParser import detect_interface_layers
 
 DATA_DIR = Path(__file__).resolve().parents[3] / "data_example" / "bader_work_dir"
 
@@ -125,6 +126,34 @@ class TestComputeFrameSurfaceCharge:
         # Charges are finite
         assert all(np.isfinite(v) for v in sigma)
         assert all(np.isfinite(v) for v in q_ch)
+
+    def test_layer_method_is_invariant_under_periodic_shift(self, bader_atoms):
+        """Periodic translation must not swap the two surface-charge columns."""
+        det = detect_interface_layers(bader_atoms, normal="c")
+        net_charge = bader_atoms.arrays["bader_net_charge"].copy()
+
+        # Charge the two detected interface layers asymmetrically so a column
+        # swap becomes visible after a periodic translation.
+        net_charge[list(det.interface_normal_aligned().atom_indices)] += 1.0
+        net_charge[list(det.interface_normal_opposed().atom_indices)] -= 1.0
+        bader_atoms.arrays["bader_net_charge"] = net_charge
+
+        result = compute_frame_surface_charge(
+            bader_atoms, normal="c", method="layer",
+        )
+        sigma_ref = np.array(result.info["surface_charge_density_e_A2"], dtype=float)
+
+        shifted = bader_atoms.copy()
+        shifted.translate(np.array([0.0, 0.0, 0.45]) @ shifted.cell.array)
+        shifted.wrap()
+        shifted_result = compute_frame_surface_charge(
+            shifted, normal="c", method="layer",
+        )
+        sigma_shifted = np.array(
+            shifted_result.info["surface_charge_density_e_A2"], dtype=float
+        )
+
+        np.testing.assert_allclose(sigma_shifted, sigma_ref, atol=1e-12)
 
     def test_normal_a(self, bader_atoms):
         """normal='a' uses cell vectors b × c for area."""
