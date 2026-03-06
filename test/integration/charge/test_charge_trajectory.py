@@ -135,8 +135,8 @@ class TestSurfaceChargeAnalysis:
         assert len(rows) == 3
 
         # All frames identical → cumulative average converges to inst. value
-        bot_0 = float(rows[0]["sigma_bottom_uC_cm2"])
-        bot_cum_2 = float(rows[2]["sigma_bottom_cumavg_uC_cm2"])
+        bot_0 = float(rows[0]["sigma_aligned_uC_cm2"])
+        bot_cum_2 = float(rows[2]["sigma_aligned_cumavg_uC_cm2"])
         assert bot_cum_2 == pytest.approx(bot_0, rel=1e-10)
 
     def test_numeric_sort_in_analysis(self, tmp_path):

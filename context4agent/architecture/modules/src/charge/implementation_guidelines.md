@@ -79,7 +79,7 @@ Both methods output `[σ_aligned, σ_opposed]` — ordered by stable `interface_
 1. Validate `normal`, `root_dir`
 2. `_sorted_frame_dirs(root, dir_pattern)` → numeric sort by t value
 3. Apply `frame_dirs[frame_start:frame_end:frame_step]` slice
-4. Per frame: `load_bader_atoms` → `compute_frame_surface_charge(..., method=method)` → collect `(step, σ_bottom, σ_top)`
+4. Per frame: `load_bader_atoms` → `compute_frame_surface_charge(..., method=method)` → collect `(step, σ_aligned, σ_opposed)`
 5. Compute cumulative average for both surfaces
 6. Write CSV (`_write_csv`) + PNG (`_plot_surface_charge`)
 7. Return CSV path

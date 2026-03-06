@@ -44,10 +44,10 @@ def compute_frame_surface_charge(
 - `"layer"` — sums net charges of interface-layer metal atoms / area.
 
 Results in `atoms.info`:
-- `surface_charge_density_e_A2`: `[σ_bottom, σ_top]` (e/Å²)
-- `surface_charge_density_uC_cm2`: `[σ_bottom, σ_top]` (μC/cm²)
-- `n_charged_atoms_per_surface`: `[n_bottom, n_top]`
-- `charge_per_surface_e`: `[Σq_bottom, Σq_top]` (e)
+- `surface_charge_density_e_A2`: `[σ_aligned, σ_opposed]` (e/Å²)
+- `surface_charge_density_uC_cm2`: `[σ_aligned, σ_opposed]` (μC/cm²)
+- `n_charged_atoms_per_surface`: `[n_aligned, n_opposed]`
+- `charge_per_surface_e`: `[Σq_aligned, Σq_opposed]` (e)
 
 ## `frame_indexed_atom_charges` Signature
 
@@ -85,7 +85,7 @@ def trajectory_surface_charge(
     structure_filename: str = DEFAULT_STRUCTURE_FILENAME,
     acf_filename: str = DEFAULT_ACF_FILENAME,
     potcar_filename: str = DEFAULT_POTCAR_FILENAME,
-) -> np.ndarray   # (t, 2): [:,0]=σ_bottom, [:,1]=σ_top, μC/cm²
+) -> np.ndarray   # (t, 2): [:,0]=σ_aligned, [:,1]=σ_opposed, μC/cm²
 ```
 
 ## `surface_charge_analysis` Signature

@@ -85,7 +85,7 @@ class TestComputeFrameSurfaceCharge:
         symbols.append("H")
         positions.append([2.5, 1.8, 0.6 * cell_c + 0.5])
         symbols.append("H")
-        # Add one K near bottom surface (frac c = 0.05)
+        # Add one K near normal_opposed surface (frac c = 0.05)
         positions.append([2.5, 2.5, 0.05 * cell_c])
         symbols.append("K")
 
@@ -363,8 +363,8 @@ class TestSurfaceChargeAnalysis:
             rows = list(reader)
         assert len(rows) == 2
         expected_cols = {
-            "step", "sigma_bottom_uC_cm2", "sigma_top_uC_cm2",
-            "sigma_bottom_cumavg_uC_cm2", "sigma_top_cumavg_uC_cm2",
+            "step", "sigma_aligned_uC_cm2", "sigma_opposed_uC_cm2",
+            "sigma_aligned_cumavg_uC_cm2", "sigma_opposed_cumavg_uC_cm2",
         }
         assert set(rows[0].keys()) == expected_cols
 

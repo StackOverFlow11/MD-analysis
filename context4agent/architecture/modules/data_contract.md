@@ -182,14 +182,14 @@ $$
 ### `trajectory_surface_charge(root_dir, *, method="counterion", ...)` 输出
 
 - 返回 `np.ndarray`：`(t, 2)`
-  - `[:, 0]`：σ_bottom（μC/cm²）
-  - `[:, 1]`：σ_top（μC/cm²）
+  - `[:, 0]`：σ_aligned（μC/cm²）
+  - `[:, 1]`：σ_opposed（μC/cm²）
 - 逐帧调用 `load_bader_atoms` + `compute_frame_surface_charge(..., method=method)`，收集 `surface_charge_density_uC_cm2`
 
 ### `surface_charge_analysis(root_dir, *, method="counterion", ...)` 输出
 
-- CSV：`step,sigma_bottom_uC_cm2,sigma_top_uC_cm2,sigma_bottom_cumavg_uC_cm2,sigma_top_cumavg_uC_cm2`
-- PNG：9×4.8 inch, 160 DPI，bottom（蓝色）和 top（橙色）各两条线（inst. + cum. avg）
+- CSV：`step,sigma_aligned_uC_cm2,sigma_opposed_uC_cm2,sigma_aligned_cumavg_uC_cm2,sigma_opposed_cumavg_uC_cm2`
+- PNG：9×4.8 inch, 160 DPI，aligned（蓝色）和 opposed（橙色）各两条线（inst. + cum. avg）
 - 默认文件名：`surface_charge.csv`、`surface_charge.png`
 - 返回 CSV 路径
 

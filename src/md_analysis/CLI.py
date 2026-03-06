@@ -140,11 +140,11 @@ def _cmd_charge(args: argparse.Namespace) -> int:
         rows = list(reader)
     if rows:
         import numpy as _np
-        bot = _np.array([float(r["sigma_bottom_uC_cm2"]) for r in rows])
-        top = _np.array([float(r["sigma_top_uC_cm2"]) for r in rows])
+        aligned = _np.array([float(r["sigma_aligned_uC_cm2"]) for r in rows])
+        opposed = _np.array([float(r["sigma_opposed_uC_cm2"]) for r in rows])
         print(f"Ensemble average ({len(rows)} frames):")
-        print(f"  sigma_bottom: {bot.mean():8.4f} +/- {bot.std():.4f} uC/cm^2")
-        print(f"  sigma_top:    {top.mean():8.4f} +/- {top.std():.4f} uC/cm^2")
+        print(f"  sigma_aligned: {aligned.mean():8.4f} +/- {aligned.std():.4f} uC/cm^2")
+        print(f"  sigma_opposed: {opposed.mean():8.4f} +/- {opposed.std():.4f} uC/cm^2")
 
     return 0
 

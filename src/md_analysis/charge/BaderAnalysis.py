@@ -424,8 +424,8 @@ def trajectory_surface_charge(
     Returns
     -------
     np.ndarray
-        Array of shape ``(t, 2)`` where ``[:, 0]`` is σ_bottom and
-        ``[:, 1]`` is σ_top, in μC/cm².
+        Array of shape ``(t, 2)`` where ``[:, 0]`` is σ_aligned
+        and ``[:, 1]`` is σ_opposed, in μC/cm².
     """
     if normal not in _AREA_VECTORS:
         raise ValueError(
@@ -483,10 +483,10 @@ def _write_csv(path: Path, rows: Iterable[dict], fieldnames: list[str]) -> None:
 def _plot_surface_charge(
     png_path: Path,
     steps: np.ndarray,
-    sigma_bottom: np.ndarray,
-    sigma_top: np.ndarray,
-    sigma_bottom_cum: np.ndarray,
-    sigma_top_cum: np.ndarray,
+    sigma_aligned: np.ndarray,
+    sigma_opposed: np.ndarray,
+    sigma_aligned_cum: np.ndarray,
+    sigma_opposed_cum: np.ndarray,
 ) -> None:
     png_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -495,10 +495,10 @@ def _plot_surface_charge(
     import matplotlib.pyplot as plt
 
     fig, ax = plt.subplots(figsize=(9, 4.8), dpi=160)
-    ax.plot(steps, sigma_bottom, lw=1.0, alpha=0.65, color="tab:blue", label="bottom (inst.)")
-    ax.plot(steps, sigma_bottom_cum, lw=2.0, color="tab:blue", ls="--", label="bottom (cum. avg)")
-    ax.plot(steps, sigma_top, lw=1.0, alpha=0.65, color="tab:orange", label="top (inst.)")
-    ax.plot(steps, sigma_top_cum, lw=2.0, color="tab:orange", ls="--", label="top (cum. avg)")
+    ax.plot(steps, sigma_aligned, lw=1.0, alpha=0.65, color="tab:blue", label="aligned (inst.)")
+    ax.plot(steps, sigma_aligned_cum, lw=2.0, color="tab:blue", ls="--", label="aligned (cum. avg)")
+    ax.plot(steps, sigma_opposed, lw=1.0, alpha=0.65, color="tab:orange", label="opposed (inst.)")
+    ax.plot(steps, sigma_opposed_cum, lw=2.0, color="tab:orange", ls="--", label="opposed (cum. avg)")
     ax.set_xlabel("MD step")
     ax.set_ylabel(r"$\sigma$ ($\mu$C/cm$^2$)")
     ax.set_title("Surface charge density")
@@ -574,8 +574,8 @@ def surface_charge_analysis(
     output_dir = Path(output_dir)
 
     steps_list: list[int] = []
-    sigma_bottom_list: list[float] = []
-    sigma_top_list: list[float] = []
+    sigma_aligned_list: list[float] = []
+    sigma_opposed_list: list[float] = []
 
     for idx, frame_dir in enumerate(frame_dirs):
         fname = frame_dir.name
@@ -598,47 +598,47 @@ def surface_charge_analysis(
         sigma = atoms.info["surface_charge_density_uC_cm2"]
         step = _extract_t_value(fname)
         steps_list.append(step)
-        sigma_bottom_list.append(sigma[0])
-        sigma_top_list.append(sigma[1])
+        sigma_aligned_list.append(sigma[0])
+        sigma_opposed_list.append(sigma[1])
 
         if verbose:
             n_ch = atoms.info["n_charged_atoms_per_surface"]
             q_ch = atoms.info["charge_per_surface_e"]
 
             print(f"  [{idx + 1}/{len(frame_dirs)}] {fname}: "
-                  f"σ_bottom={sigma[0]:.4f}, σ_top={sigma[1]:.4f} μC/cm²")
-            print(f"    charged atoms near bot: {n_ch[0]} (Σq={q_ch[0]:+.4f}e)")
-            print(f"    charged atoms near top: {n_ch[1]} (Σq={q_ch[1]:+.4f}e)")
+                  f"σ_aligned={sigma[0]:.4f}, σ_opposed={sigma[1]:.4f} μC/cm²")
+            print(f"    charged atoms near aligned: {n_ch[0]} (Σq={q_ch[0]:+.4f}e)")
+            print(f"    charged atoms near opposed: {n_ch[1]} (Σq={q_ch[1]:+.4f}e)")
 
     steps = np.array(steps_list)
-    sigma_bottom = np.array(sigma_bottom_list)
-    sigma_top = np.array(sigma_top_list)
-    sigma_bottom_cum = _cumulative_average(sigma_bottom)
-    sigma_top_cum = _cumulative_average(sigma_top)
+    sigma_aligned = np.array(sigma_aligned_list)
+    sigma_opposed = np.array(sigma_opposed_list)
+    sigma_aligned_cum = _cumulative_average(sigma_aligned)
+    sigma_opposed_cum = _cumulative_average(sigma_opposed)
 
     # CSV
     fieldnames = [
         "step",
-        "sigma_bottom_uC_cm2",
-        "sigma_top_uC_cm2",
-        "sigma_bottom_cumavg_uC_cm2",
-        "sigma_top_cumavg_uC_cm2",
+        "sigma_aligned_uC_cm2",
+        "sigma_opposed_uC_cm2",
+        "sigma_aligned_cumavg_uC_cm2",
+        "sigma_opposed_cumavg_uC_cm2",
     ]
     csv_rows: list[dict] = []
     for i in range(len(steps)):
         csv_rows.append({
             "step": int(steps[i]),
-            "sigma_bottom_uC_cm2": float(sigma_bottom[i]),
-            "sigma_top_uC_cm2": float(sigma_top[i]),
-            "sigma_bottom_cumavg_uC_cm2": float(sigma_bottom_cum[i]),
-            "sigma_top_cumavg_uC_cm2": float(sigma_top_cum[i]),
+            "sigma_aligned_uC_cm2": float(sigma_aligned[i]),
+            "sigma_opposed_uC_cm2": float(sigma_opposed[i]),
+            "sigma_aligned_cumavg_uC_cm2": float(sigma_aligned_cum[i]),
+            "sigma_opposed_cumavg_uC_cm2": float(sigma_opposed_cum[i]),
         })
     csv_path = output_dir / DEFAULT_SURFACE_CHARGE_CSV_NAME
     _write_csv(csv_path, csv_rows, fieldnames)
 
     # PNG
     png_path = output_dir / DEFAULT_SURFACE_CHARGE_PNG_NAME
-    _plot_surface_charge(png_path, steps, sigma_bottom, sigma_top,
-                         sigma_bottom_cum, sigma_top_cum)
+    _plot_surface_charge(png_path, steps, sigma_aligned, sigma_opposed,
+                         sigma_aligned_cum, sigma_opposed_cum)
 
     return csv_path
