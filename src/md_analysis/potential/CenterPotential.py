@@ -333,7 +333,7 @@ def center_slab_potential_analysis(
     cube_iter: Iterable[Path] = cube_paths
     if verbose:
         from tqdm import tqdm
-        cube_iter = tqdm(cube_paths, desc="Center slab potential", unit="cube")
+        cube_iter = tqdm(cube_paths, desc="Center slab potential", unit="cube", ascii=" =")
 
     for cp in cube_iter:
         step = extract_step_from_cube_filename(cp)
@@ -679,7 +679,7 @@ def thickness_sensitivity_analysis(
     thick_iter: Iterable = thicknesses
     if verbose:
         from tqdm import tqdm
-        thick_iter = tqdm(thicknesses, desc="Thickness sweep", unit="t")
+        thick_iter = tqdm(thicknesses, desc="Thickness sweep", unit="t", ascii=" =")
 
     for thick in thick_iter:
         thick = float(thick)

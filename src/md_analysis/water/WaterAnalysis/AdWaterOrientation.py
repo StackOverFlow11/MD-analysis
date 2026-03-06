@@ -181,7 +181,7 @@ def compute_adsorbed_water_theta_distribution(
     )
     if verbose:
         from tqdm import tqdm
-        iterator = tqdm(iterator, desc="Adsorbed water theta", unit="frame")
+        iterator = tqdm(iterator, desc="Adsorbed water theta", unit="frame", ascii=" =")
 
     for atoms in iterator:
         aligned_frac, opposed_frac = _detect_interface_fractions(atoms)

@@ -78,7 +78,7 @@ def phi_z_planeavg_analysis(
     cube_iter = cube_paths
     if verbose:
         from tqdm import tqdm
-        cube_iter = tqdm(cube_paths, desc="φ(z) plane-avg", unit="cube")
+        cube_iter = tqdm(cube_paths, desc="φ(z) plane-avg", unit="cube", ascii=" =")
 
     for cp in cube_iter:
         header, values = read_cube_header_and_values(cp)

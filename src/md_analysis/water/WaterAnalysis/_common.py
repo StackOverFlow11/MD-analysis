@@ -272,7 +272,7 @@ def _compute_density_orientation_ensemble(
     )
     if verbose:
         from tqdm import tqdm
-        iterator = tqdm(iterator, desc="Water density+orientation", unit="frame")
+        iterator = tqdm(iterator, desc="Water density+orientation", unit="frame", ascii=" =")
 
     per_frame: list[tuple[np.ndarray, np.ndarray, np.ndarray, float]] = []
     for atoms in iterator:

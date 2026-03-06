@@ -580,7 +580,7 @@ def surface_charge_analysis(
     iterator = enumerate(frame_dirs)
     if verbose:
         from tqdm import tqdm
-        iterator = tqdm(frame_dirs, desc="Surface charge", unit="frame")
+        iterator = tqdm(frame_dirs, desc="Surface charge", unit="frame", ascii=" =")
         iterator = enumerate(iterator)
 
     for idx, frame_dir in iterator:
