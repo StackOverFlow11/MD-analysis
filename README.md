@@ -19,6 +19,14 @@ Lightweight analysis utilities for periodic metal-water interfaces from CP2K MD 
 - Plane-averaged φ(z) profile overlay across frames
 - Thickness sensitivity sweep (dual-axis: U vs SHE + spatial std of φ(z))
 
+**Charge analysis** — Bader surface charge density from VASP post-processing:
+
+- Two surface charge methods selectable via `--charge-method`:
+  - `counterion` — only non-water, non-metal species (counterions, adsorbates) contribute to σ
+  - `layer` — sum of interface-layer metal atom net charges / area
+- Time-series CSV with cumulative average + PNG visualization
+- Per-atom indexed charge extraction across trajectory
+
 ## Quick Start
 
 ### Install
@@ -37,11 +45,17 @@ md-analysis water --xyz md-pos-1.xyz --md-inp md.inp
 # Potential analysis
 md-analysis potential --cube-pattern "md-POTENTIAL-v_hartree-1_*.cube"
 
+# Charge analysis (Bader surface charge density)
+md-analysis charge --root-dir . --metal-elements Cu --charge-method counterion
+md-analysis charge --root-dir . --metal-elements Cu --charge-method layer
+
 # All analyses (water + potential)
 md-analysis all --xyz md-pos-1.xyz --md-inp md.inp
 ```
 
 Key potential flags: `--thickness`, `--thickness-end`, `--center-mode`, `--fermi-unit`, `--no-compute-u`, `--no-phi-z`.
+
+Key charge flags: `--charge-method` (`counterion` | `layer`), `--root-dir`, `--dir-pattern`, `--normal`, `--metal-elements`.
 
 ### Python API
 
@@ -58,7 +72,7 @@ plot_water_three_panel_analysis(
 Or use the programmatic entry points:
 
 ```python
-from md_analysis.main import run_water_analysis, run_potential_analysis, run_all
+from md_analysis.main import run_water_analysis, run_potential_analysis, run_charge_analysis, run_all
 ```
 
 ### Example input data
@@ -67,6 +81,7 @@ from md_analysis.main import run_water_analysis, run_potential_analysis, run_all
 - `data_example/potential/md.inp` — cell parameters (`ABC [angstrom] a b c`)
 - `data_example/potential/md.out` — CP2K output with Fermi energies
 - `data_example/potential/md-POTENTIAL-v_hartree-1_*.cube` — Hartree potential cube snapshots
+- `data_example/bader_work_dir/` — POSCAR, ACF.dat, POTCAR for Bader charge tests
 
 ## Project Layout
 
@@ -87,16 +102,22 @@ src/md_analysis/
 │       ├── WaterDensity.py
 │       ├── WaterOrientation.py
 │       └── AdWaterOrientation.py
-└── potential/              # multi-frame potential analysis workflows
-    ├── config.py           #   output filename constants
-    ├── CenterPotential.py  #   center-slab, Fermi, electrode potential, thickness sweep
-    └── PhiZProfile.py      #   φ(z) overlay visualization
+├── potential/              # multi-frame potential analysis workflows
+│   ├── config.py           #   output filename constants
+│   ├── CenterPotential.py  #   center-slab, Fermi, electrode potential, thickness sweep
+│   └── PhiZProfile.py      #   φ(z) overlay visualization
+└── charge/                 # Bader charge analysis workflows
+    ├── config.py           #   unit conversion constants, default filenames
+    └── BaderAnalysis.py    #   surface charge (counterion/layer), indexed charges, trajectory analysis
 
 test/
-├── unit/utils/             # pytest unit tests (ClusterUtils, LayerParser, WaterParser)
+├── unit/
+│   ├── utils/              # pytest unit tests (ClusterUtils, LayerParser, WaterParser)
+│   └── charge/             # unit tests for BaderAnalysis
 └── integration/
     ├── water/              # end-to-end water analysis scripts
-    └── potential/          # end-to-end potential analysis scripts
+    ├── potential/          # end-to-end potential analysis scripts
+    └── charge/             # end-to-end charge analysis scripts
 
 data_example/               # minimal reproducible input data
 context4agent/                    # architecture contracts, decisions, requirements
@@ -119,10 +140,11 @@ python test/integration/potential/test_phi_z_profile.py
 
 ## Architecture Notes
 
-- **Three-layer design**: `utils` (single-frame primitives) → `water` / `potential` (multi-frame workflows) → `main` / `CLI` (integration entry points)
+- **Three-layer design**: `utils` (single-frame primitives) → `water` / `potential` / `charge` (multi-frame workflows) → `main` / `CLI` (integration entry points)
 - **Interface detection**: 1D periodic clustering on metal z-coordinates, largest gap = water region, two bounding layers = interfaces
 - **Water profiles**: computed from selected interface toward the cell midpoint, normalized to [0, 1], then ensemble-averaged across frames
 - **Electrode potential**: U = -E_Fermi + φ_center + ΔΨ_a(H₃O⁺/w) - μ(H⁺,g⁰) - ΔE_ZP (computational SHE)
+- **Surface charge**: two methods — `counterion` (non-water non-metal species only) and `layer` (interface-layer metal atom net charge sum)
 - **Frame selection**: `--frame-start`, `--frame-end`, `--frame-step` supported across all workflows
 
 ## For Contributors
