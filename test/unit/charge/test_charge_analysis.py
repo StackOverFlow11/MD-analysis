@@ -36,7 +36,7 @@ class TestComputeFrameSurfaceCharge:
         )
 
     def test_basic_sigma(self, bader_atoms):
-        """Test data has no counterions → σ must be [0, 0]."""
+        """Test that σ results are present and well-formed."""
         result = compute_frame_surface_charge(bader_atoms)
         assert "surface_charge_density_e_A2" in result.info
         assert "surface_charge_density_uC_cm2" in result.info
@@ -44,27 +44,27 @@ class TestComputeFrameSurfaceCharge:
         sigma_uc = result.info["surface_charge_density_uC_cm2"]
         assert len(sigma_e) == 2
         assert len(sigma_uc) == 2
-        # No counterions → zero
-        for i in range(2):
-            assert sigma_e[i] == 0.0
-            assert sigma_uc[i] == 0.0
+        assert all(np.isfinite(v) for v in sigma_e)
+        assert all(np.isfinite(v) for v in sigma_uc)
 
     def test_sigma_is_finite(self, bader_atoms):
         result = compute_frame_surface_charge(bader_atoms)
         sigma = result.info["surface_charge_density_uC_cm2"]
         assert all(np.isfinite(v) for v in sigma)
 
-    def test_no_counterions_gives_zero(self, bader_atoms):
-        """Explicit test: Cu+Ag+O+H system without counterions → σ = 0."""
+    def test_info_keys_present(self, bader_atoms):
+        """All expected info keys are set after computation."""
         result = compute_frame_surface_charge(bader_atoms)
-        sigma = result.info["surface_charge_density_uC_cm2"]
-        assert sigma == [0.0, 0.0]
-        n_ci = result.info["n_counterions_per_surface"]
-        assert n_ci == [0, 0]
+        assert "surface_charge_density_uC_cm2" in result.info
+        assert "n_charged_atoms_per_surface" in result.info
+        assert "charge_per_surface_e" in result.info
+        n_ch = result.info["n_charged_atoms_per_surface"]
+        assert len(n_ch) == 2
+        assert all(isinstance(v, int) for v in n_ch)
 
-    def test_with_synthetic_counterion(self):
-        """Build a mock slab + one K atom near bottom surface → σ_bottom ≠ 0."""
-        # 4-layer Cu slab along c with 10 Å vacuum
+    def test_with_synthetic_charged_atoms(self):
+        """Build a mock slab + charged atoms → σ reflects all charges."""
+        # 4-layer Cu slab along c with vacuum
         cell_c = 30.0
         cell_a = 5.0
         # Place 4 Cu layers at frac c = 0.1, 0.2, 0.3, 0.4 (3–12 Å)
@@ -84,7 +84,7 @@ class TestComputeFrameSurfaceCharge:
         symbols.append("H")
         positions.append([2.5, 1.8, 0.6 * cell_c + 0.5])
         symbols.append("H")
-        # Add one K counterion near bottom surface (frac c = 0.05, distance 1.5 Å)
+        # Add one K near bottom surface (frac c = 0.05)
         positions.append([2.5, 2.5, 0.05 * cell_c])
         symbols.append("K")
 
@@ -104,23 +104,25 @@ class TestComputeFrameSurfaceCharge:
         # H: slightly positive
         net_charge[-3] = 0.05
         net_charge[-2] = 0.05
-        # K counterion: +0.8e (lost electron to surface)
+        # K: +0.8e
         net_charge[-1] = 0.8
         atoms.arrays["bader_net_charge"] = net_charge
 
         result = compute_frame_surface_charge(
-            atoms, metal_symbols={"Cu"}, normal="c", cutoff_A=7.0,
+            atoms, metal_symbols={"Cu"}, normal="c",
         )
 
         sigma = result.info["surface_charge_density_uC_cm2"]
-        n_ci = result.info["n_counterions_per_surface"]
-        # K is near bottom surface → σ_bottom ≠ 0
-        assert n_ci[0] == 1
+        n_ch = result.info["n_charged_atoms_per_surface"]
+        q_ch = result.info["charge_per_surface_e"]
+        # K is near bottom surface → contributes to σ_bottom
+        assert n_ch[0] >= 1
         assert sigma[0] != 0.0
-        assert sigma[0] > 0.0  # positive K charge → positive σ
-        # No counterion near top → σ_top = 0
-        assert n_ci[1] == 0
-        assert sigma[1] == 0.0
+        # Water O + H are near top surface → contribute to σ_top
+        assert n_ch[1] >= 1
+        # Charges are finite
+        assert all(np.isfinite(v) for v in sigma)
+        assert all(np.isfinite(v) for v in q_ch)
 
     def test_normal_a(self, bader_atoms):
         """normal='a' uses cell vectors b × c for area."""

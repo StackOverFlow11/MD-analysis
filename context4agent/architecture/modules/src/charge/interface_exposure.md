@@ -10,8 +10,6 @@
 | `trajectory_surface_charge`         | ChargeAnalysis.py   | Multi-frame surface charge density time series → `(t, 2)` μC/cm² |
 | `surface_charge_analysis`           | ChargeAnalysis.py   | End-to-end surface charge analysis → CSV + PNG output           |
 | `E_PER_A2_TO_UC_PER_CM2`           | config.py           | Unit conversion: 1 e/Å² = 1.602176634×10³ μC/cm²               |
-| `DEFAULT_CUTOFF_A`                  | config.py           | Default counterion cutoff distance (7.0 Å)                      |
-| `SOLVENT_SYMBOLS`                   | config.py           | Solvent element symbols excluded from counterion detection       |
 | `DEFAULT_SURFACE_CHARGE_CSV_NAME`   | config.py           | Default CSV output filename                                     |
 | `DEFAULT_SURFACE_CHARGE_PNG_NAME`   | config.py           | Default PNG output filename                                     |
 
@@ -26,8 +24,6 @@ All default filenames and constants are defined in `config.py`:
 | `DEFAULT_STRUCTURE_FILENAME`      | `POSCAR`             |
 | `DEFAULT_ACF_FILENAME`            | `ACF.dat`            |
 | `DEFAULT_POTCAR_FILENAME`         | `POTCAR`             |
-| `DEFAULT_CUTOFF_A`                | `7.0`                |
-| `SOLVENT_SYMBOLS`                 | `frozenset({"O", "H"})` |
 | `DEFAULT_SURFACE_CHARGE_CSV_NAME` | `surface_charge.csv` |
 | `DEFAULT_SURFACE_CHARGE_PNG_NAME` | `surface_charge.png` |
 
@@ -39,15 +35,14 @@ def compute_frame_surface_charge(
     *,
     metal_symbols: Iterable[str] | None = None,
     normal: str = "c",   # "a" | "b" | "c"
-    cutoff_A: float = DEFAULT_CUTOFF_A,
 ) -> Atoms
 ```
 
 Results in `atoms.info`:
 - `surface_charge_density_e_A2`: `[σ_bottom, σ_top]` (e/Å²)
 - `surface_charge_density_uC_cm2`: `[σ_bottom, σ_top]` (μC/cm²)
-- `n_counterions_per_surface`: `[n_bottom, n_top]`
-- `counterion_charge_per_surface_e`: `[Σq_bottom, Σq_top]` (e)
+- `n_charged_atoms_per_surface`: `[n_bottom, n_top]`
+- `charge_per_surface_e`: `[Σq_bottom, Σq_top]` (e)
 
 ## `frame_indexed_atom_charges` Signature
 
@@ -80,7 +75,6 @@ def trajectory_surface_charge(
     *,
     metal_symbols: Iterable[str] | None = None,
     normal: str = "c",
-    cutoff_A: float = DEFAULT_CUTOFF_A,
     dir_pattern: str = DEFAULT_DIR_PATTERN,
     structure_filename: str = DEFAULT_STRUCTURE_FILENAME,
     acf_filename: str = DEFAULT_ACF_FILENAME,
@@ -96,7 +90,6 @@ def surface_charge_analysis(
     *,
     metal_symbols: Iterable[str] | None = None,
     normal: str = "c",
-    cutoff_A: float = DEFAULT_CUTOFF_A,
     dir_pattern: str = DEFAULT_DIR_PATTERN,
     structure_filename: str = DEFAULT_STRUCTURE_FILENAME,
     acf_filename: str = DEFAULT_ACF_FILENAME,

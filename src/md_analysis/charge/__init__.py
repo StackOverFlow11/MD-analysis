@@ -10,11 +10,9 @@ from .ChargeAnalysis import (
     trajectory_surface_charge,
 )
 from .config import (
-    DEFAULT_CUTOFF_A,
     DEFAULT_SURFACE_CHARGE_CSV_NAME,
     DEFAULT_SURFACE_CHARGE_PNG_NAME,
     E_PER_A2_TO_UC_PER_CM2,
-    SOLVENT_SYMBOLS,
 )
 
 __all__ = [
@@ -23,9 +21,7 @@ __all__ = [
     "surface_charge_analysis",
     "trajectory_indexed_atom_charges",
     "trajectory_surface_charge",
-    "DEFAULT_CUTOFF_A",
     "DEFAULT_SURFACE_CHARGE_CSV_NAME",
     "DEFAULT_SURFACE_CHARGE_PNG_NAME",
     "E_PER_A2_TO_UC_PER_CM2",
-    "SOLVENT_SYMBOLS",
 ]

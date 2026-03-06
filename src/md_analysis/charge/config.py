@@ -12,6 +12,3 @@ DEFAULT_POTCAR_FILENAME = "POTCAR"
 
 DEFAULT_SURFACE_CHARGE_CSV_NAME = "surface_charge.csv"
 DEFAULT_SURFACE_CHARGE_PNG_NAME = "surface_charge.png"
-
-DEFAULT_CUTOFF_A: float = 7.0
-SOLVENT_SYMBOLS: frozenset[str] = frozenset({"O", "H"})

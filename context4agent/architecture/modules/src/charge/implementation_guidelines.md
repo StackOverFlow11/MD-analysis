@@ -15,20 +15,19 @@ Flat structure (no sub-packages):
 
 ### Single frame (`compute_frame_surface_charge`)
 
-Counterion-based surface charge computation:
+All-atom surface charge computation (considers every atom with non-zero net charge):
 
 1. Validate `normal` ∈ `{"a", "b", "c"}` → `ValueError`
 2. Validate `"bader_net_charge" in atoms.arrays`
 3. `detect_interface_layers(atoms)` → 2 interface layers (needed for surface positions)
 4. Surface area: `|cell[i] × cell[j]|` where `(i, j) = _AREA_VECTORS[normal]`
-5. Identify counterion indices: `symbol ∉ metal_set ∪ SOLVENT_SYMBOLS`
-6. If no counterions → σ = [0, 0], return early
-7. Compute fractional coords along normal; surface positions via circular mean of interface layer atoms
-8. Slab midplane via circular mean of all metal fractional coords → gap midpoint = (midplane + 0.5) % 1
-9. For each counterion, MIC delta to each surface; check (a) water-side direction, (b) within `cutoff_A`
-10. Sum `net_charge[assigned_counterion_indices]` for each surface → σ = sum / area
-11. Convert e/Å² → μC/cm² via `E_PER_A2_TO_UC_PER_CM2`
-12. Store in `atoms.info`: `surface_charge_density_e_A2`, `surface_charge_density_uC_cm2`, `n_counterions_per_surface`, `counterion_charge_per_surface_e`
+5. Find all atoms with `net_charge != 0`; if none → σ = [0, 0], return early
+6. Compute fractional coords along normal; surface positions via circular mean of interface layer atoms
+7. Slab midplane via circular mean of all metal fractional coords → gap midpoint = (midplane + 0.5) % 1
+8. For each charged atom, MIC delta to each surface; check (a) water-side direction, (b) `|delta| < |gap_dir|` (within half-gap cutoff)
+9. Sum `net_charge[assigned_indices]` for each surface → σ = sum / area
+10. Convert e/Å² → μC/cm² via `E_PER_A2_TO_UC_PER_CM2`
+11. Store in `atoms.info`: `surface_charge_density_e_A2`, `surface_charge_density_uC_cm2`, `n_charged_atoms_per_surface`, `charge_per_surface_e`
 
 ### Single frame indexed (`frame_indexed_atom_charges`)
 
@@ -74,22 +73,20 @@ Counterion-based surface charge computation:
 
 All trajectory functions use `_sorted_frame_dirs()` which sorts by the numeric value of `_t(\d+)` in the directory name, avoiding lexicographic mis-ordering of non-zero-padded names (e.g., `calc_t1000` before `calc_t50`).
 
-## Counterion detection
+## Charged atom selection
 
-- Counterion = any atom whose symbol ∉ `metal_set ∪ SOLVENT_SYMBOLS`
-- `SOLVENT_SYMBOLS = frozenset({"O", "H"})`
-- Supports alkali metals (Group 1), halides (Group 17), any species
-- No counterions → σ = 0 (neutral electrode, naturally handled by empty sum)
+- All atoms with `bader_net_charge != 0` are considered (metal, solvent, counterions — any species)
+- No charged atoms → σ = 0 (naturally handled by empty index array)
 
-## Directional cutoff (PBC-safe)
+## Geometry-derived cutoff (PBC-safe)
 
 Uses minimum image convention (MIC) on fractional coordinates:
-- `gap_dir = mic(gap_frac - frac_surface)` — direction from surface toward water region
-- `delta = mic(frac_ion - frac_surface)` — direction from surface toward ion
-- Assigned if `delta * gap_dir > 0` (water-side) AND `|delta| * cell_len < cutoff_A`
-- Default `cutoff_A = 7.0` Å
+- `gap_dir = mic(gap_frac - frac_surface)` — direction from surface toward water region center
+- `delta = mic(frac_atom - frac_surface)` — direction from surface toward atom
+- Assigned if `delta * gap_dir > 0` (water-side) AND `|delta| < |gap_dir|` (closer to surface than gap midpoint)
+- Cutoff is geometry-derived: half-gap distance = `|gap_dir| * cell_len` (no user parameter)
 
 ## Unit convention
 
-- Internal computation: e/Å² (`σ = Σ q_counterion / A`)
+- Internal computation: e/Å² (`σ = Σ q_charged / A`)
 - Output: μC/cm² (`1 e/Å² = 1.602176634 × 10³ μC/cm²`)
