@@ -53,6 +53,9 @@ def _cmd_101(params: dict) -> int:
         xyz_path=params["xyz"],
         md_inp_path=params["md_inp"],
         output_dir=outdir,
+        frame_start=params["frame_start"],
+        frame_end=params["frame_end"],
+        frame_step=params["frame_step"],
     )
     print(f"\n Analysis complete. Output:\n   density_csv: {csv_path}")
     return 0
@@ -68,6 +71,9 @@ def _cmd_102(params: dict) -> int:
         xyz_path=params["xyz"],
         md_inp_path=params["md_inp"],
         output_dir=outdir,
+        frame_start=params["frame_start"],
+        frame_end=params["frame_end"],
+        frame_step=params["frame_step"],
     )
     print(f"\n Analysis complete. Output:\n   orientation_csv: {csv_path}")
     return 0
@@ -83,6 +89,9 @@ def _cmd_103(params: dict) -> int:
         xyz_path=params["xyz"],
         md_inp_path=params["md_inp"],
         output_dir=outdir,
+        frame_start=params["frame_start"],
+        frame_end=params["frame_end"],
+        frame_step=params["frame_step"],
     )
     print("\n Analysis complete. Outputs:")
     print(f"   adsorbed_profile_csv: {profile_csv}")
