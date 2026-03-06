@@ -29,7 +29,7 @@ Only non-water, non-metal species (counterions, adsorbates) with non-zero net ch
 
 Sum net charges of the interface-layer metal atoms directly:
 
-1. `detect_interface_layers(atoms)` → 2 interface layers (sorted by center_s)
+1. `detect_interface_layers(atoms)` → 2 interface layers (sorted by center_frac)
 2. For each layer: σ = Σ(net_charge[layer_atoms]) / area
 
 ## Data flow

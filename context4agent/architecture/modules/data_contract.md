@@ -16,6 +16,8 @@
 - 处理对象：单帧 `ase.Atoms`
 - 原子索引：统一使用 **0-based**
 - 分数坐标：默认按 wrap 后区间处理（`[0, 1)`）
+- 界面标签：`"normal_aligned"` (outward normal = +axis) / `"normal_opposed"` (outward normal = −axis)
+- 水分析起始界面：`StartInterface = Literal["normal_aligned", "normal_opposed"]`（默认 `"normal_aligned"`）
 
 ## 核心数据载体（输出形状契约）
 

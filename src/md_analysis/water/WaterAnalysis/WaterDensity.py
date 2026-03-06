@@ -13,7 +13,7 @@ from ..config import DEFAULT_START_INTERFACE
 from ._common import (
     StartInterface,
     _compute_density_orientation_ensemble,
-    _detect_low_high_interface_fractions,
+    _detect_interface_fractions,
     _parse_abc_from_md_inp,
 )
 

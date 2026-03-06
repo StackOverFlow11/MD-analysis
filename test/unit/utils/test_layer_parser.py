@@ -63,3 +63,19 @@ def test_detect_interface_layers_marks_two_sides(simple_slab_with_environment: A
     assert len(interfaces) == 2
     z_signs = {int(np.sign(layer.normal_unit[2])) for layer in interfaces if layer.normal_unit is not None}
     assert z_signs == {-1, 1}
+
+    # Verify center_frac and interface_label fields
+    for layer in result.metal_layers_sorted:
+        assert 0.0 <= layer.center_frac < 1.0
+    labels = {layer.interface_label for layer in interfaces}
+    assert labels == {"normal_aligned", "normal_opposed"}
+
+    # Ordering: first layer is normal_aligned, last is normal_opposed
+    assert result.metal_layers_sorted[0].interface_label == "normal_aligned"
+    assert result.metal_layers_sorted[-1].interface_label == "normal_opposed"
+
+    # Accessor methods
+    aligned = result.interface_normal_aligned()
+    opposed = result.interface_normal_opposed()
+    assert aligned.interface_label == "normal_aligned"
+    assert opposed.interface_label == "normal_opposed"

@@ -26,6 +26,12 @@
 
 - `detect_interface_layers()` 固定每侧标记 1 层界面层，共 2 层，不可配置。
 - 原有 `n_interface_layers` 参数已移除（该参数从未影响实现逻辑）。
+- 界面层命名：`normal_aligned`（outward normal = +axis）、`normal_opposed`（outward normal = −axis）。
+- `Layer.center_frac`：层中心分数坐标（[0,1)），取代旧名 `center_s`。
+- `Layer.interface_label`：`"normal_aligned"` | `"normal_opposed"` | `None`。
+- `metal_layers_sorted` 排列顺序：`[normal_aligned, slab_interior…, normal_opposed]`（穿过 slab 遍历）。
+- Water 分析中 `StartInterface` 类型：`"normal_aligned"` | `"normal_opposed"`（取代旧名 `"low_c"` / `"high_c"`）。
+- 默认 `DEFAULT_START_INTERFACE = "normal_aligned"`。
 
 ## 单位约定（已确认）
 

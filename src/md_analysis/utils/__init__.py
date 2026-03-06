@@ -6,7 +6,6 @@ from __future__ import annotations
 # Intentionally excluded from __all__ but explicitly collected here to centralise
 # cross-layer internal dependencies.  If a private function is renamed or moved,
 # only this file needs updating.
-from .LayerParser import _circular_mean_fractional
 from .WaterParser import _compute_bisector_cos_theta_vec
 from .WaterParser import _oxygen_to_hydrogen_map
 from .WaterParser import _theta_bin_count_from_ndeg

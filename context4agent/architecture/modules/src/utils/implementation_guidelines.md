@@ -75,8 +75,12 @@
 ### 3.2 分层与界面判定
 
 - 先按法向投影做 1D 聚类
-- 界面层仅保留直接面向非金属环境的一层（low/high 两侧各一层）
-- 对 `"a" / "b" / "c"` 轴采用分数坐标 MIC 判法向；无法判定时允许几何回退
+- 界面层仅保留直接面向非金属环境的一层（normal_aligned/normal_opposed 各一层）
+- 对 `"a" / "b" / "c"` 轴采用分数坐标 MIC 判法向；自定义向量法向不支持（ValueError）
+- `Layer.center_frac`：层中心的分数坐标（[0,1)），由 `_circular_mean_fractional` 计算
+- `Layer.interface_label`：`"normal_aligned"` | `"normal_opposed"` | `None`
+- `metal_layers_sorted` 排列：`[normal_aligned, slab_interior…, normal_opposed]`（穿过 slab 遍历）
+- `SurfaceDetectionResult` 提供 `.interface_normal_aligned()` 和 `.interface_normal_opposed()` 访问器
 
 ### 3.3 数据结构约束
 

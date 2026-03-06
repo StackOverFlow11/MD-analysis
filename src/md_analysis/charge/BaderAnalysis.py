@@ -126,7 +126,7 @@ def _compute_surface_charge_layer(
     cell = np.asarray(atoms.cell.array, dtype=float)
     area_A2 = float(np.linalg.norm(np.cross(cell[i0], cell[i1])))
 
-    sorted_iface = sorted(iface_layers, key=lambda L: L.center_s)
+    sorted_iface = sorted(iface_layers, key=lambda L: L.center_frac)
 
     sigma_e_A2 = np.empty(2)
     n_atoms_per_surface = []
@@ -179,7 +179,7 @@ def _compute_surface_charge_counterion(
     cell = np.asarray(atoms.cell.array, dtype=float)
     area_A2 = float(np.linalg.norm(np.cross(cell[i0], cell[i1])))
 
-    sorted_iface = sorted(iface_layers, key=lambda L: L.center_s)
+    sorted_iface = sorted(iface_layers, key=lambda L: L.center_frac)
 
     # Exclude water and metal atoms — only solute/counterion species contribute
     water_mol = detect_water_molecule_indices(atoms)
@@ -201,12 +201,8 @@ def _compute_surface_charge_counterion(
     axis_idx = {"a": 0, "b": 1, "c": 2}[normal]
     scaled = np.asarray(atoms.get_scaled_positions(wrap=True), dtype=float)
 
-    frac_bot = _circular_mean_fractional(
-        scaled[list(sorted_iface[0].atom_indices), axis_idx]
-    )
-    frac_top = _circular_mean_fractional(
-        scaled[list(sorted_iface[1].atom_indices), axis_idx]
-    )
+    frac_bot = sorted_iface[0].center_frac
+    frac_top = sorted_iface[1].center_frac
 
     metal_frac = scaled[list(det.metal_indices), axis_idx]
     midplane = _circular_mean_fractional(metal_frac)

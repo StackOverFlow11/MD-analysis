@@ -25,7 +25,7 @@ from ..config import (
 from ._common import (
     StartInterface,
     _compute_density_orientation_ensemble,
-    _detect_low_high_interface_fractions,
+    _detect_interface_fractions,
     _iter_trajectory,
     _parse_abc_from_md_inp,
 )
@@ -184,7 +184,7 @@ def compute_adsorbed_water_theta_distribution(
         iterator = tqdm(iterator, desc="Adsorbed water theta", unit="frame")
 
     for atoms in iterator:
-        low_c, high_c = _detect_low_high_interface_fractions(atoms)
+        aligned_frac, opposed_frac = _detect_interface_fractions(atoms)
         water_idx = detect_water_molecule_indices(atoms)
         oxygen_indices = get_water_oxygen_indices_array(water_idx).reshape(-1)
         o_to_h = _oxygen_to_hydrogen_map(water_idx)
@@ -197,10 +197,10 @@ def compute_adsorbed_water_theta_distribution(
 
         scaled = np.asarray(atoms.get_scaled_positions(wrap=True), dtype=float)
         oxygen_c = scaled[oxygen_indices, 2]
-        if start_interface == "low_c":
-            delta_c = np.mod(oxygen_c - low_c, 1.0)
+        if start_interface == "normal_aligned":
+            delta_c = np.mod(oxygen_c - aligned_frac, 1.0)
         else:
-            delta_c = np.mod(high_c - oxygen_c, 1.0)
+            delta_c = np.mod(opposed_frac - oxygen_c, 1.0)
         delta_A = delta_c * c_norm
 
         in_adsorbed = (delta_A >= d_start_A) & (delta_A <= d_end_A)

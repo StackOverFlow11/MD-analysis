@@ -11,10 +11,13 @@ Design principles
 -----------------
 - Default metal symbols are centralized in `config.py` and can be overridden
   explicitly by caller input.
-- Works with non-orthogonal cells by projecting positions onto a chosen normal.
-- Layering is done by 1D clustering on the projected coordinate.
-
-This module is intentionally minimal and can be extended later.
+- All internal computation uses fractional coordinates along the chosen cell axis.
+- Layering is done by periodic 1D clustering on fractional coordinates
+  (``cluster_1d_periodic`` from ``ClusterUtils``).
+- Layer ordering in ``metal_layers_sorted``:
+  ``[interface_normal_aligned, slab_interior…, interface_normal_opposed]``,
+  traversing through the slab from the +axis-facing interface to the
+  −axis-facing interface.
 """
 
 from __future__ import annotations
@@ -35,35 +38,55 @@ from .ClusterUtils import cluster_1d_periodic, find_largest_gap_periodic
 
 NormalSpec = Literal["a", "b", "c"] | Sequence[float]
 
+_AXIS_MAP = {"a": 0, "b": 1, "c": 2}
+
 
 @dataclass(frozen=True)
 class Layer:
     """One atomic layer grouped along a surface normal."""
 
     atom_indices: tuple[int, ...]
-    center_s: float  # layer center along the chosen normal-projection coordinate s (Å)
-    # Under PBC for water–metal–water, the slab has two interface sides.
-    # Mark interface layers and attach the outward normal (metal -> water).
+    center_frac: float  # layer center in fractional coordinate along the normal axis, [0, 1)
     is_interface: bool = False
-    normal_unit: tuple[float, float, float] | None = None  # only set if is_interface is True
+    interface_label: str | None = None  # "normal_aligned" | "normal_opposed" | None
+    # Outward normal (metal → water), only set if is_interface is True.
+    normal_unit: tuple[float, float, float] | None = None
 
 
 @dataclass(frozen=True)
 class SurfaceDetectionResult:
-    """Result of metal layer detection with interface-layer annotations (both sides under PBC)."""
+    """Result of metal layer detection with interface-layer annotations (both sides under PBC).
+
+    ``metal_layers_sorted`` is ordered as
+    ``[interface_normal_aligned, slab_interior…, interface_normal_opposed]``.
+    """
 
     # Use an immutable container for deep immutability (np.ndarray is mutable even in frozen dataclass).
-    axis_unit: tuple[float, float, float]  # (x, y, z), unit length, used to sort layers by projection coordinate s
+    axis_unit: tuple[float, float, float]  # (x, y, z), unit length
     metal_indices: tuple[int, ...]
-    metal_layers_sorted: tuple[Layer, ...]  # sorted from low-s to high-s
+    metal_layers_sorted: tuple[Layer, ...]
 
     def axis_unit_vec(self) -> np.ndarray:
         """Return a numpy view/copy for computations (always safe to mutate externally)."""
         return np.asarray(self.axis_unit, dtype=float)
 
     def interface_layers(self) -> tuple[Layer, ...]:
-        """All layers marked as interface layers (both sides)."""
+        """All layers marked as interface layers, in order [normal_aligned, normal_opposed]."""
         return tuple(layer for layer in self.metal_layers_sorted if layer.is_interface)
+
+    def interface_normal_aligned(self) -> Layer:
+        """The interface layer with outward normal aligned with +axis."""
+        for layer in self.metal_layers_sorted:
+            if layer.interface_label == "normal_aligned":
+                return layer
+        raise SurfaceGeometryError("No normal_aligned interface layer found")
+
+    def interface_normal_opposed(self) -> Layer:
+        """The interface layer with outward normal opposed to +axis."""
+        for layer in self.metal_layers_sorted:
+            if layer.interface_label == "normal_opposed":
+                return layer
+        raise SurfaceGeometryError("No normal_opposed interface layer found")
 
 
 class SurfaceGeometryError(RuntimeError):
@@ -72,10 +95,9 @@ class SurfaceGeometryError(RuntimeError):
 
 def _normal_unit_from_atoms(atoms: Atoms, normal: NormalSpec) -> np.ndarray:
     if isinstance(normal, str):
-        axis_map = {"a": 0, "b": 1, "c": 2}
-        if normal not in axis_map:
+        if normal not in _AXIS_MAP:
             raise ValueError(f"normal must be one of 'a'/'b'/'c' or a vector, got: {normal!r}")
-        axis = axis_map[normal]
+        axis = _AXIS_MAP[normal]
         cell = np.asarray(atoms.cell.array, dtype=float)
         v = cell[axis]
     else:
@@ -85,38 +107,6 @@ def _normal_unit_from_atoms(atoms: Atoms, normal: NormalSpec) -> np.ndarray:
     if norm == 0.0:
         raise ValueError("normal vector must be non-zero")
     return v / norm
-
-
-def _project_s(positions: np.ndarray, normal_unit: np.ndarray) -> np.ndarray:
-    # positions: (N, 3), normal_unit: (3,)
-    return positions @ normal_unit
-
-
-def _cluster_1d(values_sorted: np.ndarray, tol: float) -> list[tuple[float, int, int]]:
-    """
-    Cluster sorted 1D values into contiguous groups.
-
-    Returns list of (center, start_idx, end_idx_exclusive) in *sorted-array* indexing.
-    """
-    if values_sorted.size == 0:
-        return []
-    if tol <= 0:
-        raise ValueError("tol must be > 0")
-
-    clusters: list[tuple[float, int, int]] = []
-    start = 0
-    acc = [float(values_sorted[0])]
-    for i in range(1, values_sorted.size):
-        v = float(values_sorted[i])
-        center = float(np.mean(acc))
-        if abs(v - center) <= tol:
-            acc.append(v)
-        else:
-            clusters.append((float(np.mean(acc)), start, i))
-            start = i
-            acc = [v]
-    clusters.append((float(np.mean(acc)), start, values_sorted.size))
-    return clusters
 
 
 def _circular_mean_fractional(f: np.ndarray) -> float:
@@ -159,13 +149,15 @@ def detect_interface_layers(
     """
     Detect metal layers from a single-frame ASE Atoms, and mark interface layers.
 
-    Notes
-    -----
-    In the periodic water–metal–water setting, there are exactly **two** interfaces
-    per frame. This function always marks exactly one directly water-facing layer per
-    side (two interface layers total), and assigns `Layer.normal_unit` for those
-    layers pointing metal -> water. The interface selection strategy is fixed and
-    not configurable.
+    Uses periodic 1D clustering on fractional coordinates along the chosen cell
+    axis and identifies the largest inter-layer gap as the water region.
+
+    Layer ordering
+    --------------
+    ``metal_layers_sorted`` is ordered as
+    ``[interface_normal_aligned, slab_interior…, interface_normal_opposed]``,
+    traversing through the slab from the +axis-facing interface to the
+    −axis-facing interface.
 
     Parameters
     ----------
@@ -175,21 +167,27 @@ def detect_interface_layers(
         Symbols considered as *metal slab* atoms, e.g. {"Cu", "Ag"}.
         If omitted, uses `DEFAULT_METAL_SYMBOLS` from `config.py`.
     normal
-        Surface normal spec:
-        - "a"/"b"/"c" -> use the corresponding cell vector
-        - a length-3 vector -> use it directly
+        Surface normal spec: ``"a"``/``"b"``/``"c"`` → corresponding cell axis.
+        Custom vector normals are not supported.
     layer_tol_A
-        1D clustering tolerance (Å) when grouping metal atoms into layers
-        along the normal projection coordinate.
+        1D clustering tolerance (Å); converted to fractional coordinates
+        internally using the cell-axis length.
     nonmetal_symbols_hint
-        Optional hint for which symbols represent "environment" (water/ions/etc.).
-        If omitted, we use all atoms not in `metal_symbols` as non-metal for deciding
-        which side is the interface.
+        Preserved for API compatibility; not used for gap detection.
 
     Returns
     -------
     SurfaceDetectionResult
     """
+    # --- Validate normal ---
+    if not isinstance(normal, str) or normal not in _AXIS_MAP:
+        raise ValueError(
+            f"normal must be 'a', 'b', or 'c', got {normal!r}. "
+            "Custom vector normals are not supported; use a cell-axis label."
+        )
+    axis_idx = _AXIS_MAP[normal]
+
+    # --- Metal atom selection ---
     metal_symbols_iter = DEFAULT_METAL_SYMBOLS if metal_symbols is None else metal_symbols
     metal_symbols_set = {str(s) for s in metal_symbols_iter}
     if not metal_symbols_set:
@@ -201,127 +199,92 @@ def detect_interface_layers(
     if metal_idx.size == 0:
         raise SurfaceGeometryError(f"No metal atoms found for symbols={sorted(metal_symbols_set)}")
 
-    if nonmetal_symbols_hint is None:
-        nonmetal_mask = ~metal_mask
-    else:
-        nonmetal_set = {str(s) for s in nonmetal_symbols_hint}
-        nonmetal_mask = np.isin(symbols, list(nonmetal_set))
-
-    nonmetal_idx = np.where(nonmetal_mask)[0]
-    if nonmetal_idx.size == 0:
-        raise SurfaceGeometryError(
-            "No non-metal atoms found to determine interface normal. "
-            "Provide nonmetal_symbols_hint or ensure the frame contains environment atoms."
-        )
-
+    # --- Compute axis unit vector and convert tolerance to fractional ---
     axis_unit_vec = _normal_unit_from_atoms(atoms, normal)
-    pos = np.asarray(atoms.get_positions(), dtype=float)
+    cell = np.asarray(atoms.cell.array, dtype=float)
+    axis_length_A = float(np.linalg.norm(cell[axis_idx]))
+    if axis_length_A <= 0:
+        raise SurfaceGeometryError("Cell axis length must be positive")
+    tol_frac = layer_tol_A / axis_length_A
 
-    s_all = _project_s(pos, axis_unit_vec)
-    s_m = s_all[metal_idx]
+    # --- Fractional coordinates of metal atoms ---
+    scaled = np.asarray(atoms.get_scaled_positions(wrap=True), dtype=float)
+    metal_frac = scaled[metal_idx, axis_idx]
 
-    # Build layers from metal atoms
-    order = np.argsort(s_m)
-    s_m_sorted = s_m[order]
-    metal_idx_sorted = metal_idx[order]
+    # --- Periodic 1D clustering ---
+    clusters = cluster_1d_periodic(metal_frac, period=1.0, tol=tol_frac)
 
-    clusters = _cluster_1d(s_m_sorted, tol=layer_tol_A)
-    if len(clusters) < 2:
-        # Still return what we have, but caller should know it looks odd.
-        # (Small slabs or tol too large.)
-        pass
+    # Build Layer objects (sorted by center_frac, matching cluster_1d_periodic output)
+    layers_sorted: list[Layer] = []
+    for center_frac, member_indices in clusters:
+        atom_idxs = tuple(int(metal_idx[j]) for j in member_indices)
+        layers_sorted.append(Layer(atom_indices=atom_idxs, center_frac=float(center_frac)))
 
-    layers: list[Layer] = []
-    for center, start, end in clusters:
-        idxs = tuple(int(i) for i in metal_idx_sorted[start:end])
-        layers.append(Layer(atom_indices=idxs, center_s=float(center)))
+    N = len(layers_sorted)
+    if N == 0:
+        raise SurfaceGeometryError("No metal layers detected.")
 
-    layers_sorted = tuple(sorted(layers, key=lambda L: L.center_s))
+    axis_unit_tuple = (float(axis_unit_vec[0]), float(axis_unit_vec[1]), float(axis_unit_vec[2]))
 
-    # Mark only the two layers that directly face the non-metal region.
-    n_layers = len(layers_sorted)
-    if n_layers == 0:
-        raise SurfaceGeometryError("No metal layers detected (unexpected).")
-
-    # Assign per-layer interface normal using fractional-coordinate MIC along the chosen axis, if possible.
-    axis_map = {"a": 0, "b": 1, "c": 2}
-    axis_idx: int | None = axis_map.get(normal) if isinstance(normal, str) else None
-
-    if axis_idx is None:
-        scaled = None
-        env_frac_axis = None
-    else:
-        scaled = np.asarray(atoms.get_scaled_positions(wrap=True), dtype=float)
-        env_frac_axis = scaled[nonmetal_idx, axis_idx]
-
-    interface_layer_ids: set[int]
-    normal_sign_by_layer: dict[int, float] = {}
-
-    if axis_idx is not None and scaled is not None:
-        # Use circular ordering along fractional axis and pick the pair across the
-        # largest gap, which corresponds to the non-metal region between two surfaces.
-        layer_frac: list[tuple[int, float]] = []
-        for i, layer in enumerate(layers_sorted):
-            fvals = scaled[list(layer.atom_indices), axis_idx]
-            layer_frac.append((i, _circular_mean_fractional(fvals)))
-
-        if len(layer_frac) == 1:
-            interface_layer_ids = {0}
-            normal_sign_by_layer[0] = -1.0
-        else:
-            layer_frac_sorted = sorted(layer_frac, key=lambda x: x[1])
-            ids = [item[0] for item in layer_frac_sorted]
-            fracs_arr = np.array([item[1] for item in layer_frac_sorted], dtype=float)
-
-            low_k, high_k, _ = find_largest_gap_periodic(fracs_arr, period=1.0)
-            low_side_id = ids[low_k]
-            high_side_id = ids[high_k]
-            interface_layer_ids = {low_side_id, high_side_id}
-            # Moving forward (increasing fractional coordinate) through the largest gap
-            # points from low-side interface toward the non-metal region.
-            normal_sign_by_layer[low_side_id] = 1.0
-            normal_sign_by_layer[high_side_id] = -1.0
-    else:
-        # Fallback without fractional-axis context: keep two geometric end layers.
-        if n_layers == 1:
-            interface_layer_ids = {0}
-            normal_sign_by_layer[0] = -1.0
-        else:
-            interface_layer_ids = {0, n_layers - 1}
-            normal_sign_by_layer[0] = -1.0
-            normal_sign_by_layer[n_layers - 1] = 1.0
-
-    marked_layers: list[Layer] = []
-    for i, layer in enumerate(layers_sorted):
-        if i not in interface_layer_ids:
-            marked_layers.append(layer)
-            continue
-
-        # Decide normal sign (+axis or -axis) for the selected interface layer.
-        sign = normal_sign_by_layer.get(i)
-        if sign is None:
-            if scaled is None or env_frac_axis is None or env_frac_axis.size == 0:
-                sign = -1.0 if i < n_layers / 2 else 1.0
-            else:
-                m_frac = _circular_mean_fractional(scaled[list(layer.atom_indices), axis_idx])
-                df_mic = _mic_delta_fractional(env_frac_axis - m_frac)
-                j = int(np.argmin(np.abs(df_mic)))
-                sign = float(np.sign(df_mic[j]))
-                if sign == 0.0:
-                    sign = -1.0 if i < n_layers / 2 else 1.0
-
-        nvec = axis_unit_vec * sign
-        marked_layers.append(
-            Layer(
-                atom_indices=layer.atom_indices,
-                center_s=layer.center_s,
-                is_interface=True,
-                normal_unit=(float(nvec[0]), float(nvec[1]), float(nvec[2])),
-            )
+    # --- Single layer: mark as normal_aligned ---
+    if N == 1:
+        layer = layers_sorted[0]
+        nvec = axis_unit_vec
+        marked = Layer(
+            atom_indices=layer.atom_indices,
+            center_frac=layer.center_frac,
+            is_interface=True,
+            interface_label="normal_aligned",
+            normal_unit=(float(nvec[0]), float(nvec[1]), float(nvec[2])),
         )
+        return SurfaceDetectionResult(
+            axis_unit=axis_unit_tuple,
+            metal_indices=tuple(int(i) for i in metal_idx.tolist()),
+            metal_layers_sorted=(marked,),
+        )
+
+    # --- Find largest gap (water region) ---
+    centers_arr = np.array([L.center_frac for L in layers_sorted], dtype=float)
+    low_k, high_k, _gap = find_largest_gap_periodic(centers_arr, period=1.0)
+
+    # --- Build ordered layer list ---
+    # Traverse through the slab from normal_aligned (low_k) to normal_opposed (high_k),
+    # going in the decreasing-frac direction (through slab interior, not through water gap).
+    ordered_indices: list[int] = []
+    i = low_k
+    while True:
+        ordered_indices.append(i)
+        if i == high_k:
+            break
+        i = (i - 1) % N
+
+    # --- Mark interfaces and build result ---
+    marked_layers: list[Layer] = []
+    for idx in ordered_indices:
+        layer = layers_sorted[idx]
+        if idx == low_k:
+            nvec = axis_unit_vec  # outward normal = +axis
+            marked_layers.append(Layer(
+                atom_indices=layer.atom_indices,
+                center_frac=layer.center_frac,
+                is_interface=True,
+                interface_label="normal_aligned",
+                normal_unit=(float(nvec[0]), float(nvec[1]), float(nvec[2])),
+            ))
+        elif idx == high_k:
+            nvec = -axis_unit_vec  # outward normal = -axis
+            marked_layers.append(Layer(
+                atom_indices=layer.atom_indices,
+                center_frac=layer.center_frac,
+                is_interface=True,
+                interface_label="normal_opposed",
+                normal_unit=(float(nvec[0]), float(nvec[1]), float(nvec[2])),
+            ))
+        else:
+            marked_layers.append(layer)
 
     return SurfaceDetectionResult(
-        axis_unit=(float(axis_unit_vec[0]), float(axis_unit_vec[1]), float(axis_unit_vec[2])),
+        axis_unit=axis_unit_tuple,
         metal_indices=tuple(int(i) for i in metal_idx.tolist()),
         metal_layers_sorted=tuple(marked_layers),
     )
@@ -334,11 +297,14 @@ def format_detection_summary(result: SurfaceDetectionResult) -> str:
     lines.append(f"Metal atoms: {len(result.metal_indices)}")
     lines.append(f"Metal layers detected: {len(result.metal_layers_sorted)}")
     for i, layer in enumerate(result.metal_layers_sorted, start=1):
+        label = ""
         if layer.is_interface and layer.normal_unit is not None:
-            lines.append(
-                f"  Layer {i:02d}: center_s={layer.center_s:.3f} Å, n={len(layer.atom_indices)} "
-                f"<== interface, normal_unit=[{layer.normal_unit[0]:.0f},{layer.normal_unit[1]:.0f},{layer.normal_unit[2]:.0f}]"
+            label_str = layer.interface_label or "interface"
+            label = (
+                f" <== {label_str}, "
+                f"normal_unit=[{layer.normal_unit[0]:.0f},{layer.normal_unit[1]:.0f},{layer.normal_unit[2]:.0f}]"
             )
-        else:
-            lines.append(f"  Layer {i:02d}: center_s={layer.center_s:.3f} Å, n={len(layer.atom_indices)}")
+        lines.append(
+            f"  Layer {i:02d}: center_frac={layer.center_frac:.4f}, n={len(layer.atom_indices)}{label}"
+        )
     return "\n".join(lines)
