@@ -16,6 +16,7 @@ from ..utils.LayerParser import (
     _mic_delta_fractional,
     detect_interface_layers,
 )
+from ..utils.WaterParser import detect_water_molecule_indices
 from .config import (
     DEFAULT_ACF_FILENAME,
     DEFAULT_DIR_PATTERN,
@@ -58,13 +59,13 @@ def compute_frame_surface_charge(
     metal_symbols: Iterable[str] | None = None,
     normal: str = "c",
 ) -> Atoms:
-    """Compute surface charge density from all charged atoms near each surface.
+    """Compute surface charge density from non-water charged species near each surface.
 
-    Surface charge is determined by the net charges of all atoms with
-    non-zero Bader net charge within the half-gap region of each interface
-    layer (water side).  The cutoff distance is derived from the geometry:
-    the distance along the normal axis from the gap midpoint to each
-    surface.
+    Surface charge is determined by the net charges of all non-water atoms
+    with non-zero Bader net charge within the half-gap region of each
+    interface layer (water side).  The cutoff distance is derived from the
+    geometry: the distance along the normal axis from the gap midpoint to
+    each surface.
 
     The input ``atoms`` must already carry ``"bader_net_charge"`` in
     ``atoms.arrays`` (as produced by :func:`load_bader_atoms`).
@@ -118,8 +119,15 @@ def compute_frame_surface_charge(
     # Sort interface layers by center_s (bottom first)
     sorted_iface = sorted(iface_layers, key=lambda L: L.center_s)
 
-    # All atoms with non-zero net charge
-    charged_idx = np.where(net_charge != 0.0)[0]
+    # Exclude water atoms
+    water_mol = detect_water_molecule_indices(atoms)
+    water_set = set(water_mol.ravel().tolist())
+
+    # All non-water atoms with non-zero net charge
+    charged_idx = np.array(
+        [i for i in np.where(net_charge != 0.0)[0] if i not in water_set],
+        dtype=int,
+    )
 
     # No charged atoms → σ = 0
     if charged_idx.size == 0:
