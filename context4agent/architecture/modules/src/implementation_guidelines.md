@@ -13,7 +13,7 @@
   - `md_analysis.water`：水分析多帧工作流
   - `md_analysis.potential`：电势分析多帧工作流
   - `md_analysis.charge`：电荷分析多帧工作流
-- 编程入口 `main.py` 和 CLI 入口 `CLI.py` 位于顶层，负责协调子包调用。
+- 编程入口 `main.py` 位于顶层，负责协调子包调用。CLI 入口由 `cli/` 子包提供（VASPKIT 风格交互式菜单）。
 - 目录文档治理采用硬约束：`context4agent/architecture/modules/src/` 必须镜像 `src/md_analysis/`，且每个子目录都需维护
   `interface_exposure.md` 与 `implementation_guidelines.md`。
 

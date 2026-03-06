@@ -18,7 +18,7 @@ dependencies = [
 test = ["pytest"]
 
 [project.scripts]
-md-analysis = "md_analysis.CLI:main"
+md-analysis = "md_analysis.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

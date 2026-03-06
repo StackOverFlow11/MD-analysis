@@ -92,10 +92,15 @@
 - `potential/PhiZProfile.py`
   - `phi_z_planeavg_analysis()`：所有帧的 φ(z) overlay 可视化
 
-### 5) `md_analysis.main` / `md_analysis.CLI`（集成入口）
+### 5) `md_analysis.main` / `md_analysis.cli`（集成入口）
 
 - `main.py`：编程入口 `run_water_analysis()`、`run_potential_analysis()`、`run_charge_analysis()`、`run_all()`
-- `CLI.py`：argparse CLI，注册为 `md-analysis` console script（子命令：`water`、`potential`、`charge`、`all`）
+- `cli/`：VASPKIT 风格交互式 CLI 包，注册为 `md-analysis` console script
+  - `__init__.py`：`main()` 入口 + banner + 顶层菜单分发
+  - `_prompt.py`：可复用的输入提示辅助函数
+  - `_water.py`：水分析子菜单（101-105）+ 参数采集 + 处理函数
+  - `_potential.py`：电势分析子菜单（201-206）+ 参数采集 + 处理函数
+  - `_charge.py`：电荷分析子菜单（301-303）+ 参数采集 + 处理函数
 
 ## 核心数据流（当前端到端）
 
