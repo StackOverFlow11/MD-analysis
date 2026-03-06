@@ -63,7 +63,7 @@ class TestComputeFrameSurfaceCharge:
         assert all(isinstance(v, int) for v in n_ch)
 
     def test_with_synthetic_charged_atoms(self):
-        """Build a mock slab + charged atoms → σ reflects all charges."""
+        """Build a mock slab + charged atoms → σ reflects counterion charges only."""
         # 4-layer Cu slab along c with vacuum
         cell_c = 30.0
         cell_a = 5.0
@@ -116,10 +116,12 @@ class TestComputeFrameSurfaceCharge:
         n_ch = result.info["n_charged_atoms_per_surface"]
         q_ch = result.info["charge_per_surface_e"]
         # K is near bottom surface → contributes to σ_bottom
-        assert n_ch[0] >= 1
+        assert n_ch[0] == 1
+        assert q_ch[0] == pytest.approx(0.8)
         assert sigma[0] != 0.0
-        # Water O + H are near top surface → contribute to σ_top
-        assert n_ch[1] >= 1
+        # Water and metal are excluded → no atoms assigned to top
+        assert n_ch[1] == 0
+        assert q_ch[1] == 0.0
         # Charges are finite
         assert all(np.isfinite(v) for v in sigma)
         assert all(np.isfinite(v) for v in q_ch)

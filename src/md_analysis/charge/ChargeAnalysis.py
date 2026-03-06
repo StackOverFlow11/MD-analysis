@@ -59,13 +59,12 @@ def compute_frame_surface_charge(
     metal_symbols: Iterable[str] | None = None,
     normal: str = "c",
 ) -> Atoms:
-    """Compute surface charge density from non-water charged species near each surface.
+    """Compute surface charge density from counterion/solute species near each surface.
 
-    Surface charge is determined by the net charges of all non-water atoms
-    with non-zero Bader net charge within the half-gap region of each
-    interface layer (water side).  The cutoff distance is derived from the
-    geometry: the distance along the normal axis from the gap midpoint to
-    each surface.
+    Water molecules and metal slab atoms are excluded — only non-water,
+    non-metal species (counterions, adsorbates, etc.) with non-zero Bader
+    net charge contribute to σ.  Each contributing atom is assigned to the
+    nearest surface within the half-gap region.
 
     The input ``atoms`` must already carry ``"bader_net_charge"`` in
     ``atoms.arrays`` (as produced by :func:`load_bader_atoms`).
@@ -119,13 +118,12 @@ def compute_frame_surface_charge(
     # Sort interface layers by center_s (bottom first)
     sorted_iface = sorted(iface_layers, key=lambda L: L.center_s)
 
-    # Exclude water atoms
+    # Exclude water and metal atoms — only solute/counterion species contribute
     water_mol = detect_water_molecule_indices(atoms)
-    water_set = set(water_mol.ravel().tolist())
+    exclude = set(water_mol.ravel().tolist()) | set(det.metal_indices)
 
-    # All non-water atoms with non-zero net charge
     charged_idx = np.array(
-        [i for i in np.where(net_charge != 0.0)[0] if i not in water_set],
+        [i for i in np.where(net_charge != 0.0)[0] if i not in exclude],
         dtype=int,
     )
 
