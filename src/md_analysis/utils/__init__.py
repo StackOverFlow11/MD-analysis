@@ -6,7 +6,6 @@ from __future__ import annotations
 # Intentionally excluded from __all__ but explicitly collected here to centralise
 # cross-layer internal dependencies.  If a private function is renamed or moved,
 # only this file needs updating.
-from .LayerParser import _circular_mean_fractional
 from .WaterParser import _compute_bisector_cos_theta_vec
 from .WaterParser import _oxygen_to_hydrogen_map
 from .WaterParser import _theta_bin_count_from_ndeg
@@ -39,6 +38,8 @@ from .config import BOHR_TO_ANG
 from .config import DP_A_H3O_W_EV
 from .config import MU_HPLUS_G0_EV
 from .config import DELTA_E_ZP_EV
+from .BaderParser import BaderParseError
+from .BaderParser import load_bader_atoms
 
 __all__ = [
     "TRANSITION_METAL_SYMBOLS",
@@ -69,4 +70,6 @@ __all__ = [
     "DP_A_H3O_W_EV",
     "MU_HPLUS_G0_EV",
     "DELTA_E_ZP_EV",
+    "BaderParseError",
+    "load_bader_atoms",
 ]

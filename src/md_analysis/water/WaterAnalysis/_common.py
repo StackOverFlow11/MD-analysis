@@ -30,7 +30,6 @@ except ImportError:  # pragma: no cover
 from ...utils import (
     SurfaceGeometryError,
     detect_interface_layers,
-    _circular_mean_fractional,
     _compute_bisector_cos_theta_vec,
     _oxygen_to_hydrogen_map,
 )
@@ -43,7 +42,7 @@ from ...utils.WaterParser import (
 )
 from ...utils.config import DEFAULT_Z_BIN_WIDTH_A, WATER_MOLAR_MASS_G_PER_MOL
 
-StartInterface = Literal["low_c", "high_c"]
+StartInterface = Literal["normal_aligned", "normal_opposed"]
 
 
 # ---------------------------------------------------------------------------
@@ -67,53 +66,34 @@ def _parse_abc_from_md_inp(md_inp_path: Path) -> tuple[float, float, float]:
 # Interface detection
 # ---------------------------------------------------------------------------
 
-def _detect_low_high_interface_fractions(
+def _detect_interface_fractions(
     atoms: Atoms,
     *,
     metal_symbols: Iterable[str] | None = None,
 ) -> tuple[float, float]:
     """
-    Return (low_c_fraction, high_c_fraction) of the two water-facing metal layers.
+    Return (aligned_frac, opposed_frac) of the two water-facing metal layers.
 
-    Uses LayerParser to find interface layers, then computes their circular-mean
-    fractional c-coordinate.
+    Uses LayerParser to find interface layers and reads their ``center_frac``
+    directly (already the circular-mean fractional coordinate).
+
+    - ``aligned_frac`` = normal_aligned interface (outward normal = +axis)
+    - ``opposed_frac`` = normal_opposed interface (outward normal = -axis)
     """
     detection = detect_interface_layers(
         atoms,
         normal="c",
         metal_symbols=metal_symbols,
     )
-    interface_layers = detection.interface_layers()
-    if len(interface_layers) < 2:
-        raise SurfaceGeometryError(
-            f"Expected at least 2 interface layers, got {len(interface_layers)}."
-        )
 
-    scaled = np.asarray(atoms.get_scaled_positions(wrap=True), dtype=float)
-    interface_cfractions = []
-    for layer in interface_layers:
-        frac_values = scaled[list(layer.atom_indices), 2]
-        interface_cfractions.append(_circular_mean_fractional(frac_values))
+    aligned_frac = detection.interface_normal_aligned().center_frac
+    opposed_frac = detection.interface_normal_opposed().center_frac
 
-    interface_cfractions.sort()
-
-    if len(interface_cfractions) == 2:
-        low_c = float(interface_cfractions[0])
-        high_c = float(interface_cfractions[1])
-    elif len(interface_cfractions) >= 4:
-        low_c = float(interface_cfractions[1])
-        high_c = float(interface_cfractions[-2])
-    else:
-        raise SurfaceGeometryError(
-            "Cannot determine water-facing interface pair. "
-            f"Need at least 2 layers and prefer 4, got {len(interface_cfractions)}."
-        )
-
-    if np.isclose(low_c, high_c):
+    if np.isclose(aligned_frac, opposed_frac):
         raise SurfaceGeometryError(
             "Detected interface c-fractions are identical; cannot build analysis window."
         )
-    return low_c, high_c
+    return aligned_frac, opposed_frac
 
 
 # ---------------------------------------------------------------------------
@@ -185,14 +165,14 @@ def _single_frame_density_and_orientation(
     """
     if dz_A <= 0.0:
         raise ValueError("dz_A must be > 0")
-    if start_interface not in {"low_c", "high_c"}:
-        raise ValueError(f"start_interface must be 'low_c' or 'high_c', got {start_interface!r}")
+    if start_interface not in {"normal_aligned", "normal_opposed"}:
+        raise ValueError(f"start_interface must be 'normal_aligned' or 'normal_opposed', got {start_interface!r}")
 
-    low_c, high_c = _detect_low_high_interface_fractions(atoms, metal_symbols=metal_symbols)
-    interface_separation_c = high_c - low_c
-    if interface_separation_c <= 0.0:
-        raise SurfaceGeometryError("interface_separation_c must be positive.")
-    half_path_c = 0.5 * interface_separation_c
+    aligned_frac, opposed_frac = _detect_interface_fractions(atoms, metal_symbols=metal_symbols)
+    gap_frac = (opposed_frac - aligned_frac) % 1.0
+    if gap_frac <= 0.0:
+        raise SurfaceGeometryError("Water gap fractional width must be positive.")
+    half_path_c = 0.5 * gap_frac
 
     water_indices = detect_water_molecule_indices(atoms)
     oxygen_indices = get_water_oxygen_indices_array(water_indices).reshape(-1)
@@ -203,10 +183,10 @@ def _single_frame_density_and_orientation(
     scaled = np.asarray(atoms.get_scaled_positions(wrap=True), dtype=float)
     oxygen_c = scaled[oxygen_indices, 2]
 
-    if start_interface == "low_c":
-        delta_c = np.mod(oxygen_c - low_c, 1.0)
+    if start_interface == "normal_aligned":
+        delta_c = np.mod(oxygen_c - aligned_frac, 1.0)
     else:
-        delta_c = np.mod(high_c - oxygen_c, 1.0)
+        delta_c = np.mod(opposed_frac - oxygen_c, 1.0)
 
     in_path = (delta_c >= 0.0) & (delta_c <= half_path_c)
     selected_oxygen = oxygen_indices[in_path]
@@ -261,7 +241,7 @@ def _compute_density_orientation_ensemble(
     xyz_path: Path,
     md_inp_path: Path,
     *,
-    start_interface: StartInterface = "low_c",
+    start_interface: StartInterface = "normal_aligned",
     dz_A: float = DEFAULT_Z_BIN_WIDTH_A,
     metal_symbols: Iterable[str] | None = None,
     compute_orientation: bool = True,
