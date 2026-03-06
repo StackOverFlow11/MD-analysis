@@ -116,22 +116,19 @@ def _compute_surface_charge_layer(
     net_charge = atoms.arrays["bader_net_charge"]
 
     det = detect_interface_layers(atoms, metal_symbols=metal_symbols, normal=normal)
-    iface_layers = det.interface_layers()
-    if len(iface_layers) != 2:
-        raise ValueError(
-            f"Expected exactly 2 interface layers, got {len(iface_layers)}"
-        )
+    iface_aligned = det.interface_normal_aligned()
+    iface_opposed = det.interface_normal_opposed()
 
     i0, i1 = _AREA_VECTORS[normal]
     cell = np.asarray(atoms.cell.array, dtype=float)
     area_A2 = float(np.linalg.norm(np.cross(cell[i0], cell[i1])))
 
-    sorted_iface = sorted(iface_layers, key=lambda L: L.center_frac)
+    ordered_iface = [iface_aligned, iface_opposed]
 
     sigma_e_A2 = np.empty(2)
     n_atoms_per_surface = []
     q_per_surface = []
-    for i, layer in enumerate(sorted_iface):
+    for i, layer in enumerate(ordered_iface):
         idx = np.array(list(layer.atom_indices))
         q = float(net_charge[idx].sum())
         sigma_e_A2[i] = q / area_A2
@@ -169,17 +166,12 @@ def _compute_surface_charge_counterion(
     net_charge = atoms.arrays["bader_net_charge"]
 
     det = detect_interface_layers(atoms, metal_symbols=metal_symbols, normal=normal)
-    iface_layers = det.interface_layers()
-    if len(iface_layers) != 2:
-        raise ValueError(
-            f"Expected exactly 2 interface layers, got {len(iface_layers)}"
-        )
+    iface_aligned = det.interface_normal_aligned()
+    iface_opposed = det.interface_normal_opposed()
 
     i0, i1 = _AREA_VECTORS[normal]
     cell = np.asarray(atoms.cell.array, dtype=float)
     area_A2 = float(np.linalg.norm(np.cross(cell[i0], cell[i1])))
-
-    sorted_iface = sorted(iface_layers, key=lambda L: L.center_frac)
 
     # Exclude water and metal atoms — only solute/counterion species contribute
     water_mol = detect_water_molecule_indices(atoms)
@@ -201,8 +193,8 @@ def _compute_surface_charge_counterion(
     axis_idx = {"a": 0, "b": 1, "c": 2}[normal]
     scaled = np.asarray(atoms.get_scaled_positions(wrap=True), dtype=float)
 
-    frac_bot = sorted_iface[0].center_frac
-    frac_top = sorted_iface[1].center_frac
+    frac_aligned = iface_aligned.center_frac
+    frac_opposed = iface_opposed.center_frac
 
     metal_frac = scaled[list(det.metal_indices), axis_idx]
     midplane = _circular_mean_fractional(metal_frac)
@@ -210,31 +202,31 @@ def _compute_surface_charge_counterion(
 
     frac_charged = scaled[charged_idx, axis_idx]
 
-    gap_dir_bot = _mic_delta_fractional(gap_frac - frac_bot)
-    delta_bot = _mic_delta_fractional(frac_charged - frac_bot)
-    assigned_bot = (delta_bot * gap_dir_bot > 0) & (
-        np.abs(delta_bot) < np.abs(gap_dir_bot)
+    gap_dir_aligned = _mic_delta_fractional(gap_frac - frac_aligned)
+    delta_aligned = _mic_delta_fractional(frac_charged - frac_aligned)
+    assigned_aligned = (delta_aligned * gap_dir_aligned > 0) & (
+        np.abs(delta_aligned) < np.abs(gap_dir_aligned)
     )
 
-    gap_dir_top = _mic_delta_fractional(gap_frac - frac_top)
-    delta_top = _mic_delta_fractional(frac_charged - frac_top)
-    assigned_top = (delta_top * gap_dir_top > 0) & (
-        np.abs(delta_top) < np.abs(gap_dir_top)
+    gap_dir_opposed = _mic_delta_fractional(gap_frac - frac_opposed)
+    delta_opposed = _mic_delta_fractional(frac_charged - frac_opposed)
+    assigned_opposed = (delta_opposed * gap_dir_opposed > 0) & (
+        np.abs(delta_opposed) < np.abs(gap_dir_opposed)
     )
 
-    q_bot = float(net_charge[charged_idx[assigned_bot]].sum()) if assigned_bot.any() else 0.0
-    q_top = float(net_charge[charged_idx[assigned_top]].sum()) if assigned_top.any() else 0.0
+    q_aligned = float(net_charge[charged_idx[assigned_aligned]].sum()) if assigned_aligned.any() else 0.0
+    q_opposed = float(net_charge[charged_idx[assigned_opposed]].sum()) if assigned_opposed.any() else 0.0
 
-    sigma_e_A2 = np.array([q_bot / area_A2, q_top / area_A2])
+    sigma_e_A2 = np.array([q_aligned / area_A2, q_opposed / area_A2])
     sigma_uC_cm2 = sigma_e_A2 * E_PER_A2_TO_UC_PER_CM2
 
     atoms.info["surface_charge_density_e_A2"] = sigma_e_A2.tolist()
     atoms.info["surface_charge_density_uC_cm2"] = sigma_uC_cm2.tolist()
     atoms.info["n_charged_atoms_per_surface"] = [
-        int(assigned_bot.sum()),
-        int(assigned_top.sum()),
+        int(assigned_aligned.sum()),
+        int(assigned_opposed.sum()),
     ]
-    atoms.info["charge_per_surface_e"] = [q_bot, q_top]
+    atoms.info["charge_per_surface_e"] = [q_aligned, q_opposed]
 
     return atoms
 

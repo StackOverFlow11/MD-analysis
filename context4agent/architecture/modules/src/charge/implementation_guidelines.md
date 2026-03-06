@@ -19,7 +19,7 @@ Flat structure (no sub-packages):
 
 Only non-water, non-metal species (counterions, adsorbates) with non-zero net charge contribute:
 
-1. `detect_interface_layers(atoms)` → 2 interface layers
+1. `detect_interface_layers(atoms)` → `interface_normal_aligned()` / `interface_normal_opposed()`
 2. `detect_water_molecule_indices(atoms)` → water atom set
 3. Exclude = water ∪ metal → remaining charged atoms only
 4. MIC-based directional assignment to nearest surface within half-gap
@@ -29,8 +29,12 @@ Only non-water, non-metal species (counterions, adsorbates) with non-zero net ch
 
 Sum net charges of the interface-layer metal atoms directly:
 
-1. `detect_interface_layers(atoms)` → 2 interface layers (sorted by center_frac)
+1. `detect_interface_layers(atoms)` → `interface_normal_aligned()` / `interface_normal_opposed()`
 2. For each layer: σ = Σ(net_charge[layer_atoms]) / area
+
+### Output column ordering
+
+Both methods output `[σ_aligned, σ_opposed]` — ordered by stable `interface_label`, not by `center_frac`. This ensures PBC-shift invariance: a periodic translation does not swap the two columns.
 
 ## Data flow
 

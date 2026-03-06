@@ -116,13 +116,16 @@ class TestComputeFrameSurfaceCharge:
         sigma = result.info["surface_charge_density_uC_cm2"]
         n_ch = result.info["n_charged_atoms_per_surface"]
         q_ch = result.info["charge_per_surface_e"]
-        # K is near bottom surface → contributes to σ_bottom
-        assert n_ch[0] == 1
-        assert q_ch[0] == pytest.approx(0.8)
-        assert sigma[0] != 0.0
-        # Water and metal are excluded → no atoms assigned to top
-        assert n_ch[1] == 0
-        assert q_ch[1] == 0.0
+        # Output order: [normal_aligned, normal_opposed].
+        # Layers at frac 0.1..0.4; gap 0.4→0.1 wrapping.
+        # normal_aligned = frac 0.4, normal_opposed = frac 0.1.
+        # K at frac 0.05 is near the normal_opposed surface (index 1).
+        assert n_ch[1] == 1
+        assert q_ch[1] == pytest.approx(0.8)
+        assert sigma[1] != 0.0
+        # Water and metal are excluded → no atoms assigned to aligned surface
+        assert n_ch[0] == 0
+        assert q_ch[0] == 0.0
         # Charges are finite
         assert all(np.isfinite(v) for v in sigma)
         assert all(np.isfinite(v) for v in q_ch)

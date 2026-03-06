@@ -157,10 +157,11 @@ $$
   - `"counterion"`：排除水分子和金属原子，仅非水非金属物种（反离子/溶质）的净电荷贡献 σ
   - `"layer"`：直接对界面层金属原子的净电荷求和除以面积
 - 结果存入 `atoms.info`（原地修改）
-- `atoms.info["surface_charge_density_e_A2"]`：`[σ_bottom, σ_top]`，单位 e/Å²
-- `atoms.info["surface_charge_density_uC_cm2"]`：`[σ_bottom, σ_top]`，单位 μC/cm²
-- `atoms.info["n_charged_atoms_per_surface"]`：`[n_bottom, n_top]`
-- `atoms.info["charge_per_surface_e"]`：`[Σq_bottom, Σq_top]`，单位 e
+- `atoms.info["surface_charge_density_e_A2"]`：`[σ_aligned, σ_opposed]`，单位 e/Å²
+- `atoms.info["surface_charge_density_uC_cm2"]`：`[σ_aligned, σ_opposed]`，单位 μC/cm²
+- `atoms.info["n_charged_atoms_per_surface"]`：`[n_aligned, n_opposed]`
+- `atoms.info["charge_per_surface_e"]`：`[Σq_aligned, Σq_opposed]`，单位 e
+- 排列顺序由稳定的 `interface_label` 决定（aligned=index 0, opposed=index 1），不受 PBC 平移影响
 - `normal` 参数控制面积计算：`_AREA_VECTORS = {"a": (1,2), "b": (0,2), "c": (0,1)}`
 
 ### `frame_indexed_atom_charges(atoms, atom_indices)` 输出
