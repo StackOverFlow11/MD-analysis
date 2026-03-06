@@ -149,11 +149,16 @@ $$
 
 ## Charge 层输出契约
 
-### `compute_frame_surface_charge(atoms, ...)` 输出
+### `compute_frame_surface_charge(atoms, *, method="counterion", ...)` 输出
 
+- `method` 参数选择计算逻辑：
+  - `"counterion"`：排除水分子和金属原子，仅非水非金属物种（反离子/溶质）的净电荷贡献 σ
+  - `"layer"`：直接对界面层金属原子的净电荷求和除以面积
 - 结果存入 `atoms.info`（原地修改）
 - `atoms.info["surface_charge_density_e_A2"]`：`[σ_bottom, σ_top]`，单位 e/Å²
 - `atoms.info["surface_charge_density_uC_cm2"]`：`[σ_bottom, σ_top]`，单位 μC/cm²
+- `atoms.info["n_charged_atoms_per_surface"]`：`[n_bottom, n_top]`
+- `atoms.info["charge_per_surface_e"]`：`[Σq_bottom, Σq_top]`，单位 e
 - `normal` 参数控制面积计算：`_AREA_VECTORS = {"a": (1,2), "b": (0,2), "c": (0,1)}`
 
 ### `frame_indexed_atom_charges(atoms, atom_indices)` 输出
@@ -171,14 +176,14 @@ $$
   - `[:, :, 1]`：对应的 Bader 净电荷（单位 e）
 - 内部逐帧调用 `frame_indexed_atom_charges`
 
-### `trajectory_surface_charge(root_dir, ...)` 输出
+### `trajectory_surface_charge(root_dir, *, method="counterion", ...)` 输出
 
 - 返回 `np.ndarray`：`(t, 2)`
   - `[:, 0]`：σ_bottom（μC/cm²）
   - `[:, 1]`：σ_top（μC/cm²）
-- 逐帧调用 `load_bader_atoms` + `compute_frame_surface_charge`，收集 `surface_charge_density_uC_cm2`
+- 逐帧调用 `load_bader_atoms` + `compute_frame_surface_charge(..., method=method)`，收集 `surface_charge_density_uC_cm2`
 
-### `surface_charge_analysis(root_dir, ...)` 输出
+### `surface_charge_analysis(root_dir, *, method="counterion", ...)` 输出
 
 - CSV：`step,sigma_bottom_uC_cm2,sigma_top_uC_cm2,sigma_bottom_cumavg_uC_cm2,sigma_top_cumavg_uC_cm2`
 - PNG：9×4.8 inch, 160 DPI，bottom（蓝色）和 top（橙色）各两条线（inst. + cum. avg）

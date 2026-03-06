@@ -11,7 +11,9 @@
   - 电势分析（`potential/`）：center slab potential、Fermi energy、electrode potential U vs SHE、φ(z) overlay、thickness sensitivity
   - 集成入口：CLI（`md-analysis` 命令）、编程入口（`main.py`）
 - Bader 电荷解析（`utils/BaderParser.py`）：从 VASP Bader 输出（ACF.dat + POTCAR）读取原始电子数与净电荷，附加到 ASE Atoms
-  - Bader 电荷下游分析（`charge/`）：单帧表面电荷密度（`compute_frame_surface_charge`）、按帧指定原子索引提取净电荷（`trajectory_indexed_atom_charges`）
+  - Bader 电荷下游分析（`charge/BaderAnalysis.py`）：
+    - 单帧表面电荷密度 `compute_frame_surface_charge(method=...)`，支持 `"counterion"`（反离子/溶质）和 `"layer"`（界面层净电荷）两种计算方法
+    - 按帧指定原子索引提取净电荷（`trajectory_indexed_atom_charges`）
 - **当前未覆盖**：按层/按元素电荷转移统计；Mulliken 电荷分析仍未实现。
 
 ## 已确认的体系前提（用户声明，值得记录）
@@ -25,7 +27,7 @@
 - **CLI 入口**：
   - `md-analysis water --xyz md-pos-1.xyz --md-inp md.inp`
   - `md-analysis potential --cube-pattern "md-POTENTIAL-*.cube"`
-  - `md-analysis charge --root-dir .` （Bader 表面电荷密度时序分析，CSV + PNG 输出）
+  - `md-analysis charge --root-dir . --charge-method counterion|layer` （Bader 表面电荷密度时序分析，CSV + PNG 输出）
   - `md-analysis all --xyz ... --md-inp ... --cube-pattern ...`
 - **编程入口**：
   - `md_analysis.main.run_water_analysis(xyz_path, md_inp_path, ...)`
@@ -51,8 +53,11 @@
 - **I/O（读取与标准化）**
   - 统一记录单位、时间步、采样间隔等元数据（当前仅解析 `md.inp` 的 `ABC [angstrom]`）
 - **Analysis（扩展分析量）**
-  - Bader 电荷下游分析（已实现表面电荷密度，`charge/` 子包）：
-    - ✅ 表面电荷密度：结合 `detect_interface_layers` 识别表面层，计算每层净电荷密度；内部计算用 e/Å²，最终输出转换为 μC/cm²（与实验量纲对齐）；支持 `normal` 参数（a/b/c）选择法向轴
+  - Bader 电荷下游分析（已实现表面电荷密度，`charge/BaderAnalysis.py`）：
+    - ✅ 表面电荷密度（双方法）：
+      - `method="counterion"`：排除水分子和金属原子，仅反离子/溶质物种净电荷贡献 σ
+      - `method="layer"`：界面层金属原子净电荷求和 / 面积
+      - CLI 通过 `--charge-method counterion|layer` 选择；输出目录按方法分离 `<outdir>/charge/<method>/`
     - ✅ 单帧原子净电荷提取：`frame_indexed_atom_charges` 传入 `(N,)` 索引，返回 `(N, 2)` 的索引+净电荷数组
     - ✅ 轨迹原子净电荷提取：`trajectory_indexed_atom_charges` 按帧传入 `(t, N)` 索引矩阵，返回 `(t, N, 2)` 的索引+净电荷数组（内部调用 `frame_indexed_atom_charges`）
     - ✅ 轨迹表面电荷密度时序：`trajectory_surface_charge` 逐帧计算表面电荷密度，返回 `(t, 2)` 的 μC/cm² 数组
