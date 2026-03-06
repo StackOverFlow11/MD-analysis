@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .ChargeAnalysis import (
+from .BaderAnalysis import (
     compute_frame_surface_charge,
     frame_indexed_atom_charges,
     surface_charge_analysis,

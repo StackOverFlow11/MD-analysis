@@ -202,6 +202,7 @@ def run_charge_analysis(
     root_dir: str | Path = ".",
     metal_symbols: Iterable[str] | None = None,
     normal: str = "c",
+    method: str = "counterion",
     dir_pattern: str = "calc_t*_i*",
     frame_start: int | None = None,
     frame_end: int | None = None,
@@ -210,7 +211,7 @@ def run_charge_analysis(
 ) -> dict[str, Path]:
     """Run surface charge density analysis (CSV + PNG).
 
-    Outputs are written under ``output_dir/charge/``.
+    Outputs are written under ``output_dir/charge/<method>/``.
     Returns a dict mapping output names to file paths.
     """
     from .charge import surface_charge_analysis
@@ -219,13 +220,14 @@ def run_charge_analysis(
         DEFAULT_SURFACE_CHARGE_PNG_NAME,
     )
 
-    charge_dir = Path(output_dir) / "charge"
+    charge_dir = Path(output_dir) / "charge" / method
     charge_dir.mkdir(parents=True, exist_ok=True)
 
     csv_path = surface_charge_analysis(
         root_dir,
         metal_symbols=metal_symbols,
         normal=normal,
+        method=method,
         dir_pattern=dir_pattern,
         output_dir=charge_dir,
         frame_start=frame_start,

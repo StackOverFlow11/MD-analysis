@@ -107,6 +107,8 @@ def _add_charge_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--dir-pattern", type=str, default="calc_t*_i*", help="Glob pattern for frame subdirectories (default: calc_t*_i*).")
     parser.add_argument("--normal", choices=["a", "b", "c"], default="c", help="Cell axis perpendicular to the surface (default: c).")
     parser.add_argument("--metal-elements", type=str, default=None, help="Comma-separated metal element symbols (e.g., Cu,Ag).")
+    parser.add_argument("--charge-method", choices=["counterion", "layer"], default="counterion",
+                        help="Surface charge method: 'counterion' (non-water non-metal species) or 'layer' (interface-layer net charge). Default: counterion.")
 
 
 def _cmd_charge(args: argparse.Namespace) -> int:
@@ -119,6 +121,7 @@ def _cmd_charge(args: argparse.Namespace) -> int:
         root_dir=args.root_dir,
         metal_symbols=_parse_metal_elements(args.metal_elements),
         normal=args.normal,
+        method=args.charge_method,
         dir_pattern=args.dir_pattern,
         frame_start=args.frame_start,
         frame_end=args.frame_end,

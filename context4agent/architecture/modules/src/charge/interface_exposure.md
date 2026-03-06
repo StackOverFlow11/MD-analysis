@@ -4,11 +4,11 @@
 
 | Symbol                              | Module              | Description                                                     |
 |-------------------------------------|---------------------|-----------------------------------------------------------------|
-| `compute_frame_surface_charge`      | ChargeAnalysis.py   | Single-frame surface charge density → `atoms.info`              |
-| `frame_indexed_atom_charges`        | ChargeAnalysis.py   | Single-frame net charges for caller-specified atom indices → `(N, 2)` |
-| `trajectory_indexed_atom_charges`   | ChargeAnalysis.py   | Per-frame net charges for caller-specified atom indices → `(t, N, 2)` |
-| `trajectory_surface_charge`         | ChargeAnalysis.py   | Multi-frame surface charge density time series → `(t, 2)` μC/cm² |
-| `surface_charge_analysis`           | ChargeAnalysis.py   | End-to-end surface charge analysis → CSV + PNG output           |
+| `compute_frame_surface_charge`      | BaderAnalysis.py    | Single-frame surface charge density → `atoms.info` (`method` selects algorithm) |
+| `frame_indexed_atom_charges`        | BaderAnalysis.py    | Single-frame net charges for caller-specified atom indices → `(N, 2)` |
+| `trajectory_indexed_atom_charges`   | BaderAnalysis.py    | Per-frame net charges for caller-specified atom indices → `(t, N, 2)` |
+| `trajectory_surface_charge`         | BaderAnalysis.py    | Multi-frame surface charge density time series → `(t, 2)` μC/cm² |
+| `surface_charge_analysis`           | BaderAnalysis.py    | End-to-end surface charge analysis → CSV + PNG output           |
 | `E_PER_A2_TO_UC_PER_CM2`           | config.py           | Unit conversion: 1 e/Å² = 1.602176634×10³ μC/cm²               |
 | `DEFAULT_SURFACE_CHARGE_CSV_NAME`   | config.py           | Default CSV output filename                                     |
 | `DEFAULT_SURFACE_CHARGE_PNG_NAME`   | config.py           | Default PNG output filename                                     |
@@ -35,8 +35,13 @@ def compute_frame_surface_charge(
     *,
     metal_symbols: Iterable[str] | None = None,
     normal: str = "c",   # "a" | "b" | "c"
+    method: str = "counterion",  # "counterion" | "layer"
 ) -> Atoms
 ```
+
+`method` options:
+- `"counterion"` — excludes water and metal; only counterion/solute species contribute to σ.
+- `"layer"` — sums net charges of interface-layer metal atoms / area.
 
 Results in `atoms.info`:
 - `surface_charge_density_e_A2`: `[σ_bottom, σ_top]` (e/Å²)
@@ -75,6 +80,7 @@ def trajectory_surface_charge(
     *,
     metal_symbols: Iterable[str] | None = None,
     normal: str = "c",
+    method: str = "counterion",
     dir_pattern: str = DEFAULT_DIR_PATTERN,
     structure_filename: str = DEFAULT_STRUCTURE_FILENAME,
     acf_filename: str = DEFAULT_ACF_FILENAME,
@@ -90,6 +96,7 @@ def surface_charge_analysis(
     *,
     metal_symbols: Iterable[str] | None = None,
     normal: str = "c",
+    method: str = "counterion",
     dir_pattern: str = DEFAULT_DIR_PATTERN,
     structure_filename: str = DEFAULT_STRUCTURE_FILENAME,
     acf_filename: str = DEFAULT_ACF_FILENAME,

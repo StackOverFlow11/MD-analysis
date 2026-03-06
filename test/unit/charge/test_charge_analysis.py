@@ -1,4 +1,4 @@
-"""Unit tests for md_analysis.charge.ChargeAnalysis."""
+"""Unit tests for md_analysis.charge.BaderAnalysis."""
 
 import shutil
 from pathlib import Path
@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 from ase import Atoms
 
-from md_analysis.charge.ChargeAnalysis import (
+from md_analysis.charge.BaderAnalysis import (
     _extract_t_value,
     _sorted_frame_dirs,
     compute_frame_surface_charge,

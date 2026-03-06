@@ -72,12 +72,12 @@
 输入：根目录下 `calc_t*_i*` 子目录，每帧各含 POSCAR + ACF.dat + POTCAR
 
 - `charge/config.py`：单位换算常量（`E_PER_A2_TO_UC_PER_CM2`）、默认文件名
-- `charge/ChargeAnalysis.py`
-  - `compute_frame_surface_charge()`：单帧表面电荷密度（结果存入 `atoms.info`；`normal` 参数控制面积向量对）
+- `charge/BaderAnalysis.py`
+  - `compute_frame_surface_charge(method=...)`：单帧表面电荷密度（`method="counterion"` 或 `"layer"`；结果存入 `atoms.info`）
   - `frame_indexed_atom_charges()`：单帧指定原子索引提取净电荷 → `(N, 2)` ndarray
   - `trajectory_indexed_atom_charges()`：按帧指定原子索引提取净电荷 → `(t, N, 2)` ndarray（内部调用 `frame_indexed_atom_charges`）
-  - `trajectory_surface_charge()`：多帧表面电荷密度时序 → `(t, 2)` ndarray（逐帧调用 `compute_frame_surface_charge`）
-  - `surface_charge_analysis()`：端到端表面电荷密度分析（CSV + PNG 输出，含累积平均）
+  - `trajectory_surface_charge(method=...)`：多帧表面电荷密度时序 → `(t, 2)` ndarray
+  - `surface_charge_analysis(method=...)`：端到端表面电荷密度分析（CSV + PNG 输出，含累积平均）
 
 ### 4) `md_analysis.potential`（多帧/电势分析工作流）
 
