@@ -11,6 +11,7 @@ from ase import Atoms
 from md_analysis.scripts.BaderGen import (
     BaderGenError,
     DEFAULT_WORKDIR_NAME,
+    batch_generate_bader_workdirs,
     generate_bader_workdir,
 )
 from md_analysis.scripts.utils.IndexMapper import read_index_map_from_poscar
@@ -169,3 +170,107 @@ class TestGenerateBaderWorkdir:
         )
         imap = read_index_map_from_poscar(workdir / "POSCAR")
         assert imap.element_order == ("H", "O", "Cu")
+
+
+def _write_test_xyz(path: Path, n_frames: int = 3) -> None:
+    """Write a minimal extxyz trajectory with CP2K-style comment lines."""
+    symbols = ["Cu", "Cu", "O", "H", "H", "O", "H", "H"]
+    positions = [
+        "0.0 0.0 0.0",
+        "1.8 1.8 0.0",
+        "0.9 0.9 2.5",
+        "0.9 0.2 3.1",
+        "0.9 1.6 3.1",
+        "2.7 0.9 2.5",
+        "2.7 0.2 3.1",
+        "2.7 1.6 3.1",
+    ]
+    lines: list[str] = []
+    for fi in range(n_frames):
+        step = fi * 5
+        time_fs = float(step)
+        lines.append(f"{len(symbols)}")
+        lines.append(
+            f' i = {step:>8d}, time = {time_fs:>12.3f}, E = -1000.0'
+        )
+        for sym, pos in zip(symbols, positions):
+            lines.append(f"{sym}  {pos}")
+    path.write_text("\n".join(lines) + "\n")
+
+
+class TestBatchGenerateBaderWorkdirs:
+    """Tests for batch_generate_bader_workdirs."""
+
+    def test_batch_creates_all_directories(self, tmp_path):
+        """3 frames → 3 directories with correct names."""
+        xyz = tmp_path / "traj.xyz"
+        _write_test_xyz(xyz, n_frames=3)
+        dirs = batch_generate_bader_workdirs(
+            xyz, (3.6, 3.6, 10.0), tmp_path / "out",
+            generate_potcar=False,
+        )
+        assert len(dirs) == 3
+        names = [d.name for d in dirs]
+        assert names == ["bader_t0_i0", "bader_t5_i5", "bader_t10_i10"]
+
+    def test_batch_frame_slicing(self, tmp_path):
+        """frame_start=1, frame_end=3 → 2 directories."""
+        xyz = tmp_path / "traj.xyz"
+        _write_test_xyz(xyz, n_frames=4)
+        dirs = batch_generate_bader_workdirs(
+            xyz, (3.6, 3.6, 10.0), tmp_path / "out",
+            frame_start=1, frame_end=3,
+            generate_potcar=False,
+        )
+        assert len(dirs) == 2
+        names = [d.name for d in dirs]
+        assert names == ["bader_t5_i5", "bader_t10_i10"]
+
+    def test_batch_frame_step(self, tmp_path):
+        """frame_step=2 → every other frame."""
+        xyz = tmp_path / "traj.xyz"
+        _write_test_xyz(xyz, n_frames=4)
+        dirs = batch_generate_bader_workdirs(
+            xyz, (3.6, 3.6, 10.0), tmp_path / "out",
+            frame_step=2,
+            generate_potcar=False,
+        )
+        assert len(dirs) == 2
+        names = [d.name for d in dirs]
+        assert names == ["bader_t0_i0", "bader_t10_i10"]
+
+    def test_batch_each_dir_has_files(self, tmp_path):
+        """Each sub-directory contains POSCAR, INCAR, KPOINTS."""
+        xyz = tmp_path / "traj.xyz"
+        _write_test_xyz(xyz, n_frames=2)
+        dirs = batch_generate_bader_workdirs(
+            xyz, (3.6, 3.6, 10.0), tmp_path / "out",
+            generate_potcar=False,
+        )
+        for d in dirs:
+            assert (d / "POSCAR").is_file()
+            assert (d / "INCAR").is_file()
+            assert (d / "KPOINTS").is_file()
+
+    def test_batch_poscar_frame_metadata(self, tmp_path):
+        """Each POSCAR records the correct frame index."""
+        xyz = tmp_path / "traj.xyz"
+        _write_test_xyz(xyz, n_frames=3)
+        dirs = batch_generate_bader_workdirs(
+            xyz, (3.6, 3.6, 10.0), tmp_path / "out",
+            generate_potcar=False,
+        )
+        for expected_frame, d in enumerate(dirs):
+            imap = read_index_map_from_poscar(d / "POSCAR")
+            assert imap.frame == expected_frame
+
+    def test_batch_returns_path_list(self, tmp_path):
+        """Return value is list[Path]."""
+        xyz = tmp_path / "traj.xyz"
+        _write_test_xyz(xyz, n_frames=1)
+        result = batch_generate_bader_workdirs(
+            xyz, (3.6, 3.6, 10.0), tmp_path / "out",
+            generate_potcar=False,
+        )
+        assert isinstance(result, list)
+        assert all(isinstance(p, Path) for p in result)

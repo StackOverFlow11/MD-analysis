@@ -2,10 +2,11 @@
 
 ## Public API
 
-| Symbol                  | Module        | Description                                              |
-|-------------------------|---------------|----------------------------------------------------------|
-| `BaderGenError`         | BaderGen.py   | Exception for Bader work directory generation failures   |
-| `generate_bader_workdir`| BaderGen.py   | Generate a VASP single-point work directory for Bader charge analysis |
+| Symbol                         | Module        | Description                                              |
+|--------------------------------|---------------|----------------------------------------------------------|
+| `BaderGenError`                | BaderGen.py   | Exception for Bader work directory generation failures   |
+| `generate_bader_workdir`       | BaderGen.py   | Generate a VASP single-point work directory for Bader charge analysis |
+| `batch_generate_bader_workdirs`| BaderGen.py   | Batch-generate Bader work directories from XYZ trajectory |
 
 ## `generate_bader_workdir` Signature
 
@@ -42,7 +43,37 @@ def generate_bader_workdir(
 2. If `script_path is None` → read `KEY_VASP_SCRIPT_PATH` from persistent config
 3. If neither → no script.sh copied
 
+## `batch_generate_bader_workdirs` Signature
+
+```python
+def batch_generate_bader_workdirs(
+    xyz_path: str | Path,
+    cell_abc: tuple[float, float, float],
+    output_dir: str | Path,
+    *,
+    frame_start: int = 0,
+    frame_end: int | None = None,
+    frame_step: int = 1,
+    script_path: str | Path | None = None,
+    element_order: tuple[str, ...] | None = None,
+    generate_potcar: bool = True,
+    direct: bool = True,
+    verbose: bool = False,
+) -> list[Path]:
+```
+
+**Parameters:**
+- `xyz_path`: CP2K XYZ trajectory file.
+- `cell_abc`: Orthogonal cell lengths (A), e.g. from `parse_abc_from_restart`.
+- `output_dir`: Parent directory; sub-directories `bader_t{time}_i{step}` are created.
+- `frame_start/end/step`: 0-based frame index slicing.
+- `verbose`: Show tqdm progress bar when True.
+
+**Returns** list of created work directory paths.
+
+**Sub-directory naming**: `bader_t{int(time_fs)}_i{step}` where `time` and `i` are read from XYZ comment line metadata (`atoms.info`).
+
 ## Stability
 
-- **Experimental** — single-frame API; batch multi-frame will be built on top.
+- **Stable** — single-frame and batch APIs.
 - Not re-exported from `md_analysis` top-level `__init__.py`.

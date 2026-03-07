@@ -1,6 +1,6 @@
 # `md_analysis.utils` 内部实现准则（当前实现口径）
 
-> 适用范围：`src/md_analysis/utils/`（`config.py`、`ClusterUtils.py`、`CubeParser.py`、`LayerParser.py`、`WaterParser.py`）。
+> 适用范围：`src/md_analysis/utils/`（`config.py`、`ClusterUtils.py`、`CubeParser.py`、`LayerParser.py`、`WaterParser.py`、`BaderParser.py`、`RestartParser.py`）。
 >
 > 目标：在明确物理口径与输入输出契约的前提下，提供可复用、可测试、可维护的底层实现。
 
@@ -35,6 +35,14 @@
 - 负责金属层识别、界面层标记、法向符号判定。
 - 负责层级数据结构与摘要输出。
 - 不负责水分子拓扑识别、角度 PDF 统计。
+
+### `RestartParser.py`
+
+- 负责从 CP2K `.restart` 文件解析正交 cell 参数。
+- 用正则表达式定位 `&CELL ... &END CELL` 块，提取 A/B/C 向量行。
+- 验证正交性：离对角元素 < 1e-6 Å。
+- 返回 `(a, b, c)` 对角元素，类型与 `_parse_abc_from_md_inp` 一致。
+- 不依赖 ASE。
 
 ### `WaterParser.py`
 

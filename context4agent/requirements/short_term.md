@@ -69,7 +69,9 @@
     - ✅ POSCAR 通过 IndexMapper 生成，保留 XYZ↔POSCAR 索引映射
     - ✅ POTCAR 通过 vaspkit 103 自动生成（可选）
     - ✅ 提交脚本路径支持持久化配置（`~/.config/md_analysis/config.json`）
-    - 待实现：多帧批量生成（复用单帧 API）
+    - ✅ 多帧批量生成：`batch_generate_bader_workdirs(xyz_path, cell_abc, output_dir, *, frame_start/end/step, ...)`
+    - ✅ CLI 支持：401（单帧）+ 402（批量），cell 来源支持 `.restart` 和 `md.inp`
+    - ✅ RestartParser：`parse_abc_from_restart()` 从 CP2K `.restart` 文件解析正交 cell 参数
   - 持久化用户配置（`config.py`）：
     - ✅ `load_config`、`save_config`、`get_config`、`set_config`
     - ✅ CLI 设置菜单（901/902）支持查看和修改配置

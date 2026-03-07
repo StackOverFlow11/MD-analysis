@@ -12,7 +12,7 @@
 - `_water.py` -- water analysis sub-menu (codes 101-105) + parameter collection + dispatch
 - `_potential.py` -- potential analysis sub-menu (codes 201-206) + parameter collection + dispatch
 - `_charge.py` -- charge analysis sub-menu (codes 301-303) + parameter collection + dispatch
-- `_scripts.py` -- scripts/tools sub-menu (code 401) + Bader work directory generation
+- `_scripts.py` -- scripts/tools sub-menu (codes 401-402) + single-frame and batch Bader work directory generation
 - `_settings.py` -- settings sub-menu (codes 901-902) + persistent config management
 
 ## Menu structure

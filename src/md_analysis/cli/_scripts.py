@@ -4,13 +4,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ._prompt import _prompt_bool, _prompt_int, _prompt_str, _prompt_str_required
+from ._prompt import _prompt_bool, _prompt_choice, _prompt_int, _prompt_str, _prompt_str_required
 
 _MENU = """\
 
  ---------- Scripts / Tools ----------
 
- 401) Generate Bader Work Directory
+ 401) Generate Bader Work Directory (single frame)
+ 402) Batch Generate Bader Work Directories
 
    0) Back / Exit
 
@@ -28,15 +29,43 @@ def scripts_menu() -> int:
 
     if choice == "401":
         return _cmd_401()
+    elif choice == "402":
+        return _cmd_402()
     else:
         print(f"\n Invalid choice: {choice!r}")
         return 1
 
 
+def _read_cell_abc(cell_source: str) -> tuple[float, float, float] | None:
+    """Read cell parameters from the chosen source. Returns None on error."""
+    if cell_source == ".restart":
+        restart_path = _prompt_str_required("CP2K .restart file")
+        from ..utils.RestartParser import RestartParseError, parse_abc_from_restart
+        try:
+            abc = parse_abc_from_restart(restart_path)
+        except RestartParseError as exc:
+            print(f"\n  Error: {exc}")
+            return None
+    else:
+        md_inp_path = _prompt_str_required("CP2K input file (e.g. md.inp)")
+        from ..water.WaterAnalysis._common import _parse_abc_from_md_inp
+        try:
+            abc = _parse_abc_from_md_inp(md_inp_path)
+        except (ValueError, FileNotFoundError) as exc:
+            print(f"\n  Error: {exc}")
+            return None
+    print(f"  Cell: a={abc[0]:.4f}, b={abc[1]:.4f}, c={abc[2]:.4f} A")
+    return abc
+
+
 def _cmd_401() -> int:
     print()
     xyz_path = _prompt_str_required("XYZ trajectory file (e.g. md-pos-1.xyz)")
-    md_inp_path = _prompt_str_required("CP2K input file (e.g. md.inp)")
+    cell_source = _prompt_choice("Cell source", ["md.inp", ".restart"], default=".restart")
+    abc = _read_cell_abc(cell_source)
+    if abc is None:
+        return 1
+
     frame = _prompt_int("Frame number (0-based)", default=0) or 0
     output_dir = _prompt_str("Output directory", default=".") or "."
     workdir_name = _prompt_str("Work directory name", default="bader") or "bader"
@@ -56,7 +85,7 @@ def _cmd_401() -> int:
 
     print(f"\n Reading frame {frame} from {xyz_path} ...")
     atoms = None
-    for i, a in enumerate(iread(xyz_path, format="xyz")):
+    for i, a in enumerate(iread(xyz_path, index=":")):
         if i == frame:
             atoms = a
             break
@@ -64,10 +93,6 @@ def _cmd_401() -> int:
         print(f"  Error: frame {frame} not found in {xyz_path}")
         return 1
 
-    # Parse cell from md.inp
-    from ..water.WaterAnalysis._common import _parse_abc_from_md_inp
-
-    abc = _parse_abc_from_md_inp(md_inp_path)
     atoms.set_cell(abc)
     atoms.set_pbc(True)
 
@@ -90,4 +115,51 @@ def _cmd_401() -> int:
     print(f"\n Bader work directory created: {workdir}")
     contents = sorted(p.name for p in workdir.iterdir())
     print(f"  Contents: {', '.join(contents)}")
+    return 0
+
+
+def _cmd_402() -> int:
+    print()
+    xyz_path = _prompt_str_required("XYZ trajectory file (e.g. md-pos-1.xyz)")
+    cell_source = _prompt_choice("Cell source", ["md.inp", ".restart"], default=".restart")
+    abc = _read_cell_abc(cell_source)
+    if abc is None:
+        return 1
+
+    frame_start = _prompt_int("Frame start (0-based)", default=0) or 0
+    frame_end = _prompt_int("Frame end (exclusive, empty=all)", default=None)
+    frame_step = _prompt_int("Frame step", default=1) or 1
+    output_dir = _prompt_str("Output directory", default=".") or "."
+
+    from ..config import KEY_VASP_SCRIPT_PATH, get_config
+
+    default_script = get_config(KEY_VASP_SCRIPT_PATH)
+    script_path = _prompt_str(
+        "Submission script path",
+        default=default_script,
+    )
+
+    gen_potcar = _prompt_bool("Generate POTCAR via vaspkit?", default=True)
+
+    from ..scripts import batch_generate_bader_workdirs
+
+    try:
+        dirs = batch_generate_bader_workdirs(
+            xyz_path,
+            abc,
+            output_dir,
+            frame_start=frame_start,
+            frame_end=frame_end,
+            frame_step=frame_step,
+            script_path=script_path,
+            generate_potcar=gen_potcar,
+            verbose=True,
+        )
+    except Exception as exc:
+        print(f"\n  Error: {exc}")
+        return 1
+
+    print(f"\n Created {len(dirs)} Bader work directories:")
+    for d in dirs:
+        print(f"  {d}")
     return 0
