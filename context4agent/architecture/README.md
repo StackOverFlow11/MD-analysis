@@ -102,6 +102,17 @@
   - `_potential.py`：电势分析子菜单（201-206）+ 参数采集 + 处理函数
   - `_charge.py`：电荷分析子菜单（301-303）+ 参数采集 + 处理函数
 
+### 6) `md_analysis.scripts`（自动化脚本工具）
+
+- `scripts/__init__.py`：空包标记（docstring only），不 re-export 到顶层
+- `scripts/utils/IndexMapper.py`
+  - CP2K XYZ ↔ VASP POSCAR 双射索引映射
+  - `compute_index_map()`：计算排列映射
+  - `write_poscar_with_map()`：写入带映射注释的 POSCAR
+  - `read_index_map_from_poscar()`：从 POSCAR 注释行解码映射
+  - `encode_comment_line()` / `decode_comment_line()`：注释行编解码
+  - `remap_array()`：按映射重排 per-atom 数组
+
 ## 核心数据流（当前端到端）
 
 ### 水分析
