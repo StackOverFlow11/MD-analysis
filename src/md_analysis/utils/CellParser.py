@@ -1,4 +1,4 @@
-"""Parse cell parameters from CP2K .restart files."""
+"""Parse cell parameters from CP2K input and restart files."""
 
 from __future__ import annotations
 
@@ -12,10 +12,14 @@ _VECTOR_RE = re.compile(
     r"^\s*(A|B|C)\s+([0-9.eE+-]+)\s+([0-9.eE+-]+)\s+([0-9.eE+-]+)",
     re.MULTILINE | re.IGNORECASE,
 )
+_ABC_RE = re.compile(
+    r"^\s*ABC\s+\[angstrom\]\s+([0-9.eE+-]+)\s+([0-9.eE+-]+)\s+([0-9.eE+-]+)\s*$",
+    re.MULTILINE,
+)
 
 
-class RestartParseError(RuntimeError):
-    """Raised when parsing a CP2K .restart file fails."""
+class CellParseError(RuntimeError):
+    """Raised when parsing cell parameters from a CP2K file fails."""
 
 
 def parse_abc_from_restart(
@@ -24,7 +28,7 @@ def parse_abc_from_restart(
     """Parse orthogonal cell lengths (A) from a CP2K .restart file.
 
     Reads the ``&CELL`` section, extracts diagonal elements of A/B/C vectors.
-    Raises :class:`RestartParseError` if the cell block is not found, any
+    Raises :class:`CellParseError` if the cell block is not found, any
     vector is missing, or the cell is not orthogonal.
 
     Parameters
@@ -41,7 +45,7 @@ def parse_abc_from_restart(
 
     match = _CELL_BLOCK_RE.search(text)
     if match is None:
-        raise RestartParseError(
+        raise CellParseError(
             f"No &CELL ... &END CELL block found in {restart_path}"
         )
     cell_block = match.group(1)
@@ -53,7 +57,7 @@ def parse_abc_from_restart(
 
     for label in ("A", "B", "C"):
         if label not in vectors:
-            raise RestartParseError(
+            raise CellParseError(
                 f"Vector {label} not found in &CELL block of {restart_path}"
             )
 
@@ -64,9 +68,41 @@ def parse_abc_from_restart(
     cx, cy, cz = vectors["C"]
     off_diag = [ay, az, bx, bz, cx, cy]
     if any(abs(v) > tol for v in off_diag):
-        raise RestartParseError(
+        raise CellParseError(
             f"Non-orthogonal cell detected in {restart_path}. "
             f"Off-diagonal elements: A=({ay}, {az}), B=({bx}, {bz}), C=({cx}, {cy})"
         )
 
     return (ax, by, cz)
+
+
+def parse_abc_from_md_inp(
+    md_inp_path: str | Path,
+) -> tuple[float, float, float]:
+    """Parse orthogonal cell lengths (A) from a CP2K md.inp file.
+
+    Looks for an ``ABC [angstrom] a b c`` line in the input file.
+
+    Parameters
+    ----------
+    md_inp_path : str or Path
+        Path to the CP2K input file (e.g. ``md.inp``).
+
+    Returns
+    -------
+    tuple[float, float, float]
+        ``(a, b, c)`` cell lengths in angstrom.
+
+    Raises
+    ------
+    CellParseError
+        If the ``ABC [angstrom] ...`` line is not found.
+    """
+    md_inp_path = Path(md_inp_path)
+    text = md_inp_path.read_text(encoding="utf-8")
+    match = _ABC_RE.search(text)
+    if not match:
+        raise CellParseError(
+            f"Cannot find `ABC [angstrom] ...` in {md_inp_path}"
+        )
+    return float(match.group(1)), float(match.group(2)), float(match.group(3))

@@ -20,7 +20,7 @@ Interactive CLI package providing a VASPKIT-style numbered menu interface. Repla
 - `cli` -> `water`, `potential`, `charge` (for individual analysis functions)
 - `cli` -> `potential.config` (for default constants)
 - `cli` -> `scripts` (for `generate_bader_workdir`, `batch_generate_bader_workdirs`)
-- `cli` -> `utils.RestartParser` (for `parse_abc_from_restart`)
+- `cli` -> `utils.CellParser` (for `parse_abc_from_restart`, `parse_abc_from_md_inp`)
 - `cli` -> `config` (for persistent user configuration)
 - No reverse dependencies: no other module imports from `cli`
 

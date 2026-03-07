@@ -109,12 +109,12 @@
   - 输出：增强的 `ase.Atoms`，附加 `atoms.arrays["bader_charge"]`（原始电子数）和 `atoms.arrays["bader_net_charge"]`（ZVAL - bader_charge，正值 = 失去电子）
   - 语义：解析 VASP Bader 电荷分析结果，与结构信息合并
 
-### 2.7 `RestartParser.py` 导出（Stable）
+### 2.7 `CellParser.py` 导出（Stable）
 
 异常：
 
-- `RestartParseError`
-  - `.restart` 文件格式错误、缺少 &CELL 块、缺少 A/B/C 向量或非正交 cell 时抛出
+- `CellParseError`
+  - CP2K 文件格式错误（缺少 &CELL 块、缺少 A/B/C 向量、非正交 cell、缺少 ABC 行）时抛出
 
 函数：
 
@@ -122,7 +122,12 @@
   - 输入：CP2K `.restart` 文件路径
   - 输出：正交 cell 的 `(a, b, c)` 长度（Angstrom）
   - 语义：解析 `&CELL ... &END CELL` 块中 A/B/C 向量的对角元素
-  - 与 `_parse_abc_from_md_inp` 返回类型一致，可互换使用
+
+- `parse_abc_from_md_inp(md_inp_path) -> (float, float, float)`
+  - 输入：CP2K 输入文件路径（如 `md.inp`）
+  - 输出：正交 cell 的 `(a, b, c)` 长度（Angstrom）
+  - 语义：匹配 `ABC [angstrom] a b c` 行
+  - 从 `water/WaterAnalysis/_common.py` 迁移而来，升级为公开 API
 
 > **注**：`_compute_water_mass_density_z_distribution`、`_compute_water_orientation_weighted_density_z_distribution`、
 > `_compute_water_orientation_theta_pdf_in_c_fraction_window` 三个函数已降级为内部（`_` 前缀），不再属于公开 API。

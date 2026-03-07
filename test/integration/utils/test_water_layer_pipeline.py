@@ -9,7 +9,7 @@ import pytest
 
 ase_io = pytest.importorskip("ase.io")
 
-from md_analysis.water.WaterAnalysis._common import _parse_abc_from_md_inp
+from md_analysis.utils.CellParser import parse_abc_from_md_inp as _parse_abc_from_md_inp
 from md_analysis.utils.LayerParser import detect_interface_layers
 from md_analysis.utils.WaterParser import _compute_water_mass_density_z_distribution as compute_water_mass_density_z_distribution
 from md_analysis.utils.WaterParser import _compute_water_orientation_weighted_density_z_distribution as compute_water_orientation_weighted_density_z_distribution

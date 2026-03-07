@@ -53,7 +53,7 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 | `WaterParser.py` | `detect_water_molecule_indices(atoms)` → `(n_water, 3)`, `get_water_oxygen_indices_array()`, `WaterTopologyError`, `_compute_bisector_cos_theta_vec()`, `_oxygen_to_hydrogen_map()`, `_compute_water_mass_density_z_distribution()`, `_compute_water_orientation_weighted_density_z_distribution()`, `_compute_water_orientation_theta_pdf_in_c_fraction_window()` | Water topology + single-frame z-profiles |
 | `CubeParser.py` | `CubeHeader` (dataclass), `read_cube_header_and_values(path)`, `slab_average_potential_ev(header, values, thickness, *, z_center)`, `plane_avg_phi_z_ev()`, `z_coords_ang()`, `extract_step_from_cube_filename()` | Gaussian cube file I/O + potential utilities |
 | `BaderParser.py` | `load_bader_atoms(structure, acf, potcar)` → Atoms with `bader_charge`/`bader_net_charge` arrays, `BaderParseError`, `_read_acf()`, `_read_potcar_zval()` | VASP Bader charge parsing |
-| `RestartParser.py` | `parse_abc_from_restart(restart_path)` → `(a, b, c)`, `RestartParseError` | CP2K `.restart` file cell parsing |
+| `CellParser.py` | `parse_abc_from_restart(restart_path)` → `(a, b, c)`, `parse_abc_from_md_inp(md_inp_path)` → `(a, b, c)`, `CellParseError` | CP2K cell parameter parsing (`.restart` + `md.inp`) |
 
 ### `src/md_analysis/water/` — Water Analysis Workflows
 
@@ -63,7 +63,7 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 | `__init__.py` | Re-exports all public water API + utils types | Package interface |
 | `Water.py` | `plot_water_three_panel_analysis(xyz_path, md_inp_path, *, output_dir, ...)` → PNG path | Integrated 3-panel figure (density + orientation + theta PDF) |
 | `WaterAnalysis/__init__.py` | Re-exports from sub-modules; internal: `StartInterface`, `_compute_density_orientation_ensemble` | Sub-package interface |
-| `WaterAnalysis/_common.py` | `_parse_abc_from_md_inp()`, `_detect_interface_fractions()`, `_iter_trajectory()`, `_single_frame_density_and_orientation()`, `_compute_density_orientation_ensemble()` | Shared private trajectory/frame helpers |
+| `WaterAnalysis/_common.py` | `_detect_interface_fractions()`, `_iter_trajectory()`, `_single_frame_density_and_orientation()`, `_compute_density_orientation_ensemble()` (re-imports `_parse_abc_from_md_inp` from `utils.CellParser`) | Shared private trajectory/frame helpers |
 | `WaterAnalysis/WaterDensity.py` | `water_mass_density_z_distribution_analysis(xyz, md_inp, *, output_dir, ...)` → CSV path | Ensemble-averaged mass density profile |
 | `WaterAnalysis/WaterOrientation.py` | `water_orientation_weighted_density_z_distribution_analysis(xyz, md_inp, *, output_dir, ...)` → CSV path | Ensemble-averaged orientation-weighted density |
 | `WaterAnalysis/AdWaterOrientation.py` | `ad_water_orientation_analysis(xyz, md_inp, *, output_dir, ...)` → (CSV, TXT), `compute_adsorbed_water_theta_distribution(...)` → (centers, pdf, CSV), `detect_adsorbed_layer_range_from_density_profile(distance, rho)` | Adsorbed-layer orientation analysis |
@@ -114,7 +114,7 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 | `test/unit/utils/test_water_parser.py` | `detect_water_molecule_indices`, density/orientation helpers |
 | `test/unit/utils/test_bader_parser.py` | `_read_acf`, `_read_potcar_zval`, `load_bader_atoms` |
 | `test/unit/test_config.py` | `load_config`, `save_config`, `get_config`, `set_config`, `ConfigError` |
-| `test/unit/utils/test_restart_parser.py` | `parse_abc_from_restart`: valid/missing/non-orthogonal cases |
+| `test/unit/utils/test_cell_parser.py` | `parse_abc_from_restart` + `parse_abc_from_md_inp`: valid/missing/error cases |
 | `test/unit/scripts/test_bader_gen.py` | `generate_bader_workdir` + `batch_generate_bader_workdirs`: directory structure, frame slicing, metadata |
 | `test/unit/scripts/utils/test_index_mapper.py` | `compute_index_map`, `encode/decode_comment_line`, `write/read_poscar_with_map`, `remap_array` |
 | `test/unit/charge/test_charge_analysis.py` | All 5 charge public functions + internal `_extract_t_value`, `_sorted_frame_dirs` |

@@ -38,20 +38,19 @@ def scripts_menu() -> int:
 
 def _read_cell_abc(cell_source: str) -> tuple[float, float, float] | None:
     """Read cell parameters from the chosen source. Returns None on error."""
+    from ..utils.CellParser import CellParseError, parse_abc_from_md_inp, parse_abc_from_restart
     if cell_source == ".restart":
         restart_path = _prompt_str_required("CP2K .restart file")
-        from ..utils.RestartParser import RestartParseError, parse_abc_from_restart
         try:
             abc = parse_abc_from_restart(restart_path)
-        except RestartParseError as exc:
+        except CellParseError as exc:
             print(f"\n  Error: {exc}")
             return None
     else:
         md_inp_path = _prompt_str_required("CP2K input file (e.g. md.inp)")
-        from ..water.WaterAnalysis._common import _parse_abc_from_md_inp
         try:
-            abc = _parse_abc_from_md_inp(md_inp_path)
-        except (ValueError, FileNotFoundError) as exc:
+            abc = parse_abc_from_md_inp(md_inp_path)
+        except CellParseError as exc:
             print(f"\n  Error: {exc}")
             return None
     print(f"  Cell: a={abc[0]:.4f}, b={abc[1]:.4f}, c={abc[2]:.4f} A")
