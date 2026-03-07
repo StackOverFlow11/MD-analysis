@@ -203,7 +203,7 @@ def run_charge_analysis(
     metal_symbols: Iterable[str] | None = None,
     normal: str = "c",
     method: str = "counterion",
-    dir_pattern: str = "calc_t*_i*",
+    dir_pattern: str = "bader_t*_i*",
     frame_start: int | None = None,
     frame_end: int | None = None,
     frame_step: int | None = None,

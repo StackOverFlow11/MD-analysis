@@ -54,7 +54,7 @@ Both methods output `[σ_aligned, σ_opposed]` — ordered by stable `interface_
 ### Trajectory (`trajectory_indexed_atom_charges`)
 
 1. Validate `atom_index_matrix`: must be 2-D, integer, non-negative → `ValueError`
-2. Discover `calc_t*_i*` subdirectories via `_sorted_frame_dirs(root, dir_pattern)` (numeric sort by t value)
+2. Discover `bader_t*_i*` subdirectories via `_sorted_frame_dirs(root, dir_pattern)` (numeric sort by t value)
 3. Validate `t == len(frame_dirs)` → `ValueError`
 4. Per frame:
    - Check POSCAR/ACF.dat/POTCAR exist → `FileNotFoundError` (includes frame name)
@@ -67,7 +67,7 @@ Both methods output `[σ_aligned, σ_opposed]` — ordered by stable `interface_
 
 1. Validate `normal` ∈ `{"a", "b", "c"}` → `ValueError`
 2. Validate `root_dir` exists → `FileNotFoundError`
-3. Discover `calc_t*_i*` subdirectories via `_sorted_frame_dirs` (numeric sort) → `FileNotFoundError` if none
+3. Discover `bader_t*_i*` subdirectories via `_sorted_frame_dirs` (numeric sort) → `FileNotFoundError` if none
 4. Per frame:
    - Check POSCAR/ACF.dat/POTCAR exist → `FileNotFoundError` (includes frame name)
    - `load_bader_atoms()` → `compute_frame_surface_charge(atoms, ..., method=method)`
@@ -92,7 +92,7 @@ Output directory: `<outdir>/charge/<method>/`
 
 ## Directory sorting
 
-All trajectory functions use `_sorted_frame_dirs()` which sorts by the numeric value of `_t(\d+)` in the directory name, avoiding lexicographic mis-ordering of non-zero-padded names (e.g., `calc_t1000` before `calc_t50`).
+All trajectory functions use `_sorted_frame_dirs()` which sorts by the numeric value of `_t(\d+)` in the directory name, avoiding lexicographic mis-ordering of non-zero-padded names (e.g., `bader_t1000` before `bader_t50`).
 
 ## Unit convention
 

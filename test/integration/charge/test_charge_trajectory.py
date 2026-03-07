@@ -22,9 +22,9 @@ _FRAME_FILES = ["POSCAR", "ACF.dat", "POTCAR"]
 
 
 def _build_fake_trajectory(tmp_path: Path, n_frames: int = 2) -> Path:
-    """Copy bader_work_dir data into calc_t*_i* subdirectories."""
+    """Copy bader_work_dir data into bader_t*_i* subdirectories."""
     for i in range(n_frames):
-        frame_dir = tmp_path / f"calc_t{i:03d}_i000"
+        frame_dir = tmp_path / f"bader_t{i:03d}_i000"
         frame_dir.mkdir()
         for fname in _FRAME_FILES:
             shutil.copy2(DATA_DIR / fname, frame_dir / fname)
@@ -96,7 +96,7 @@ class TestTrajectorySurfaceCharge:
         traj_result = trajectory_surface_charge(root)
 
         # Manually compute for each frame
-        for i, frame_dir in enumerate(sorted(root.glob("calc_t*_i*"))):
+        for i, frame_dir in enumerate(sorted(root.glob("bader_t*_i*"))):
             atoms = load_bader_atoms(
                 frame_dir / "POSCAR",
                 frame_dir / "ACF.dat",
@@ -109,11 +109,11 @@ class TestTrajectorySurfaceCharge:
     def test_numeric_sort_non_zero_padded(self, tmp_path):
         """Non-zero-padded directory names are sorted numerically."""
         for t in [50, 1000, 200, 5]:
-            frame_dir = tmp_path / f"calc_t{t}_i0"
+            frame_dir = tmp_path / f"bader_t{t}_i0"
             frame_dir.mkdir()
             for fname in _FRAME_FILES:
                 shutil.copy2(DATA_DIR / fname, frame_dir / fname)
-        result = trajectory_surface_charge(tmp_path, dir_pattern="calc_t*_i*")
+        result = trajectory_surface_charge(tmp_path, dir_pattern="bader_t*_i*")
         assert result.shape == (4, 2)
         # All frames are identical data, so values should match
         np.testing.assert_allclose(result[0], result[3], atol=1e-10)
@@ -142,13 +142,13 @@ class TestSurfaceChargeAnalysis:
     def test_numeric_sort_in_analysis(self, tmp_path):
         """surface_charge_analysis uses numeric sort for non-zero-padded dirs."""
         for t in [1000, 50]:
-            frame_dir = tmp_path / f"calc_t{t}_i0"
+            frame_dir = tmp_path / f"bader_t{t}_i0"
             frame_dir.mkdir()
             for fname in _FRAME_FILES:
                 shutil.copy2(DATA_DIR / fname, frame_dir / fname)
         out = tmp_path / "output"
         csv_path = surface_charge_analysis(
-            tmp_path, output_dir=out, dir_pattern="calc_t*_i*",
+            tmp_path, output_dir=out, dir_pattern="bader_t*_i*",
         )
         with csv_path.open(encoding="utf-8") as f:
             rows = list(csv.DictReader(f))

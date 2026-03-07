@@ -34,7 +34,7 @@ _T_VALUE_RE = re.compile(r"_t(\d+)")
 
 
 def _extract_t_value(dirname: str) -> int:
-    """Extract numeric t value from a directory name like ``calc_t50_i0``."""
+    """Extract numeric t value from a directory name like ``bader_t50_i0``."""
     m = _T_VALUE_RE.search(dirname)
     return int(m.group(1)) if m else 0
 

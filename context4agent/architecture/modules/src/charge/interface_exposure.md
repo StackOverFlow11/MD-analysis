@@ -20,7 +20,7 @@ All default filenames and constants are defined in `config.py`:
 | Constant                          | Value                |
 |-----------------------------------|----------------------|
 | `E_PER_A2_TO_UC_PER_CM2`         | `1.602176634e3`      |
-| `DEFAULT_DIR_PATTERN`             | `calc_t*_i*`         |
+| `DEFAULT_DIR_PATTERN`             | `bader_t*_i*`         |
 | `DEFAULT_STRUCTURE_FILENAME`      | `POSCAR`             |
 | `DEFAULT_ACF_FILENAME`            | `ACF.dat`            |
 | `DEFAULT_POTCAR_FILENAME`         | `POTCAR`             |

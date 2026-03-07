@@ -40,8 +40,8 @@ def _collect_params(*, method: str | None = None) -> dict:
     if _prompt_bool("Modify advanced parameters?", default=False):
         params["root_dir"] = _prompt_str("Root directory", default=".") or "."
         params["dir_pattern"] = (
-            _prompt_str("Frame subdirectory pattern", default="calc_t*_i*")
-            or "calc_t*_i*"
+            _prompt_str("Frame subdirectory pattern", default="bader_t*_i*")
+            or "bader_t*_i*"
         )
         params["normal"] = _prompt_choice(
             "Surface normal axis", ["a", "b", "c"], default="c",
@@ -52,7 +52,7 @@ def _collect_params(*, method: str | None = None) -> dict:
         params.update(_prompt_global_params())
     else:
         params["root_dir"] = "."
-        params["dir_pattern"] = "calc_t*_i*"
+        params["dir_pattern"] = "bader_t*_i*"
         params["normal"] = "c"
         params["metal_elements"] = None
         params["outdir"] = "analysis"

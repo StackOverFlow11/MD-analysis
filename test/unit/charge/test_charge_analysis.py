@@ -209,7 +209,7 @@ class TestTrajectoryIndexedAtomCharges:
     def test_t_mismatch_raises(self, tmp_path):
         """t rows != number of frame directories."""
         # Create 1 frame dir but provide 2-row matrix
-        frame = tmp_path / "calc_t000_i000"
+        frame = tmp_path / "bader_t000_i000"
         frame.mkdir()
         with pytest.raises(ValueError, match="rows"):
             trajectory_indexed_atom_charges(
@@ -218,7 +218,7 @@ class TestTrajectoryIndexedAtomCharges:
 
     def test_missing_file_raises(self, tmp_path):
         """Missing POSCAR/ACF.dat/POTCAR raises FileNotFoundError."""
-        frame = tmp_path / "calc_t000_i000"
+        frame = tmp_path / "bader_t000_i000"
         frame.mkdir()
         with pytest.raises(FileNotFoundError):
             trajectory_indexed_atom_charges(
@@ -228,13 +228,13 @@ class TestTrajectoryIndexedAtomCharges:
     def test_out_of_bounds_raises(self, tmp_path):
         """Index exceeding atom count raises IndexError with frame name."""
         import shutil
-        frame = tmp_path / "calc_t000_i000"
+        frame = tmp_path / "bader_t000_i000"
         frame.mkdir()
         for f in ["POSCAR", "ACF.dat", "POTCAR"]:
             shutil.copy2(DATA_DIR / f, frame / f)
 
         big_idx = 99999
-        with pytest.raises(IndexError, match="calc_t000_i000"):
+        with pytest.raises(IndexError, match="bader_t000_i000"):
             trajectory_indexed_atom_charges(
                 tmp_path, np.array([[big_idx]])
             )
@@ -306,9 +306,9 @@ class TestSortedFrameDirs:
     """Tests for numeric sorting of frame directories."""
 
     def test_extract_t_value_basic(self):
-        assert _extract_t_value("calc_t50_i0") == 50
-        assert _extract_t_value("calc_t1000_i0") == 1000
-        assert _extract_t_value("calc_t0_i0") == 0
+        assert _extract_t_value("bader_t50_i0") == 50
+        assert _extract_t_value("bader_t1000_i0") == 1000
+        assert _extract_t_value("bader_t0_i0") == 0
 
     def test_extract_t_value_no_match(self):
         assert _extract_t_value("no_match") == 0
@@ -316,14 +316,14 @@ class TestSortedFrameDirs:
     def test_sorted_frame_dirs_numeric_order(self, tmp_path):
         """Non-zero-padded directory names sort numerically, not lexically."""
         for t in [50, 1000, 200, 5]:
-            (tmp_path / f"calc_t{t}_i0").mkdir()
-        result = _sorted_frame_dirs(tmp_path, "calc_t*_i*")
+            (tmp_path / f"bader_t{t}_i0").mkdir()
+        result = _sorted_frame_dirs(tmp_path, "bader_t*_i*")
         names = [p.name for p in result]
-        assert names == ["calc_t5_i0", "calc_t50_i0", "calc_t200_i0", "calc_t1000_i0"]
+        assert names == ["bader_t5_i0", "bader_t50_i0", "bader_t200_i0", "bader_t1000_i0"]
 
     def test_sorted_frame_dirs_empty_raises(self, tmp_path):
         with pytest.raises(FileNotFoundError, match="No subdirectories"):
-            _sorted_frame_dirs(tmp_path, "calc_t*_i*")
+            _sorted_frame_dirs(tmp_path, "bader_t*_i*")
 
 
 # ---------------------------------------------------------------------------
@@ -335,7 +335,7 @@ _FRAME_FILES = ["POSCAR", "ACF.dat", "POTCAR"]
 
 def _build_fake_trajectory(tmp_path: Path, n_frames: int = 2) -> Path:
     for i in range(n_frames):
-        frame_dir = tmp_path / f"calc_t{i:03d}_i000"
+        frame_dir = tmp_path / f"bader_t{i:03d}_i000"
         frame_dir.mkdir()
         for fname in _FRAME_FILES:
             shutil.copy2(DATA_DIR / fname, frame_dir / fname)

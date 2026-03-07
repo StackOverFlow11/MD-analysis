@@ -69,7 +69,7 @@
 
 ### 3) `md_analysis.charge`（多帧/电荷分析工作流）
 
-输入：根目录下 `calc_t*_i*` 子目录，每帧各含 POSCAR + ACF.dat + POTCAR
+输入：根目录下 `bader_t*_i*` 子目录，每帧各含 POSCAR + ACF.dat + POTCAR
 
 - `charge/config.py`：单位换算常量（`E_PER_A2_TO_UC_PER_CM2`）、默认文件名
 - `charge/BaderAnalysis.py`

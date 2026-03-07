@@ -83,7 +83,7 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 
 | File | Key Exports | Purpose |
 |---|---|---|
-| `config.py` | `E_PER_A2_TO_UC_PER_CM2 = 1602.18`, `DEFAULT_DIR_PATTERN = "calc_t*_i*"`, `DEFAULT_STRUCTURE_FILENAME = "POSCAR"`, `DEFAULT_ACF_FILENAME = "ACF.dat"`, `DEFAULT_POTCAR_FILENAME = "POTCAR"`, output CSV/PNG names | Charge analysis defaults |
+| `config.py` | `E_PER_A2_TO_UC_PER_CM2 = 1602.18`, `DEFAULT_DIR_PATTERN = "bader_t*_i*"`, `DEFAULT_STRUCTURE_FILENAME = "POSCAR"`, `DEFAULT_ACF_FILENAME = "ACF.dat"`, `DEFAULT_POTCAR_FILENAME = "POTCAR"`, output CSV/PNG names | Charge analysis defaults |
 | `__init__.py` | Re-exports 5 functions + 3 constants | Package interface |
 | `BaderAnalysis.py` | `compute_frame_surface_charge(atoms, *, metal_symbols, normal, method)` → mutated Atoms, `frame_indexed_atom_charges(atoms, indices)` → `(N,2)`, `trajectory_indexed_atom_charges(root_dir, matrix, ...)` → `(t,N,2)`, `trajectory_surface_charge(root_dir, *, method, ...)` → `(t,2)` uC/cm2, `surface_charge_analysis(root_dir, *, method, output_dir, ...)` → CSV path | Surface charge density (counterion/layer methods) |
 
@@ -136,7 +136,7 @@ Mirrors `src/md_analysis/` structure. Each sub-package has `interface_exposure.m
 - **Interface labels:** `"normal_aligned"` (+axis facing) / `"normal_opposed"` (-axis facing)
 - **Layer ordering:** `[normal_aligned, slab_interior..., normal_opposed]`
 - **Surface normal:** only `"a"/"b"/"c"` cell axes supported (no custom vectors)
-- **Frame dirs:** `calc_t*_i*` pattern, numerically sorted by `_t(\d+)` regex
+- **Frame dirs:** `bader_t*_i*` pattern, numerically sorted by `_t(\d+)` regex
 - **Output dir structure:** `<outdir>/water/`, `<outdir>/potential/<sub>/`, `<outdir>/charge/<method>/`
 - **Relative imports** inside `md_analysis/`; **absolute imports** in tests
 
