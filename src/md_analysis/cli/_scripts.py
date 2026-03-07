@@ -36,6 +36,47 @@ def scripts_menu() -> int:
         return 1
 
 
+def _print_trajectory_info(xyz_path: str) -> None:
+    """Peek at XYZ trajectory and print frame/step/time metadata."""
+    from pathlib import Path
+
+    p = Path(xyz_path)
+    if not p.is_file():
+        return
+
+    # Count total frames via line count (fast, no parsing).
+    with open(p) as fh:
+        first_line = fh.readline().strip()
+        try:
+            natoms = int(first_line)
+        except ValueError:
+            return
+        total_lines = sum(1 for _ in fh) + 1
+    block_size = natoms + 2
+    total_frames = total_lines // block_size
+
+    # Read first 2 frames for step/time interval.
+    from ase.io import iread
+
+    frames_meta: list[tuple[int, float]] = []
+    for idx, atoms in enumerate(iread(str(p), index=":")):
+        if idx >= 2:
+            break
+        frames_meta.append((
+            int(atoms.info.get("i", idx)),
+            float(atoms.info.get("time", 0.0)),
+        ))
+
+    print(f"\n  Trajectory: {total_frames} frames, {natoms} atoms/frame")
+    if len(frames_meta) >= 2:
+        step_interval = frames_meta[1][0] - frames_meta[0][0]
+        time_interval = frames_meta[1][1] - frames_meta[0][1]
+        if step_interval > 0:
+            dt = time_interval / step_interval
+            print(f"  Frame interval: {step_interval} MD steps, {time_interval:.1f} fs/frame (dt = {dt:.1f} fs/step)")
+    print()
+
+
 def _read_cell_abc(cell_source: str) -> tuple[float, float, float] | None:
     """Read cell parameters from the chosen source. Returns None on error."""
     from ..utils.CellParser import CellParseError, parse_abc_from_md_inp, parse_abc_from_restart
@@ -60,6 +101,7 @@ def _read_cell_abc(cell_source: str) -> tuple[float, float, float] | None:
 def _cmd_401() -> int:
     print()
     xyz_path = _prompt_str_required("XYZ trajectory file (e.g. md-pos-1.xyz)")
+    _print_trajectory_info(xyz_path)
     cell_source = _prompt_choice("Cell source", ["md.inp", ".restart"], default=".restart")
     abc = _read_cell_abc(cell_source)
     if abc is None:
@@ -120,6 +162,7 @@ def _cmd_401() -> int:
 def _cmd_402() -> int:
     print()
     xyz_path = _prompt_str_required("XYZ trajectory file (e.g. md-pos-1.xyz)")
+    _print_trajectory_info(xyz_path)
     cell_source = _prompt_choice("Cell source", ["md.inp", ".restart"], default=".restart")
     abc = _read_cell_abc(cell_source)
     if abc is None:
