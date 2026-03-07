@@ -21,7 +21,9 @@ _MENU = """\
  1) Water Analysis
  2) Potential Analysis
  3) Charge Analysis
+ 4) Scripts / Tools
 
+ 9) Settings
  0) Exit
 
 ================================================================================"""
@@ -43,6 +45,12 @@ def main() -> int:
         elif choice == "3":
             from ._charge import charge_menu
             return charge_menu()
+        elif choice == "4":
+            from ._scripts import scripts_menu
+            return scripts_menu()
+        elif choice == "9":
+            from ._settings import settings_menu
+            return settings_menu()
         elif choice == "0":
             print("\n Bye!")
             return 0

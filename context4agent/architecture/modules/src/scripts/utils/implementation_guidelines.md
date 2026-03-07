@@ -26,7 +26,9 @@ No dependency on other `md_analysis` sub-packages.
 
 ```
 scripts/
-  __init__.py             # docstring only, no re-exports
+  __init__.py             # re-exports BaderGenError, generate_bader_workdir
+  BaderGen.py             # Bader work directory generation
+  template/               # VASP template files (INCAR, KPOINTS)
   utils/
     __init__.py           # re-exports all IndexMapper public symbols
     IndexMapper.py        # core implementation

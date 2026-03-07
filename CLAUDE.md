@@ -21,22 +21,27 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 | File | Purpose |
 |---|---|
 | `__init__.py` | Re-exports sub-packages (`utils`, `water`, `potential`, `charge`); `__version__ = "0.1.0"` |
+| `config.py` | Persistent user configuration (`~/.config/md_analysis/config.json`): `load_config`, `save_config`, `get_config`, `set_config`, `ConfigError`, `KEY_VASP_SCRIPT_PATH` |
 | `main.py` | Programmatic entry points: `run_water_analysis()`, `run_potential_analysis()`, `run_charge_analysis()`, `run_all()` |
 
 ### `src/md_analysis/cli/` — Interactive CLI (no argparse)
 
 | File | Purpose | Key Functions |
 |---|---|---|
-| `__init__.py` | Top menu (1=Water, 2=Potential, 3=Charge, 0=Exit) | `main()` |
+| `__init__.py` | Top menu (1=Water, 2=Potential, 3=Charge, 4=Scripts, 9=Settings, 0=Exit) | `main()` |
 | `_prompt.py` | Reusable input helpers | `_prompt_str`, `_prompt_int`, `_prompt_float`, `_prompt_choice`, `_prompt_bool`, `_parse_metal_elements`, `_prompt_global_params` |
 | `_water.py` | Water sub-menu (101-105) | `water_menu()`, dispatches to `water` module or `main.run_water_analysis` |
 | `_potential.py` | Potential sub-menu (201-206) | `potential_menu()`, dispatches to `potential` module or `main.run_potential_analysis` |
 | `_charge.py` | Charge sub-menu (301-303) | `charge_menu()`, `_collect_params()`, `_run_charge()`, `_print_ensemble_summary()` |
+| `_scripts.py` | Scripts/Tools sub-menu (401) | `scripts_menu()`, 401: generate Bader work directory |
+| `_settings.py` | Settings sub-menu (901-902) | `settings_menu()`, 901: set VASP script path, 902: show config |
 
 **Menu codes:**
 - 101: mass density, 102: orientation-weighted density, 103: adsorbed orientation, 104: theta distribution, 105: full three-panel
 - 201: center slab potential, 202: Fermi energy, 203: electrode potential (U vs SHE), 204: phi(z) profile, 205: thickness sensitivity, 206: full potential
 - 301: surface charge (counterion), 302: surface charge (layer), 303: full charge (method prompted)
+- 401: generate Bader work directory
+- 901: set VASP submission script path, 902: show current configuration
 
 ### `src/md_analysis/utils/` — Shared Low-Level Utilities
 
@@ -88,7 +93,11 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 
 | File | Key Exports | Purpose |
 |---|---|---|
-| `__init__.py` | (empty) | Package marker |
+| `__init__.py` | Re-exports `BaderGenError`, `generate_bader_workdir` | Package interface |
+| `BaderGen.py` | `BaderGenError`, `DEFAULT_WORKDIR_NAME`, `generate_bader_workdir(atoms, output_dir, *, script_path, workdir_name, frame, source, element_order, generate_potcar, direct)` → `Path` | Generate VASP Bader work directory (POSCAR + INCAR + KPOINTS + POTCAR + script.sh) |
+| `template/__init__.py` | (empty) | Package marker for `importlib.resources` |
+| `template/INCAR` | — | VASP INCAR template for Bader single-point |
+| `template/KPOINTS` | — | VASP KPOINTS template (Gamma-only) |
 | `utils/__init__.py` | Re-exports all `IndexMapper` public symbols | Sub-package interface |
 | `utils/IndexMapper.py` | `IndexMap` (dataclass), `IndexMapError`, `IndexMapParseError`, `compute_index_map(atoms_xyz, *, frame, source, element_order)` → `IndexMap`, `write_poscar_with_map(atoms_xyz, output_path, index_map, *, direct)` → `Path`, `read_index_map_from_poscar(poscar_path)` → `IndexMap`, `encode_comment_line(index_map)` → `str`, `decode_comment_line(comment)` → `IndexMap`, `remap_array(data, index_map, direction)` → `np.ndarray` | CP2K XYZ ↔ VASP POSCAR bijective index mapping |
 
@@ -103,6 +112,8 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 | `test/unit/utils/test_layer_parser.py` | `detect_interface_layers`, `Layer`, `SurfaceDetectionResult` |
 | `test/unit/utils/test_water_parser.py` | `detect_water_molecule_indices`, density/orientation helpers |
 | `test/unit/utils/test_bader_parser.py` | `_read_acf`, `_read_potcar_zval`, `load_bader_atoms` |
+| `test/unit/test_config.py` | `load_config`, `save_config`, `get_config`, `set_config`, `ConfigError` |
+| `test/unit/scripts/test_bader_gen.py` | `generate_bader_workdir`: directory structure, POSCAR index map, template copy, script copy, vaspkit mock, config fallback |
 | `test/unit/scripts/utils/test_index_mapper.py` | `compute_index_map`, `encode/decode_comment_line`, `write/read_poscar_with_map`, `remap_array` |
 | `test/unit/charge/test_charge_analysis.py` | All 5 charge public functions + internal `_extract_t_value`, `_sorted_frame_dirs` |
 | `test/unit/potential/test_single_frame_electrode.py` | Single-frame potential pipeline |

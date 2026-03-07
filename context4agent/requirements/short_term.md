@@ -63,7 +63,16 @@
     - ✅ 轨迹表面电荷密度时序：`trajectory_surface_charge` 逐帧计算表面电荷密度，返回 `(t, 2)` 的 μC/cm² 数组
     - ✅ 端到端表面电荷分析：`surface_charge_analysis` 输出 CSV（含累积平均）+ PNG，CLI 子命令 `md-analysis charge`
     - 按层/按元素电荷转移统计：分层聚合 `bader_net_charge`，输出每层各元素的平均净电荷（待实现）
-    - 典型工作流：CP2K MD → 提取结构帧 → VASP 单点 → Bader 分析 → `load_bader_atoms` → 表面电荷/电荷转移
+    - 典型工作流：CP2K MD → 提取结构帧 → `generate_bader_workdir` 生成 VASP 工作目录 → VASP 单点 → Bader 分析 → `load_bader_atoms` → 表面电荷/电荷转移
+  - Bader 工作目录生成（`scripts/BaderGen.py`）：
+    - ✅ `generate_bader_workdir()`：从单帧 Atoms 生成完整 VASP 工作目录（POSCAR + INCAR + KPOINTS + POTCAR + script.sh）
+    - ✅ POSCAR 通过 IndexMapper 生成，保留 XYZ↔POSCAR 索引映射
+    - ✅ POTCAR 通过 vaspkit 103 自动生成（可选）
+    - ✅ 提交脚本路径支持持久化配置（`~/.config/md_analysis/config.json`）
+    - 待实现：多帧批量生成（复用单帧 API）
+  - 持久化用户配置（`config.py`）：
+    - ✅ `load_config`、`save_config`、`get_config`、`set_config`
+    - ✅ CLI 设置菜单（901/902）支持查看和修改配置
   - Mulliken 电荷：按元素/分组/分层统计（优先级低于 Bader，待后续明确需求）
 - **工程化（可复现与易用性）**
   - 依赖与环境说明（固定最小依赖集合与安装方式）

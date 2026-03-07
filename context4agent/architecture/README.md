@@ -92,7 +92,13 @@
 - `potential/PhiZProfile.py`
   - `phi_z_planeavg_analysis()`：所有帧的 φ(z) overlay 可视化
 
-### 5) `md_analysis.main` / `md_analysis.cli`（集成入口）
+### 5) `md_analysis.config`（持久化用户配置）
+
+- `config.py`：用户偏好持久化（`~/.config/md_analysis/config.json`）
+  - `load_config()`、`save_config()`、`get_config()`、`set_config()`
+  - 配置键常量：`KEY_VASP_SCRIPT_PATH`
+
+### 6) `md_analysis.main` / `md_analysis.cli`（集成入口）
 
 - `main.py`：编程入口 `run_water_analysis()`、`run_potential_analysis()`、`run_charge_analysis()`、`run_all()`
 - `cli/`：VASPKIT 风格交互式 CLI 包，注册为 `md-analysis` console script
@@ -101,10 +107,14 @@
   - `_water.py`：水分析子菜单（101-105）+ 参数采集 + 处理函数
   - `_potential.py`：电势分析子菜单（201-206）+ 参数采集 + 处理函数
   - `_charge.py`：电荷分析子菜单（301-303）+ 参数采集 + 处理函数
+  - `_scripts.py`：脚本/工具子菜单（401）+ Bader 工作目录生成
+  - `_settings.py`：设置子菜单（901-902）+ 持久化配置管理
 
-### 6) `md_analysis.scripts`（自动化脚本工具）
+### 7) `md_analysis.scripts`（自动化脚本工具）
 
-- `scripts/__init__.py`：空包标记（docstring only），不 re-export 到顶层
+- `scripts/__init__.py`：re-exports `BaderGenError`, `generate_bader_workdir`
+- `scripts/BaderGen.py`：从单帧 MD 结构生成 VASP Bader 工作目录（POSCAR + INCAR + KPOINTS + POTCAR + script.sh）
+- `scripts/template/`：VASP 模板文件（INCAR、KPOINTS），通过 `importlib.resources` 访问
 - `scripts/utils/IndexMapper.py`
   - CP2K XYZ ↔ VASP POSCAR 双射索引映射
   - `compute_index_map()`：计算排列映射

@@ -20,6 +20,9 @@ test = ["pytest"]
 [project.scripts]
 md-analysis = "md_analysis.cli:main"
 
+[tool.setuptools.package-data]
+"md_analysis.scripts.template" = ["*"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["md_analysis*"]

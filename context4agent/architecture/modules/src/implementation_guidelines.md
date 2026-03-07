@@ -13,6 +13,9 @@
   - `md_analysis.water`：水分析多帧工作流
   - `md_analysis.potential`：电势分析多帧工作流
   - `md_analysis.charge`：电荷分析多帧工作流
+- 顶层辅助模块：
+  - `md_analysis.config`：持久化用户配置（`~/.config/md_analysis/config.json`）
+  - `md_analysis.scripts`：自动化脚本工具（Bader 工作目录生成等）
 - 编程入口 `main.py` 位于顶层，负责协调子包调用。CLI 入口由 `cli/` 子包提供（VASPKIT 风格交互式菜单）。
 - 目录文档治理采用硬约束：`context4agent/architecture/modules/src/` 必须镜像 `src/md_analysis/`，且每个子目录都需维护
   `interface_exposure.md` 与 `implementation_guidelines.md`。
@@ -41,6 +44,10 @@
 - 允许方向：`md_analysis.water` -> `md_analysis.utils`
 - 允许方向：`md_analysis.potential` -> `md_analysis.utils`
 - 允许方向：`md_analysis.charge` -> `md_analysis.utils`
+- 允许方向：`md_analysis.scripts` -> `md_analysis.config`（持久化配置读取）
+- 允许方向：`md_analysis.scripts` -> `md_analysis.scripts.utils`（IndexMapper）
+- 允许方向：`md_analysis.cli` -> `md_analysis.config`（设置菜单）
+- 允许方向：`md_analysis.cli` -> `md_analysis.scripts`（脚本/工具菜单）
 - 禁止反向依赖：子包不应依赖 `md_analysis` 顶层内部状态
 - 禁止跨层耦合：
   - `md_analysis.water`、`md_analysis.potential`、`md_analysis.charge` 之间不互相依赖
