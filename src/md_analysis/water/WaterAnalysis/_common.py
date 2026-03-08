@@ -31,14 +31,14 @@ from ...utils import (
     _compute_bisector_cos_theta_vec,
     _oxygen_to_hydrogen_map,
 )
-from ...utils.WaterParser import (
+from ...utils.StructureParser.WaterParser import (
     AVOGADRO_NUMBER,
     ANGSTROM3_TO_CM3,
     WaterTopologyError,
     detect_water_molecule_indices,
     get_water_oxygen_indices_array,
 )
-from ...utils.CellParser import parse_abc_from_md_inp as _parse_abc_from_md_inp
+from ...utils.RestartParser.CellParser import parse_abc_from_md_inp as _parse_abc_from_md_inp
 from ...utils.config import DEFAULT_Z_BIN_WIDTH_A, WATER_MOLAR_MASS_G_PER_MOL
 
 StartInterface = Literal["normal_aligned", "normal_opposed"]

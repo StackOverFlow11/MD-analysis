@@ -13,10 +13,10 @@ from typing import Sequence
 
 import numpy as np
 
-from .config import DEFAULT_THETA_BIN_DEG
-from .config import DEFAULT_WATER_OH_CUTOFF_A
-from .config import DEFAULT_Z_BIN_WIDTH_A
-from .config import WATER_MOLAR_MASS_G_PER_MOL
+from ..config import DEFAULT_THETA_BIN_DEG
+from ..config import DEFAULT_WATER_OH_CUTOFF_A
+from ..config import DEFAULT_Z_BIN_WIDTH_A
+from ..config import WATER_MOLAR_MASS_G_PER_MOL
 
 try:
     from ase import Atoms

@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from md_analysis.utils.ClusterUtils import (
+from md_analysis.utils.StructureParser.ClusterUtils import (
     cluster_1d_periodic,
     find_largest_gap_periodic,
     gap_midpoint_periodic,

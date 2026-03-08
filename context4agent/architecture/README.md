@@ -27,20 +27,23 @@
   - 全局常量：`TRANSITION_METAL_SYMBOLS`、`DEFAULT_METAL_SYMBOLS`、默认分箱宽度/阈值
   - 单位换算：`HA_TO_EV`、`BOHR_TO_ANG`
   - cSHE 常量：`DP_A_H3O_W_EV`、`MU_HPLUS_G0_EV`、`DELTA_E_ZP_EV`
-- `ClusterUtils.py`
-  - 1D 周期性聚类 + 最大间隙检测 + 间隙中点计算
 - `CubeParser.py`
   - Gaussian cube 文件 I/O、plane-averaged φ(z)、slab-averaged potential
-- `LayerParser.py`
-  - 金属原子筛选 → 沿法向投影做 1D 聚类成"层"
-  - 在周期水–金属–水体系下标记**两侧**直接面向环境的界面层（每侧固定 1 层，共 2 层）
-  - 给界面层附带 `normal_unit`（从金属指向环境一侧）
-- `WaterParser.py`
-  - 以 MIC 距离 + O–H 截断推断水分子拓扑，输出 `(n_water, 3)` 的 `[O, H1, H2]`
-  - 基于氧索引计算：
-    - 水质量密度 $\rho(z)$（`g/cm^3`）
-    - 取向加权密度（`g/cm^3`，按 $\sum_i \cos\theta_i \cdot m_{\mathrm{H_2O}} / V_{\mathrm{bin}}$）
-    - 指定 c 分数窗口内的 $\theta$ PDF（`degree^-1`）
+- `StructureParser/` 子包（结构解析：周期聚类、金属层识别、水分子拓扑）
+  - `ClusterUtils.py`：1D 周期性聚类 + 最大间隙检测 + 间隙中点计算
+  - `LayerParser.py`
+    - 金属原子筛选 → 沿法向投影做 1D 聚类成"层"
+    - 在周期水–金属–水体系下标记**两侧**直接面向环境的界面层（每侧固定 1 层，共 2 层）
+    - 给界面层附带 `normal_unit`（从金属指向环境一侧）
+  - `WaterParser.py`
+    - 以 MIC 距离 + O–H 截断推断水分子拓扑，输出 `(n_water, 3)` 的 `[O, H1, H2]`
+    - 基于氧索引计算：
+      - 水质量密度 $\rho(z)$（`g/cm^3`）
+      - 取向加权密度（`g/cm^3`，按 $\sum_i \cos\theta_i \cdot m_{\mathrm{H_2O}} / V_{\mathrm{bin}}$）
+      - 指定 c 分数窗口内的 $\theta$ PDF（`degree^-1`）
+- `RestartParser/` 子包（CP2K restart 文件解析）
+  - `CellParser.py`：CP2K cell 参数解析（`.restart` + `md.inp`）
+  - `SlowgrowthParser.py`：slow-growth restart + LagrangeMultLog 解析
 
 > 低层 shape/单位/窗口规则以 `context4agent/architecture/modules/data_contract.md` 为准。
 

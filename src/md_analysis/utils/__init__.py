@@ -6,9 +6,9 @@ from __future__ import annotations
 # Intentionally excluded from __all__ but explicitly collected here to centralise
 # cross-layer internal dependencies.  If a private function is renamed or moved,
 # only this file needs updating.
-from .WaterParser import _compute_bisector_cos_theta_vec
-from .WaterParser import _oxygen_to_hydrogen_map
-from .WaterParser import _theta_bin_count_from_ndeg
+from .StructureParser.WaterParser import _compute_bisector_cos_theta_vec
+from .StructureParser.WaterParser import _oxygen_to_hydrogen_map
+from .StructureParser.WaterParser import _theta_bin_count_from_ndeg
 
 from .config import DEFAULT_METAL_SYMBOLS
 from .config import DEFAULT_THETA_BIN_DEG
@@ -16,17 +16,17 @@ from .config import DEFAULT_WATER_OH_CUTOFF_A
 from .config import DEFAULT_Z_BIN_WIDTH_A
 from .config import TRANSITION_METAL_SYMBOLS
 from .config import WATER_MOLAR_MASS_G_PER_MOL
-from .LayerParser import Layer
-from .LayerParser import SurfaceDetectionResult
-from .LayerParser import SurfaceGeometryError
-from .LayerParser import detect_interface_layers
-from .LayerParser import format_detection_summary
-from .WaterParser import WaterTopologyError
-from .WaterParser import detect_water_molecule_indices
-from .WaterParser import get_water_oxygen_indices_array
-from .ClusterUtils import cluster_1d_periodic
-from .ClusterUtils import find_largest_gap_periodic
-from .ClusterUtils import gap_midpoint_periodic
+from .StructureParser.LayerParser import Layer
+from .StructureParser.LayerParser import SurfaceDetectionResult
+from .StructureParser.LayerParser import SurfaceGeometryError
+from .StructureParser.LayerParser import detect_interface_layers
+from .StructureParser.LayerParser import format_detection_summary
+from .StructureParser.WaterParser import WaterTopologyError
+from .StructureParser.WaterParser import detect_water_molecule_indices
+from .StructureParser.WaterParser import get_water_oxygen_indices_array
+from .StructureParser.ClusterUtils import cluster_1d_periodic
+from .StructureParser.ClusterUtils import find_largest_gap_periodic
+from .StructureParser.ClusterUtils import gap_midpoint_periodic
 from .CubeParser import CubeHeader
 from .CubeParser import read_cube_header_and_values
 from .CubeParser import slab_average_potential_ev
@@ -40,9 +40,9 @@ from .config import MU_HPLUS_G0_EV
 from .config import DELTA_E_ZP_EV
 from .BaderParser import BaderParseError
 from .BaderParser import load_bader_atoms
-from .CellParser import CellParseError
-from .CellParser import parse_abc_from_md_inp
-from .CellParser import parse_abc_from_restart
+from .RestartParser.CellParser import CellParseError
+from .RestartParser.CellParser import parse_abc_from_md_inp
+from .RestartParser.CellParser import parse_abc_from_restart
 from .RestartParser import ColvarDef
 from .RestartParser import ConstraintInfo
 from .RestartParser import LagrangeMultLog

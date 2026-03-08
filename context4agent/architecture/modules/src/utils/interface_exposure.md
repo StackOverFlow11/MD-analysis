@@ -34,7 +34,7 @@
   - `DEFAULT_THETA_BIN_DEG = 5.0` degree
   - `DEFAULT_WATER_OH_CUTOFF_A = 1.25` Angstrom
 
-### 2.2 `ClusterUtils.py` 导出（Stable）
+### 2.2 `StructureParser/ClusterUtils.py` 导出（Stable）
 
 函数：
 
@@ -64,7 +64,7 @@
 - `extract_step_from_cube_filename(...)`
   - 从 cube 文件名提取 step 编号
 
-### 2.4 `LayerParser.py` 导出（Stable）
+### 2.4 `StructureParser/LayerParser.py` 导出（Stable）
 
 数据结构与异常：
 
@@ -82,7 +82,7 @@
   - 输入：`SurfaceDetectionResult`
   - 输出：可读文本摘要 `str`
 
-### 2.5 `WaterParser.py` 导出（Stable）
+### 2.5 `StructureParser/WaterParser.py` 导出（Stable）
 
 异常：
 
@@ -109,7 +109,7 @@
   - 输出：增强的 `ase.Atoms`，附加 `atoms.arrays["bader_charge"]`（原始电子数）和 `atoms.arrays["bader_net_charge"]`（ZVAL - bader_charge，正值 = 失去电子）
   - 语义：解析 VASP Bader 电荷分析结果，与结构信息合并
 
-### 2.7 `CellParser.py` 导出（Stable）
+### 2.7 `RestartParser/CellParser.py` 导出（Stable）
 
 异常：
 

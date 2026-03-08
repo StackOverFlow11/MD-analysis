@@ -31,7 +31,7 @@ from ..utils.CubeParser import (
     read_cube_header_and_values,
     slab_average_potential_ev,
 )
-from ..utils.ClusterUtils import cluster_1d_periodic, find_largest_gap_periodic, gap_midpoint_periodic
+from ..utils.StructureParser.ClusterUtils import cluster_1d_periodic, find_largest_gap_periodic, gap_midpoint_periodic
 from .config import (
     DEFAULT_CENTER_POTENTIAL_CSV_NAME,
     DEFAULT_CENTER_POTENTIAL_PNG_NAME,

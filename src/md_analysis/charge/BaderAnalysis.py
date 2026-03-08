@@ -11,12 +11,12 @@ import numpy as np
 from ase import Atoms
 
 from ..utils.BaderParser import load_bader_atoms
-from ..utils.LayerParser import (
+from ..utils.StructureParser.LayerParser import (
     _circular_mean_fractional,
     _mic_delta_fractional,
     detect_interface_layers,
 )
-from ..utils.WaterParser import detect_water_molecule_indices
+from ..utils.StructureParser.WaterParser import detect_water_molecule_indices
 from .config import (
     DEFAULT_ACF_FILENAME,
     DEFAULT_DIR_PATTERN,

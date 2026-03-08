@@ -11,10 +11,10 @@ from ase.io import iread
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
-from md_analysis.utils.WaterParser import _compute_water_mass_density_z_distribution as compute_water_mass_density_z_distribution
-from md_analysis.utils.WaterParser import _compute_water_orientation_weighted_density_z_distribution as compute_water_orientation_weighted_density_z_distribution
-from md_analysis.utils.WaterParser import detect_water_molecule_indices
-from md_analysis.utils.WaterParser import get_water_oxygen_indices_array
+from md_analysis.utils.StructureParser.WaterParser import _compute_water_mass_density_z_distribution as compute_water_mass_density_z_distribution
+from md_analysis.utils.StructureParser.WaterParser import _compute_water_orientation_weighted_density_z_distribution as compute_water_orientation_weighted_density_z_distribution
+from md_analysis.utils.StructureParser.WaterParser import detect_water_molecule_indices
+from md_analysis.utils.StructureParser.WaterParser import get_water_oxygen_indices_array
 from md_analysis.utils.config import DEFAULT_Z_BIN_WIDTH_A
 
 ANGSTROM3_TO_CM3 = 1.0e-24

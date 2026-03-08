@@ -32,7 +32,7 @@ try:
 except ImportError:  # pragma: no cover
     Atoms = object  # type: ignore[misc]
 
-from .config import DEFAULT_METAL_SYMBOLS
+from ..config import DEFAULT_METAL_SYMBOLS
 from .ClusterUtils import cluster_1d_periodic, find_largest_gap_periodic
 
 

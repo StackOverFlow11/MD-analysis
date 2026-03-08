@@ -79,7 +79,7 @@ def _print_trajectory_info(xyz_path: str) -> None:
 
 def _read_cell_abc(cell_source: str) -> tuple[float, float, float] | None:
     """Read cell parameters from the chosen source. Returns None on error."""
-    from ..utils.CellParser import CellParseError, parse_abc_from_md_inp, parse_abc_from_restart
+    from ..utils.RestartParser.CellParser import CellParseError, parse_abc_from_md_inp, parse_abc_from_restart
     if cell_source == ".restart":
         restart_path = _prompt_str_required("CP2K .restart file")
         try:

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import numpy as np
 
-from ..CellParser import parse_abc_from_restart
+from .CellParser import parse_abc_from_restart
 
 
 class SlowGrowthParseError(RuntimeError):
