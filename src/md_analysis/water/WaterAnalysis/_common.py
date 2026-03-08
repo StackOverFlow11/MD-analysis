@@ -2,7 +2,6 @@
 Shared private utilities for the WaterAnalysis layer.
 
 Provides:
-- Cell parameter parsing from CP2K md.inp
 - Interface fraction detection
 - Trajectory frame iterator
 - Combined single-frame density + orientation profile
@@ -14,7 +13,6 @@ the public API in WaterAnalysis/__init__.py.
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 from typing import Generator, Iterable, Literal
 
@@ -40,26 +38,10 @@ from ...utils.WaterParser import (
     detect_water_molecule_indices,
     get_water_oxygen_indices_array,
 )
+from ...utils.CellParser import parse_abc_from_md_inp as _parse_abc_from_md_inp
 from ...utils.config import DEFAULT_Z_BIN_WIDTH_A, WATER_MOLAR_MASS_G_PER_MOL
 
 StartInterface = Literal["normal_aligned", "normal_opposed"]
-
-
-# ---------------------------------------------------------------------------
-# Cell parameter parsing
-# ---------------------------------------------------------------------------
-
-def _parse_abc_from_md_inp(md_inp_path: Path) -> tuple[float, float, float]:
-    """Parse orthogonal cell lengths (Å) from a CP2K md.inp file."""
-    text = md_inp_path.read_text(encoding="utf-8")
-    match = re.search(
-        r"^\s*ABC\s+\[angstrom\]\s+([0-9.eE+-]+)\s+([0-9.eE+-]+)\s+([0-9.eE+-]+)\s*$",
-        text,
-        re.MULTILINE,
-    )
-    if not match:
-        raise ValueError(f"Cannot find `ABC [angstrom] ...` in {md_inp_path}")
-    return float(match.group(1)), float(match.group(2)), float(match.group(3))
 
 
 # ---------------------------------------------------------------------------
@@ -272,7 +254,7 @@ def _compute_density_orientation_ensemble(
     )
     if verbose:
         from tqdm import tqdm
-        iterator = tqdm(iterator, desc="Water density+orientation", unit="frame")
+        iterator = tqdm(iterator, desc="Water density+orientation", unit="frame", ascii=" =")
 
     per_frame: list[tuple[np.ndarray, np.ndarray, np.ndarray, float]] = []
     for atoms in iterator:

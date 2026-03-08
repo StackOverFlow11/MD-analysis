@@ -181,7 +181,7 @@ def compute_adsorbed_water_theta_distribution(
     )
     if verbose:
         from tqdm import tqdm
-        iterator = tqdm(iterator, desc="Adsorbed water theta", unit="frame")
+        iterator = tqdm(iterator, desc="Adsorbed water theta", unit="frame", ascii=" =")
 
     for atoms in iterator:
         aligned_frac, opposed_frac = _detect_interface_fractions(atoms)
@@ -249,6 +249,9 @@ def ad_water_orientation_analysis(
     dz_A: float = DEFAULT_Z_BIN_WIDTH_A,
     near_zero_ratio: float = 0.05,
     smoothing_window_bins: int = 5,
+    frame_start: int | None = None,
+    frame_end: int | None = None,
+    frame_step: int | None = None,
 ) -> tuple[Path, Path]:
     """
     Build adsorbed-water orientation profile based on detected adsorbed layer range.
@@ -270,6 +273,9 @@ def ad_water_orientation_analysis(
         md_inp_path,
         start_interface=start_interface,
         dz_A=dz_A,
+        frame_start=frame_start,
+        frame_end=frame_end,
+        frame_step=frame_step,
     )
     distance_A = common_centers_u * mean_path_A
 

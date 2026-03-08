@@ -34,7 +34,7 @@ _T_VALUE_RE = re.compile(r"_t(\d+)")
 
 
 def _extract_t_value(dirname: str) -> int:
-    """Extract numeric t value from a directory name like ``calc_t50_i0``."""
+    """Extract numeric t value from a directory name like ``bader_t50_i0``."""
     m = _T_VALUE_RE.search(dirname)
     return int(m.group(1)) if m else 0
 
@@ -577,7 +577,13 @@ def surface_charge_analysis(
     sigma_aligned_list: list[float] = []
     sigma_opposed_list: list[float] = []
 
-    for idx, frame_dir in enumerate(frame_dirs):
+    iterator = enumerate(frame_dirs)
+    if verbose:
+        from tqdm import tqdm
+        iterator = tqdm(frame_dirs, desc="Surface charge", unit="frame", ascii=" =")
+        iterator = enumerate(iterator)
+
+    for idx, frame_dir in iterator:
         fname = frame_dir.name
         poscar = frame_dir / structure_filename
         acf = frame_dir / acf_filename
@@ -600,15 +606,6 @@ def surface_charge_analysis(
         steps_list.append(step)
         sigma_aligned_list.append(sigma[0])
         sigma_opposed_list.append(sigma[1])
-
-        if verbose:
-            n_ch = atoms.info["n_charged_atoms_per_surface"]
-            q_ch = atoms.info["charge_per_surface_e"]
-
-            print(f"  [{idx + 1}/{len(frame_dirs)}] {fname}: "
-                  f"σ_aligned={sigma[0]:.4f}, σ_opposed={sigma[1]:.4f} μC/cm²")
-            print(f"    charged atoms near aligned: {n_ch[0]} (Σq={q_ch[0]:+.4f}e)")
-            print(f"    charged atoms near opposed: {n_ch[1]} (Σq={q_ch[1]:+.4f}e)")
 
     steps = np.array(steps_list)
     sigma_aligned = np.array(sigma_aligned_list)

@@ -24,6 +24,9 @@ def water_orientation_weighted_density_z_distribution_analysis(
     start_interface: StartInterface = DEFAULT_START_INTERFACE,
     dz_A: float = DEFAULT_Z_BIN_WIDTH_A,
     metal_symbols: Iterable[str] | None = None,
+    frame_start: int | None = None,
+    frame_end: int | None = None,
+    frame_step: int | None = None,
 ) -> Path:
     """
     Ensemble-average orientation-weighted density profile from a selected metal interface
@@ -45,6 +48,9 @@ def water_orientation_weighted_density_z_distribution_analysis(
         start_interface=start_interface,
         dz_A=dz_A,
         metal_symbols=metal_symbols,
+        frame_start=frame_start,
+        frame_end=frame_end,
+        frame_step=frame_step,
     )
     distance_A = common_centers_u * mean_path_A
 
