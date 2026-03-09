@@ -20,7 +20,8 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 
 | File | Purpose |
 |---|---|
-| `__init__.py` | Re-exports sub-packages (`utils`, `water`, `potential`, `charge`); `__version__ = "0.1.0"` |
+| `__init__.py` | Re-exports sub-packages (`utils`, `water`, `potential`, `charge`), `MDAnalysisError`; `__version__ = "0.1.0"` |
+| `exceptions.py` | `MDAnalysisError(Exception)` — base class for all domain-specific errors; all 9 custom exceptions inherit from it |
 | `config.py` | Persistent user configuration (`~/.config/md_analysis/config.json`): `load_config`, `save_config`, `get_config`, `set_config`, `ConfigError`, `KEY_VASP_SCRIPT_PATH` |
 | `main.py` | Programmatic entry points: `run_water_analysis()`, `run_potential_analysis()`, `run_charge_analysis()`, `run_all()` |
 

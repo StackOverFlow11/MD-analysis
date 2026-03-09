@@ -11,7 +11,10 @@ import numpy as np
 from .CellParser import parse_abc_from_restart
 
 
-class SlowGrowthParseError(RuntimeError):
+from ...exceptions import MDAnalysisError
+
+
+class SlowGrowthParseError(MDAnalysisError):
     """Raised when parsing a slow-growth file fails."""
 
 

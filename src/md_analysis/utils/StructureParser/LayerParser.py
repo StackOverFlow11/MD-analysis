@@ -92,7 +92,10 @@ class SurfaceDetectionResult:
         raise SurfaceGeometryError("No normal_opposed interface layer found")
 
 
-class SurfaceGeometryError(RuntimeError):
+from ...exceptions import MDAnalysisError
+
+
+class SurfaceGeometryError(MDAnalysisError):
     pass
 
 

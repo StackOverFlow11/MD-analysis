@@ -18,7 +18,10 @@ _ABC_RE = re.compile(
 )
 
 
-class CellParseError(RuntimeError):
+from ...exceptions import MDAnalysisError
+
+
+class CellParseError(MDAnalysisError):
     """Raised when parsing cell parameters from a CP2K file fails."""
 
 

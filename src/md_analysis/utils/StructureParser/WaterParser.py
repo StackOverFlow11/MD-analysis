@@ -28,7 +28,10 @@ AVOGADRO_NUMBER = 6.022_140_76e23
 ANGSTROM3_TO_CM3 = 1.0e-24
 
 
-class WaterTopologyError(RuntimeError):
+from ...exceptions import MDAnalysisError
+
+
+class WaterTopologyError(MDAnalysisError):
     """Raised when water topology cannot be inferred robustly."""
 
 

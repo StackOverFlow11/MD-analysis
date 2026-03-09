@@ -9,7 +9,10 @@ from ase import Atoms
 from ase.io import read as ase_read
 
 
-class BaderParseError(RuntimeError):
+from ..exceptions import MDAnalysisError
+
+
+class BaderParseError(MDAnalysisError):
     """Raised when ACF file format is invalid or atom counts mismatch."""
 
 

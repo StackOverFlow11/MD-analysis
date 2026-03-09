@@ -12,7 +12,10 @@ CONFIG_FILE = CONFIG_DIR / "config.json"
 KEY_VASP_SCRIPT_PATH = "vasp_script_path"
 
 
-class ConfigError(Exception):
+from .exceptions import MDAnalysisError
+
+
+class ConfigError(MDAnalysisError):
     """Raised on configuration read/write failures."""
 
 

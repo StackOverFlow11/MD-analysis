@@ -14,7 +14,10 @@ from ase import Atoms
 from ase.io import write as ase_write
 
 
-class IndexMapError(Exception):
+from ...exceptions import MDAnalysisError
+
+
+class IndexMapError(MDAnalysisError):
     """Base exception for index-mapping operations."""
 
 

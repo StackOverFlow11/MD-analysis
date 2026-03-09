@@ -16,7 +16,10 @@ from .utils.IndexMapper import compute_index_map, write_poscar_with_map
 DEFAULT_WORKDIR_NAME = "bader"
 
 
-class BaderGenError(Exception):
+from ..exceptions import MDAnalysisError
+
+
+class BaderGenError(MDAnalysisError):
     """Raised when Bader work directory generation fails."""
 
 

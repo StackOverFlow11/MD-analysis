@@ -162,6 +162,7 @@
 
 ### 6.1 异常分类
 
+- 所有领域异常均继承 `MDAnalysisError`（定义在 `md_analysis.exceptions`）
 - 几何/界面类异常优先使用 `SurfaceGeometryError`
 - 水拓扑/取向类异常优先使用 `WaterTopologyError`
 - 参数合法性问题使用 `ValueError`

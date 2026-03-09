@@ -45,6 +45,7 @@ from .config import BOHR_TO_ANG
 from .config import DP_A_H3O_W_EV
 from .config import MU_HPLUS_G0_EV
 from .config import DELTA_E_ZP_EV
+from ..exceptions import MDAnalysisError
 from .BaderParser import BaderParseError
 from .BaderParser import load_bader_atoms
 from .RestartParser.CellParser import CellParseError
@@ -95,6 +96,7 @@ __all__ = [
     "DP_A_H3O_W_EV",
     "MU_HPLUS_G0_EV",
     "DELTA_E_ZP_EV",
+    "MDAnalysisError",
     "BaderParseError",
     "load_bader_atoms",
     "CellParseError",

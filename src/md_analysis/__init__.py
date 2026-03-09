@@ -6,7 +6,8 @@ from . import utils
 from . import water
 from . import potential
 from . import charge
+from .exceptions import MDAnalysisError
 
 __version__ = "0.1.0"
 
-__all__ = ["utils", "water", "potential", "charge", "__version__"]
+__all__ = ["utils", "water", "potential", "charge", "__version__", "MDAnalysisError"]
