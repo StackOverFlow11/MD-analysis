@@ -86,3 +86,22 @@ MU_HPLUS_G0_EV: float = 15.81
 
 # Zero-point energy correction (eV).
 DELTA_E_ZP_EV: float = 0.35
+
+# --------------------------------------------------------------------------
+# Axis mapping and area-vector indices
+# --------------------------------------------------------------------------
+
+# Map cell-axis label to integer index.
+AXIS_MAP: dict[str, int] = {"a": 0, "b": 1, "c": 2}
+
+# Map surface-normal axis to the two cell-vector indices spanning the surface plane.
+AREA_VECTOR_INDICES: dict[str, tuple[int, int]] = {"a": (1, 2), "b": (0, 2), "c": (0, 1)}
+
+# --------------------------------------------------------------------------
+# Interface label and charge method constants
+# --------------------------------------------------------------------------
+
+INTERFACE_NORMAL_ALIGNED: str = "normal_aligned"
+INTERFACE_NORMAL_OPPOSED: str = "normal_opposed"
+CHARGE_METHOD_COUNTERION: str = "counterion"
+CHARGE_METHOD_LAYER: str = "layer"

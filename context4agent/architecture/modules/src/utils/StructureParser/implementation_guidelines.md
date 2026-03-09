@@ -19,3 +19,13 @@
 ## 3. 实现准则
 
 各模块的具体实现准则（坐标口径、分箱规则、异常分类等）继续遵循父级 `utils/implementation_guidelines.md` 中的对应章节。
+
+### 3.1 `ClusterUtils.py` 补充
+
+- `_circular_mean(values, period)` 对空输入做显式校验，抛出 `ValueError("cannot compute circular mean of empty array")`。
+
+### 3.2 `LayerParser.py` 补充
+
+- `_circular_mean_fractional()` 不再独立实现圆周均值逻辑，而是委托给 `ClusterUtils._circular_mean(values, period=1.0)`，避免重复实现。
+- 轴映射使用 `config.py` 中的集中式常量 `AXIS_MAP`（取代原有的模块局部 `_AXIS_MAP`）。
+- 界面标签使用 `config.py` 中的 `INTERFACE_NORMAL_ALIGNED` / `INTERFACE_NORMAL_OPPOSED` 常量（取代硬编码字符串）。

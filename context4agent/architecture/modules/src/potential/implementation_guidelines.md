@@ -2,7 +2,7 @@
 
 ## Layer dependency
 
-- `md_analysis.potential` depends on `md_analysis.utils` (CubeParser, ClusterUtils, config)
+- `md_analysis.potential` depends on `md_analysis.utils` (CubeParser, ClusterUtils, config, `_io_helpers`)
 - `md_analysis.potential` does NOT depend on `md_analysis.water`
 
 ## Module layout
@@ -11,6 +11,12 @@ Flat structure (no sub-packages):
 - `config.py` — default output filenames
 - `CenterPotential.py` — center slab potential + Fermi + electrode potential + thickness sensitivity
 - `PhiZProfile.py` — φ(z) plane-averaged profile analysis
+
+## Key imports from `utils`
+
+- `discover_cube_files` — 从 `CubeParser` 导入，取代 `CenterPotential.py` 中原有的内联 glob+检查逻辑
+- `_float` — 从 `CubeParser` 导入的 Fortran 浮点解析 helper（私有但跨模块使用），用于解析 md.out 中的数值
+- `_cumulative_average`, `_write_csv` — 从 `utils._io_helpers` 导入的私有共享 helper，取代原有的模块内重复实现
 
 ## Cube file conventions
 

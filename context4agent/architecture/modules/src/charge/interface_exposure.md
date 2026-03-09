@@ -39,7 +39,7 @@ def compute_frame_surface_charge(
 ) -> Atoms
 ```
 
-`method` options:
+`method` options (validated against `CHARGE_METHOD_COUNTERION` / `CHARGE_METHOD_LAYER` constants from `utils.config`):
 - `"counterion"` — excludes water and metal; only counterion/solute species contribute to σ.
 - `"layer"` — sums net charges of interface-layer metal atoms / area.
 

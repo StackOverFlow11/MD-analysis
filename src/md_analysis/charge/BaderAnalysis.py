@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import csv
 import re
 from pathlib import Path
 from typing import Iterable
@@ -10,7 +9,14 @@ from typing import Iterable
 import numpy as np
 from ase import Atoms
 
+from ..utils._io_helpers import _cumulative_average, _write_csv
 from ..utils.BaderParser import load_bader_atoms
+from ..utils.config import (
+    AREA_VECTOR_INDICES,
+    AXIS_MAP,
+    CHARGE_METHOD_COUNTERION,
+    CHARGE_METHOD_LAYER,
+)
 from ..utils.StructureParser.LayerParser import (
     _circular_mean_fractional,
     _mic_delta_fractional,
@@ -26,9 +32,6 @@ from .config import (
     DEFAULT_SURFACE_CHARGE_PNG_NAME,
     E_PER_A2_TO_UC_PER_CM2,
 )
-
-# Map normal axis to the two cell-vector indices spanning the surface plane
-_AREA_VECTORS = {"a": (1, 2), "b": (0, 2), "c": (0, 1)}
 
 _T_VALUE_RE = re.compile(r"_t(\d+)")
 
@@ -53,7 +56,7 @@ def _sorted_frame_dirs(root: Path, dir_pattern: str) -> list[Path]:
 # Single-frame analysis
 # ---------------------------------------------------------------------------
 
-_VALID_METHODS = ("counterion", "layer")
+_VALID_METHODS = (CHARGE_METHOD_COUNTERION, CHARGE_METHOD_LAYER)
 
 
 def compute_frame_surface_charge(
@@ -86,7 +89,7 @@ def compute_frame_surface_charge(
         raise ValueError(
             f"method must be one of {_VALID_METHODS}, got {method!r}"
         )
-    if method == "layer":
+    if method == CHARGE_METHOD_LAYER:
         return _compute_surface_charge_layer(
             atoms, metal_symbols=metal_symbols, normal=normal,
         )
@@ -102,9 +105,9 @@ def _compute_surface_charge_layer(
     normal: str = "c",
 ) -> Atoms:
     """Surface charge = Σ(net charge of interface-layer atoms) / area."""
-    if normal not in _AREA_VECTORS:
+    if normal not in AREA_VECTOR_INDICES:
         raise ValueError(
-            f"normal must be one of {set(_AREA_VECTORS)}, got {normal!r}"
+            f"normal must be one of {set(AREA_VECTOR_INDICES)}, got {normal!r}"
         )
 
     if "bader_net_charge" not in atoms.arrays:
@@ -119,7 +122,7 @@ def _compute_surface_charge_layer(
     iface_aligned = det.interface_normal_aligned()
     iface_opposed = det.interface_normal_opposed()
 
-    i0, i1 = _AREA_VECTORS[normal]
+    i0, i1 = AREA_VECTOR_INDICES[normal]
     cell = np.asarray(atoms.cell.array, dtype=float)
     area_A2 = float(np.linalg.norm(np.cross(cell[i0], cell[i1])))
 
@@ -152,9 +155,9 @@ def _compute_surface_charge_counterion(
     normal: str = "c",
 ) -> Atoms:
     """Surface charge from non-water, non-metal species near each surface."""
-    if normal not in _AREA_VECTORS:
+    if normal not in AREA_VECTOR_INDICES:
         raise ValueError(
-            f"normal must be one of {set(_AREA_VECTORS)}, got {normal!r}"
+            f"normal must be one of {set(AREA_VECTOR_INDICES)}, got {normal!r}"
         )
 
     if "bader_net_charge" not in atoms.arrays:
@@ -169,7 +172,7 @@ def _compute_surface_charge_counterion(
     iface_aligned = det.interface_normal_aligned()
     iface_opposed = det.interface_normal_opposed()
 
-    i0, i1 = _AREA_VECTORS[normal]
+    i0, i1 = AREA_VECTOR_INDICES[normal]
     cell = np.asarray(atoms.cell.array, dtype=float)
     area_A2 = float(np.linalg.norm(np.cross(cell[i0], cell[i1])))
 
@@ -190,7 +193,7 @@ def _compute_surface_charge_counterion(
         atoms.info["charge_per_surface_e"] = [0.0, 0.0]
         return atoms
 
-    axis_idx = {"a": 0, "b": 1, "c": 2}[normal]
+    axis_idx = AXIS_MAP[normal]
     scaled = np.asarray(atoms.get_scaled_positions(wrap=True), dtype=float)
 
     frac_aligned = iface_aligned.center_frac
@@ -427,9 +430,9 @@ def trajectory_surface_charge(
         Array of shape ``(t, 2)`` where ``[:, 0]`` is σ_aligned
         and ``[:, 1]`` is σ_opposed, in μC/cm².
     """
-    if normal not in _AREA_VECTORS:
+    if normal not in AREA_VECTOR_INDICES:
         raise ValueError(
-            f"normal must be one of {set(_AREA_VECTORS)}, got {normal!r}"
+            f"normal must be one of {set(AREA_VECTOR_INDICES)}, got {normal!r}"
         )
 
     root = Path(root_dir)
@@ -466,19 +469,6 @@ def trajectory_surface_charge(
 # ---------------------------------------------------------------------------
 # Private helpers for analysis output
 # ---------------------------------------------------------------------------
-
-def _cumulative_average(values: np.ndarray) -> np.ndarray:
-    csum = np.cumsum(values, dtype=float)
-    return csum / np.arange(1, values.size + 1, dtype=float)
-
-
-def _write_csv(path: Path, rows: Iterable[dict], fieldnames: list[str]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=fieldnames)
-        w.writeheader()
-        w.writerows(rows)
-
 
 def _plot_surface_charge(
     png_path: Path,
@@ -555,9 +545,9 @@ def surface_charge_analysis(
     Path
         Path to the written CSV file.
     """
-    if normal not in _AREA_VECTORS:
+    if normal not in AREA_VECTOR_INDICES:
         raise ValueError(
-            f"normal must be one of {set(_AREA_VECTORS)}, got {normal!r}"
+            f"normal must be one of {set(AREA_VECTOR_INDICES)}, got {normal!r}"
         )
 
     root = Path(root_dir)

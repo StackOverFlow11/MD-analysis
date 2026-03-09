@@ -1,6 +1,6 @@
 # `md_analysis.utils` 内部实现准则（当前实现口径）
 
-> 适用范围：`src/md_analysis/utils/`（`config.py`、`CubeParser.py`、`BaderParser.py`、`StructureParser/`（`ClusterUtils.py`、`LayerParser.py`、`WaterParser.py`）、`RestartParser/`（`CellParser.py`、`SlowgrowthParser.py`））。
+> 适用范围：`src/md_analysis/utils/`（`config.py`、`_io_helpers.py`、`CubeParser.py`、`BaderParser.py`、`StructureParser/`（`ClusterUtils.py`、`LayerParser.py`、`WaterParser.py`）、`RestartParser/`（`CellParser.py`、`SlowgrowthParser.py`））。
 >
 > 目标：在明确物理口径与输入输出契约的前提下，提供可复用、可测试、可维护的底层实现。
 
@@ -13,7 +13,18 @@
   - 分箱步长
   - 几何阈值
   - 单位换算相关常量（`HA_TO_EV`、`BOHR_TO_ANG`、cSHE 常量）
+  - 轴映射与面积向量索引（`AXIS_MAP`、`AREA_VECTOR_INDICES`）
+  - 界面标签常量（`INTERFACE_NORMAL_ALIGNED`、`INTERFACE_NORMAL_OPPOSED`）
+  - 电荷方法常量（`CHARGE_METHOD_COUNTERION`、`CHARGE_METHOD_LAYER`）
 - 禁止写任何业务计算逻辑。
+
+### `_io_helpers.py`
+
+- 私有模块（`_` 前缀），不属于公开 API，不出现在 `__all__` 中。
+- 提供被 `potential/CenterPotential.py` 和 `charge/BaderAnalysis.py` 共享的 I/O 与数值 helper：
+  - `_cumulative_average(values)` — 1-D 数组逐元素累积平均
+  - `_write_csv(path, rows, fieldnames)` — 将字典行列表写入 CSV 文件（自动创建父目录）
+- 不依赖 ASE 或其他上层模块。
 
 ### `StructureParser/ClusterUtils.py`
 
@@ -25,16 +36,21 @@
 
 - 负责 Gaussian cube 文件的读取与解析。
 - 负责 plane-averaged φ(z) 计算和 slab-averaged potential 计算。
+- 负责 cube 文件发现与切片（`discover_cube_files`）。
 - 输入：cube 文件路径或已解析的 header + values。
 - 输出：`CubeHeader` 数据结构、φ(z) 数组、`(phi_center_ev, info)` 等。
 - CP2K cube 文件约定：z 为 fastest-running index，reshape 为 `(nx, ny, nz)`。
 - 单位：cube 内部为 Bohr/Hartree，输出转为 Angstrom/eV。
+- `discover_cube_files(cube_pattern, *, workdir, frame_start, frame_end, frame_step)` — 在 `workdir` 下按 glob 匹配 cube 文件，词法排序后按 `[frame_start:frame_end:frame_step]` 切片返回。无匹配时抛出 `FileNotFoundError`。被 `potential/CenterPotential.py` 调用，取代原来内联的 glob+检查逻辑。
 
 ### `StructureParser/LayerParser.py`
 
 - 负责金属层识别、界面层标记、法向符号判定。
 - 负责层级数据结构与摘要输出。
 - 不负责水分子拓扑识别、角度 PDF 统计。
+- 使用 `config.py` 中的 `AXIS_MAP` 常量（取代原有的模块局部 `_AXIS_MAP` 字典）。
+- 使用 `config.py` 中的 `INTERFACE_NORMAL_ALIGNED`/`INTERFACE_NORMAL_OPPOSED` 常量作为界面标签。
+- `_circular_mean_fractional()` 委托给 `ClusterUtils._circular_mean(values, period=1.0)`。
 
 ### `RestartParser/CellParser.py`
 

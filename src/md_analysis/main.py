@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from .potential.config import DEFAULT_THICKNESS_ANG
+from .utils.config import CHARGE_METHOD_COUNTERION
 
 
 def run_water_analysis(
@@ -202,7 +203,7 @@ def run_charge_analysis(
     root_dir: str | Path = ".",
     metal_symbols: Iterable[str] | None = None,
     normal: str = "c",
-    method: str = "counterion",
+    method: str = CHARGE_METHOD_COUNTERION,
     dir_pattern: str = "bader_t*_i*",
     frame_start: int | None = None,
     frame_end: int | None = None,

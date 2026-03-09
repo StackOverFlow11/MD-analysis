@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
+from ..utils.config import INTERFACE_NORMAL_ALIGNED
+
 # Default output directory sentinel.
 # None means "resolve to Path.cwd() at call time", avoiding import-time evaluation.
 DEFAULT_OUTPUT_DIR: Path | None = None
@@ -12,7 +14,7 @@ DEFAULT_OUTPUT_DIR: Path | None = None
 # Which metal interface to use as the profile start point along the surface normal.
 # - "normal_aligned": interface with outward normal aligned with +axis
 # - "normal_opposed": interface with outward normal opposed to +axis
-DEFAULT_START_INTERFACE: Literal["normal_aligned", "normal_opposed"] = "normal_aligned"
+DEFAULT_START_INTERFACE: Literal["normal_aligned", "normal_opposed"] = INTERFACE_NORMAL_ALIGNED
 
 # Default output CSV filename for water mass-density analysis.
 DEFAULT_WATER_MASS_DENSITY_CSV_NAME: str = "water_mass_density_z_distribution_analysis.csv"

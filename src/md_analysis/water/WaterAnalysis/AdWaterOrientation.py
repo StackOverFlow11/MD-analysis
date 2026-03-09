@@ -14,7 +14,7 @@ from ...utils import (
     detect_water_molecule_indices,
     get_water_oxygen_indices_array,
 )
-from ...utils.config import DEFAULT_THETA_BIN_DEG, DEFAULT_Z_BIN_WIDTH_A
+from ...utils.config import DEFAULT_THETA_BIN_DEG, DEFAULT_Z_BIN_WIDTH_A, INTERFACE_NORMAL_ALIGNED
 from ..config import (
     DEFAULT_ADSORBED_WATER_PROFILE_CSV_NAME,
     DEFAULT_ADSORBED_WATER_RANGE_TXT_NAME,
@@ -197,7 +197,7 @@ def compute_adsorbed_water_theta_distribution(
 
         scaled = np.asarray(atoms.get_scaled_positions(wrap=True), dtype=float)
         oxygen_c = scaled[oxygen_indices, 2]
-        if start_interface == "normal_aligned":
+        if start_interface == INTERFACE_NORMAL_ALIGNED:
             delta_c = np.mod(oxygen_c - aligned_frac, 1.0)
         else:
             delta_c = np.mod(opposed_frac - oxygen_c, 1.0)

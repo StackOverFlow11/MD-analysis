@@ -32,13 +32,16 @@ try:
 except ImportError:  # pragma: no cover
     Atoms = object  # type: ignore[misc]
 
-from ..config import DEFAULT_METAL_SYMBOLS
-from .ClusterUtils import cluster_1d_periodic, find_largest_gap_periodic
+from ..config import (
+    AXIS_MAP,
+    DEFAULT_METAL_SYMBOLS,
+    INTERFACE_NORMAL_ALIGNED,
+    INTERFACE_NORMAL_OPPOSED,
+)
+from .ClusterUtils import _circular_mean, cluster_1d_periodic, find_largest_gap_periodic
 
 
 NormalSpec = Literal["a", "b", "c"] | Sequence[float]
-
-_AXIS_MAP = {"a": 0, "b": 1, "c": 2}
 
 
 @dataclass(frozen=True)
@@ -77,14 +80,14 @@ class SurfaceDetectionResult:
     def interface_normal_aligned(self) -> Layer:
         """The interface layer with outward normal aligned with +axis."""
         for layer in self.metal_layers_sorted:
-            if layer.interface_label == "normal_aligned":
+            if layer.interface_label == INTERFACE_NORMAL_ALIGNED:
                 return layer
         raise SurfaceGeometryError("No normal_aligned interface layer found")
 
     def interface_normal_opposed(self) -> Layer:
         """The interface layer with outward normal opposed to +axis."""
         for layer in self.metal_layers_sorted:
-            if layer.interface_label == "normal_opposed":
+            if layer.interface_label == INTERFACE_NORMAL_OPPOSED:
                 return layer
         raise SurfaceGeometryError("No normal_opposed interface layer found")
 
@@ -95,9 +98,9 @@ class SurfaceGeometryError(RuntimeError):
 
 def _normal_unit_from_atoms(atoms: Atoms, normal: NormalSpec) -> np.ndarray:
     if isinstance(normal, str):
-        if normal not in _AXIS_MAP:
+        if normal not in AXIS_MAP:
             raise ValueError(f"normal must be one of 'a'/'b'/'c' or a vector, got: {normal!r}")
-        axis = _AXIS_MAP[normal]
+        axis = AXIS_MAP[normal]
         cell = np.asarray(atoms.cell.array, dtype=float)
         v = cell[axis]
     else:
@@ -113,19 +116,10 @@ def _circular_mean_fractional(f: np.ndarray) -> float:
     """
     Mean of fractional coordinates on a circle (robust near 0/1 wrap).
 
-    Returns a value in [0, 1).
+    Returns a value in [0, 1).  Delegates to
+    ``ClusterUtils._circular_mean(values, period=1.0)``.
     """
-    f = np.asarray(f, dtype=float).ravel()
-    if f.size == 0:
-        raise ValueError("cannot compute circular mean of empty array")
-    angles = 2.0 * np.pi * f
-    z = np.mean(np.cos(angles)) + 1j * np.mean(np.sin(angles))
-    if z == 0:
-        return float(np.mod(np.mean(f), 1.0))
-    mean_angle = np.angle(z)
-    if mean_angle < 0:
-        mean_angle += 2.0 * np.pi
-    return float(mean_angle / (2.0 * np.pi))
+    return _circular_mean(np.asarray(f, dtype=float).ravel(), period=1.0)
 
 
 def _mic_delta_fractional(df: np.ndarray) -> np.ndarray:
@@ -180,12 +174,12 @@ def detect_interface_layers(
     SurfaceDetectionResult
     """
     # --- Validate normal ---
-    if not isinstance(normal, str) or normal not in _AXIS_MAP:
+    if not isinstance(normal, str) or normal not in AXIS_MAP:
         raise ValueError(
             f"normal must be 'a', 'b', or 'c', got {normal!r}. "
             "Custom vector normals are not supported; use a cell-axis label."
         )
-    axis_idx = _AXIS_MAP[normal]
+    axis_idx = AXIS_MAP[normal]
 
     # --- Metal atom selection ---
     metal_symbols_iter = DEFAULT_METAL_SYMBOLS if metal_symbols is None else metal_symbols
@@ -234,7 +228,7 @@ def detect_interface_layers(
             atom_indices=layer.atom_indices,
             center_frac=layer.center_frac,
             is_interface=True,
-            interface_label="normal_aligned",
+            interface_label=INTERFACE_NORMAL_ALIGNED,
             normal_unit=(float(nvec[0]), float(nvec[1]), float(nvec[2])),
         )
         return SurfaceDetectionResult(
@@ -268,7 +262,7 @@ def detect_interface_layers(
                 atom_indices=layer.atom_indices,
                 center_frac=layer.center_frac,
                 is_interface=True,
-                interface_label="normal_aligned",
+                interface_label=INTERFACE_NORMAL_ALIGNED,
                 normal_unit=(float(nvec[0]), float(nvec[1]), float(nvec[2])),
             ))
         elif idx == high_k:
@@ -277,7 +271,7 @@ def detect_interface_layers(
                 atom_indices=layer.atom_indices,
                 center_frac=layer.center_frac,
                 is_interface=True,
-                interface_label="normal_opposed",
+                interface_label=INTERFACE_NORMAL_OPPOSED,
                 normal_unit=(float(nvec[0]), float(nvec[1]), float(nvec[2])),
             ))
         else:

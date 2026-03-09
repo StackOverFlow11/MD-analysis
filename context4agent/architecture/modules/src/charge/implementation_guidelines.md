@@ -2,7 +2,7 @@
 
 ## Layer dependency
 
-- `md_analysis.charge` depends on `md_analysis.utils` (BaderParser, LayerParser, WaterParser)
+- `md_analysis.charge` depends on `md_analysis.utils` (BaderParser, LayerParser, WaterParser, config constants, `_io_helpers`)
 - `md_analysis.charge` does NOT depend on `md_analysis.water` or `md_analysis.potential`
 
 ## Module layout
@@ -11,9 +11,15 @@ Flat structure (no sub-packages):
 - `config.py` — unit conversion constant + default filenames + output file name constants
 - `BaderAnalysis.py` — single-frame surface charge (two methods), single-frame indexed atom charges, trajectory indexed atom charges, trajectory surface charge, end-to-end surface charge analysis
 
+## Key imports from `utils`
+
+- `AXIS_MAP`, `AREA_VECTOR_INDICES` — 轴索引和面积计算向量索引，取代原有的模块局部映射字典
+- `CHARGE_METHOD_COUNTERION`, `CHARGE_METHOD_LAYER` — 电荷方法名称常量，取代硬编码字符串
+- `_cumulative_average`, `_write_csv` — 从 `utils._io_helpers` 导入的私有共享 helper，取代原有的模块内重复实现
+
 ## Surface charge methods
 
-`compute_frame_surface_charge(atoms, *, method="counterion")` dispatches to one of:
+`compute_frame_surface_charge(atoms, *, method="counterion")` dispatches to one of (validated against `_VALID_METHODS = (CHARGE_METHOD_COUNTERION, CHARGE_METHOD_LAYER)`):
 
 ### `method="counterion"` (`_compute_surface_charge_counterion`)
 

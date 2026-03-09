@@ -14,6 +14,7 @@ from typing import Optional
 import numpy as np
 
 from ..utils.CubeParser import (
+    discover_cube_files,
     extract_step_from_cube_filename,
     plane_avg_phi_z_ev,
     read_cube_header_and_values,
@@ -66,10 +67,10 @@ def phi_z_planeavg_analysis(
     outdir = (output_dir or workdir).resolve()
     outdir.mkdir(parents=True, exist_ok=True)
 
-    cube_paths = [Path(p) for p in sorted(workdir.glob(cube_pattern))]
-    if not cube_paths:
-        raise FileNotFoundError(f"No cube files matched pattern: {cube_pattern!r} in {workdir}")
-    cube_paths = cube_paths[frame_start:frame_end:frame_step]
+    cube_paths = discover_cube_files(
+        cube_pattern, workdir=workdir,
+        frame_start=frame_start, frame_end=frame_end, frame_step=frame_step,
+    )
 
     steps: list[int] = []
     phi_list: list[np.ndarray] = []

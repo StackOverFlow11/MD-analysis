@@ -25,6 +25,12 @@
 - `DP_A_H3O_W_EV`
 - `MU_HPLUS_G0_EV`
 - `DELTA_E_ZP_EV`
+- `AXIS_MAP`
+- `AREA_VECTOR_INDICES`
+- `INTERFACE_NORMAL_ALIGNED`
+- `INTERFACE_NORMAL_OPPOSED`
+- `CHARGE_METHOD_COUNTERION`
+- `CHARGE_METHOD_LAYER`
 
 说明：
 
@@ -33,6 +39,12 @@
   - `DEFAULT_Z_BIN_WIDTH_A = 0.1` Angstrom
   - `DEFAULT_THETA_BIN_DEG = 5.0` degree
   - `DEFAULT_WATER_OH_CUTOFF_A = 1.25` Angstrom
+  - `AXIS_MAP = {"a": 0, "b": 1, "c": 2}`
+  - `AREA_VECTOR_INDICES = {"a": (1, 2), "b": (0, 2), "c": (0, 1)}`
+  - `INTERFACE_NORMAL_ALIGNED = "normal_aligned"`
+  - `INTERFACE_NORMAL_OPPOSED = "normal_opposed"`
+  - `CHARGE_METHOD_COUNTERION = "counterion"`
+  - `CHARGE_METHOD_LAYER = "layer"`
 
 ### 2.2 `StructureParser/ClusterUtils.py` 导出（Stable）
 
@@ -61,6 +73,10 @@
   - xy 平面平均的 φ(z) profile
 - `z_coords_ang(...)`
   - z 轴网格坐标（Angstrom）
+- `discover_cube_files(cube_pattern, *, workdir, frame_start, frame_end, frame_step)`
+  - 按 glob 模式发现 cube 文件，排序后按 slice 参数裁剪，返回 `list[Path]`
+  - `workdir` 默认为当前工作目录
+  - 无匹配时抛出 `FileNotFoundError`
 - `extract_step_from_cube_filename(...)`
   - 从 cube 文件名提取 step 编号
 
@@ -167,7 +183,11 @@
 - `from md_analysis.utils import get_water_oxygen_indices_array`
 - `from md_analysis.utils import DEFAULT_Z_BIN_WIDTH_A, DEFAULT_THETA_BIN_DEG`
 - `from md_analysis.utils import read_cube_header_and_values, slab_average_potential_ev`
+- `from md_analysis.utils import discover_cube_files`
 - `from md_analysis.utils import HA_TO_EV, BOHR_TO_ANG`
+- `from md_analysis.utils import AXIS_MAP, AREA_VECTOR_INDICES`
+- `from md_analysis.utils import INTERFACE_NORMAL_ALIGNED, INTERFACE_NORMAL_OPPOSED`
+- `from md_analysis.utils import CHARGE_METHOD_COUNTERION, CHARGE_METHOD_LAYER`
 
 ## 4. 非公开边界（必须遵守）
 

@@ -184,6 +184,45 @@ def z_coords_ang(header: CubeHeader) -> np.ndarray:
     return origin_z_ang + (np.arange(header.nz, dtype=float) + 0.5) * dz_ang
 
 
+def discover_cube_files(
+    cube_pattern: str,
+    *,
+    workdir: Path | None = None,
+    frame_start: int | None = None,
+    frame_end: int | None = None,
+    frame_step: int | None = None,
+) -> list[Path]:
+    """Discover and slice cube files matching *cube_pattern*.
+
+    Parameters
+    ----------
+    cube_pattern
+        Glob pattern relative to *workdir*.
+    workdir
+        Base directory. Defaults to ``Path(".").resolve()``.
+    frame_start, frame_end, frame_step
+        Optional slice parameters applied to the sorted file list.
+
+    Returns
+    -------
+    list[Path]
+        Sorted (lexicographic) list of matched cube file paths,
+        after slicing.
+
+    Raises
+    ------
+    FileNotFoundError
+        If no files match the pattern.
+    """
+    workdir = (workdir or Path(".")).resolve()
+    cube_paths = [Path(p) for p in sorted(workdir.glob(cube_pattern))]
+    if not cube_paths:
+        raise FileNotFoundError(
+            f"No cube files matched pattern: {cube_pattern!r} in {workdir}"
+        )
+    return cube_paths[frame_start:frame_end:frame_step]
+
+
 _CUBE_STEP_RE = re.compile(r"_(\d+)\.cube$")
 
 

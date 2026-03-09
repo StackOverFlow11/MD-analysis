@@ -9,6 +9,7 @@ import pytest
 
 from md_analysis.utils.CubeParser import (
     CubeHeader,
+    discover_cube_files,
     extract_step_from_cube_filename,
     plane_avg_phi_z_ev,
     read_cube_header_and_values,
@@ -295,3 +296,41 @@ class TestExtractStepFromCubeFilename:
 
     def test_multi_underscore(self):
         assert extract_step_from_cube_filename(Path("a_b_999.cube")) == 999
+
+
+# ===========================================================================
+# TestDiscoverCubeFiles
+# ===========================================================================
+
+
+class TestDiscoverCubeFiles:
+
+    def test_happy_path(self, tmp_path: Path):
+        """Sorted list of matching cube files is returned."""
+        for name in ["c_3.cube", "a_1.cube", "b_2.cube"]:
+            _write_cube(tmp_path / name)
+        result = discover_cube_files("*.cube", workdir=tmp_path)
+        assert [p.name for p in result] == ["a_1.cube", "b_2.cube", "c_3.cube"]
+
+    def test_no_match_raises(self, tmp_path: Path):
+        """FileNotFoundError when no files match."""
+        with pytest.raises(FileNotFoundError, match="No cube files"):
+            discover_cube_files("*.cube", workdir=tmp_path)
+
+    def test_frame_slicing(self, tmp_path: Path):
+        """frame_start/end/step correctly slice the sorted list."""
+        for i in range(5):
+            _write_cube(tmp_path / f"cube_{i}.cube")
+        result = discover_cube_files(
+            "*.cube", workdir=tmp_path,
+            frame_start=1, frame_end=4, frame_step=2,
+        )
+        assert [p.name for p in result] == ["cube_1.cube", "cube_3.cube"]
+
+    def test_default_workdir(self, tmp_path: Path, monkeypatch):
+        """When workdir is None, cwd is used."""
+        _write_cube(tmp_path / "test_0.cube")
+        monkeypatch.chdir(tmp_path)
+        result = discover_cube_files("*.cube")
+        assert len(result) == 1
+        assert result[0].name == "test_0.cube"

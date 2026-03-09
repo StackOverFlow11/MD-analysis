@@ -39,7 +39,12 @@ from ...utils.StructureParser.WaterParser import (
     get_water_oxygen_indices_array,
 )
 from ...utils.RestartParser.CellParser import parse_abc_from_md_inp as _parse_abc_from_md_inp
-from ...utils.config import DEFAULT_Z_BIN_WIDTH_A, WATER_MOLAR_MASS_G_PER_MOL
+from ...utils.config import (
+    DEFAULT_Z_BIN_WIDTH_A,
+    INTERFACE_NORMAL_ALIGNED,
+    INTERFACE_NORMAL_OPPOSED,
+    WATER_MOLAR_MASS_G_PER_MOL,
+)
 
 StartInterface = Literal["normal_aligned", "normal_opposed"]
 
@@ -147,7 +152,7 @@ def _single_frame_density_and_orientation(
     """
     if dz_A <= 0.0:
         raise ValueError("dz_A must be > 0")
-    if start_interface not in {"normal_aligned", "normal_opposed"}:
+    if start_interface not in {INTERFACE_NORMAL_ALIGNED, INTERFACE_NORMAL_OPPOSED}:
         raise ValueError(f"start_interface must be 'normal_aligned' or 'normal_opposed', got {start_interface!r}")
 
     aligned_frac, opposed_frac = _detect_interface_fractions(atoms, metal_symbols=metal_symbols)
@@ -165,7 +170,7 @@ def _single_frame_density_and_orientation(
     scaled = np.asarray(atoms.get_scaled_positions(wrap=True), dtype=float)
     oxygen_c = scaled[oxygen_indices, 2]
 
-    if start_interface == "normal_aligned":
+    if start_interface == INTERFACE_NORMAL_ALIGNED:
         delta_c = np.mod(oxygen_c - aligned_frac, 1.0)
     else:
         delta_c = np.mod(opposed_frac - oxygen_c, 1.0)

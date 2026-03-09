@@ -29,6 +29,6 @@
 
 ## 4. 内部依赖
 
-- `LayerParser` → `ClusterUtils`（同级导入）
-- `LayerParser` → `../config.py`（`DEFAULT_METAL_SYMBOLS`）
+- `LayerParser` → `ClusterUtils`（同级导入：`cluster_1d_periodic`、`find_largest_gap_periodic`、`_circular_mean`）
+- `LayerParser` → `../config.py`（`DEFAULT_METAL_SYMBOLS`、`AXIS_MAP`、`INTERFACE_NORMAL_ALIGNED`、`INTERFACE_NORMAL_OPPOSED`）
 - `WaterParser` → `../config.py`（`DEFAULT_THETA_BIN_DEG` 等）

@@ -26,7 +26,10 @@ from ..utils.config import (
     MU_HPLUS_G0_EV,
     TRANSITION_METAL_SYMBOLS,
 )
+from ..utils._io_helpers import _cumulative_average, _write_csv
 from ..utils.CubeParser import (
+    _float,
+    discover_cube_files,
     extract_step_from_cube_filename,
     read_cube_header_and_values,
     slab_average_potential_ev,
@@ -54,10 +57,6 @@ XYZ_STEP_RE = re.compile(r"\bi\s*=\s*(\d+)\b")
 STEP_RE = re.compile(r"STEP NUMBER\s*=\s*(\d+)")
 TIME_RE = re.compile(r"TIME\s*\[fs\]\s*=\s*([+-]?\d+(?:\.\d*)?(?:[EeDd][+-]?\d+)?)")
 FERMI_RE = re.compile(r"Fermi energy:\s*([+-]?\d+(?:\.\d*)?(?:[EeDd][+-]?\d+)?)")
-
-
-def _float(s: str) -> float:
-    return float(s.replace("D", "E").replace("d", "e"))
 
 
 def _parse_md_out_fermi(md_out_path: Path) -> list[dict]:
@@ -210,20 +209,6 @@ def _detect_metal_water_interfaces_z_ang(
     }
 
 
-def _cumulative_average(values: np.ndarray) -> np.ndarray:
-    csum = np.cumsum(values, dtype=float)
-    return csum / np.arange(1, values.size + 1, dtype=float)
-
-
-def _write_csv(path: Path, rows: Iterable[dict], fieldnames: list[str]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=fieldnames)
-        w.writeheader()
-        for r in rows:
-            w.writerow(r)
-
-
 def _plot_series_with_cumavg(
     png_path: Path,
     x: np.ndarray,
@@ -293,10 +278,10 @@ def center_slab_potential_analysis(
     outdir = (output_dir or workdir).resolve()
     outdir.mkdir(parents=True, exist_ok=True)
 
-    cube_paths = [Path(p) for p in sorted(workdir.glob(cube_pattern))]
-    if not cube_paths:
-        raise FileNotFoundError(f"No cube files matched pattern: {cube_pattern!r} in {workdir}")
-    cube_paths = cube_paths[frame_start:frame_end:frame_step]
+    cube_paths = discover_cube_files(
+        cube_pattern, workdir=workdir,
+        frame_start=frame_start, frame_end=frame_end, frame_step=frame_step,
+    )
 
     # Optional interface detection from xyz
     use_interface_center = center_mode == "interface"
@@ -593,10 +578,10 @@ def thickness_sensitivity_analysis(
     outdir = (output_dir or workdir).resolve()
     outdir.mkdir(parents=True, exist_ok=True)
 
-    cube_paths = [Path(p) for p in sorted(workdir.glob(cube_pattern))]
-    if not cube_paths:
-        raise FileNotFoundError(f"No cube files matched pattern: {cube_pattern!r} in {workdir}")
-    cube_paths = cube_paths[frame_start:frame_end:frame_step]
+    cube_paths = discover_cube_files(
+        cube_pattern, workdir=workdir,
+        frame_start=frame_start, frame_end=frame_end, frame_step=frame_step,
+    )
 
     # --- Parse Fermi energies from md.out ---
     md_out_path = Path(md_out_path).resolve()

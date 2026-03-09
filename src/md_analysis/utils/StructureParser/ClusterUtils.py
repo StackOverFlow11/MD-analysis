@@ -163,7 +163,13 @@ def gap_midpoint_periodic(
 # ---------------------------------------------------------------------------
 
 def _circular_mean(values: np.ndarray, period: float) -> float:
-    """Circular mean on ``[0, period)``."""
+    """Circular mean on ``[0, period)``.
+
+    Raises ``ValueError`` if *values* is empty.
+    """
+    values = np.asarray(values, dtype=float).ravel()
+    if values.size == 0:
+        raise ValueError("cannot compute circular mean of empty array")
     angles = 2.0 * np.pi * values / period
     z = np.mean(np.cos(angles)) + 1j * np.mean(np.sin(angles))
     if z == 0:

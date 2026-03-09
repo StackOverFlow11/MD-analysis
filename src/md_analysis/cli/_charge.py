@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from ..utils.config import CHARGE_METHOD_COUNTERION, CHARGE_METHOD_LAYER
 from ._prompt import (
     _parse_metal_elements,
     _prompt_bool,
@@ -34,7 +35,9 @@ def _collect_params(*, method: str | None = None) -> dict:
         params["method"] = method
     else:
         params["method"] = _prompt_choice(
-            "Charge method", ["counterion", "layer"], default="counterion",
+            "Charge method",
+            [CHARGE_METHOD_COUNTERION, CHARGE_METHOD_LAYER],
+            default=CHARGE_METHOD_COUNTERION,
         )
 
     if _prompt_bool("Modify advanced parameters?", default=False):
@@ -121,10 +124,10 @@ def charge_menu() -> int:
         return 0
 
     if choice == "301":
-        params = _collect_params(method="counterion")
+        params = _collect_params(method=CHARGE_METHOD_COUNTERION)
         return _run_charge(params)
     elif choice == "302":
-        params = _collect_params(method="layer")
+        params = _collect_params(method=CHARGE_METHOD_LAYER)
         return _run_charge(params)
     elif choice == "303":
         params = _collect_params()
