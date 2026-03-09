@@ -6,6 +6,7 @@ from pathlib import Path
 
 from ..potential.config import DEFAULT_THICKNESS_ANG
 from ._prompt import (
+    _handle_cmd_error,
     _parse_metal_elements,
     _prompt_bool,
     _prompt_choice,
@@ -100,6 +101,7 @@ def _collect_params_for(code: str) -> dict:
     return params
 
 
+@_handle_cmd_error
 def _cmd_201(params: dict) -> int:
     from ..potential import center_slab_potential_analysis
 
@@ -123,6 +125,7 @@ def _cmd_201(params: dict) -> int:
     return 0
 
 
+@_handle_cmd_error
 def _cmd_202(params: dict) -> int:
     from ..potential import fermi_energy_analysis
 
@@ -141,6 +144,7 @@ def _cmd_202(params: dict) -> int:
     return 0
 
 
+@_handle_cmd_error
 def _cmd_203(params: dict) -> int:
     from ..potential import electrode_potential_analysis
 
@@ -166,6 +170,7 @@ def _cmd_203(params: dict) -> int:
     return 0
 
 
+@_handle_cmd_error
 def _cmd_204(params: dict) -> int:
     from ..potential import phi_z_planeavg_analysis
 
@@ -185,6 +190,7 @@ def _cmd_204(params: dict) -> int:
     return 0
 
 
+@_handle_cmd_error
 def _cmd_205(params: dict) -> int:
     from ..potential import thickness_sensitivity_analysis
 
@@ -210,6 +216,7 @@ def _cmd_205(params: dict) -> int:
     return 0
 
 
+@_handle_cmd_error
 def _cmd_206(params: dict) -> int:
     from ..main import run_potential_analysis
 

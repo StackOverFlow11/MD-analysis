@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ._prompt import _prompt_str
+from ._prompt import _handle_cmd_error, _prompt_str
 
 _MENU = """\
 
@@ -36,6 +36,7 @@ def settings_menu() -> int:
         return 1
 
 
+@_handle_cmd_error
 def _cmd_901() -> int:
     from ..config import KEY_VASP_SCRIPT_PATH, get_config, set_config
 
@@ -59,6 +60,7 @@ def _cmd_901() -> int:
     return 0
 
 
+@_handle_cmd_error
 def _cmd_902() -> int:
     from ..config import load_config
 

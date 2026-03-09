@@ -30,7 +30,7 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 | File | Purpose | Key Functions |
 |---|---|---|
 | `__init__.py` | Top menu (1=Water, 2=Potential, 3=Charge, 4=Scripts, 9=Settings, 0=Exit) | `main()` |
-| `_prompt.py` | Reusable input helpers | `_prompt_str`, `_prompt_int`, `_prompt_float`, `_prompt_choice`, `_prompt_bool`, `_parse_metal_elements`, `_prompt_global_params` |
+| `_prompt.py` | Reusable input helpers + error decorator | `_prompt_str`, `_prompt_int`, `_prompt_float`, `_prompt_choice`, `_prompt_bool`, `_parse_metal_elements`, `_prompt_global_params`, `_handle_cmd_error` (decorator: catches exceptions in `_cmd_*` handlers, prints user-friendly message, returns 1) |
 | `_water.py` | Water sub-menu (101-105) | `water_menu()`, dispatches to `water` module or `main.run_water_analysis` |
 | `_potential.py` | Potential sub-menu (201-206) | `potential_menu()`, dispatches to `potential` module or `main.run_potential_analysis` |
 | `_charge.py` | Charge sub-menu (301-303) | `charge_menu()`, `_collect_params()`, `_run_charge()`, `_print_ensemble_summary()` |
@@ -115,6 +115,7 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 | `test/unit/utils/test_water_parser.py` | `detect_water_molecule_indices`, density/orientation helpers |
 | `test/unit/utils/test_bader_parser.py` | `_read_acf`, `_read_potcar_zval`, `load_bader_atoms` |
 | `test/unit/test_config.py` | `load_config`, `save_config`, `get_config`, `set_config`, `ConfigError` |
+| `test/unit/cli/test_handle_cmd_error.py` | `_handle_cmd_error` decorator: known/unexpected exceptions, normal return |
 | `test/unit/utils/test_cell_parser.py` | `parse_abc_from_restart` + `parse_abc_from_md_inp`: valid/missing/error cases |
 | `test/unit/scripts/test_bader_gen.py` | `generate_bader_workdir` + `batch_generate_bader_workdirs`: directory structure, frame slicing, metadata |
 | `test/unit/scripts/utils/test_index_mapper.py` | `compute_index_map`, `encode/decode_comment_line`, `write/read_poscar_with_map`, `remap_array` |

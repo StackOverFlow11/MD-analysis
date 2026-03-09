@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from ._prompt import (
+    _handle_cmd_error,
     _prompt_bool,
     _prompt_global_params,
     _prompt_str_required,
@@ -43,6 +44,7 @@ def _collect_params() -> dict:
     return params
 
 
+@_handle_cmd_error
 def _cmd_101(params: dict) -> int:
     from ..water import water_mass_density_z_distribution_analysis
 
@@ -61,6 +63,7 @@ def _cmd_101(params: dict) -> int:
     return 0
 
 
+@_handle_cmd_error
 def _cmd_102(params: dict) -> int:
     from ..water import water_orientation_weighted_density_z_distribution_analysis
 
@@ -79,6 +82,7 @@ def _cmd_102(params: dict) -> int:
     return 0
 
 
+@_handle_cmd_error
 def _cmd_103(params: dict) -> int:
     from ..water import ad_water_orientation_analysis
 
@@ -99,6 +103,7 @@ def _cmd_103(params: dict) -> int:
     return 0
 
 
+@_handle_cmd_error
 def _cmd_104(params: dict) -> int:
     from ..water import compute_adsorbed_water_theta_distribution
 
@@ -118,6 +123,7 @@ def _cmd_104(params: dict) -> int:
     return 0
 
 
+@_handle_cmd_error
 def _cmd_105(params: dict) -> int:
     from ..main import run_water_analysis
 

@@ -13,6 +13,7 @@ Interactive CLI package providing a VASPKIT-style numbered menu interface. Repla
 - Prompt helpers in `_prompt.py` are shared across all sub-menus
 - Handlers delegate to `main.py` workflow functions or directly to sub-package analysis functions
 - `KeyboardInterrupt` / `EOFError` caught at top level for clean exit
+- All `_cmd_*()` / `_run_*()` handlers decorated with `@_handle_cmd_error` (from `_prompt.py`): catches `MDAnalysisError`/`FileNotFoundError`/`ValueError`/`RuntimeError` with user-friendly message, and unexpected exceptions with type name; returns 1 on error
 
 ## Dependencies
 

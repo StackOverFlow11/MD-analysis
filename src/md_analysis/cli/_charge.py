@@ -6,6 +6,7 @@ from pathlib import Path
 
 from ..utils.config import CHARGE_METHOD_COUNTERION, CHARGE_METHOD_LAYER
 from ._prompt import (
+    _handle_cmd_error,
     _parse_metal_elements,
     _prompt_bool,
     _prompt_choice,
@@ -89,6 +90,7 @@ def _print_ensemble_summary(csv_path: Path) -> None:
     print(f"   sigma_opposed: {opposed.mean():8.4f} +/- {opposed.std():.4f} uC/cm^2")
 
 
+@_handle_cmd_error
 def _run_charge(params: dict) -> int:
     """Shared handler for 301/302/303."""
     from ..main import run_charge_analysis

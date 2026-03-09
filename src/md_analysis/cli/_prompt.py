@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import functools
+
+from ..exceptions import MDAnalysisError
+
 
 def _prompt_str(label: str, *, default: str | None = None) -> str | None:
     """Prompt for a string value. Returns *default* on empty input."""
@@ -81,3 +85,18 @@ def _prompt_global_params() -> dict:
     params["frame_end"] = _prompt_int("Frame end (exclusive)", default=None)
     params["frame_step"] = _prompt_int("Frame step", default=None)
     return params
+
+
+def _handle_cmd_error(func):
+    """Catch analysis errors in CLI handlers, print message, return 1."""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except (MDAnalysisError, FileNotFoundError, ValueError, RuntimeError) as exc:
+            print(f"\n  Error: {exc}")
+            return 1
+        except Exception as exc:
+            print(f"\n  Unexpected error ({type(exc).__name__}): {exc}")
+            return 1
+    return wrapper

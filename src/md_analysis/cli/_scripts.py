@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ._prompt import _prompt_bool, _prompt_choice, _prompt_int, _prompt_str, _prompt_str_required
+from ._prompt import _handle_cmd_error, _prompt_bool, _prompt_choice, _prompt_int, _prompt_str, _prompt_str_required
 
 _MENU = """\
 
@@ -98,6 +98,7 @@ def _read_cell_abc(cell_source: str) -> tuple[float, float, float] | None:
     return abc
 
 
+@_handle_cmd_error
 def _cmd_401() -> int:
     print()
     xyz_path = _prompt_str_required("XYZ trajectory file (e.g. md-pos-1.xyz)")
@@ -139,19 +140,15 @@ def _cmd_401() -> int:
 
     from ..scripts import generate_bader_workdir
 
-    try:
-        workdir = generate_bader_workdir(
-            atoms,
-            output_dir,
-            script_path=script_path,
-            workdir_name=workdir_name,
-            frame=frame,
-            source=xyz_path,
-            generate_potcar=gen_potcar,
-        )
-    except Exception as exc:
-        print(f"\n  Error: {exc}")
-        return 1
+    workdir = generate_bader_workdir(
+        atoms,
+        output_dir,
+        script_path=script_path,
+        workdir_name=workdir_name,
+        frame=frame,
+        source=xyz_path,
+        generate_potcar=gen_potcar,
+    )
 
     print(f"\n Bader work directory created: {workdir}")
     contents = sorted(p.name for p in workdir.iterdir())
@@ -159,6 +156,7 @@ def _cmd_401() -> int:
     return 0
 
 
+@_handle_cmd_error
 def _cmd_402() -> int:
     print()
     xyz_path = _prompt_str_required("XYZ trajectory file (e.g. md-pos-1.xyz)")
@@ -185,21 +183,17 @@ def _cmd_402() -> int:
 
     from ..scripts import batch_generate_bader_workdirs
 
-    try:
-        dirs = batch_generate_bader_workdirs(
-            xyz_path,
-            abc,
-            output_dir,
-            frame_start=frame_start,
-            frame_end=frame_end,
-            frame_step=frame_step,
-            script_path=script_path,
-            generate_potcar=gen_potcar,
-            verbose=True,
-        )
-    except Exception as exc:
-        print(f"\n  Error: {exc}")
-        return 1
+    dirs = batch_generate_bader_workdirs(
+        xyz_path,
+        abc,
+        output_dir,
+        frame_start=frame_start,
+        frame_end=frame_end,
+        frame_step=frame_step,
+        script_path=script_path,
+        generate_potcar=gen_potcar,
+        verbose=True,
+    )
 
     print(f"\n Created {len(dirs)} Bader work directories:")
     for d in dirs:
