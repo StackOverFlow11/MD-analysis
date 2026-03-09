@@ -58,14 +58,16 @@
 
 ### 2.3 分析函数（Stable）
 
-- `water_mass_density_z_distribution_analysis(xyz_path, md_inp_path, *, output_dir, output_csv_name, start_interface, dz_A, metal_symbols, frame_start, frame_end, frame_step) -> Path`
+- `water_mass_density_z_distribution_analysis(xyz_path, md_inp_path=None, *, cell_abc=None, output_dir, output_csv_name, start_interface, dz_A, metal_symbols, frame_start, frame_end, frame_step) -> Path`
   - 文件位置：`src/md_analysis/water/WaterAnalysis/WaterDensity.py`
   - 统计口径：A 口径（逐帧等权系综平均）
+  - cell 来源：`cell_abc` 优先；为 None 时从 `md_inp_path` 解析
   - 返回：CSV 路径
 
-- `water_orientation_weighted_density_z_distribution_analysis(xyz_path, md_inp_path, *, output_dir, output_csv_name, start_interface, dz_A, metal_symbols, frame_start, frame_end, frame_step) -> Path`
+- `water_orientation_weighted_density_z_distribution_analysis(xyz_path, md_inp_path=None, *, cell_abc=None, output_dir, output_csv_name, start_interface, dz_A, metal_symbols, frame_start, frame_end, frame_step) -> Path`
   - 文件位置：`src/md_analysis/water/WaterAnalysis/WaterOrientation.py`
   - 统计口径：A 口径（逐帧等权系综平均）
+  - cell 来源：`cell_abc` 优先；为 None 时从 `md_inp_path` 解析
   - 返回：CSV 路径
 
 - `detect_adsorbed_layer_range_from_density_profile(distance_A, rho_g_cm3, *, near_zero_ratio, smoothing_window_bins) -> tuple[float, float, float]`
@@ -73,20 +75,23 @@
   - 主峰定义：直接取水密度分布最高 bin 位置
   - 返回：`(start_distance_A, end_distance_A, peak_distance_A)`
 
-- `ad_water_orientation_analysis(xyz_path, md_inp_path, *, output_dir, output_profile_csv_name, output_range_txt_name, start_interface, dz_A, near_zero_ratio, smoothing_window_bins, frame_start, frame_end, frame_step) -> tuple[Path, Path]`
+- `ad_water_orientation_analysis(xyz_path, md_inp_path=None, *, cell_abc=None, output_dir, output_profile_csv_name, output_range_txt_name, start_interface, dz_A, near_zero_ratio, smoothing_window_bins, frame_start, frame_end, frame_step) -> tuple[Path, Path]`
   - 文件位置：`src/md_analysis/water/WaterAnalysis/AdWaterOrientation.py`
   - 功能：自动识别吸附层区间并输出取向分析结果
+  - cell 来源：`cell_abc` 优先；为 None 时从 `md_inp_path` 解析
   - 返回：`(profile_csv_path, range_txt_path)`
 
-- `compute_adsorbed_water_theta_distribution(xyz_path, md_inp_path, *, adsorbed_range_A, output_dir, output_csv_name, start_interface, dz_A, ndeg, near_zero_ratio, smoothing_window_bins, frame_start, frame_end, frame_step, verbose) -> tuple[ndarray, ndarray, Path]`
+- `compute_adsorbed_water_theta_distribution(xyz_path, md_inp_path=None, *, cell_abc=None, adsorbed_range_A, output_dir, output_csv_name, start_interface, dz_A, ndeg, near_zero_ratio, smoothing_window_bins, frame_start, frame_end, frame_step, verbose) -> tuple[ndarray, ndarray, Path]`
   - 文件位置：`src/md_analysis/water/WaterAnalysis/AdWaterOrientation.py`
   - 功能：统计吸附层内 `0-180` 度取向分布（PDF）
+  - cell 来源：`cell_abc` 优先；为 None 时从 `md_inp_path` 解析
   - 返回：`(theta_centers_deg, theta_pdf_degree_inv, csv_path)`
 
-- `plot_water_three_panel_analysis(xyz_path, md_inp_path, *, output_dir, output_png_name, start_interface, dz_A, ndeg, frame_start, frame_end, frame_step, verbose) -> Path`
+- `plot_water_three_panel_analysis(xyz_path, md_inp_path=None, *, cell_abc=None, output_dir, output_png_name, start_interface, dz_A, ndeg, frame_start, frame_end, frame_step, verbose) -> Path`
   - 文件位置：`src/md_analysis/water/Water.py`
   - 功能：集成三联图（密度、取向、吸附层 $\theta$ 分布）并输出 PNG，同时落盘相关 CSV/TXT
   - 轨迹读取：固定两次（第一次密度+取向；第二次吸附层 $\theta$ 分布）
+  - cell 来源：`cell_abc` 优先；为 None 时从 `md_inp_path` 解析
   - 返回：PNG 路径
 
 ## 3. 推荐导入方式

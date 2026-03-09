@@ -36,6 +36,16 @@ Interactive CLI package providing a VASPKIT-style numbered menu interface. Repla
 
 All sub-menu handler functions follow a unified `_cmd_<code>()` naming pattern, where `<code>` is the menu code number (e.g., `_cmd_101()`, `_cmd_201()`). This applies to all 15 handler functions across `_water.py`, `_potential.py`, `_charge.py`, `_scripts.py`, and `_settings.py`. Each handler is decorated with `@_handle_cmd_error` for unified error handling.
 
+## Cell parameter acquisition
+
+All sub-menus requiring cell parameters (water 101-105, scripts 401-402) use the shared `_prompt_cell_abc()` helper from `_prompt.py`:
+
+1. Prompt cell source: `.restart` (default) or `md.inp`
+2. Parse the chosen file (`parse_abc_from_restart` or `parse_abc_from_md_inp`)
+3. On failure, offer one retry with a different file
+4. On second failure, raise `CellParseError` (caught by `@_handle_cmd_error`)
+5. Return `(a, b, c)` tuple, passed as `cell_abc` keyword argument to analysis functions
+
 ## Parameter flow
 
 1. User selects analysis code from sub-menu

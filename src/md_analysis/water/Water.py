@@ -40,8 +40,9 @@ def _savgol_smooth_window5(values: np.ndarray) -> np.ndarray:
 
 def plot_water_three_panel_analysis(
     xyz_path: str | Path,
-    md_inp_path: str | Path,
+    md_inp_path: str | Path | None = None,
     *,
+    cell_abc: tuple[float, float, float] | None = None,
     output_dir: str | Path | None = None,
     output_png_name: str = DEFAULT_WATER_THREE_PANEL_PLOT_PNG_NAME,
     start_interface: StartInterface = DEFAULT_START_INTERFACE,
@@ -65,7 +66,7 @@ def plot_water_three_panel_analysis(
     logger.info("Starting three-panel water analysis")
 
     xyz_path = Path(xyz_path)
-    md_inp_path = Path(md_inp_path)
+    md_inp_path = Path(md_inp_path) if md_inp_path is not None else None
     output_dir_path = Path(output_dir) if output_dir is not None else Path.cwd()
     output_dir_path.mkdir(parents=True, exist_ok=True)
 
@@ -73,6 +74,7 @@ def plot_water_three_panel_analysis(
     common_centers_u, mean_path_A, rho_ensemble, orient_ensemble = _compute_density_orientation_ensemble(
         xyz_path,
         md_inp_path,
+        cell_abc=cell_abc,
         start_interface=start_interface,
         dz_A=dz_A,
         frame_start=frame_start,
@@ -135,6 +137,7 @@ def plot_water_three_panel_analysis(
     theta_centers, theta_pdf, _ = compute_adsorbed_water_theta_distribution(
         xyz_path=xyz_path,
         md_inp_path=md_inp_path,
+        cell_abc=cell_abc,
         adsorbed_range_A=(d_start_A, d_end_A),
         output_dir=output_dir_path,
         start_interface=start_interface,

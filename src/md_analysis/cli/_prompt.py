@@ -72,6 +72,41 @@ def _prompt_bool(label: str, *, default: bool = True) -> bool:
     return raw in ("y", "yes")
 
 
+def _prompt_cell_abc() -> tuple[float, float, float]:
+    """Prompt for cell parameters with restart-first priority and retry on failure.
+
+    Interactive flow:
+    1. Ask for cell source (.restart or md.inp), default .restart
+    2. Parse the chosen file
+    3. On failure, offer one retry with a different file
+    4. On second failure, raise CellParseError (caught by @_handle_cmd_error)
+    """
+    from ..utils.RestartParser.CellParser import CellParseError, parse_abc_from_md_inp, parse_abc_from_restart
+
+    for attempt in range(2):
+        source = _prompt_choice("Cell source", [".restart", "md.inp"], default=".restart")
+
+        try:
+            if source == ".restart":
+                path = _prompt_str_required("CP2K .restart file")
+                abc = parse_abc_from_restart(path)
+            else:
+                path = _prompt_str_required("CP2K input file (e.g. md.inp)")
+                abc = parse_abc_from_md_inp(path)
+        except (CellParseError, FileNotFoundError) as exc:
+            print(f"\n  Error: {exc}")
+            if attempt == 0:
+                if _prompt_bool("Retry with different file?", default=True):
+                    continue
+            raise CellParseError(str(exc)) from exc
+
+        print(f"  Cell: a={abc[0]:.4f}, b={abc[1]:.4f}, c={abc[2]:.4f} A")
+        return abc
+
+    # Should not reach here, but satisfy type checker
+    raise CellParseError("Failed to parse cell parameters.")  # pragma: no cover
+
+
 def _parse_metal_elements(s: str | None) -> set[str] | None:
     """Parse comma-separated element symbols into a set, or None."""
     if s is None:

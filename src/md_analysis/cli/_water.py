@@ -7,6 +7,7 @@ from pathlib import Path
 from ._prompt import (
     _handle_cmd_error,
     _prompt_bool,
+    _prompt_cell_abc,
     _prompt_global_params,
     _prompt_str_required,
 )
@@ -31,7 +32,7 @@ def _collect_params() -> dict:
     print()
     params: dict = {}
     params["xyz"] = _prompt_str_required("XYZ trajectory file (e.g. md-pos-1.xyz)")
-    params["md_inp"] = _prompt_str_required("CP2K input file (e.g. md.inp)")
+    params["cell_abc"] = _prompt_cell_abc()
 
     if _prompt_bool("Modify advanced parameters?", default=False):
         params.update(_prompt_global_params())
@@ -54,7 +55,7 @@ def _cmd_101(params: dict) -> int:
 
     csv_path = water_mass_density_z_distribution_analysis(
         xyz_path=params["xyz"],
-        md_inp_path=params["md_inp"],
+        cell_abc=params["cell_abc"],
         output_dir=outdir,
         frame_start=params["frame_start"],
         frame_end=params["frame_end"],
@@ -74,7 +75,7 @@ def _cmd_102(params: dict) -> int:
 
     csv_path = water_orientation_weighted_density_z_distribution_analysis(
         xyz_path=params["xyz"],
-        md_inp_path=params["md_inp"],
+        cell_abc=params["cell_abc"],
         output_dir=outdir,
         frame_start=params["frame_start"],
         frame_end=params["frame_end"],
@@ -94,7 +95,7 @@ def _cmd_103(params: dict) -> int:
 
     profile_csv, range_txt = ad_water_orientation_analysis(
         xyz_path=params["xyz"],
-        md_inp_path=params["md_inp"],
+        cell_abc=params["cell_abc"],
         output_dir=outdir,
         frame_start=params["frame_start"],
         frame_end=params["frame_end"],
@@ -116,7 +117,7 @@ def _cmd_104(params: dict) -> int:
 
     _, _, csv_path = compute_adsorbed_water_theta_distribution(
         xyz_path=params["xyz"],
-        md_inp_path=params["md_inp"],
+        cell_abc=params["cell_abc"],
         output_dir=outdir,
         frame_start=params["frame_start"],
         frame_end=params["frame_end"],
@@ -134,7 +135,7 @@ def _cmd_105(params: dict) -> int:
 
     results = run_water_analysis(
         xyz_path=Path(params["xyz"]),
-        md_inp_path=Path(params["md_inp"]),
+        cell_abc=params["cell_abc"],
         output_dir=Path(params["outdir"]),
         frame_start=params["frame_start"],
         frame_end=params["frame_end"],

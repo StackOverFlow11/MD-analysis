@@ -22,8 +22,9 @@ logger = logging.getLogger(__name__)
 
 def run_water_analysis(
     xyz_path: Path,
-    md_inp_path: Path,
+    md_inp_path: Path | None = None,
     *,
+    cell_abc: tuple[float, float, float] | None = None,
     output_dir: Path,
     frame_start: int | None = None,
     frame_end: int | None = None,
@@ -56,6 +57,7 @@ def run_water_analysis(
     png_path = plot_water_three_panel_analysis(
         xyz_path=xyz_path,
         md_inp_path=md_inp_path,
+        cell_abc=cell_abc,
         output_dir=water_dir,
         frame_start=frame_start,
         frame_end=frame_end,
@@ -254,8 +256,9 @@ def run_charge_analysis(
 
 def run_all(
     xyz_path: Path,
-    md_inp_path: Path,
+    md_inp_path: Path | None = None,
     *,
+    cell_abc: tuple[float, float, float] | None = None,
     output_dir: Path,
     cube_pattern: str = "md-POTENTIAL-v_hartree-1_*.cube",
     md_out_path: Path | None = None,
@@ -274,7 +277,7 @@ def run_all(
     results: dict[str, Path] = {}
 
     results.update(run_water_analysis(
-        xyz_path, md_inp_path, output_dir=output_dir,
+        xyz_path, md_inp_path, cell_abc=cell_abc, output_dir=output_dir,
         frame_start=frame_start, frame_end=frame_end, frame_step=frame_step,
         verbose=verbose,
     ))

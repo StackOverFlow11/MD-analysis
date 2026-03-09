@@ -125,8 +125,9 @@ def detect_adsorbed_layer_range_from_density_profile(
 
 def compute_adsorbed_water_theta_distribution(
     xyz_path: str | Path,
-    md_inp_path: str | Path,
+    md_inp_path: str | Path | None = None,
     *,
+    cell_abc: tuple[float, float, float] | None = None,
     adsorbed_range_A: tuple[float, float] | None = None,
     output_dir: str | Path | None = None,
     output_csv_name: str = DEFAULT_ADSORBED_WATER_THETA_DISTRIBUTION_CSV_NAME,
@@ -154,7 +155,7 @@ def compute_adsorbed_water_theta_distribution(
     )
 
     xyz_path = Path(xyz_path)
-    md_inp_path = Path(md_inp_path)
+    md_inp_path = Path(md_inp_path) if md_inp_path is not None else None
     output_dir_path = Path(output_dir) if output_dir is not None else Path.cwd()
     output_dir_path.mkdir(parents=True, exist_ok=True)
 
@@ -163,6 +164,7 @@ def compute_adsorbed_water_theta_distribution(
         common_centers_u, mean_path_A, rho_ensemble, _ = _compute_density_orientation_ensemble(
             xyz_path,
             md_inp_path,
+            cell_abc=cell_abc,
             start_interface=start_interface,
             dz_A=dz_A,
             frame_start=frame_start,
@@ -182,7 +184,12 @@ def compute_adsorbed_water_theta_distribution(
     if d_end_A <= d_start_A:
         raise ValueError("adsorbed_range_A must satisfy end > start")
 
-    a_A, b_A, c_A = _parse_abc_from_md_inp(md_inp_path)
+    if cell_abc is not None:
+        a_A, b_A, c_A = cell_abc
+    elif md_inp_path is not None:
+        a_A, b_A, c_A = _parse_abc_from_md_inp(md_inp_path)
+    else:
+        raise ValueError("Either cell_abc or md_inp_path must be provided.")
     n_bins = _theta_bin_count_from_ndeg(float(ndeg))
     theta_values_deg: list[np.ndarray] = []
 
@@ -251,8 +258,9 @@ def compute_adsorbed_water_theta_distribution(
 
 def ad_water_orientation_analysis(
     xyz_path: str | Path,
-    md_inp_path: str | Path,
+    md_inp_path: str | Path | None = None,
     *,
+    cell_abc: tuple[float, float, float] | None = None,
     output_dir: str | Path | None = None,
     output_profile_csv_name: str = DEFAULT_ADSORBED_WATER_PROFILE_CSV_NAME,
     output_range_txt_name: str = DEFAULT_ADSORBED_WATER_RANGE_TXT_NAME,
@@ -274,7 +282,7 @@ def ad_water_orientation_analysis(
     - range TXT path (start/end/peak)
     """
     xyz_path = Path(xyz_path)
-    md_inp_path = Path(md_inp_path)
+    md_inp_path = Path(md_inp_path) if md_inp_path is not None else None
     output_dir_path = Path(output_dir) if output_dir is not None else Path.cwd()
     output_dir_path.mkdir(parents=True, exist_ok=True)
 
@@ -282,6 +290,7 @@ def ad_water_orientation_analysis(
     common_centers_u, mean_path_A, rho_ensemble, orient_ensemble = _compute_density_orientation_ensemble(
         xyz_path,
         md_inp_path,
+        cell_abc=cell_abc,
         start_interface=start_interface,
         dz_A=dz_A,
         frame_start=frame_start,

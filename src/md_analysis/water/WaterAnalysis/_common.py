@@ -229,8 +229,9 @@ def _single_frame_density_and_orientation(
 
 def _compute_density_orientation_ensemble(
     xyz_path: Path,
-    md_inp_path: Path,
+    md_inp_path: Path | None = None,
     *,
+    cell_abc: tuple[float, float, float] | None = None,
     start_interface: StartInterface = "normal_aligned",
     dz_A: float = DEFAULT_Z_BIN_WIDTH_A,
     metal_symbols: Iterable[str] | None = None,
@@ -242,6 +243,12 @@ def _compute_density_orientation_ensemble(
 ) -> tuple[np.ndarray, float, np.ndarray, np.ndarray]:
     """
     Read the trajectory **once** and compute ensemble-averaged density and orientation.
+
+    Parameters
+    ----------
+    cell_abc : tuple[float, float, float] | None
+        Pre-parsed cell lengths ``(a, b, c)`` in angstrom.  When provided,
+        *md_inp_path* is ignored and no file parsing is performed.
 
     Returns
     -------
@@ -256,7 +263,12 @@ def _compute_density_orientation_ensemble(
     """
     logger.info("Computing density+orientation ensemble")
 
-    a_A, b_A, c_A = _parse_abc_from_md_inp(md_inp_path)
+    if cell_abc is not None:
+        a_A, b_A, c_A = cell_abc
+    elif md_inp_path is not None:
+        a_A, b_A, c_A = _parse_abc_from_md_inp(md_inp_path)
+    else:
+        raise ValueError("Either cell_abc or md_inp_path must be provided.")
 
     iterator = _iter_trajectory(
         xyz_path, a_A, b_A, c_A,

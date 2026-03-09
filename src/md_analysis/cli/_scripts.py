@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ._prompt import _handle_cmd_error, _prompt_bool, _prompt_choice, _prompt_int, _prompt_str, _prompt_str_required
+from ._prompt import _handle_cmd_error, _prompt_bool, _prompt_cell_abc, _prompt_int, _prompt_str, _prompt_str_required
 
 _MENU = """\
 
@@ -77,37 +77,13 @@ def _print_trajectory_info(xyz_path: str) -> None:
     print()
 
 
-def _read_cell_abc(cell_source: str) -> tuple[float, float, float] | None:
-    """Read cell parameters from the chosen source. Returns None on error."""
-    from ..utils.RestartParser.CellParser import CellParseError, parse_abc_from_md_inp, parse_abc_from_restart
-    if cell_source == ".restart":
-        restart_path = _prompt_str_required("CP2K .restart file")
-        try:
-            abc = parse_abc_from_restart(restart_path)
-        except CellParseError as exc:
-            print(f"\n  Error: {exc}")
-            return None
-    else:
-        md_inp_path = _prompt_str_required("CP2K input file (e.g. md.inp)")
-        try:
-            abc = parse_abc_from_md_inp(md_inp_path)
-        except CellParseError as exc:
-            print(f"\n  Error: {exc}")
-            return None
-    print(f"  Cell: a={abc[0]:.4f}, b={abc[1]:.4f}, c={abc[2]:.4f} A")
-    return abc
-
-
 @_handle_cmd_error
 def _cmd_401() -> int:
     """Generate single-frame Bader work directory (menu 401)."""
     print()
     xyz_path = _prompt_str_required("XYZ trajectory file (e.g. md-pos-1.xyz)")
     _print_trajectory_info(xyz_path)
-    cell_source = _prompt_choice("Cell source", ["md.inp", ".restart"], default=".restart")
-    abc = _read_cell_abc(cell_source)
-    if abc is None:
-        return 1
+    abc = _prompt_cell_abc()
 
     frame = _prompt_int("Frame number (0-based)", default=0) or 0
     output_dir = _prompt_str("Output directory", default=".") or "."
@@ -163,10 +139,7 @@ def _cmd_402() -> int:
     print()
     xyz_path = _prompt_str_required("XYZ trajectory file (e.g. md-pos-1.xyz)")
     _print_trajectory_info(xyz_path)
-    cell_source = _prompt_choice("Cell source", ["md.inp", ".restart"], default=".restart")
-    abc = _read_cell_abc(cell_source)
-    if abc is None:
-        return 1
+    abc = _prompt_cell_abc()
 
     frame_start = _prompt_int("Frame start (0-based)", default=0) or 0
     frame_end = _prompt_int("Frame end (exclusive, empty=all)", default=None)

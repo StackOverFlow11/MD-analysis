@@ -22,8 +22,9 @@ __all__ = ["water_mass_density_z_distribution_analysis"]
 
 def water_mass_density_z_distribution_analysis(
     xyz_path: str | Path,
-    md_inp_path: str | Path,
+    md_inp_path: str | Path | None = None,
     *,
+    cell_abc: tuple[float, float, float] | None = None,
     output_dir: str | Path | None = None,
     output_csv_name: str = DEFAULT_WATER_MASS_DENSITY_CSV_NAME,
     start_interface: StartInterface = DEFAULT_START_INTERFACE,
@@ -43,13 +44,14 @@ def water_mass_density_z_distribution_analysis(
     - rho_ensemble_avg_g_cm3: ensemble-averaged water mass density
     """
     xyz_path = Path(xyz_path)
-    md_inp_path = Path(md_inp_path)
+    md_inp_path = Path(md_inp_path) if md_inp_path is not None else None
     output_dir_path = Path(output_dir) if output_dir is not None else Path.cwd()
     output_dir_path.mkdir(parents=True, exist_ok=True)
 
     common_centers_u, mean_path_A, rho_ensemble, _ = _compute_density_orientation_ensemble(
         xyz_path,
         md_inp_path,
+        cell_abc=cell_abc,
         start_interface=start_interface,
         dz_A=dz_A,
         metal_symbols=metal_symbols,
