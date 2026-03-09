@@ -1,6 +1,6 @@
 # `md_analysis.utils` 内部实现准则（当前实现口径）
 
-> 适用范围：`src/md_analysis/utils/`（`config.py`、`_io_helpers.py`、`CubeParser.py`、`BaderParser.py`、`StructureParser/`（`ClusterUtils.py`、`LayerParser.py`、`WaterParser.py`）、`RestartParser/`（`CellParser.py`、`SlowgrowthParser.py`））。
+> 适用范围：`src/md_analysis/utils/`（`config.py`、`_io_helpers.py`、`CubeParser.py`、`BaderParser.py`、`StructureParser/`（`ClusterUtils.py`、`LayerParser.py`、`WaterParser.py`）、`RestartParser/`（`CellParser.py`、`ColvarParser.py`））。
 >
 > 目标：在明确物理口径与输入输出契约的前提下，提供可复用、可测试、可维护的底层实现。
 
@@ -61,11 +61,12 @@
 - 统一异常类型 `CellParseError`。
 - 不依赖 ASE。
 
-### `RestartParser/SlowgrowthParser.py`
+### `RestartParser/ColvarParser.py`
 
-- 负责 CP2K slow-growth（慢增长自由能）模拟的 restart 文件和 LagrangeMultLog 文件解析。
+- 负责 CP2K COLVAR（集合变量约束）模拟的 restart 文件和 LagrangeMultLog 文件解析。
 - 复用 `CellParser.parse_abc_from_restart()` 获取 cell 参数，避免重复实现。
-- 支持 COLVAR 类型：`DISTANCE`、`ANGLE`、`COMBINE_COLVAR`（递归嵌套）。
+- 使用 `finditer` 解析所有 `&COLLECTIVE` 块，支持多约束场景，结果包装为 `ColvarInfo` 容器。
+- 不解析 COLVAR 定义（CV 类型由 CP2K 决定，种类繁多，不逐一写正则）。
 - 支持 `&FIXED_ATOMS` 的 `LIST` 行解析：逗号/空格分隔、`N..M` 范围展开、`\` 续行。
 - LagrangeMultLog 格式自动检测：单约束（每行一个值）vs 多约束（多行矩阵块）。
 - 不完整末尾处理：末尾只有 Shake 无配对 Rattle 时静默丢弃。

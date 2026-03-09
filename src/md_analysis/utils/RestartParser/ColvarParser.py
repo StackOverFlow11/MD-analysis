@@ -1,10 +1,11 @@
-"""Parse CP2K slow-growth restart files and LagrangeMultLog files."""
+"""Parse CP2K COLVAR restart files and LagrangeMultLog files."""
 
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Iterator
 
 import numpy as np
 
@@ -14,24 +15,13 @@ from .CellParser import parse_abc_from_restart
 from ...exceptions import MDAnalysisError
 
 
-class SlowGrowthParseError(MDAnalysisError):
-    """Raised when parsing a slow-growth file fails."""
+class ColvarParseError(MDAnalysisError):
+    """Raised when parsing a COLVAR restart or LagrangeMultLog file fails."""
 
 
 # ---------------------------------------------------------------------------
 # Dataclasses
 # ---------------------------------------------------------------------------
-
-@dataclass(frozen=True)
-class ColvarDef:
-    """Collective variable definition."""
-
-    cv_type: str  # "DISTANCE" | "ANGLE" | "COMBINE_COLVAR"
-    atoms: tuple[int, ...] | None
-    function: str | None
-    variables: tuple[str, ...] | None
-    components: tuple[ColvarDef, ...] | None
-
 
 @dataclass(frozen=True)
 class ConstraintInfo:
@@ -44,17 +34,40 @@ class ConstraintInfo:
 
 
 @dataclass(frozen=True)
-class SlowGrowthRestart:
-    """Metadata parsed from a slow-growth restart file."""
+class ColvarInfo:
+    """Collection of collective variable constraints."""
+
+    constraints: tuple[ConstraintInfo, ...]
+
+    def __len__(self) -> int:
+        return len(self.constraints)
+
+    def __getitem__(self, colvar_id: int) -> ConstraintInfo:
+        for c in self.constraints:
+            if c.colvar_id == colvar_id:
+                return c
+        raise KeyError(f"No constraint with colvar_id={colvar_id}")
+
+    def __iter__(self) -> Iterator[ConstraintInfo]:
+        return iter(self.constraints)
+
+    @property
+    def primary(self) -> ConstraintInfo:
+        """Return the first constraint (primary CV)."""
+        return self.constraints[0]
+
+
+@dataclass(frozen=True)
+class ColvarRestart:
+    """Metadata parsed from a COLVAR restart file."""
 
     project_name: str
     step_start: int
     time_start_fs: float
     timestep_fs: float
     total_steps: int
-    constraint: ConstraintInfo
+    colvars: ColvarInfo
     lagrange_filename: str
-    colvar: ColvarDef
     cell_abc_ang: tuple[float, float, float]
     fixed_atom_indices: tuple[int, ...] | None
 
@@ -97,18 +110,6 @@ _FIXED_ATOMS_BLOCK_RE = re.compile(
     r"&FIXED_ATOMS\s*\n(.*?)&END\s+FIXED_ATOMS",
     re.DOTALL | re.IGNORECASE,
 )
-_COMBINE_COLVAR_RE = re.compile(
-    r"&COMBINE_COLVAR\s*\n(.*?)&END\s+COMBINE_COLVAR",
-    re.DOTALL | re.IGNORECASE,
-)
-_ANGLE_RE = re.compile(
-    r"&ANGLE\s*\n\s*ATOMS\s+([\d\s]+?)\s*\n\s*&END\s+ANGLE",
-    re.IGNORECASE,
-)
-_DISTANCE_RE = re.compile(
-    r"&DISTANCE\s*\n\s*ATOMS\s+([\d\s]+?)\s*\n\s*&END\s+DISTANCE",
-    re.IGNORECASE,
-)
 
 
 def _extract_scalar(block: str, key: str) -> str | None:
@@ -119,14 +120,14 @@ def _extract_scalar(block: str, key: str) -> str | None:
 def _require_scalar(block: str, key: str, context: str) -> str:
     val = _extract_scalar(block, key)
     if val is None:
-        raise SlowGrowthParseError(f"{key} not found in {context}")
+        raise ColvarParseError(f"{key} not found in {context}")
     return val
 
 
 def _parse_md_block(text: str) -> dict:
     md_match = re.search(r"&MD\b(.*?)&END\s+MD", text, re.DOTALL | re.IGNORECASE)
     if not md_match:
-        raise SlowGrowthParseError("No &MD block found")
+        raise ColvarParseError("No &MD block found")
     block = md_match.group(1)
     return {
         "step_start": int(_require_scalar(block, "STEP_START_VAL", "&MD")),
@@ -136,17 +137,7 @@ def _parse_md_block(text: str) -> dict:
     }
 
 
-def _parse_collective_block(text: str) -> ConstraintInfo:
-    constraint_match = _CONSTRAINT_BLOCK_RE.search(text)
-    if not constraint_match:
-        raise SlowGrowthParseError("No &CONSTRAINT block found")
-    constraint_text = constraint_match.group(1)
-
-    coll_match = _COLLECTIVE_BLOCK_RE.search(constraint_text)
-    if not coll_match:
-        raise SlowGrowthParseError("No &COLLECTIVE block found in &CONSTRAINT")
-    block = coll_match.group(1)
-
+def _parse_single_collective_block(block: str) -> ConstraintInfo:
     inter_val = _extract_scalar(block, "INTERMOLECULAR")
     intermolecular = False
     if inter_val is not None:
@@ -162,13 +153,29 @@ def _parse_collective_block(text: str) -> ConstraintInfo:
     )
 
 
+def _parse_all_collective_blocks(text: str) -> ColvarInfo:
+    constraint_match = _CONSTRAINT_BLOCK_RE.search(text)
+    if not constraint_match:
+        raise ColvarParseError("No &CONSTRAINT block found")
+    constraint_text = constraint_match.group(1)
+
+    matches = list(_COLLECTIVE_BLOCK_RE.finditer(constraint_text))
+    if not matches:
+        raise ColvarParseError("No &COLLECTIVE block found in &CONSTRAINT")
+
+    constraints = tuple(
+        _parse_single_collective_block(m.group(1)) for m in matches
+    )
+    return ColvarInfo(constraints=constraints)
+
+
 def _parse_lagrange_filename(text: str) -> str:
     constraint_match = _CONSTRAINT_BLOCK_RE.search(text)
     if not constraint_match:
-        raise SlowGrowthParseError("No &CONSTRAINT block found")
+        raise ColvarParseError("No &CONSTRAINT block found")
     lag_match = _LAGRANGE_BLOCK_RE.search(constraint_match.group(1))
     if not lag_match:
-        raise SlowGrowthParseError("No &LAGRANGE_MULTIPLIERS block found")
+        raise ColvarParseError("No &LAGRANGE_MULTIPLIERS block found")
     fn = _require_scalar(lag_match.group(1), "FILENAME", "&LAGRANGE_MULTIPLIERS")
     return fn.strip()
 
@@ -215,53 +222,6 @@ def _parse_fixed_atoms_list(text: str) -> tuple[int, ...] | None:
     return tuple(sorted(indices))
 
 
-def _parse_simple_colvar(text: str) -> ColvarDef:
-    angle_m = _ANGLE_RE.search(text)
-    if angle_m:
-        atoms = tuple(int(x) for x in angle_m.group(1).split())
-        return ColvarDef("ANGLE", atoms=atoms, function=None, variables=None, components=None)
-
-    dist_m = _DISTANCE_RE.search(text)
-    if dist_m:
-        atoms = tuple(int(x) for x in dist_m.group(1).split())
-        return ColvarDef("DISTANCE", atoms=atoms, function=None, variables=None, components=None)
-
-    raise SlowGrowthParseError(
-        "No supported COLVAR type found (expected ANGLE or DISTANCE)"
-    )
-
-
-def _parse_colvar_block(text: str) -> ColvarDef:
-    combine_m = _COMBINE_COLVAR_RE.search(text)
-    if combine_m:
-        block = combine_m.group(1)
-        func_m = re.search(
-            r"^\s*FUNCTION\s+(.+?)\s*$", block, re.MULTILINE | re.IGNORECASE,
-        )
-        vars_m = re.search(
-            r"^\s*VARIABLES\s+(.+?)\s*$", block, re.MULTILINE | re.IGNORECASE,
-        )
-        function = func_m.group(1).strip() if func_m else None
-        variables = tuple(vars_m.group(1).split()) if vars_m else None
-
-        # Find nested &COLVAR ... &END COLVAR blocks inside COMBINE_COLVAR
-        components: list[ColvarDef] = []
-        for nested in re.finditer(
-            r"&COLVAR\s*\n(.*?)&END\s+COLVAR", block, re.DOTALL | re.IGNORECASE,
-        ):
-            components.append(_parse_simple_colvar(nested.group(1)))
-
-        return ColvarDef(
-            cv_type="COMBINE_COLVAR",
-            atoms=None,
-            function=function,
-            variables=variables,
-            components=tuple(components),
-        )
-
-    return _parse_simple_colvar(text)
-
-
 # ---------------------------------------------------------------------------
 # Private helpers — LagrangeMultLog parsing
 # ---------------------------------------------------------------------------
@@ -271,7 +231,7 @@ _LABEL_RE = re.compile(r"^(Shake|Rattle)\s+Lagrangian\s+Multipliers:", re.IGNORE
 
 def _detect_log_format(lines: list[str]) -> str:
     if len(lines) < 2:
-        raise SlowGrowthParseError("LagrangeMultLog file is too short")
+        raise ColvarParseError("LagrangeMultLog file is too short")
     if _LABEL_RE.match(lines[1].strip()):
         return "single"
     return "multi"
@@ -343,8 +303,8 @@ def _parse_multi_constraint_log(
 # ---------------------------------------------------------------------------
 
 
-def parse_slowgrowth_restart(restart_path: str | Path) -> SlowGrowthRestart:
-    """Parse slow-growth metadata from a CP2K restart file.
+def parse_colvar_restart(restart_path: str | Path) -> ColvarRestart:
+    """Parse COLVAR metadata from a CP2K restart file.
 
     Reuses :func:`~md_analysis.utils.CellParser.parse_abc_from_restart` for
     cell parameters.
@@ -356,24 +316,22 @@ def parse_slowgrowth_restart(restart_path: str | Path) -> SlowGrowthRestart:
         r"^\s*PROJECT_NAME\s+(\S+)", text, re.MULTILINE | re.IGNORECASE,
     )
     if not proj_match:
-        raise SlowGrowthParseError(f"PROJECT_NAME not found in {restart_path}")
+        raise ColvarParseError(f"PROJECT_NAME not found in {restart_path}")
 
     md = _parse_md_block(text)
-    constraint = _parse_collective_block(text)
+    colvars = _parse_all_collective_blocks(text)
     lagrange_filename = _parse_lagrange_filename(text)
-    colvar = _parse_colvar_block(text)
     cell_abc_ang = parse_abc_from_restart(restart_path)
     fixed_atoms = _parse_fixed_atoms_list(text)
 
-    return SlowGrowthRestart(
+    return ColvarRestart(
         project_name=proj_match.group(1),
         step_start=md["step_start"],
         time_start_fs=md["time_start_fs"],
         timestep_fs=md["timestep_fs"],
         total_steps=md["total_steps"],
-        constraint=constraint,
+        colvars=colvars,
         lagrange_filename=lagrange_filename,
-        colvar=colvar,
         cell_abc_ang=cell_abc_ang,
         fixed_atom_indices=fixed_atoms,
     )
@@ -384,7 +342,7 @@ def parse_lagrange_mult_log(log_path: str | Path) -> LagrangeMultLog:
     path = Path(log_path)
     lines = path.read_text(encoding="utf-8").splitlines()
     if not lines:
-        raise SlowGrowthParseError(f"LagrangeMultLog file is empty: {log_path}")
+        raise ColvarParseError(f"LagrangeMultLog file is empty: {log_path}")
 
     fmt = _detect_log_format(lines)
 
@@ -400,14 +358,33 @@ def parse_lagrange_mult_log(log_path: str | Path) -> LagrangeMultLog:
     )
 
 
-def compute_target_series(restart: SlowGrowthRestart, n_steps: int) -> np.ndarray:
+def compute_target_series(
+    restart: ColvarRestart,
+    n_steps: int,
+    *,
+    colvar_id: int | None = None,
+) -> np.ndarray:
     """Reconstruct the target CV series in atomic units.
 
     ``xi(k) = target_au + (k - step_start) * target_growth_au``
     where *k* = 1, 2, ..., *n_steps*.
+
+    Parameters
+    ----------
+    restart : ColvarRestart
+        Parsed restart metadata.
+    n_steps : int
+        Number of steps to generate.
+    colvar_id : int, optional
+        If given, use the constraint with this ``colvar_id``.
+        Defaults to the primary (first) constraint.
     """
+    if colvar_id is not None:
+        constraint = restart.colvars[colvar_id]
+    else:
+        constraint = restart.colvars.primary
     k = np.arange(1, n_steps + 1)
     return (
-        restart.constraint.target_au
-        + (k - restart.step_start) * restart.constraint.target_growth_au
+        constraint.target_au
+        + (k - restart.step_start) * constraint.target_growth_au
     )

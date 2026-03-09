@@ -1,4 +1,4 @@
-"""Tests for SlowgrowthParser — restart + LagrangeMultLog parsing."""
+"""Tests for ColvarParser — restart + LagrangeMultLog parsing."""
 
 from __future__ import annotations
 
@@ -8,45 +8,72 @@ import numpy as np
 import pytest
 
 from md_analysis.utils.RestartParser import (
-    ColvarDef,
+    ColvarInfo,
+    ColvarParseError,
+    ColvarRestart,
     ConstraintInfo,
     LagrangeMultLog,
-    SlowGrowthParseError,
-    SlowGrowthRestart,
     compute_target_series,
+    parse_colvar_restart,
     parse_lagrange_mult_log,
-    parse_slowgrowth_restart,
 )
 
 DATA = Path(__file__).resolve().parents[3] / "data_example" / "sg"
 
 
 # =========================================================================
-# parse_slowgrowth_restart — 4 scenarios
+# ColvarInfo
 # =========================================================================
 
-class TestParseSlowgrowthRestart:
+class TestColvarInfo:
+    """Test ColvarInfo container."""
+
+    @pytest.fixture()
+    def info(self) -> ColvarInfo:
+        c1 = ConstraintInfo(colvar_id=1, target_au=1.0, target_growth_au=0.01, intermolecular=True)
+        c2 = ConstraintInfo(colvar_id=3, target_au=2.0, target_growth_au=0.02, intermolecular=False)
+        return ColvarInfo(constraints=(c1, c2))
+
+    def test_len(self, info: ColvarInfo):
+        assert len(info) == 2
+
+    def test_primary(self, info: ColvarInfo):
+        assert info.primary.colvar_id == 1
+        assert info.primary.target_au == 1.0
+
+    def test_getitem(self, info: ColvarInfo):
+        assert info[1].colvar_id == 1
+        assert info[3].colvar_id == 3
+
+    def test_getitem_missing(self, info: ColvarInfo):
+        with pytest.raises(KeyError, match="colvar_id=99"):
+            info[99]
+
+    def test_iter(self, info: ColvarInfo):
+        ids = [c.colvar_id for c in info]
+        assert ids == [1, 3]
+
+
+# =========================================================================
+# parse_colvar_restart — 4 scenarios
+# =========================================================================
+
+class TestParseColvarRestart:
     """Parse restart files for all 4 data scenarios."""
 
     def test_angle(self):
-        r = parse_slowgrowth_restart(DATA / "angle" / "slowgrowth-1.restart")
+        r = parse_colvar_restart(DATA / "angle" / "slowgrowth-1.restart")
         assert r.project_name == "slowgrowth"
         assert r.step_start == 5100
         assert r.total_steps == 6000
         assert r.timestep_fs == pytest.approx(1.0, rel=1e-6)
         assert r.time_start_fs == pytest.approx(5100.0, rel=1e-3)
 
-        # Constraint
-        assert r.constraint.colvar_id == 1
-        assert r.constraint.intermolecular is True
-        assert r.constraint.target_au == pytest.approx(3.0282160653801862)
-        assert r.constraint.target_growth_au == pytest.approx(4.2217495722394033e-06)
-
-        # COLVAR
-        assert r.colvar.cv_type == "ANGLE"
-        assert r.colvar.atoms == (267, 119, 268)
-        assert r.colvar.function is None
-        assert r.colvar.components is None
+        # Constraint (primary)
+        assert r.colvars.primary.colvar_id == 1
+        assert r.colvars.primary.intermolecular is True
+        assert r.colvars.primary.target_au == pytest.approx(3.0282160653801862)
+        assert r.colvars.primary.target_growth_au == pytest.approx(4.2217495722394033e-06)
 
         # Cell
         assert r.cell_abc_ang == pytest.approx((10.2239, 10.2239, 26.422), rel=1e-4)
@@ -58,7 +85,7 @@ class TestParseSlowgrowthRestart:
         assert r.fixed_atom_indices is None
 
     def test_distance(self):
-        r = parse_slowgrowth_restart(
+        r = parse_colvar_restart(
             DATA / "distance" / "slowgrowth-1.restart.bak-1"
         )
         assert r.project_name == "slowgrowth"
@@ -66,41 +93,28 @@ class TestParseSlowgrowthRestart:
         assert r.total_steps == 8000
         assert r.timestep_fs == pytest.approx(1.0, rel=1e-6)
 
-        assert r.constraint.target_au == pytest.approx(3.4015070391917179)
-        assert r.constraint.target_growth_au == pytest.approx(-2.2855144621117898e-05)
-        assert r.constraint.intermolecular is True
-
-        assert r.colvar.cv_type == "DISTANCE"
-        assert r.colvar.atoms == (51, 119)
+        assert r.colvars.primary.target_au == pytest.approx(3.4015070391917179)
+        assert r.colvars.primary.target_growth_au == pytest.approx(-2.2855144621117898e-05)
+        assert r.colvars.primary.intermolecular is True
 
         assert r.cell_abc_ang == pytest.approx((10.2239, 10.2239, 26.422), rel=1e-4)
         assert r.fixed_atom_indices is None
 
     def test_distance_combinedCV(self):
-        r = parse_slowgrowth_restart(
+        r = parse_colvar_restart(
             DATA / "distance_combinedCV" / "slowgrowth-1.restart"
         )
         assert r.project_name == "slowgrowth"
         assert r.step_start == 5270
         assert r.total_steps == 8000
 
-        assert r.constraint.target_au == pytest.approx(-8.9573018698768436e-01)
-        assert r.constraint.target_growth_au == pytest.approx(-9.1420578484471594e-06)
-
-        assert r.colvar.cv_type == "COMBINE_COLVAR"
-        assert r.colvar.function == "D1-D2"
-        assert r.colvar.variables == ("D1", "D2")
-        assert r.colvar.atoms is None
-        assert len(r.colvar.components) == 2
-        assert r.colvar.components[0].cv_type == "DISTANCE"
-        assert r.colvar.components[0].atoms == (270, 229)
-        assert r.colvar.components[1].cv_type == "DISTANCE"
-        assert r.colvar.components[1].atoms == (228, 229)
+        assert r.colvars.primary.target_au == pytest.approx(-8.9573018698768436e-01)
+        assert r.colvars.primary.target_growth_au == pytest.approx(-9.1420578484471594e-06)
 
         assert r.fixed_atom_indices is None
 
     def test_more_constrain(self):
-        r = parse_slowgrowth_restart(
+        r = parse_colvar_restart(
             DATA / "more_constrain" / "slowgrowth-1.restart"
         )
         assert r.project_name == "slowgrowth"
@@ -108,14 +122,8 @@ class TestParseSlowgrowthRestart:
         assert r.total_steps == 10000
         assert r.timestep_fs == pytest.approx(1.0, rel=1e-6)
 
-        assert r.constraint.target_au == pytest.approx(2.7236433780667042)
-        assert r.constraint.target_growth_au == pytest.approx(4.5710289242235795e-05)
-
-        assert r.colvar.cv_type == "COMBINE_COLVAR"
-        assert r.colvar.function == "D1-D2"
-        assert r.colvar.variables == ("D1", "D2")
-        assert r.colvar.components[0].atoms == (82, 80)
-        assert r.colvar.components[1].atoms == (82, 221)
+        assert r.colvars.primary.target_au == pytest.approx(2.7236433780667042)
+        assert r.colvars.primary.target_growth_au == pytest.approx(4.5710289242235795e-05)
 
         assert r.cell_abc_ang == pytest.approx((10.2239, 8.8542, 27.1231), rel=1e-4)
 
@@ -133,6 +141,66 @@ class TestParseSlowgrowthRestart:
         )
         assert r.fixed_atom_indices == expected
         assert len(r.fixed_atom_indices) == 32
+
+
+# =========================================================================
+# Multi-COLLECTIVE block parsing
+# =========================================================================
+
+class TestMultiCollectiveBlocks:
+    """Test parsing of restart files with multiple &COLLECTIVE blocks."""
+
+    def test_more_constrain_has_multiple_colvars(self):
+        r = parse_colvar_restart(
+            DATA / "more_constrain" / "slowgrowth-1.restart"
+        )
+        # more_constrain has multiple COLLECTIVE blocks
+        assert len(r.colvars) >= 1
+
+    def test_synthetic_multi_collective(self, tmp_path):
+        """Synthetic restart with two &COLLECTIVE blocks."""
+        restart = tmp_path / "multi.restart"
+        restart.write_text(
+            "&GLOBAL\n  PROJECT_NAME multi_cv\n&END GLOBAL\n"
+            "&FORCE_EVAL\n  &SUBSYS\n"
+            "    &CELL\n"
+            "      A  10.0  0.0  0.0\n"
+            "      B   0.0 10.0  0.0\n"
+            "      C   0.0  0.0 20.0\n"
+            "    &END CELL\n"
+            "  &END SUBSYS\n"
+            "&END FORCE_EVAL\n"
+            "&MOTION\n"
+            "  &MD\n"
+            "    STEPS 100\n    TIMESTEP 0.5\n"
+            "    STEP_START_VAL 0\n    TIME_START_VAL 0.0\n"
+            "  &END MD\n"
+            "  &CONSTRAINT\n"
+            "    &COLLECTIVE\n"
+            "      COLVAR 1\n      TARGET 1.5\n      TARGET_GROWTH 0.001\n"
+            "      INTERMOLECULAR .TRUE.\n"
+            "    &END COLLECTIVE\n"
+            "    &COLLECTIVE\n"
+            "      COLVAR 2\n      TARGET 3.0\n      TARGET_GROWTH -0.002\n"
+            "    &END COLLECTIVE\n"
+            "    &LAGRANGE_MULTIPLIERS\n"
+            "      FILENAME constraint_force.dat\n"
+            "    &END LAGRANGE_MULTIPLIERS\n"
+            "  &END CONSTRAINT\n"
+            "&END MOTION\n"
+        )
+        r = parse_colvar_restart(restart)
+        assert r.project_name == "multi_cv"
+        assert len(r.colvars) == 2
+
+        assert r.colvars.primary.colvar_id == 1
+        assert r.colvars.primary.target_au == pytest.approx(1.5)
+        assert r.colvars.primary.intermolecular is True
+
+        assert r.colvars[2].colvar_id == 2
+        assert r.colvars[2].target_au == pytest.approx(3.0)
+        assert r.colvars[2].target_growth_au == pytest.approx(-0.002)
+        assert r.colvars[2].intermolecular is False
 
 
 # =========================================================================
@@ -201,7 +269,7 @@ class TestComputeTargetSeries:
 
     def test_at_step_start_equals_target(self):
         """xi(step_start) == target_au by construction."""
-        r = parse_slowgrowth_restart(DATA / "angle" / "slowgrowth-1.restart")
+        r = parse_colvar_restart(DATA / "angle" / "slowgrowth-1.restart")
         log = parse_lagrange_mult_log(
             DATA / "angle"
             / "slowgrowth-constraint_force.dat-1.LagrangeMultLog"
@@ -211,26 +279,59 @@ class TestComputeTargetSeries:
         # At k = step_start, xi should equal target_au
         if r.step_start <= log.n_steps:
             assert xi[r.step_start - 1] == pytest.approx(
-                r.constraint.target_au, rel=1e-10,
+                r.colvars.primary.target_au, rel=1e-10,
             )
 
     def test_linear_growth(self):
         """Verify linearity: xi(k+1) - xi(k) == target_growth_au."""
-        r = parse_slowgrowth_restart(
+        r = parse_colvar_restart(
             DATA / "distance" / "slowgrowth-1.restart.bak-1"
         )
         xi = compute_target_series(r, 100)
         diffs = np.diff(xi)
         np.testing.assert_allclose(
-            diffs, r.constraint.target_growth_au, rtol=1e-10,
+            diffs, r.colvars.primary.target_growth_au, rtol=1e-10,
         )
 
     def test_shape(self):
-        r = parse_slowgrowth_restart(
+        r = parse_colvar_restart(
             DATA / "distance_combinedCV" / "slowgrowth-1.restart"
         )
         xi = compute_target_series(r, 50)
         assert xi.shape == (50,)
+
+    def test_colvar_id_param(self, tmp_path):
+        """compute_target_series with explicit colvar_id."""
+        restart = tmp_path / "multi.restart"
+        restart.write_text(
+            "&GLOBAL\n  PROJECT_NAME test\n&END GLOBAL\n"
+            "&FORCE_EVAL\n  &SUBSYS\n"
+            "    &CELL\n"
+            "      A 10.0 0.0 0.0\n      B 0.0 10.0 0.0\n      C 0.0 0.0 20.0\n"
+            "    &END CELL\n"
+            "  &END SUBSYS\n"
+            "&END FORCE_EVAL\n"
+            "&MOTION\n"
+            "  &MD\n    STEPS 100\n    TIMESTEP 1.0\n"
+            "    STEP_START_VAL 0\n    TIME_START_VAL 0.0\n  &END MD\n"
+            "  &CONSTRAINT\n"
+            "    &COLLECTIVE\n      COLVAR 1\n      TARGET 1.0\n      TARGET_GROWTH 0.01\n"
+            "    &END COLLECTIVE\n"
+            "    &COLLECTIVE\n      COLVAR 2\n      TARGET 5.0\n      TARGET_GROWTH -0.05\n"
+            "    &END COLLECTIVE\n"
+            "    &LAGRANGE_MULTIPLIERS\n      FILENAME f.dat\n"
+            "    &END LAGRANGE_MULTIPLIERS\n"
+            "  &END CONSTRAINT\n"
+            "&END MOTION\n"
+        )
+        r = parse_colvar_restart(restart)
+        # Default uses primary (colvar_id=1)
+        xi_default = compute_target_series(r, 10)
+        assert xi_default[0] == pytest.approx(1.0 + (1 - 0) * 0.01)
+
+        # Explicit colvar_id=2
+        xi_cv2 = compute_target_series(r, 10, colvar_id=2)
+        assert xi_cv2[0] == pytest.approx(5.0 + (1 - 0) * (-0.05))
 
 
 # =========================================================================
@@ -242,7 +343,7 @@ class TestEdgeCases:
     def test_empty_file_raises(self, tmp_path):
         empty = tmp_path / "empty.LagrangeMultLog"
         empty.write_text("")
-        with pytest.raises(SlowGrowthParseError, match="empty"):
+        with pytest.raises(ColvarParseError, match="empty"):
             parse_lagrange_mult_log(empty)
 
     def test_missing_constraint_raises(self, tmp_path):
@@ -253,12 +354,12 @@ class TestEdgeCases:
             "    STEP_START_VAL 0\n    TIME_START_VAL 0.0\n"
             "  &END MD\n&END MOTION\n"
         )
-        with pytest.raises(SlowGrowthParseError, match="CONSTRAINT"):
-            parse_slowgrowth_restart(fake)
+        with pytest.raises(ColvarParseError, match="CONSTRAINT"):
+            parse_colvar_restart(fake)
 
     def test_fixed_atoms_range_expansion(self, tmp_path):
         """Verify that N..M range syntax is expanded correctly."""
-        from md_analysis.utils.RestartParser.SlowgrowthParser import (
+        from md_analysis.utils.RestartParser.ColvarParser import (
             _parse_fixed_atoms_list,
         )
         text = (

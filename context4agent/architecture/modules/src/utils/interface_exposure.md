@@ -149,32 +149,35 @@
 > `_compute_water_orientation_theta_pdf_in_c_fraction_window` 三个函数已降级为内部（`_` 前缀），不再属于公开 API。
 > 它们针对全 cell z 轴分箱，与 `water` 层的界面-到-中点分析语义不同，不适合作为公开接口暴露。
 
-### 2.8 `RestartParser/SlowgrowthParser.py` 导出（Stable）
+### 2.8 `RestartParser/ColvarParser.py` 导出（Stable）
 
 异常：
 
-- `SlowGrowthParseError`
-  - 解析 slow-growth restart 或 LagrangeMultLog 文件失败时抛出
+- `ColvarParseError`
+  - 解析 COLVAR restart 或 LagrangeMultLog 文件失败时抛出
 
 数据结构（frozen dataclass）：
 
-- `ColvarDef`
-  - 集合变量定义：`cv_type`（`"DISTANCE"` / `"ANGLE"` / `"COMBINE_COLVAR"`）、`atoms`、`function`、`variables`、`components`
 - `ConstraintInfo`
   - COLLECTIVE 约束参数：`colvar_id`、`target_au`、`target_growth_au`、`intermolecular`
-- `SlowGrowthRestart`
-  - restart 文件元数据：`project_name`、`step_start`、`time_start_fs`、`timestep_fs`、`total_steps`、`constraint`、`lagrange_filename`、`colvar`、`cell_abc_ang`、`fixed_atom_indices`
+- `ColvarInfo`
+  - 约束集合容器：`constraints: tuple[ConstraintInfo, ...]`
+  - 支持 `__len__`、`__getitem__(colvar_id)`（按 colvar_id 查找，KeyError 如未找到）、`__iter__`
+  - 属性 `primary` 返回第一个约束
+- `ColvarRestart`
+  - restart 文件元数据：`project_name`、`step_start`、`time_start_fs`、`timestep_fs`、`total_steps`、`colvars: ColvarInfo`、`lagrange_filename`、`cell_abc_ang`、`fixed_atom_indices`
 - `LagrangeMultLog`
   - 拉格朗日乘子时序：`shake`、`rattle`、`n_steps`、`n_constraints`；属性 `collective_shake`/`collective_rattle` 提取 CV 乘子
 
 函数：
 
-- `parse_slowgrowth_restart(restart_path) -> SlowGrowthRestart`
-  - 解析 CP2K slow-growth restart 文件，内部复用 `CellParser.parse_abc_from_restart()`
+- `parse_colvar_restart(restart_path) -> ColvarRestart`
+  - 解析 CP2K COLVAR restart 文件，使用 `finditer` 解析所有 `&COLLECTIVE` 块，内部复用 `CellParser.parse_abc_from_restart()`
 - `parse_lagrange_mult_log(log_path) -> LagrangeMultLog`
   - 解析 LagrangeMultLog 文件，自动检测单约束/多约束格式
-- `compute_target_series(restart, n_steps) -> np.ndarray`
+- `compute_target_series(restart, n_steps, *, colvar_id=None) -> np.ndarray`
   - 重建 ξ(t) 序列（原子单位），`xi(k) = target_au + (k - step_start) * target_growth_au`
+  - `colvar_id` 可选参数：指定使用哪个约束，默认使用 primary（第一个）
 
 ## 3. 推荐导入方式
 

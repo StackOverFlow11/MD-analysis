@@ -51,14 +51,14 @@ from .BaderParser import load_bader_atoms
 from .RestartParser.CellParser import CellParseError
 from .RestartParser.CellParser import parse_abc_from_md_inp
 from .RestartParser.CellParser import parse_abc_from_restart
-from .RestartParser import ColvarDef
+from .RestartParser import ColvarInfo
+from .RestartParser import ColvarParseError
+from .RestartParser import ColvarRestart
 from .RestartParser import ConstraintInfo
 from .RestartParser import LagrangeMultLog
-from .RestartParser import SlowGrowthParseError
-from .RestartParser import SlowGrowthRestart
 from .RestartParser import compute_target_series
+from .RestartParser import parse_colvar_restart
 from .RestartParser import parse_lagrange_mult_log
-from .RestartParser import parse_slowgrowth_restart
 
 __all__ = [
     "AREA_VECTOR_INDICES",
@@ -102,12 +102,12 @@ __all__ = [
     "CellParseError",
     "parse_abc_from_md_inp",
     "parse_abc_from_restart",
-    "ColvarDef",
+    "ColvarInfo",
+    "ColvarParseError",
+    "ColvarRestart",
     "ConstraintInfo",
     "LagrangeMultLog",
-    "SlowGrowthParseError",
-    "SlowGrowthRestart",
     "compute_target_series",
+    "parse_colvar_restart",
     "parse_lagrange_mult_log",
-    "parse_slowgrowth_restart",
 ]
