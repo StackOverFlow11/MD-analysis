@@ -45,6 +45,7 @@ __all__ = [
 # ---------------------------------------------------------------------------
 
 def _smooth_1d(values: np.ndarray, window_bins: int) -> np.ndarray:
+    """Apply 1D moving-average smoothing with odd window size."""
     values = np.asarray(values, dtype=float).reshape(-1)
     if values.size == 0:
         return values.copy()

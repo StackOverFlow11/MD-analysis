@@ -221,6 +221,7 @@ def _plot_series_with_cumavg(
     ylabel: str,
     title: str,
 ) -> None:
+    """Plot instantaneous values with cumulative average overlay."""
     png_path.parent.mkdir(parents=True, exist_ok=True)
 
     import matplotlib
@@ -241,6 +242,7 @@ def _plot_series_with_cumavg(
 
 
 def _parse_csv_symbols(s: Optional[str]) -> Optional[set[str]]:
+    """Parse comma-separated element symbols into a set, or None."""
     if s is None:
         return None
     raw = [p.strip() for p in s.split(",")]

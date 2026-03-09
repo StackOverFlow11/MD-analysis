@@ -68,7 +68,7 @@ class TestHandleCmdError:
         with caplog.at_level(logging.ERROR, logger="md_analysis.cli._prompt"):
             _raise_type("logged error")
         assert any(
-            r.levelno == logging.ERROR and "logged error" in r.message
+            r.levelno == logging.ERROR and "logged error" in r.getMessage()
             for r in caplog.records
         )
         assert any(

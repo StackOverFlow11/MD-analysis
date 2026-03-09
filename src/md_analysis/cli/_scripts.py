@@ -100,6 +100,7 @@ def _read_cell_abc(cell_source: str) -> tuple[float, float, float] | None:
 
 @_handle_cmd_error
 def _cmd_401() -> int:
+    """Generate single-frame Bader work directory (menu 401)."""
     print()
     xyz_path = _prompt_str_required("XYZ trajectory file (e.g. md-pos-1.xyz)")
     _print_trajectory_info(xyz_path)
@@ -158,6 +159,7 @@ def _cmd_401() -> int:
 
 @_handle_cmd_error
 def _cmd_402() -> int:
+    """Batch generate Bader work directories (menu 402)."""
     print()
     xyz_path = _prompt_str_required("XYZ trajectory file (e.g. md-pos-1.xyz)")
     _print_trajectory_info(xyz_path)

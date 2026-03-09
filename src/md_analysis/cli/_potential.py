@@ -103,6 +103,7 @@ def _collect_params_for(code: str) -> dict:
 
 @_handle_cmd_error
 def _cmd_201(params: dict) -> int:
+    """Run center slab potential analysis (menu 201)."""
     from ..potential import center_slab_potential_analysis
 
     outdir = Path(params["outdir"]) / "potential" / "center"
@@ -127,6 +128,7 @@ def _cmd_201(params: dict) -> int:
 
 @_handle_cmd_error
 def _cmd_202(params: dict) -> int:
+    """Run Fermi energy analysis (menu 202)."""
     from ..potential import fermi_energy_analysis
 
     outdir = Path(params["outdir"]) / "potential" / "fermi"
@@ -146,6 +148,7 @@ def _cmd_202(params: dict) -> int:
 
 @_handle_cmd_error
 def _cmd_203(params: dict) -> int:
+    """Run electrode potential analysis (menu 203)."""
     from ..potential import electrode_potential_analysis
 
     outdir = Path(params["outdir"]) / "potential" / "electrode"
@@ -172,6 +175,7 @@ def _cmd_203(params: dict) -> int:
 
 @_handle_cmd_error
 def _cmd_204(params: dict) -> int:
+    """Run phi(z) plane-averaged profile (menu 204)."""
     from ..potential import phi_z_planeavg_analysis
 
     outdir = Path(params["outdir"]) / "potential" / "phi_z"
@@ -192,6 +196,7 @@ def _cmd_204(params: dict) -> int:
 
 @_handle_cmd_error
 def _cmd_205(params: dict) -> int:
+    """Run thickness sensitivity sweep (menu 205)."""
     from ..potential import thickness_sensitivity_analysis
 
     outdir = Path(params["outdir"]) / "potential" / "thickness_sensitivity"
@@ -218,6 +223,7 @@ def _cmd_205(params: dict) -> int:
 
 @_handle_cmd_error
 def _cmd_206(params: dict) -> int:
+    """Run full potential analysis (menu 206)."""
     from ..main import run_potential_analysis
 
     md_out_path = Path(params["md_out"])

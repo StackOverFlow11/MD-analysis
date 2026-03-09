@@ -481,6 +481,7 @@ def _plot_surface_charge(
     sigma_aligned_cum: np.ndarray,
     sigma_opposed_cum: np.ndarray,
 ) -> None:
+    """Plot surface charge density with instantaneous and cumulative average."""
     png_path.parent.mkdir(parents=True, exist_ok=True)
 
     import matplotlib

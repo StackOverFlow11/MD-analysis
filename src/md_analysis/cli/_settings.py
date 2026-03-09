@@ -38,6 +38,7 @@ def settings_menu() -> int:
 
 @_handle_cmd_error
 def _cmd_901() -> int:
+    """Set VASP submission script path (menu 901)."""
     from ..config import KEY_VASP_SCRIPT_PATH, get_config, set_config
 
     current = get_config(KEY_VASP_SCRIPT_PATH)
@@ -62,6 +63,7 @@ def _cmd_901() -> int:
 
 @_handle_cmd_error
 def _cmd_902() -> int:
+    """Show current configuration (menu 902)."""
     from ..config import load_config
 
     cfg = load_config()

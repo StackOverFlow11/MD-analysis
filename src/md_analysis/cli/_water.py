@@ -46,6 +46,7 @@ def _collect_params() -> dict:
 
 @_handle_cmd_error
 def _cmd_101(params: dict) -> int:
+    """Run water mass density analysis (menu 101)."""
     from ..water import water_mass_density_z_distribution_analysis
 
     outdir = Path(params["outdir"]) / "water"
@@ -65,6 +66,7 @@ def _cmd_101(params: dict) -> int:
 
 @_handle_cmd_error
 def _cmd_102(params: dict) -> int:
+    """Run water orientation-weighted density analysis (menu 102)."""
     from ..water import water_orientation_weighted_density_z_distribution_analysis
 
     outdir = Path(params["outdir"]) / "water"
@@ -84,6 +86,7 @@ def _cmd_102(params: dict) -> int:
 
 @_handle_cmd_error
 def _cmd_103(params: dict) -> int:
+    """Run adsorbed-water orientation analysis (menu 103)."""
     from ..water import ad_water_orientation_analysis
 
     outdir = Path(params["outdir"]) / "water"
@@ -105,6 +108,7 @@ def _cmd_103(params: dict) -> int:
 
 @_handle_cmd_error
 def _cmd_104(params: dict) -> int:
+    """Run adsorbed-water theta distribution (menu 104)."""
     from ..water import compute_adsorbed_water_theta_distribution
 
     outdir = Path(params["outdir"]) / "water"
@@ -125,6 +129,7 @@ def _cmd_104(params: dict) -> int:
 
 @_handle_cmd_error
 def _cmd_105(params: dict) -> int:
+    """Run full three-panel water analysis (menu 105)."""
     from ..main import run_water_analysis
 
     results = run_water_analysis(
