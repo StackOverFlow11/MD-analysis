@@ -13,10 +13,13 @@ the public API in WaterAnalysis/__init__.py.
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Generator, Iterable, Literal
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 try:
     from ase import Atoms
@@ -251,6 +254,8 @@ def _compute_density_orientation_ensemble(
     orient_ensemble : np.ndarray, shape (nbins,)
         Equal-weight ensemble-averaged orientation-weighted mass density (g/cm³).
     """
+    logger.info("Computing density+orientation ensemble")
+
     a_A, b_A, c_A = _parse_abc_from_md_inp(md_inp_path)
 
     iterator = _iter_trajectory(

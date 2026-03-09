@@ -11,12 +11,15 @@ Public API
 from __future__ import annotations
 
 import csv
+import logging
 import math
 import re
 from pathlib import Path
 from typing import Iterable, Optional
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 from ..utils.config import (
     BOHR_TO_ANG,
@@ -282,6 +285,7 @@ def center_slab_potential_analysis(
         cube_pattern, workdir=workdir,
         frame_start=frame_start, frame_end=frame_end, frame_step=frame_step,
     )
+    logger.info("Center slab potential: %d cube files, thickness=%.1f A", len(cube_paths), thickness_ang)
 
     # Optional interface detection from xyz
     use_interface_center = center_mode == "interface"
@@ -423,6 +427,7 @@ def fermi_energy_analysis(
     if not fermi_records:
         raise RuntimeError(f"No (step, Fermi energy) records parsed from: {md_out_path}")
     fermi_records = fermi_records[frame_start:frame_end:frame_step]
+    logger.info("Fermi energy: %d records from %s", len(fermi_records), md_out_path)
 
     f_steps = np.array([r["step"] for r in fermi_records], dtype=int)
     f_time = np.array([r["time_fs"] if r["time_fs"] is not None else math.nan for r in fermi_records], dtype=float)
@@ -522,6 +527,8 @@ def electrode_potential_analysis(
         u_v = -ef_ev + phi_ev + DP_A_H3O_W_EV - MU_HPLUS_G0_EV - DELTA_E_ZP_EV
         u_vals.append(u_v)
         u_rows.append({"step": s, "U_vs_SHE_V": float(u_v)})
+
+    logger.info("Electrode potential: %d matched frames", len(u_rows))
 
     u_csv_path = outdir / DEFAULT_ELECTRODE_POTENTIAL_CSV_NAME
     if u_rows:
@@ -656,6 +663,7 @@ def thickness_sensitivity_analysis(
     # --- Sweep thickness values ---
     cSHE_offset = DP_A_H3O_W_EV - MU_HPLUS_G0_EV - DELTA_E_ZP_EV
     thicknesses = np.arange(thickness_start, thickness_end + thickness_step * 0.5, thickness_step)
+    logger.info("Thickness sensitivity: sweeping %d values", len(thicknesses))
 
     rows: list[dict] = []
     means: list[float] = []

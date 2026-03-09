@@ -25,6 +25,13 @@ Interactive CLI package providing a VASPKIT-style numbered menu interface. Repla
 - `cli` -> `config` (for persistent user configuration)
 - No reverse dependencies: no other module imports from `cli`
 
+## Logging configuration
+
+- `main()` configures a `StreamHandler` on the `"md_analysis"` logger at `INFO` level, outputting to stderr with format `"%(levelname)s: %(message)s"`
+- Configuration is idempotent: only adds the handler if no non-NullHandler handlers exist
+- The library itself uses `NullHandler` (set in `md_analysis/__init__.py`), so logging is silent unless the CLI (or an application) explicitly configures a handler
+- `_handle_cmd_error` logs unexpected exceptions at `ERROR` level with `exc_info=True` for full traceback in logs, while printing a concise message to stdout for the user
+
 ## Parameter flow
 
 1. User selects analysis code from sub-menu

@@ -31,6 +31,14 @@ _MENU = """\
 
 def main() -> int:
     """Interactive top-level menu."""
+    import logging
+    _logger = logging.getLogger("md_analysis")
+    if not _logger.handlers or all(isinstance(h, logging.NullHandler) for h in _logger.handlers):
+        _handler = logging.StreamHandler()  # stderr
+        _handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
+        _logger.addHandler(_handler)
+        _logger.setLevel(logging.INFO)
+
     try:
         print(_BANNER)
         print(_MENU)

@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Iterable
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 from ...utils import (
     _compute_bisector_cos_theta_vec,
@@ -142,6 +145,13 @@ def compute_adsorbed_water_theta_distribution(
     - If adsorbed_range_A is None, auto-detect range from density profile.
     - Returns (theta_centers_deg, theta_pdf_degree_inv, csv_path).
     """
+    d_start_display = adsorbed_range_A[0] if adsorbed_range_A is not None else 0.0
+    d_end_display = adsorbed_range_A[1] if adsorbed_range_A is not None else 0.0
+    logger.info(
+        "Computing adsorbed-water theta distribution, range=[%.3f, %.3f] A",
+        d_start_display, d_end_display,
+    )
+
     xyz_path = Path(xyz_path)
     md_inp_path = Path(md_inp_path)
     output_dir_path = Path(output_dir) if output_dir is not None else Path.cwd()

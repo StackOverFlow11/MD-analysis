@@ -10,11 +10,14 @@ Public API
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any, Iterable
 
 from .potential.config import DEFAULT_THICKNESS_ANG
 from .utils.config import CHARGE_METHOD_COUNTERION
+
+logger = logging.getLogger(__name__)
 
 
 def run_water_analysis(
@@ -35,6 +38,8 @@ def run_water_analysis(
 
     Returns a dict mapping output names to file paths.
     """
+    logger.info("Starting water analysis: xyz=%s, output_dir=%s", xyz_path, output_dir)
+
     from .water import plot_water_three_panel_analysis
     from .water.config import (
         DEFAULT_WATER_MASS_DENSITY_CSV_NAME,
@@ -96,6 +101,8 @@ def run_potential_analysis(
 
     Returns a dict mapping output names to file paths.
     """
+    logger.info("Starting potential analysis: output_dir=%s", output_dir)
+
     from .potential import (
         center_slab_potential_analysis,
         fermi_energy_analysis,
@@ -215,6 +222,8 @@ def run_charge_analysis(
     Outputs are written under ``output_dir/charge/<method>/``.
     Returns a dict mapping output names to file paths.
     """
+    logger.info("Starting charge analysis: method=%s, output_dir=%s", method, output_dir)
+
     from .charge import surface_charge_analysis
     from .charge.config import (
         DEFAULT_SURFACE_CHARGE_CSV_NAME,
@@ -260,6 +269,8 @@ def run_all(
 
     Returns a merged dict of all output file paths.
     """
+    logger.info("Starting full analysis: output_dir=%s", output_dir)
+
     results: dict[str, Path] = {}
 
     results.update(run_water_analysis(

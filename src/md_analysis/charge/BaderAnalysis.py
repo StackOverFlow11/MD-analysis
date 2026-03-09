@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from pathlib import Path
 from typing import Iterable
 
 import numpy as np
 from ase import Atoms
+
+logger = logging.getLogger(__name__)
 
 from ..utils._io_helpers import _cumulative_average, _write_csv
 from ..utils.BaderParser import load_bader_atoms
@@ -558,6 +561,7 @@ def surface_charge_analysis(
     frame_dirs = frame_dirs[frame_start:frame_end:frame_step]
     if not frame_dirs:
         raise FileNotFoundError("No frame directories after slicing")
+    logger.info("Surface charge analysis: %d frames, method=%s", len(frame_dirs), method)
 
     if output_dir is None:
         output_dir = root

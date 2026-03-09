@@ -11,3 +11,6 @@ from .exceptions import MDAnalysisError
 __version__ = "0.1.0"
 
 __all__ = ["utils", "water", "potential", "charge", "__version__", "MDAnalysisError"]
+
+import logging
+logging.getLogger(__name__).addHandler(logging.NullHandler())

@@ -6,6 +6,7 @@ potential extraction φ(z), and slab-averaged potential computation.
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -14,6 +15,8 @@ from typing import Optional
 import numpy as np
 
 from .config import BOHR_TO_ANG, HA_TO_EV
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -216,6 +219,7 @@ def discover_cube_files(
     """
     workdir = (workdir or Path(".")).resolve()
     cube_paths = [Path(p) for p in sorted(workdir.glob(cube_pattern))]
+    logger.debug("Discovered %d cube files matching %r", len(cube_paths), cube_pattern)
     if not cube_paths:
         raise FileNotFoundError(
             f"No cube files matched pattern: {cube_pattern!r} in {workdir}"

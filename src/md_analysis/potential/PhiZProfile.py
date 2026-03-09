@@ -8,10 +8,13 @@ Public API
 from __future__ import annotations
 
 import csv
+import logging
 from pathlib import Path
 from typing import Optional
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 from ..utils.CubeParser import (
     discover_cube_files,
@@ -71,6 +74,7 @@ def phi_z_planeavg_analysis(
         cube_pattern, workdir=workdir,
         frame_start=frame_start, frame_end=frame_end, frame_step=frame_step,
     )
+    logger.info("phi(z) analysis: %d cube files", len(cube_paths))
 
     steps: list[int] = []
     phi_list: list[np.ndarray] = []

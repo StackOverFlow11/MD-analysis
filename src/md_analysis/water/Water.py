@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 from matplotlib.ticker import MultipleLocator
 from matplotlib.ticker import NullFormatter
 
@@ -59,6 +62,8 @@ def plot_water_three_panel_analysis(
     - Read #1: compute density + orientation profiles (single combined pass).
     - Read #2: collect theta values for adsorbed-layer molecules.
     """
+    logger.info("Starting three-panel water analysis")
+
     xyz_path = Path(xyz_path)
     md_inp_path = Path(md_inp_path)
     output_dir_path = Path(output_dir) if output_dir is not None else Path.cwd()
@@ -101,6 +106,7 @@ def plot_water_three_panel_analysis(
     d_start_A, d_end_A, d_peak_A = detect_adsorbed_layer_range_from_density_profile(
         distance_A, rho_ensemble
     )
+    logger.info("Adsorbed layer range: %.3f - %.3f A", d_start_A, d_end_A)
     in_adsorbed = (distance_A >= d_start_A) & (distance_A <= d_end_A)
 
     # Save adsorbed profile CSV and range TXT (side effects expected by callers)
@@ -198,4 +204,5 @@ def plot_water_three_panel_analysis(
         fig.savefig(out_png_path, dpi=180)
         plt.close(fig)
 
+    logger.info("Three-panel PNG: %s", out_png_path)
     return out_png_path

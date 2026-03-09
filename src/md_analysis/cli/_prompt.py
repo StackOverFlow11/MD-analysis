@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import functools
+import logging
 
 from ..exceptions import MDAnalysisError
+
+logger = logging.getLogger(__name__)
 
 
 def _prompt_str(label: str, *, default: str | None = None) -> str | None:
@@ -97,6 +100,7 @@ def _handle_cmd_error(func):
             print(f"\n  Error: {exc}")
             return 1
         except Exception as exc:
+            logger.error("Unexpected error in %s: %s", func.__name__, exc, exc_info=True)
             print(f"\n  Unexpected error ({type(exc).__name__}): {exc}")
             return 1
     return wrapper

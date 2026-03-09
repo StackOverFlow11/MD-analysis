@@ -1,5 +1,7 @@
 """Tests for the _handle_cmd_error decorator."""
 
+import logging
+
 import pytest
 
 from md_analysis.cli._prompt import _handle_cmd_error
@@ -61,3 +63,15 @@ class TestHandleCmdError:
         out = capsys.readouterr().out
         assert "Unexpected error (TypeError):" in out
         assert "bad type" in out
+
+    def test_unexpected_error_logged_with_traceback(self, caplog):
+        with caplog.at_level(logging.ERROR, logger="md_analysis.cli._prompt"):
+            _raise_type("logged error")
+        assert any(
+            r.levelno == logging.ERROR and "logged error" in r.message
+            for r in caplog.records
+        )
+        assert any(
+            r.exc_info is not None and r.exc_info[0] is TypeError
+            for r in caplog.records
+        )

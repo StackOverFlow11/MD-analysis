@@ -133,6 +133,14 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 
 Mirrors `src/md_analysis/` structure. Each sub-package has `interface_exposure.md` + `implementation_guidelines.md`. Also contains `data_contract.md` (CSV specs), `glossary_units.md`, `requirements/short_term.md`.
 
+## Logging Conventions
+
+- **Library code** uses `logging.getLogger(__name__)` per module; `NullHandler` is set on the root `md_analysis` logger in `__init__.py` (PEP 282 best practice)
+- **CLI** configures `StreamHandler(stderr)` at `INFO` level in `main()` — only when no application handler exists
+- **`verbose` parameter** controls tqdm progress bars only; logging messages are always emitted (visibility depends on handler configuration)
+- **Log placement**: only at workflow boundaries and before long operations; never in tight loops or low-level math functions
+- **`_handle_cmd_error`**: logs unexpected exceptions with `logger.error(..., exc_info=True)` for full traceback; prints concise message to stdout
+
 ## Key Conventions
 
 - **Interface labels:** `"normal_aligned"` (+axis facing) / `"normal_opposed"` (-axis facing)
