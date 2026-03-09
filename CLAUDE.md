@@ -48,8 +48,9 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 
 | File | Key Exports | Purpose |
 |---|---|---|
-| `config.py` | `TRANSITION_METAL_SYMBOLS`, `DEFAULT_METAL_SYMBOLS`, `DEFAULT_Z_BIN_WIDTH_A`, `DEFAULT_THETA_BIN_DEG`, `DEFAULT_WATER_OH_CUTOFF_A`, `WATER_MOLAR_MASS_G_PER_MOL`, `HA_TO_EV`, `BOHR_TO_ANG`, `DP_A_H3O_W_EV`, `MU_HPLUS_G0_EV`, `DELTA_E_ZP_EV` | Physical constants + defaults |
-| `CubeParser.py` | `CubeHeader` (dataclass), `read_cube_header_and_values(path)`, `slab_average_potential_ev(header, values, thickness, *, z_center)`, `plane_avg_phi_z_ev()`, `z_coords_ang()`, `extract_step_from_cube_filename()` | Gaussian cube file I/O + potential utilities |
+| `config.py` | `TRANSITION_METAL_SYMBOLS`, `DEFAULT_METAL_SYMBOLS`, `DEFAULT_Z_BIN_WIDTH_A`, `DEFAULT_THETA_BIN_DEG`, `DEFAULT_WATER_OH_CUTOFF_A`, `WATER_MOLAR_MASS_G_PER_MOL`, `HA_TO_EV`, `BOHR_TO_ANG`, `DP_A_H3O_W_EV`, `MU_HPLUS_G0_EV`, `DELTA_E_ZP_EV`, `AXIS_MAP`, `AREA_VECTOR_INDICES`, `INTERFACE_NORMAL_ALIGNED`, `INTERFACE_NORMAL_OPPOSED`, `CHARGE_METHOD_COUNTERION`, `CHARGE_METHOD_LAYER` | Physical constants + defaults |
+| `_io_helpers.py` | `_cumulative_average(values)`, `_write_csv(path, rows, fieldnames)` | Private shared I/O helpers (used by potential + charge workflows) |
+| `CubeParser.py` | `CubeHeader` (dataclass), `read_cube_header_and_values(path)`, `slab_average_potential_ev(header, values, thickness, *, z_center)`, `plane_avg_phi_z_ev()`, `z_coords_ang()`, `discover_cube_files(cube_pattern, *, workdir, frame_start, frame_end, frame_step)`, `extract_step_from_cube_filename()` | Gaussian cube file I/O + potential utilities |
 | `BaderParser.py` | `load_bader_atoms(structure, acf, potcar)` → Atoms with `bader_charge`/`bader_net_charge` arrays, `BaderParseError`, `_read_acf()`, `_read_potcar_zval()` | VASP Bader charge parsing |
 | `StructureParser/ClusterUtils.py` | `cluster_1d_periodic(values, period, tol)`, `find_largest_gap_periodic(centers, period)`, `gap_midpoint_periodic(low, high, period)` | 1D periodic clustering and gap detection |
 | `StructureParser/LayerParser.py` | `Layer` (dataclass: `atom_indices`, `center_frac`, `is_interface`, `interface_label`, `normal_unit`), `SurfaceDetectionResult` (`.interface_normal_aligned()`, `.interface_normal_opposed()`), `SurfaceGeometryError`, `detect_interface_layers(atoms, *, metal_symbols, normal, layer_tol_A)`, `format_detection_summary()`, `_circular_mean_fractional()`, `_mic_delta_fractional()` | Metal layer detection + interface labeling |
@@ -115,20 +116,25 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 | `test/unit/utils/test_layer_parser.py` | `detect_interface_layers`, `Layer`, `SurfaceDetectionResult` |
 | `test/unit/utils/test_water_parser.py` | `detect_water_molecule_indices`, density/orientation helpers |
 | `test/unit/utils/test_bader_parser.py` | `_read_acf`, `_read_potcar_zval`, `load_bader_atoms` |
-| `test/unit/test_config.py` | `load_config`, `save_config`, `get_config`, `set_config`, `ConfigError` |
-| `test/unit/cli/test_handle_cmd_error.py` | `_handle_cmd_error` decorator: known/unexpected exceptions, normal return |
+| `test/unit/utils/test_cube_parser.py` | `read_cube_header_and_values`, `slab_average_potential_ev`, `plane_avg_phi_z_ev`, `discover_cube_files` |
 | `test/unit/utils/test_cell_parser.py` | `parse_abc_from_restart` + `parse_abc_from_md_inp`: valid/missing/error cases |
-| `test/unit/scripts/test_bader_gen.py` | `generate_bader_workdir` + `batch_generate_bader_workdirs`: directory structure, frame slicing, metadata |
-| `test/unit/scripts/utils/test_index_mapper.py` | `compute_index_map`, `encode/decode_comment_line`, `write/read_poscar_with_map`, `remap_array` |
+| `test/unit/utils/test_slowgrowth_parser.py` | `ColvarInfo`, `parse_colvar_restart` (4 scenarios), `parse_lagrange_mult_log` (single/multi), `compute_target_series`, multi-COLLECTIVE blocks, edge cases |
+| `test/unit/test_config.py` | `load_config`, `save_config`, `get_config`, `set_config`, `ConfigError` |
+| `test/unit/test_logging_setup.py` | NullHandler on library logger, StreamHandler setup in CLI |
+| `test/unit/cli/test_handle_cmd_error.py` | `_handle_cmd_error` decorator: known/unexpected exceptions, normal return |
 | `test/unit/charge/test_charge_analysis.py` | All 5 charge public functions + internal `_extract_t_value`, `_sorted_frame_dirs` |
 | `test/unit/potential/test_single_frame_electrode.py` | Single-frame potential pipeline |
+| `test/unit/scripts/test_bader_gen.py` | `generate_bader_workdir` + `batch_generate_bader_workdirs`: directory structure, frame slicing, metadata |
+| `test/unit/scripts/utils/test_index_mapper.py` | `compute_index_map`, `encode/decode_comment_line`, `write/read_poscar_with_map`, `remap_array` |
+| `test/integration/test_main.py` | Programmatic entry points: `run_water_analysis`, `run_potential_analysis`, `run_charge_analysis` |
+| `test/integration/utils/test_water_layer_pipeline.py` | Water + layer detection combined pipeline |
 | `test/integration/charge/test_charge_trajectory.py` | `trajectory_*` functions, `surface_charge_analysis` end-to-end |
 | `test/integration/potential/test_center_potential.py` | `center_slab_potential_analysis` with real cube files |
 | `test/integration/potential/test_phi_z_profile.py` | `phi_z_planeavg_analysis` with real cube files |
 | `test/integration/water/test_water_*.py` | Water density/orientation/theta plots, three-panel integration |
 | `test/conftest.py` | Exports `parse_abc_from_md_inp` helper |
 
-**Test data:** `data_example/bader_work_dir/` (POSCAR, ACF.dat, POTCAR — 274 atoms: 62 Cu + 2 Ag + 70 O + 140 H), `data_example/potential/` (cube files, md.out, xyz).
+**Test data:** `data_example/bader_work_dir/` (POSCAR, ACF.dat, POTCAR — 274 atoms: 62 Cu + 2 Ag + 70 O + 140 H), `data_example/potential/` (cube files, md.out, xyz), `data_example/sg/` (COLVAR restart + LagrangeMultLog, 4 scenarios).
 
 ### `context4agent/` — Documentation Mirror (Single Source of Truth)
 

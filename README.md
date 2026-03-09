@@ -39,7 +39,7 @@ Lightweight analysis utilities for periodic metal-water interfaces from CP2K MD 
 ### Install
 
 ```bash
-pip install numpy matplotlib ase pytest
+pip install numpy matplotlib ase pytest tqdm
 pip install .
 ```
 
@@ -108,30 +108,38 @@ batch_generate_bader_workdirs(
 - `data_example/potential/md.out` — CP2K output with Fermi energies
 - `data_example/potential/md-POTENTIAL-v_hartree-1_*.cube` — Hartree potential cube snapshots
 - `data_example/bader_work_dir/` — POSCAR, ACF.dat, POTCAR for Bader charge tests
+- `data_example/sg/` — CP2K COLVAR restart + LagrangeMultLog files (4 scenarios: angle, distance, combinedCV, more_constrain)
 
 ## Project Layout
 
 ```
 src/md_analysis/
+├── __init__.py             # re-exports sub-packages + MDAnalysisError; __version__ = "0.1.0"
+├── exceptions.py           # MDAnalysisError — base class for all 9 domain exceptions
+├── config.py               # persistent user configuration (~/.config/md_analysis/)
+├── main.py                 # programmatic entry points
 ├── cli/                    # VASPKIT-style interactive CLI (md-analysis console script)
 │   ├── __init__.py         #   main() entry point, banner, top menu
-│   ├── _prompt.py          #   reusable input prompt helpers
+│   ├── _prompt.py          #   reusable input prompt helpers + _handle_cmd_error decorator
 │   ├── _water.py           #   water sub-menu (101-105)
 │   ├── _potential.py       #   potential sub-menu (201-206)
 │   ├── _charge.py          #   charge sub-menu (301-303)
 │   ├── _scripts.py         #   scripts/tools sub-menu (401-402)
 │   └── _settings.py        #   settings sub-menu (901-902)
-├── config.py               # persistent user configuration (~/.config/md_analysis/)
-├── main.py                 # programmatic entry points
 ├── utils/                  # single-frame low-level tools
 │   ├── config.py           #   constants, unit conversions, cSHE parameters
-│   ├── ClusterUtils.py     #   1D periodic clustering + gap detection
+│   ├── _io_helpers.py      #   private shared I/O helpers (_cumulative_average, _write_csv)
 │   ├── CubeParser.py       #   cube file I/O, plane-averaged φ(z), slab-averaged potential
-│   ├── LayerParser.py      #   metal layer detection, interface identification
-│   ├── WaterParser.py      #   water topology, density/orientation/angle profiles
 │   ├── BaderParser.py      #   VASP Bader charge parsing (ACF.dat + POTCAR)
-│   └── CellParser.py       #   CP2K cell parameter parsing (.restart + md.inp)
+│   ├── StructureParser/    #   structure analysis sub-package
+│   │   ├── ClusterUtils.py #     1D periodic clustering + gap detection
+│   │   ├── LayerParser.py  #     metal layer detection, interface identification
+│   │   └── WaterParser.py  #     water topology, density/orientation/angle profiles
+│   └── RestartParser/      #   CP2K restart file parsing sub-package
+│       ├── CellParser.py   #     cell parameter parsing (.restart + md.inp)
+│       └── ColvarParser.py #     COLVAR restart + LagrangeMultLog parsing
 ├── water/                  # multi-frame water analysis workflows
+│   ├── config.py           #   water analysis defaults + output filename constants
 │   ├── Water.py            #   plot_water_three_panel_analysis() — primary entry point
 │   └── WaterAnalysis/      #   density, orientation, adsorbed-layer sub-workflows
 │       ├── _common.py      #     trajectory I/O, per-frame computation, ensemble averaging
@@ -152,32 +160,43 @@ src/md_analysis/
         └── IndexMapper.py  #   CP2K XYZ ↔ VASP POSCAR bijective index mapping
 
 test/
+├── conftest.py             # shared fixtures
 ├── unit/
-│   ├── utils/              # pytest unit tests (ClusterUtils, LayerParser, WaterParser, BaderParser, CellParser)
-│   ├── charge/             # unit tests for BaderAnalysis
-│   └── scripts/            # unit tests for BaderGen + IndexMapper
+│   ├── utils/              # ClusterUtils, LayerParser, WaterParser, BaderParser, CellParser,
+│   │                       #   CubeParser, ColvarParser
+│   ├── cli/                # _handle_cmd_error decorator
+│   ├── charge/             # BaderAnalysis (5 public functions + internal helpers)
+│   ├── potential/          # single-frame electrode potential pipeline
+│   ├── scripts/            # BaderGen + IndexMapper
+│   ├── test_config.py      # persistent user config
+│   └── test_logging_setup.py  # NullHandler / StreamHandler setup
 └── integration/
-    ├── water/              # end-to-end water analysis scripts
-    ├── potential/          # end-to-end potential analysis scripts
-    └── charge/             # end-to-end charge analysis scripts
+    ├── utils/              # water-layer pipeline, full-frame distribution scripts
+    ├── water/              # density, orientation, theta, three-panel end-to-end
+    ├── potential/          # center slab potential, phi(z) profile with real cube files
+    ├── charge/             # trajectory surface charge, surface_charge_analysis end-to-end
+    └── test_main.py        # programmatic entry points (run_water/potential/charge_analysis)
 
 data_example/               # minimal reproducible input data
-context4agent/                    # architecture contracts, decisions, requirements
+├── potential/              #   cube files, md.out, md-pos-1.xyz, md.inp, .restart files
+├── bader_work_dir/         #   POSCAR, ACF.dat, POTCAR (274 atoms: 62 Cu + 2 Ag + 70 O + 140 H)
+└── sg/                     #   COLVAR restart + LagrangeMultLog test data (4 scenarios)
+context4agent/              # architecture contracts, decisions, requirements
 ```
 
 ## Running Tests
 
 ```bash
-# All tests
+# All tests (requires pip install . first)
 pytest test/
 
 # Single unit test file
 pytest test/unit/utils/test_water_parser.py
 
-# Integration tests (standalone scripts, require pip install first)
-python test/integration/water/test_water_three_panel_plot.py
-python test/integration/potential/test_center_potential.py
-python test/integration/potential/test_phi_z_profile.py
+# Specific module tests
+pytest test/unit/utils/test_slowgrowth_parser.py   # ColvarParser tests
+pytest test/unit/charge/test_charge_analysis.py     # Bader charge tests
+pytest test/integration/                             # all integration tests
 ```
 
 ## Architecture Notes
