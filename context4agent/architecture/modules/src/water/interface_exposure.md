@@ -19,37 +19,75 @@
 
 ### 2.1 配置常量（Stable）
 
-- `DEFAULT_OUTPUT_DIR`
+- `DEFAULT_OUTPUT_DIR`（`None`，语义：`None` 表示使用 `Path.cwd()` 作为输出目录）
 - `DEFAULT_ADSORBED_WATER_PROFILE_CSV_NAME`
 - `DEFAULT_ADSORBED_WATER_RANGE_TXT_NAME`
 - `DEFAULT_ADSORBED_WATER_THETA_DISTRIBUTION_CSV_NAME`
-- `DEFAULT_START_INTERFACE`
+- `DEFAULT_START_INTERFACE`（`"normal_aligned"`）
 - `DEFAULT_WATER_MASS_DENSITY_CSV_NAME`
 - `DEFAULT_WATER_ORIENTATION_WEIGHTED_DENSITY_CSV_NAME`
 - `DEFAULT_WATER_THREE_PANEL_PLOT_PNG_NAME`
-- `dz_A` 默认继承 `md_analysis.utils.config.DEFAULT_Z_BIN_WIDTH_A`（当前为 `0.1` Angstrom）
 
-### 2.2 分析函数（Stable）
+注：各分析函数的 `dz_A` 参数默认值取自 `md_analysis.utils.config.DEFAULT_Z_BIN_WIDTH_A`（当前为 `0.1` Angstrom），它是函数参数而非模块级常量。
 
-- `water_mass_density_z_distribution_analysis(...)`
+### 2.2 Re-exported Utility Types（Stable）
+
+以下符号从 `md_analysis.utils` 转发，包含在 `water/__init__.py` 的 `__all__` 中：
+
+数据结构与异常：
+
+- `Layer`（dataclass，来自 `utils.StructureParser.LayerParser`）
+- `SurfaceDetectionResult`（来自 `utils.StructureParser.LayerParser`）
+- `SurfaceGeometryError`（来自 `utils.StructureParser.LayerParser`）
+- `WaterTopologyError`（来自 `utils.StructureParser.WaterParser`）
+
+函数：
+
+- `detect_interface_layers`（来自 `utils.StructureParser.LayerParser`）
+- `format_detection_summary`（来自 `utils.StructureParser.LayerParser`）
+- `detect_water_molecule_indices`（来自 `utils.StructureParser.WaterParser`）
+- `get_water_oxygen_indices_array`（来自 `utils.StructureParser.WaterParser`）
+
+常量：
+
+- `DEFAULT_METAL_SYMBOLS`（来自 `utils.config`）
+- `DEFAULT_Z_BIN_WIDTH_A`（来自 `utils.config`）
+- `DEFAULT_THETA_BIN_DEG`（来自 `utils.config`）
+- `DEFAULT_WATER_OH_CUTOFF_A`（来自 `utils.config`）
+- `WATER_MOLAR_MASS_G_PER_MOL`（来自 `utils.config`）
+
+### 2.3 分析函数（Stable）
+
+- `water_mass_density_z_distribution_analysis(xyz_path, md_inp_path, *, output_dir, output_csv_name, start_interface, dz_A, metal_symbols, frame_start, frame_end, frame_step) -> Path`
   - 文件位置：`src/md_analysis/water/WaterAnalysis/WaterDensity.py`
   - 统计口径：A 口径（逐帧等权系综平均）
-- `water_orientation_weighted_density_z_distribution_analysis(...)`
+  - 返回：CSV 路径
+
+- `water_orientation_weighted_density_z_distribution_analysis(xyz_path, md_inp_path, *, output_dir, output_csv_name, start_interface, dz_A, metal_symbols, frame_start, frame_end, frame_step) -> Path`
   - 文件位置：`src/md_analysis/water/WaterAnalysis/WaterOrientation.py`
   - 统计口径：A 口径（逐帧等权系综平均）
-- `detect_adsorbed_layer_range_from_density_profile(...)`
+  - 返回：CSV 路径
+
+- `detect_adsorbed_layer_range_from_density_profile(distance_A, rho_g_cm3, *, near_zero_ratio, smoothing_window_bins) -> tuple[float, float, float]`
   - 文件位置：`src/md_analysis/water/WaterAnalysis/AdWaterOrientation.py`
   - 主峰定义：直接取水密度分布最高 bin 位置
-- `ad_water_orientation_analysis(...)`
+  - 返回：`(start_distance_A, end_distance_A, peak_distance_A)`
+
+- `ad_water_orientation_analysis(xyz_path, md_inp_path, *, output_dir, output_profile_csv_name, output_range_txt_name, start_interface, dz_A, near_zero_ratio, smoothing_window_bins, frame_start, frame_end, frame_step) -> tuple[Path, Path]`
   - 文件位置：`src/md_analysis/water/WaterAnalysis/AdWaterOrientation.py`
   - 功能：自动识别吸附层区间并输出取向分析结果
-- `compute_adsorbed_water_theta_distribution(...)`
+  - 返回：`(profile_csv_path, range_txt_path)`
+
+- `compute_adsorbed_water_theta_distribution(xyz_path, md_inp_path, *, adsorbed_range_A, output_dir, output_csv_name, start_interface, dz_A, ndeg, near_zero_ratio, smoothing_window_bins, frame_start, frame_end, frame_step, verbose) -> tuple[ndarray, ndarray, Path]`
   - 文件位置：`src/md_analysis/water/WaterAnalysis/AdWaterOrientation.py`
   - 功能：统计吸附层内 `0-180` 度取向分布（PDF）
-- `plot_water_three_panel_analysis(...)`
+  - 返回：`(theta_centers_deg, theta_pdf_degree_inv, csv_path)`
+
+- `plot_water_three_panel_analysis(xyz_path, md_inp_path, *, output_dir, output_png_name, start_interface, dz_A, ndeg, frame_start, frame_end, frame_step, verbose) -> Path`
   - 文件位置：`src/md_analysis/water/Water.py`
   - 功能：集成三联图（密度、取向、吸附层 $\theta$ 分布）并输出 PNG，同时落盘相关 CSV/TXT
   - 轨迹读取：固定两次（第一次密度+取向；第二次吸附层 $\theta$ 分布）
+  - 返回：PNG 路径
 
 ## 3. 推荐导入方式
 
@@ -61,7 +99,7 @@
 
 - 未在对应 `__init__.py` 的 `__all__` 中声明的符号，不属于公开接口。
 - 内部 helper（如 `_parse_*`、`_single_frame_*`）仅供模块内复用。
-- `src/md_analysis/water/WaterAnalysis/_common.py` 为私有实现模块，不属于对外契约（不要从外部直接导入/依赖）。
+- `src/md_analysis/water/WaterAnalysis/_common.py` 为私有实现模块，仅限 `water` 包内部使用（`Water.py` 和 `WaterAnalysis/` 子模块可导入），不属于对外契约。
 
 ## 5. 接口变更流程（必须执行）
 

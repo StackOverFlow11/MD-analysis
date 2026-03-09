@@ -32,6 +32,10 @@ Interactive CLI package providing a VASPKIT-style numbered menu interface. Repla
 - The library itself uses `NullHandler` (set in `md_analysis/__init__.py`), so logging is silent unless the CLI (or an application) explicitly configures a handler
 - `_handle_cmd_error` logs unexpected exceptions at `ERROR` level with `exc_info=True` for full traceback in logs, while printing a concise message to stdout for the user
 
+## Handler naming convention
+
+All sub-menu handler functions follow a unified `_cmd_<code>()` naming pattern, where `<code>` is the menu code number (e.g., `_cmd_101()`, `_cmd_201()`). This applies to all 15 handler functions across `_water.py`, `_potential.py`, `_charge.py`, `_scripts.py`, and `_settings.py`. Each handler is decorated with `@_handle_cmd_error` for unified error handling.
+
 ## Parameter flow
 
 1. User selects analysis code from sub-menu

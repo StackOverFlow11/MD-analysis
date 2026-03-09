@@ -17,8 +17,7 @@ from ._common import (
     _parse_abc_from_md_inp,
 )
 
-# Re-export StartInterface for backward compatibility with external importers.
-__all__ = ["StartInterface", "water_mass_density_z_distribution_analysis"]
+__all__ = ["water_mass_density_z_distribution_analysis"]
 
 
 def water_mass_density_z_distribution_analysis(

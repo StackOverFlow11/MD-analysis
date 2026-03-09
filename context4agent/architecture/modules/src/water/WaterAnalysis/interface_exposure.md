@@ -11,27 +11,36 @@
 
 - `WaterAnalysis` 是 `water` 子层中"水相关分析"的聚合目录。
 - 本层负责暴露水分析入口函数，不暴露内部 helper。
-- 多帧遍历/界面检测/系综平均等公共实现集中在私有模块 `_common.py` 中（外部不得依赖）。
+- 多帧遍历/界面检测/系综平均等公共实现集中在私有模块 `_common.py` 中（仅限 `water` 包内部使用，`Water.py` 和 `WaterAnalysis/` 子模块可导入，包外不得依赖）。
 
 ## 2. 当前公开接口清单
 
 ### 2.1 分析函数（Stable）
 
-- `water_mass_density_z_distribution_analysis(...)`
+- `water_mass_density_z_distribution_analysis(xyz_path, md_inp_path, *, output_dir=None, output_csv_name, start_interface, dz_A, metal_symbols=None, frame_start=None, frame_end=None, frame_step=None) -> Path`
   - 定义文件：`WaterDensity.py`
   - 统计口径：A 口径（逐帧等权系综平均，界面取水侧 interface 对）
-- `water_orientation_weighted_density_z_distribution_analysis(...)`
+  - 返回：CSV 路径
+
+- `water_orientation_weighted_density_z_distribution_analysis(xyz_path, md_inp_path, *, output_dir=None, output_csv_name, start_interface, dz_A, metal_symbols=None, frame_start=None, frame_end=None, frame_step=None) -> Path`
   - 定义文件：`WaterOrientation.py`
   - 统计口径：A 口径（逐帧等权系综平均，界面取水侧 interface 对）
-- `detect_adsorbed_layer_range_from_density_profile(...)`
+  - 返回：CSV 路径
+
+- `detect_adsorbed_layer_range_from_density_profile(distance_A, rho_g_cm3, *, near_zero_ratio=0.05, smoothing_window_bins=5) -> tuple[float, float, float]`
   - 定义文件：`AdWaterOrientation.py`
   - 主峰定义：直接取水密度分布最高 bin 位置
-- `ad_water_orientation_analysis(...)`
+  - 返回：`(start_distance_A, end_distance_A, peak_distance_A)`
+
+- `ad_water_orientation_analysis(xyz_path, md_inp_path, *, output_dir=None, output_profile_csv_name, output_range_txt_name, start_interface, dz_A, near_zero_ratio=0.05, smoothing_window_bins=5, frame_start=None, frame_end=None, frame_step=None) -> tuple[Path, Path]`
   - 定义文件：`AdWaterOrientation.py`
   - 功能：自动识别吸附层范围并导出吸附层取向分析文件
-- `compute_adsorbed_water_theta_distribution(...)`
+  - 返回：`(profile_csv_path, range_txt_path)`
+
+- `compute_adsorbed_water_theta_distribution(xyz_path, md_inp_path, *, adsorbed_range_A=None, output_dir=None, output_csv_name, start_interface, dz_A, ndeg, near_zero_ratio=0.05, smoothing_window_bins=5, frame_start=None, frame_end=None, frame_step=None, verbose=False) -> tuple[ndarray, ndarray, Path]`
   - 定义文件：`AdWaterOrientation.py`
   - 功能：统计吸附层内 `0-180` 度取向分布并导出 CSV
+  - 返回：`(theta_centers_deg, theta_pdf_degree_inv, csv_path)`
 
 ### 2.2 非公开接口（Non-public）
 

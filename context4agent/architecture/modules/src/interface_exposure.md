@@ -21,11 +21,13 @@
 - `water`
 - `potential`
 - `charge`
+- `__version__`（`str`，当前 `"0.1.0"`）
+- `MDAnalysisError`（`Exception` 子类，所有领域异常的基类，来自 `md_analysis.exceptions`）
 
 与代码一致性基线：
 
 - `src/md_analysis/__init__.py` 中已导入并写入 `__all__` 的符号，视为顶层稳定接口。
-- 当前 `__all__ = ["utils", "water", "potential", "charge", "__version__"]`。
+- 当前 `__all__ = ["utils", "water", "potential", "charge", "__version__", "MDAnalysisError"]`。
 
 ### 2.2 非公开符号（Non-public）
 
