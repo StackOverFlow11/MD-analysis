@@ -43,7 +43,7 @@
       - 指定 c 分数窗口内的 $\theta$ PDF（`degree^-1`）
 - `RestartParser/` 子包（CP2K restart 文件解析）
   - `CellParser.py`：CP2K cell 参数解析（`.restart` + `md.inp`）
-  - `SlowgrowthParser.py`：slow-growth restart + LagrangeMultLog 解析
+  - `ColvarParser.py`：CP2K COLVAR restart + LagrangeMultLog 解析
 
 > 低层 shape/单位/窗口规则以 `context4agent/architecture/modules/data_contract.md` 为准。
 

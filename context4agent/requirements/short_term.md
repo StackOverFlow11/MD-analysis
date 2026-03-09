@@ -72,7 +72,7 @@
     - ✅ 多帧批量生成：`batch_generate_bader_workdirs(xyz_path, cell_abc, output_dir, *, frame_start/end/step, ...)`
     - ✅ CLI 支持：401（单帧）+ 402（批量），cell 来源支持 `.restart` 和 `md.inp`
     - ✅ RestartParser：`parse_abc_from_restart()` 从 CP2K `.restart` 文件解析正交 cell 参数
-    - ✅ SlowgrowthParser：解析 slow-growth restart 元数据（COLVAR、CONSTRAINT、FIXED_ATOMS）和 LagrangeMultLog（单约束/多约束自动检测），重建 ξ(t) 目标序列
+    - ✅ ColvarParser：解析 CP2K COLVAR restart 元数据（COLLECTIVE、CONSTRAINT、FIXED_ATOMS）和 LagrangeMultLog（单约束/多约束自动检测），重建 ξ(t) 目标序列
   - 持久化用户配置（`config.py`）：
     - ✅ `load_config`、`save_config`、`get_config`、`set_config`
     - ✅ CLI 设置菜单（901/902）支持查看和修改配置
