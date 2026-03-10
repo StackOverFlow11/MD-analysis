@@ -1,0 +1,5 @@
+adsorbed_layer_start_A=1.9492317911
+adsorbed_layer_end_A=3.6485620705
+main_peak_distance_A=3.0487984425
+near_zero_ratio=0.050000
+smoothing_window_bins=5
