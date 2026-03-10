@@ -65,9 +65,9 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 |---|---|---|
 | `config.py` | `DEFAULT_START_INTERFACE = "normal_aligned"`, output CSV/PNG name constants | Water analysis defaults |
 | `__init__.py` | Re-exports all public water API + utils types | Package interface |
-| `Water.py` | `plot_water_three_panel_analysis(xyz_path, md_inp_path, *, output_dir, ...)` → PNG path | Integrated 3-panel figure (density + orientation + theta PDF) |
+| `Water.py` | `plot_water_three_panel_analysis(xyz_path, md_inp_path, *, output_dir, layer_tol_A, ...)` → PNG path | Integrated 3-panel figure (density + orientation + theta PDF) |
 | `WaterAnalysis/__init__.py` | Re-exports from sub-modules; internal: `StartInterface`, `_compute_density_orientation_ensemble` | Sub-package interface |
-| `WaterAnalysis/_common.py` | `_detect_interface_fractions()`, `_iter_trajectory()`, `_single_frame_density_and_orientation()`, `_compute_density_orientation_ensemble()` (re-imports `_parse_abc_from_md_inp` from `utils.RestartParser.CellParser`) | Shared private trajectory/frame helpers |
+| `WaterAnalysis/_common.py` | `_detect_interface_fractions(*, layer_tol_A)`, `_iter_trajectory()`, `_single_frame_density_and_orientation(*, layer_tol_A)`, `_compute_density_orientation_ensemble(*, layer_tol_A)` (re-imports `_parse_abc_from_md_inp` from `utils.RestartParser.CellParser`) | Shared private trajectory/frame helpers |
 | `WaterAnalysis/WaterDensity.py` | `water_mass_density_z_distribution_analysis(xyz, md_inp, *, output_dir, ...)` → CSV path | Ensemble-averaged mass density profile |
 | `WaterAnalysis/WaterOrientation.py` | `water_orientation_weighted_density_z_distribution_analysis(xyz, md_inp, *, output_dir, ...)` → CSV path | Ensemble-averaged orientation-weighted density |
 | `WaterAnalysis/AdWaterOrientation.py` | `ad_water_orientation_analysis(xyz, md_inp, *, output_dir, ...)` → (CSV, TXT), `compute_adsorbed_water_theta_distribution(...)` → (centers, pdf, CSV), `detect_adsorbed_layer_range_from_density_profile(distance, rho)` | Adsorbed-layer orientation analysis |

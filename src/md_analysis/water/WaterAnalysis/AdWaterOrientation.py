@@ -17,7 +17,7 @@ from ...utils import (
     detect_water_molecule_indices,
     get_water_oxygen_indices_array,
 )
-from ...utils.config import DEFAULT_THETA_BIN_DEG, DEFAULT_Z_BIN_WIDTH_A, INTERFACE_NORMAL_ALIGNED
+from ...utils.config import DEFAULT_LAYER_TOL_A, DEFAULT_THETA_BIN_DEG, DEFAULT_Z_BIN_WIDTH_A, INTERFACE_NORMAL_ALIGNED
 from ..config import (
     DEFAULT_ADSORBED_WATER_PROFILE_CSV_NAME,
     DEFAULT_ADSORBED_WATER_RANGE_TXT_NAME,
@@ -134,6 +134,7 @@ def compute_adsorbed_water_theta_distribution(
     start_interface: StartInterface = DEFAULT_START_INTERFACE,
     dz_A: float = DEFAULT_Z_BIN_WIDTH_A,
     ndeg: float = DEFAULT_THETA_BIN_DEG,
+    layer_tol_A: float = DEFAULT_LAYER_TOL_A,
     near_zero_ratio: float = 0.05,
     smoothing_window_bins: int = 5,
     frame_start: int | None = None,
@@ -167,6 +168,7 @@ def compute_adsorbed_water_theta_distribution(
             cell_abc=cell_abc,
             start_interface=start_interface,
             dz_A=dz_A,
+            layer_tol_A=layer_tol_A,
             frame_start=frame_start,
             frame_end=frame_end,
             frame_step=frame_step,
@@ -202,7 +204,7 @@ def compute_adsorbed_water_theta_distribution(
         iterator = tqdm(iterator, desc="Adsorbed water theta", unit="frame", ascii=" =")
 
     for atoms in iterator:
-        aligned_frac, opposed_frac = _detect_interface_fractions(atoms)
+        aligned_frac, opposed_frac = _detect_interface_fractions(atoms, layer_tol_A=layer_tol_A)
         water_idx = detect_water_molecule_indices(atoms)
         oxygen_indices = get_water_oxygen_indices_array(water_idx).reshape(-1)
         o_to_h = _oxygen_to_hydrogen_map(water_idx)
@@ -266,6 +268,7 @@ def ad_water_orientation_analysis(
     output_range_txt_name: str = DEFAULT_ADSORBED_WATER_RANGE_TXT_NAME,
     start_interface: StartInterface = DEFAULT_START_INTERFACE,
     dz_A: float = DEFAULT_Z_BIN_WIDTH_A,
+    layer_tol_A: float = DEFAULT_LAYER_TOL_A,
     near_zero_ratio: float = 0.05,
     smoothing_window_bins: int = 5,
     frame_start: int | None = None,
@@ -293,6 +296,7 @@ def ad_water_orientation_analysis(
         cell_abc=cell_abc,
         start_interface=start_interface,
         dz_A=dz_A,
+        layer_tol_A=layer_tol_A,
         frame_start=frame_start,
         frame_end=frame_end,
         frame_step=frame_step,

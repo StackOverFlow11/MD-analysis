@@ -24,12 +24,12 @@
 
 ---
 
-- `water_mass_density_z_distribution_analysis(xyz_path, md_inp_path=None, *, cell_abc=None, output_dir=None, output_csv_name, start_interface, dz_A, metal_symbols=None, frame_start=None, frame_end=None, frame_step=None) -> Path`
+- `water_mass_density_z_distribution_analysis(xyz_path, md_inp_path=None, *, cell_abc=None, output_dir=None, output_csv_name, start_interface, dz_A, metal_symbols=None, layer_tol_A=DEFAULT_LAYER_TOL_A, frame_start=None, frame_end=None, frame_step=None) -> Path`
   - 定义文件：`WaterDensity.py`
   - 统计口径：A 口径（逐帧等权系综平均，界面取水侧 interface 对）
   - 返回：CSV 路径
 
-- `water_orientation_weighted_density_z_distribution_analysis(xyz_path, md_inp_path=None, *, cell_abc=None, output_dir=None, output_csv_name, start_interface, dz_A, metal_symbols=None, frame_start=None, frame_end=None, frame_step=None) -> Path`
+- `water_orientation_weighted_density_z_distribution_analysis(xyz_path, md_inp_path=None, *, cell_abc=None, output_dir=None, output_csv_name, start_interface, dz_A, metal_symbols=None, layer_tol_A=DEFAULT_LAYER_TOL_A, frame_start=None, frame_end=None, frame_step=None) -> Path`
   - 定义文件：`WaterOrientation.py`
   - 统计口径：A 口径（逐帧等权系综平均，界面取水侧 interface 对）
   - 返回：CSV 路径
@@ -39,12 +39,12 @@
   - 主峰定义：直接取水密度分布最高 bin 位置
   - 返回：`(start_distance_A, end_distance_A, peak_distance_A)`
 
-- `ad_water_orientation_analysis(xyz_path, md_inp_path=None, *, cell_abc=None, output_dir=None, output_profile_csv_name, output_range_txt_name, start_interface, dz_A, near_zero_ratio=0.05, smoothing_window_bins=5, frame_start=None, frame_end=None, frame_step=None) -> tuple[Path, Path]`
+- `ad_water_orientation_analysis(xyz_path, md_inp_path=None, *, cell_abc=None, output_dir=None, output_profile_csv_name, output_range_txt_name, start_interface, dz_A, layer_tol_A=DEFAULT_LAYER_TOL_A, near_zero_ratio=0.05, smoothing_window_bins=5, frame_start=None, frame_end=None, frame_step=None) -> tuple[Path, Path]`
   - 定义文件：`AdWaterOrientation.py`
   - 功能：自动识别吸附层范围并导出吸附层取向分析文件
   - 返回：`(profile_csv_path, range_txt_path)`
 
-- `compute_adsorbed_water_theta_distribution(xyz_path, md_inp_path=None, *, cell_abc=None, adsorbed_range_A=None, output_dir=None, output_csv_name, start_interface, dz_A, ndeg, near_zero_ratio=0.05, smoothing_window_bins=5, frame_start=None, frame_end=None, frame_step=None, verbose=False) -> tuple[ndarray, ndarray, Path]`
+- `compute_adsorbed_water_theta_distribution(xyz_path, md_inp_path=None, *, cell_abc=None, adsorbed_range_A=None, output_dir=None, output_csv_name, start_interface, dz_A, ndeg, layer_tol_A=DEFAULT_LAYER_TOL_A, near_zero_ratio=0.05, smoothing_window_bins=5, frame_start=None, frame_end=None, frame_step=None, verbose=False) -> tuple[ndarray, ndarray, Path]`
   - 定义文件：`AdWaterOrientation.py`
   - 功能：统计吸附层内 `0-180` 度取向分布并导出 CSV
   - 返回：`(theta_centers_deg, theta_pdf_degree_inv, csv_path)`

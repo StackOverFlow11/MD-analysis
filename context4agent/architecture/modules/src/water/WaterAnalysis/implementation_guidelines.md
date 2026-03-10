@@ -12,7 +12,7 @@
 - `_common.py`（私有）
   - 解析 `md.inp` 获取正交盒长（`ABC [angstrom] a b c`）
   - 用 ASE `iread` 逐帧读取 xyz，并为每帧设置 cell + PBC
-  - 逐帧检测两侧界面（基于金属界面层的 c 分数坐标）
+  - 逐帧检测两侧界面（基于金属界面层的 c 分数坐标），聚类容差通过 `layer_tol_A` 参数传递至 `detect_interface_layers()`
   - 逐帧在"选定界面 → 两界面中点"的半路径上计算密度/取向剖面
   - 将各帧剖面重采样到统一归一化网格并做等权系综平均（A 口径）
 - `WaterDensity.py`

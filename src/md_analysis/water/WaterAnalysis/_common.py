@@ -43,6 +43,7 @@ from ...utils.StructureParser.WaterParser import (
 )
 from ...utils.RestartParser.CellParser import parse_abc_from_md_inp as _parse_abc_from_md_inp
 from ...utils.config import (
+    DEFAULT_LAYER_TOL_A,
     DEFAULT_Z_BIN_WIDTH_A,
     INTERFACE_NORMAL_ALIGNED,
     INTERFACE_NORMAL_OPPOSED,
@@ -60,6 +61,7 @@ def _detect_interface_fractions(
     atoms: Atoms,
     *,
     metal_symbols: Iterable[str] | None = None,
+    layer_tol_A: float = DEFAULT_LAYER_TOL_A,
 ) -> tuple[float, float]:
     """
     Return (aligned_frac, opposed_frac) of the two water-facing metal layers.
@@ -74,6 +76,7 @@ def _detect_interface_fractions(
         atoms,
         normal="c",
         metal_symbols=metal_symbols,
+        layer_tol_A=layer_tol_A,
     )
 
     aligned_frac = detection.interface_normal_aligned().center_frac
@@ -137,6 +140,7 @@ def _single_frame_density_and_orientation(
     start_interface: StartInterface,
     dz_A: float,
     metal_symbols: Iterable[str] | None,
+    layer_tol_A: float = DEFAULT_LAYER_TOL_A,
     compute_orientation: bool = True,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, float]:
     """
@@ -158,7 +162,7 @@ def _single_frame_density_and_orientation(
     if start_interface not in {INTERFACE_NORMAL_ALIGNED, INTERFACE_NORMAL_OPPOSED}:
         raise ValueError(f"start_interface must be 'normal_aligned' or 'normal_opposed', got {start_interface!r}")
 
-    aligned_frac, opposed_frac = _detect_interface_fractions(atoms, metal_symbols=metal_symbols)
+    aligned_frac, opposed_frac = _detect_interface_fractions(atoms, metal_symbols=metal_symbols, layer_tol_A=layer_tol_A)
     gap_frac = (opposed_frac - aligned_frac) % 1.0
     if gap_frac <= 0.0:
         raise SurfaceGeometryError("Water gap fractional width must be positive.")
@@ -235,6 +239,7 @@ def _compute_density_orientation_ensemble(
     start_interface: StartInterface = "normal_aligned",
     dz_A: float = DEFAULT_Z_BIN_WIDTH_A,
     metal_symbols: Iterable[str] | None = None,
+    layer_tol_A: float = DEFAULT_LAYER_TOL_A,
     compute_orientation: bool = True,
     frame_start: int | None = None,
     frame_end: int | None = None,
@@ -286,6 +291,7 @@ def _compute_density_orientation_ensemble(
                 start_interface=start_interface,
                 dz_A=dz_A,
                 metal_symbols=metal_symbols,
+                layer_tol_A=layer_tol_A,
                 compute_orientation=compute_orientation,
             )
         )

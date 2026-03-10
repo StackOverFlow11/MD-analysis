@@ -21,7 +21,7 @@ from .config import DEFAULT_WATER_THREE_PANEL_PLOT_PNG_NAME
 from .WaterAnalysis import compute_adsorbed_water_theta_distribution
 from .WaterAnalysis import detect_adsorbed_layer_range_from_density_profile
 from .WaterAnalysis import StartInterface, _compute_density_orientation_ensemble
-from ..utils.config import DEFAULT_THETA_BIN_DEG, DEFAULT_Z_BIN_WIDTH_A
+from ..utils.config import DEFAULT_LAYER_TOL_A, DEFAULT_THETA_BIN_DEG, DEFAULT_Z_BIN_WIDTH_A
 
 
 def _savgol_smooth_window5(values: np.ndarray) -> np.ndarray:
@@ -48,6 +48,7 @@ def plot_water_three_panel_analysis(
     start_interface: StartInterface = DEFAULT_START_INTERFACE,
     dz_A: float = DEFAULT_Z_BIN_WIDTH_A,
     ndeg: float = DEFAULT_THETA_BIN_DEG,
+    layer_tol_A: float = DEFAULT_LAYER_TOL_A,
     frame_start: int | None = None,
     frame_end: int | None = None,
     frame_step: int | None = None,
@@ -77,6 +78,7 @@ def plot_water_three_panel_analysis(
         cell_abc=cell_abc,
         start_interface=start_interface,
         dz_A=dz_A,
+        layer_tol_A=layer_tol_A,
         frame_start=frame_start,
         frame_end=frame_end,
         frame_step=frame_step,
@@ -143,6 +145,7 @@ def plot_water_three_panel_analysis(
         start_interface=start_interface,
         dz_A=dz_A,
         ndeg=ndeg,
+        layer_tol_A=layer_tol_A,
         frame_start=frame_start,
         frame_end=frame_end,
         frame_step=frame_step,
