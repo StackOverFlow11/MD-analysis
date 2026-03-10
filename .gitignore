@@ -10,3 +10,4 @@ __pycache__/
 
 # Test temporary outputs
 test/_tmp_preview/
+data_example/

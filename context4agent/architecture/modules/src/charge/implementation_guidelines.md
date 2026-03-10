@@ -19,13 +19,15 @@ Flat structure (no sub-packages):
 
 ## Surface charge methods
 
-`compute_frame_surface_charge(atoms, *, method="counterion")` dispatches to one of (validated against `_VALID_METHODS = (CHARGE_METHOD_COUNTERION, CHARGE_METHOD_LAYER)`):
+`compute_frame_surface_charge(atoms, *, method="counterion", layer_tol_A=DEFAULT_LAYER_TOL_A)` dispatches to one of (validated against `_VALID_METHODS = (CHARGE_METHOD_COUNTERION, CHARGE_METHOD_LAYER)`):
+
+The `layer_tol_A` parameter is forwarded to `detect_interface_layers()` to control the clustering tolerance (in Å) for grouping metal atoms into layers. This enables consistent layer detection across the full call chain (CLI → analysis → layer detection).
 
 ### `method="counterion"` (`_compute_surface_charge_counterion`)
 
 Only non-water, non-metal species (counterions, adsorbates) with non-zero net charge contribute:
 
-1. `detect_interface_layers(atoms)` → `interface_normal_aligned()` / `interface_normal_opposed()`
+1. `detect_interface_layers(atoms, layer_tol_A=layer_tol_A)` → `interface_normal_aligned()` / `interface_normal_opposed()`
 2. `detect_water_molecule_indices(atoms)` → water atom set
 3. Exclude = water ∪ metal → remaining charged atoms only
 4. MIC-based directional assignment to nearest surface within half-gap
@@ -35,7 +37,7 @@ Only non-water, non-metal species (counterions, adsorbates) with non-zero net ch
 
 Sum net charges of the interface-layer metal atoms directly:
 
-1. `detect_interface_layers(atoms)` → `interface_normal_aligned()` / `interface_normal_opposed()`
+1. `detect_interface_layers(atoms, layer_tol_A=layer_tol_A)` → `interface_normal_aligned()` / `interface_normal_opposed()`
 2. For each layer: σ = Σ(net_charge[layer_atoms]) / area
 
 ### Output column ordering

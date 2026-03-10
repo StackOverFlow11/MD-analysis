@@ -64,4 +64,4 @@ Settings menu 903-907 allow users to persistently override algorithm defaults fr
 - 906: `water_oh_cutoff_A` (water O-H cutoff)
 - 907: reset all analysis defaults
 
-The `_get_effective_default(key)` helper in `_prompt.py` reads the user config first, falling back to the hardcoded default from `CONFIGURABLE_DEFAULTS` registry. Analysis sub-menus (`_potential.py`, `_water.py`) use this helper to populate prompt defaults. Library function signatures remain unchanged — persistence only affects CLI prompt defaults.
+The `_get_effective_default(key)` helper in `_prompt.py` reads the user config first, falling back to the hardcoded default from `CONFIGURABLE_DEFAULTS` registry. Analysis sub-menus (`_potential.py`, `_water.py`, `_charge.py`) use this helper to populate prompt defaults. Library function signatures remain unchanged — persistence only affects CLI prompt defaults.

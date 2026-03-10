@@ -87,7 +87,7 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 
 | File | Key Exports | Purpose |
 |---|---|---|
-| `config.py` | `E_PER_A2_TO_UC_PER_CM2 = 1602.18`, `DEFAULT_DIR_PATTERN = "bader_t*_i*"`, `DEFAULT_STRUCTURE_FILENAME = "POSCAR"`, `DEFAULT_ACF_FILENAME = "ACF.dat"`, `DEFAULT_POTCAR_FILENAME = "POTCAR"`, output CSV/PNG names | Charge analysis defaults |
+| `config.py` | `E_PER_A2_TO_UC_PER_CM2 = 1602.176634`, `DEFAULT_DIR_PATTERN = "bader_t*_i*"`, `DEFAULT_STRUCTURE_FILENAME = "POSCAR"`, `DEFAULT_ACF_FILENAME = "ACF.dat"`, `DEFAULT_POTCAR_FILENAME = "POTCAR"`, output CSV/PNG names | Charge analysis defaults |
 | `__init__.py` | Re-exports 5 functions + 3 constants | Package interface |
 | `BaderAnalysis.py` | `compute_frame_surface_charge(atoms, *, metal_symbols, normal, method)` → mutated Atoms, `frame_indexed_atom_charges(atoms, indices)` → `(N,2)`, `trajectory_indexed_atom_charges(root_dir, matrix, ...)` → `(t,N,2)`, `trajectory_surface_charge(root_dir, *, method, ...)` → `(t,2)` uC/cm2, `surface_charge_analysis(root_dir, *, method, output_dir, ...)` → CSV path | Surface charge density (counterion/layer methods) |
 
@@ -136,7 +136,7 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 | `test/integration/water/test_water_*.py` | Water density/orientation/theta plots, three-panel integration |
 | `test/conftest.py` | Exports `parse_abc_from_md_inp` helper |
 
-**Test data:** `data_example/bader_work_dir/` (POSCAR, ACF.dat, POTCAR — 274 atoms: 62 Cu + 2 Ag + 70 O + 140 H), `data_example/potential/` (cube files, md.out, xyz), `data_example/sg/` (COLVAR restart + LagrangeMultLog, 4 scenarios).
+**Test data:** `data_example/bader/bader_work_dir/` (POSCAR, ACF.dat, POTCAR — 274 atoms: 62 Cu + 2 Ag + 70 O + 140 H), `data_example/potential/` (cube files, md.out, xyz), `data_example/sg/` (COLVAR restart + LagrangeMultLog, 4 scenarios).
 
 ### `context4agent/` — Documentation Mirror (Single Source of Truth)
 

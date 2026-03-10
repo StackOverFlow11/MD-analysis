@@ -57,7 +57,7 @@ The VASPKIT-style numbered menu guides you through:
 - **2) Potential Analysis** — center slab (201), Fermi (202), electrode U vs SHE (203), φ(z) (204), thickness sweep (205), full (206)
 - **3) Charge Analysis** — counterion method (301), layer method (302), full with plots (303)
 - **4) Scripts / Tools** — single-frame Bader workdir (401), batch Bader workdirs (402)
-- **9) Settings** — set VASP submission script path (901), show config (902)
+- **9) Settings** — set VASP submission script path (901), show config (902), set analysis defaults (903-906), reset defaults (907)
 
 Each option prompts for required inputs, then offers an optional "Modify advanced parameters?" gate for output directory and frame slicing.
 
@@ -107,7 +107,7 @@ batch_generate_bader_workdirs(
 - `data_example/potential/md.inp` — cell parameters (`ABC [angstrom] a b c`)
 - `data_example/potential/md.out` — CP2K output with Fermi energies
 - `data_example/potential/md-POTENTIAL-v_hartree-1_*.cube` — Hartree potential cube snapshots
-- `data_example/bader_work_dir/` — POSCAR, ACF.dat, POTCAR for Bader charge tests
+- `data_example/bader/bader_work_dir/` — POSCAR, ACF.dat, POTCAR for Bader charge tests
 - `data_example/sg/` — CP2K COLVAR restart + LagrangeMultLog files (4 scenarios: angle, distance, combinedCV, more_constrain)
 
 ## Project Layout
@@ -125,7 +125,7 @@ src/md_analysis/
 │   ├── _potential.py       #   potential sub-menu (201-206)
 │   ├── _charge.py          #   charge sub-menu (301-303)
 │   ├── _scripts.py         #   scripts/tools sub-menu (401-402)
-│   └── _settings.py        #   settings sub-menu (901-902)
+│   └── _settings.py        #   settings sub-menu (901-907)
 ├── utils/                  # single-frame low-level tools
 │   ├── config.py           #   constants, unit conversions, cSHE parameters
 │   ├── _io_helpers.py      #   private shared I/O helpers (_cumulative_average, _write_csv)
@@ -179,7 +179,7 @@ test/
 
 data_example/               # minimal reproducible input data
 ├── potential/              #   cube files, md.out, md-pos-1.xyz, md.inp, .restart files
-├── bader_work_dir/         #   POSCAR, ACF.dat, POTCAR (274 atoms: 62 Cu + 2 Ag + 70 O + 140 H)
+├── bader/                  #   bader_work_dir/ with POSCAR, ACF.dat, POTCAR (274 atoms: 62 Cu + 2 Ag + 70 O + 140 H)
 └── sg/                     #   COLVAR restart + LagrangeMultLog test data (4 scenarios)
 context4agent/              # architecture contracts, decisions, requirements
 ```

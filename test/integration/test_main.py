@@ -23,7 +23,7 @@ from md_analysis.main import (
 # ---------------------------------------------------------------------------
 
 _DATA_DIR = Path(__file__).resolve().parents[2] / "data_example" / "potential"
-_BADER_DIR = Path(__file__).resolve().parents[2] / "data_example" / "bader_work_dir"
+_BADER_DIR = Path(__file__).resolve().parents[2] / "data_example" / "bader" / "bader_work_dir"
 
 pytestmark = pytest.mark.skipif(
     not _DATA_DIR.exists(),
@@ -185,7 +185,7 @@ class TestRunChargeAnalysis:
 
     @pytest.mark.skipif(
         not _BADER_DIR.exists(),
-        reason=f"data_example/bader_work_dir/ not found at {_BADER_DIR}",
+        reason=f"data_example/bader/bader_work_dir/ not found at {_BADER_DIR}",
     )
     def test_happy_path(self, tmp_path: Path):
         root = _build_fake_trajectory(tmp_path / "traj", n_frames=2)

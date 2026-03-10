@@ -36,6 +36,7 @@ def compute_frame_surface_charge(
     metal_symbols: Iterable[str] | None = None,
     normal: str = "c",   # "a" | "b" | "c"
     method: str = "counterion",  # "counterion" | "layer"
+    layer_tol_A: float = DEFAULT_LAYER_TOL_A,
 ) -> Atoms
 ```
 
@@ -81,6 +82,7 @@ def trajectory_surface_charge(
     metal_symbols: Iterable[str] | None = None,
     normal: str = "c",
     method: str = "counterion",
+    layer_tol_A: float = DEFAULT_LAYER_TOL_A,
     dir_pattern: str = DEFAULT_DIR_PATTERN,
     structure_filename: str = DEFAULT_STRUCTURE_FILENAME,
     acf_filename: str = DEFAULT_ACF_FILENAME,
@@ -97,6 +99,7 @@ def surface_charge_analysis(
     metal_symbols: Iterable[str] | None = None,
     normal: str = "c",
     method: str = "counterion",
+    layer_tol_A: float = DEFAULT_LAYER_TOL_A,
     dir_pattern: str = DEFAULT_DIR_PATTERN,
     structure_filename: str = DEFAULT_STRUCTURE_FILENAME,
     acf_filename: str = DEFAULT_ACF_FILENAME,
