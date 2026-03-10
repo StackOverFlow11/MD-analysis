@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from .potential.config import DEFAULT_THICKNESS_ANG
-from .utils.config import CHARGE_METHOD_COUNTERION
+from .utils.config import CHARGE_METHOD_COUNTERION, DEFAULT_LAYER_TOL_A
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +85,7 @@ def run_potential_analysis(
     thickness_ang: float = DEFAULT_THICKNESS_ANG,
     center_mode: str = "interface",
     metal_elements: set[str] | None = None,
-    layer_tol_ang: float = 0.6,
+    layer_tol_ang: float = DEFAULT_LAYER_TOL_A,
     fermi_unit: str = "au",
     compute_u: bool = True,
     compute_phi_z: bool = True,

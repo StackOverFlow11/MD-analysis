@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 from ..utils.config import (
     BOHR_TO_ANG,
+    DEFAULT_LAYER_TOL_A,
     DP_A_H3O_W_EV,
     DELTA_E_ZP_EV,
     HA_TO_EV,
@@ -181,7 +182,7 @@ def _detect_metal_water_interfaces_z_ang(
     metal_z_ang: np.ndarray,
     lz_ang: float,
     *,
-    layer_tol_ang: float = 0.6,
+    layer_tol_ang: float = DEFAULT_LAYER_TOL_A,
 ) -> dict:
     """Identify two metal/water interfaces from metal z-coordinates (Å).
 
@@ -262,7 +263,7 @@ def center_slab_potential_analysis(
     center_mode: str = "interface",
     xyz_path: Path | None = None,
     metal_elements: set[str] | None = None,
-    layer_tol_ang: float = 0.6,
+    layer_tol_ang: float = DEFAULT_LAYER_TOL_A,
     frame_start: int | None = None,
     frame_end: int | None = None,
     frame_step: int | None = None,
@@ -472,7 +473,7 @@ def electrode_potential_analysis(
     center_mode: str = "interface",
     xyz_path: Path | None = None,
     metal_elements: set[str] | None = None,
-    layer_tol_ang: float = 0.6,
+    layer_tol_ang: float = DEFAULT_LAYER_TOL_A,
     fermi_unit: str = "au",
     frame_start: int | None = None,
     frame_end: int | None = None,
@@ -563,7 +564,7 @@ def thickness_sensitivity_analysis(
     center_mode: str = "interface",
     xyz_path: Path | None = None,
     metal_elements: set[str] | None = None,
-    layer_tol_ang: float = 0.6,
+    layer_tol_ang: float = DEFAULT_LAYER_TOL_A,
     fermi_unit: str = "au",
     frame_start: int | None = None,
     frame_end: int | None = None,

@@ -34,6 +34,7 @@ except ImportError:  # pragma: no cover
 
 from ..config import (
     AXIS_MAP,
+    DEFAULT_LAYER_TOL_A,
     DEFAULT_METAL_SYMBOLS,
     INTERFACE_NORMAL_ALIGNED,
     INTERFACE_NORMAL_OPPOSED,
@@ -140,7 +141,7 @@ def detect_interface_layers(
     *,
     metal_symbols: Iterable[str] | None = None,
     normal: NormalSpec = "c",
-    layer_tol_A: float = 0.6,
+    layer_tol_A: float = DEFAULT_LAYER_TOL_A,
     nonmetal_symbols_hint: Iterable[str] | None = None,
 ) -> SurfaceDetectionResult:
     """

@@ -58,6 +58,9 @@ DEFAULT_Z_BIN_WIDTH_A: float = 0.1
 # Default theta bin width for angular probability-density profiles (degree).
 DEFAULT_THETA_BIN_DEG: float = 5.0
 
+# Default layer-clustering tolerance for metal-layer detection (Angstrom).
+DEFAULT_LAYER_TOL_A: float = 0.6
+
 # Maximum O-H distance used to identify water connectivity (Angstrom).
 DEFAULT_WATER_OH_CUTOFF_A: float = 1.25
 
