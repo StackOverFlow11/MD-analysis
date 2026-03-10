@@ -4,12 +4,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from ..config import KEY_LAYER_TOL_A
 from ..utils.config import CHARGE_METHOD_COUNTERION, CHARGE_METHOD_LAYER
 from ._prompt import (
+    _get_effective_default,
     _handle_cmd_error,
     _parse_metal_elements,
     _prompt_bool,
     _prompt_choice,
+    _prompt_float,
     _prompt_global_params,
     _prompt_str,
 )
@@ -53,12 +56,17 @@ def _collect_params(*, method: str | None = None) -> dict:
         params["metal_elements"] = _parse_metal_elements(
             _prompt_str("Metal elements (comma-separated)", default=None)
         )
+        params["layer_tol"] = _prompt_float(
+            "Layer clustering tolerance (A)",
+            default=_get_effective_default(KEY_LAYER_TOL_A),
+        )
         params.update(_prompt_global_params())
     else:
         params["root_dir"] = "."
         params["dir_pattern"] = "bader_t*_i*"
         params["normal"] = "c"
         params["metal_elements"] = None
+        params["layer_tol"] = _get_effective_default(KEY_LAYER_TOL_A)
         params["outdir"] = "analysis"
         params["frame_start"] = None
         params["frame_end"] = None
@@ -101,6 +109,7 @@ def _run_charge(params: dict) -> int:
         metal_symbols=params["metal_elements"],
         normal=params["normal"],
         method=params["method"],
+        layer_tol_A=params["layer_tol"],
         dir_pattern=params["dir_pattern"],
         frame_start=params["frame_start"],
         frame_end=params["frame_end"],

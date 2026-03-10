@@ -19,6 +19,7 @@ from ..utils.config import (
     AXIS_MAP,
     CHARGE_METHOD_COUNTERION,
     CHARGE_METHOD_LAYER,
+    DEFAULT_LAYER_TOL_A,
 )
 from ..utils.StructureParser.LayerParser import (
     _circular_mean_fractional,
@@ -68,6 +69,7 @@ def compute_frame_surface_charge(
     metal_symbols: Iterable[str] | None = None,
     normal: str = "c",
     method: str = "counterion",
+    layer_tol_A: float = DEFAULT_LAYER_TOL_A,
 ) -> Atoms:
     """Compute surface charge density for a single frame.
 
@@ -82,6 +84,8 @@ def compute_frame_surface_charge(
     method
         ``"counterion"`` — only non-water, non-metal species contribute to σ.
         ``"layer"`` — sum net charges of the interface-layer metal atoms.
+    layer_tol_A
+        Layer clustering tolerance in Ångströms for ``detect_interface_layers``.
 
     Returns
     -------
@@ -95,9 +99,11 @@ def compute_frame_surface_charge(
     if method == CHARGE_METHOD_LAYER:
         return _compute_surface_charge_layer(
             atoms, metal_symbols=metal_symbols, normal=normal,
+            layer_tol_A=layer_tol_A,
         )
     return _compute_surface_charge_counterion(
         atoms, metal_symbols=metal_symbols, normal=normal,
+        layer_tol_A=layer_tol_A,
     )
 
 
@@ -106,6 +112,7 @@ def _compute_surface_charge_layer(
     *,
     metal_symbols: Iterable[str] | None = None,
     normal: str = "c",
+    layer_tol_A: float = DEFAULT_LAYER_TOL_A,
 ) -> Atoms:
     """Surface charge = Σ(net charge of interface-layer atoms) / area."""
     if normal not in AREA_VECTOR_INDICES:
@@ -121,7 +128,10 @@ def _compute_surface_charge_layer(
 
     net_charge = atoms.arrays["bader_net_charge"]
 
-    det = detect_interface_layers(atoms, metal_symbols=metal_symbols, normal=normal)
+    det = detect_interface_layers(
+        atoms, metal_symbols=metal_symbols, normal=normal,
+        layer_tol_A=layer_tol_A,
+    )
     iface_aligned = det.interface_normal_aligned()
     iface_opposed = det.interface_normal_opposed()
 
@@ -156,6 +166,7 @@ def _compute_surface_charge_counterion(
     *,
     metal_symbols: Iterable[str] | None = None,
     normal: str = "c",
+    layer_tol_A: float = DEFAULT_LAYER_TOL_A,
 ) -> Atoms:
     """Surface charge from non-water, non-metal species near each surface."""
     if normal not in AREA_VECTOR_INDICES:
@@ -171,7 +182,10 @@ def _compute_surface_charge_counterion(
 
     net_charge = atoms.arrays["bader_net_charge"]
 
-    det = detect_interface_layers(atoms, metal_symbols=metal_symbols, normal=normal)
+    det = detect_interface_layers(
+        atoms, metal_symbols=metal_symbols, normal=normal,
+        layer_tol_A=layer_tol_A,
+    )
     iface_aligned = det.interface_normal_aligned()
     iface_opposed = det.interface_normal_opposed()
 
@@ -403,6 +417,7 @@ def trajectory_surface_charge(
     metal_symbols: Iterable[str] | None = None,
     normal: str = "c",
     method: str = "counterion",
+    layer_tol_A: float = DEFAULT_LAYER_TOL_A,
     dir_pattern: str = DEFAULT_DIR_PATTERN,
     structure_filename: str = DEFAULT_STRUCTURE_FILENAME,
     acf_filename: str = DEFAULT_ACF_FILENAME,
@@ -462,6 +477,7 @@ def trajectory_surface_charge(
         atoms = load_bader_atoms(poscar, acf, potcar)
         compute_frame_surface_charge(
             atoms, metal_symbols=metal_symbols, normal=normal, method=method,
+            layer_tol_A=layer_tol_A,
         )
         sigma = atoms.info["surface_charge_density_uC_cm2"]
         rows.append(sigma)
@@ -513,6 +529,7 @@ def surface_charge_analysis(
     metal_symbols: Iterable[str] | None = None,
     normal: str = "c",
     method: str = "counterion",
+    layer_tol_A: float = DEFAULT_LAYER_TOL_A,
     dir_pattern: str = DEFAULT_DIR_PATTERN,
     structure_filename: str = DEFAULT_STRUCTURE_FILENAME,
     acf_filename: str = DEFAULT_ACF_FILENAME,
@@ -595,6 +612,7 @@ def surface_charge_analysis(
         atoms = load_bader_atoms(poscar, acf, potcar)
         compute_frame_surface_charge(
             atoms, metal_symbols=metal_symbols, normal=normal, method=method,
+            layer_tol_A=layer_tol_A,
         )
         sigma = atoms.info["surface_charge_density_uC_cm2"]
         step = _extract_t_value(fname)
