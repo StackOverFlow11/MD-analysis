@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from ..config import KEY_LAYER_TOL_A
 from ..potential.config import DEFAULT_THICKNESS_ANG
 from ._prompt import (
+    _get_effective_default,
     _handle_cmd_error,
     _parse_metal_elements,
     _prompt_bool,
@@ -44,7 +46,7 @@ def _collect_center_params(params: dict) -> None:
     params["metal_elements"] = _parse_metal_elements(
         _prompt_str("Metal elements (comma-separated, e.g. Cu,Ag)", default=None)
     )
-    params["layer_tol"] = _prompt_float("Layer clustering tolerance (A)", default=0.6)
+    params["layer_tol"] = _prompt_float("Layer clustering tolerance (A)", default=_get_effective_default(KEY_LAYER_TOL_A))
 
 
 def _collect_fermi_params(params: dict) -> None:

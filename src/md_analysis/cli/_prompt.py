@@ -10,6 +10,14 @@ from ..exceptions import MDAnalysisError
 logger = logging.getLogger(__name__)
 
 
+def _get_effective_default(key: str):
+    """Return user-configured value for *key*, falling back to hardcoded default."""
+    from ..config import CONFIGURABLE_DEFAULTS, get_config
+
+    entry = CONFIGURABLE_DEFAULTS[key]
+    return get_config(key, entry["default"])
+
+
 def _prompt_str(label: str, *, default: str | None = None) -> str | None:
     """Prompt for a string value. Returns *default* on empty input."""
     suffix = f" [{default}]" if default is not None else ""

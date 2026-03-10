@@ -22,7 +22,7 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 |---|---|
 | `__init__.py` | Re-exports sub-packages (`utils`, `water`, `potential`, `charge`), `MDAnalysisError`; `__version__ = "0.1.0"` |
 | `exceptions.py` | `MDAnalysisError(Exception)` — base class for all domain-specific errors; all 9 custom exceptions inherit from it |
-| `config.py` | Persistent user configuration (`~/.config/md_analysis/config.json`): `load_config`, `save_config`, `get_config`, `set_config`, `ConfigError`, `KEY_VASP_SCRIPT_PATH` |
+| `config.py` | Persistent user configuration (`~/.config/md_analysis/config.json`): `load_config`, `save_config`, `get_config`, `set_config`, `delete_config`, `ConfigError`, `KEY_VASP_SCRIPT_PATH`, `KEY_LAYER_TOL_A`, `KEY_Z_BIN_WIDTH_A`, `KEY_THETA_BIN_DEG`, `KEY_WATER_OH_CUTOFF_A`, `CONFIGURABLE_DEFAULTS` |
 | `main.py` | Programmatic entry points: `run_water_analysis()`, `run_potential_analysis()`, `run_charge_analysis()`, `run_all()` |
 
 ### `src/md_analysis/cli/` — Interactive CLI (no argparse)
@@ -30,12 +30,12 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 | File | Purpose | Key Functions |
 |---|---|---|
 | `__init__.py` | Top menu (1=Water, 2=Potential, 3=Charge, 4=Scripts, 9=Settings, 0=Exit) | `main()` |
-| `_prompt.py` | Reusable input helpers + error decorator | `_prompt_str`, `_prompt_int`, `_prompt_float`, `_prompt_choice`, `_prompt_bool`, `_parse_metal_elements`, `_prompt_global_params`, `_handle_cmd_error` (decorator: catches exceptions in `_cmd_*` handlers, prints user-friendly message, returns 1) |
+| `_prompt.py` | Reusable input helpers + error decorator | `_get_effective_default`, `_prompt_str`, `_prompt_int`, `_prompt_float`, `_prompt_choice`, `_prompt_bool`, `_parse_metal_elements`, `_prompt_global_params`, `_handle_cmd_error` (decorator: catches exceptions in `_cmd_*` handlers, prints user-friendly message, returns 1) |
 | `_water.py` | Water sub-menu (101-105) | `water_menu()`, dispatches to `water` module or `main.run_water_analysis` |
 | `_potential.py` | Potential sub-menu (201-206) | `potential_menu()`, dispatches to `potential` module or `main.run_potential_analysis` |
 | `_charge.py` | Charge sub-menu (301-303) | `charge_menu()`, `_collect_params()`, `_run_charge()`, `_print_ensemble_summary()` |
 | `_scripts.py` | Scripts/Tools sub-menu (401-402) | `scripts_menu()`, 401: single-frame Bader workdir, 402: batch Bader workdirs |
-| `_settings.py` | Settings sub-menu (901-902) | `settings_menu()`, 901: set VASP script path, 902: show config |
+| `_settings.py` | Settings sub-menu (901-907) | `settings_menu()`, 901: set VASP script path, 902: show config, 903-906: set analysis defaults, 907: reset all defaults |
 
 **Menu codes:**
 - 101: mass density, 102: orientation-weighted density, 103: adsorbed orientation, 104: theta distribution, 105: full three-panel
@@ -43,6 +43,7 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 - 301: surface charge (counterion), 302: surface charge (layer), 303: full charge (method prompted)
 - 401: generate Bader work directory (single frame), 402: batch generate Bader work directories
 - 901: set VASP submission script path, 902: show current configuration
+- 903: set layer clustering tolerance, 904: set z-axis bin width, 905: set theta bin width, 906: set water O-H cutoff, 907: reset all analysis defaults
 
 ### `src/md_analysis/utils/` — Shared Low-Level Utilities
 
@@ -119,9 +120,10 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 | `test/unit/utils/test_cube_parser.py` | `read_cube_header_and_values`, `slab_average_potential_ev`, `plane_avg_phi_z_ev`, `discover_cube_files` |
 | `test/unit/utils/test_cell_parser.py` | `parse_abc_from_restart` + `parse_abc_from_md_inp`: valid/missing/error cases |
 | `test/unit/utils/test_slowgrowth_parser.py` | `ColvarInfo`, `parse_colvar_restart` (4 scenarios), `parse_lagrange_mult_log` (single/multi), `compute_target_series`, multi-COLLECTIVE blocks, edge cases |
-| `test/unit/test_config.py` | `load_config`, `save_config`, `get_config`, `set_config`, `ConfigError` |
+| `test/unit/test_config.py` | `load_config`, `save_config`, `get_config`, `set_config`, `delete_config`, `ConfigError`, `CONFIGURABLE_DEFAULTS` |
 | `test/unit/test_logging_setup.py` | NullHandler on library logger, StreamHandler setup in CLI |
 | `test/unit/cli/test_handle_cmd_error.py` | `_handle_cmd_error` decorator: known/unexpected exceptions, normal return |
+| `test/unit/cli/test_settings_defaults.py` | `_get_effective_default`, settings handlers 903-907, 902 enhanced display |
 | `test/unit/charge/test_charge_analysis.py` | All 5 charge public functions + internal `_extract_t_value`, `_sorted_frame_dirs` |
 | `test/unit/potential/test_single_frame_electrode.py` | Single-frame potential pipeline |
 | `test/unit/scripts/test_bader_gen.py` | `generate_bader_workdir` + `batch_generate_bader_workdirs`: directory structure, frame slicing, metadata |

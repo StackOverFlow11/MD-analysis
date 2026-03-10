@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from ..config import KEY_Z_BIN_WIDTH_A
 from ._prompt import (
+    _get_effective_default,
     _handle_cmd_error,
     _prompt_bool,
     _prompt_cell_abc,
@@ -33,6 +35,7 @@ def _collect_params() -> dict:
     params: dict = {}
     params["xyz"] = _prompt_str_required("XYZ trajectory file (e.g. md-pos-1.xyz)")
     params["cell_abc"] = _prompt_cell_abc()
+    params["dz_A"] = _get_effective_default(KEY_Z_BIN_WIDTH_A)
 
     if _prompt_bool("Modify advanced parameters?", default=False):
         params.update(_prompt_global_params())
@@ -57,6 +60,7 @@ def _cmd_101(params: dict) -> int:
         xyz_path=params["xyz"],
         cell_abc=params["cell_abc"],
         output_dir=outdir,
+        dz_A=params["dz_A"],
         frame_start=params["frame_start"],
         frame_end=params["frame_end"],
         frame_step=params["frame_step"],
@@ -77,6 +81,7 @@ def _cmd_102(params: dict) -> int:
         xyz_path=params["xyz"],
         cell_abc=params["cell_abc"],
         output_dir=outdir,
+        dz_A=params["dz_A"],
         frame_start=params["frame_start"],
         frame_end=params["frame_end"],
         frame_step=params["frame_step"],
@@ -97,6 +102,7 @@ def _cmd_103(params: dict) -> int:
         xyz_path=params["xyz"],
         cell_abc=params["cell_abc"],
         output_dir=outdir,
+        dz_A=params["dz_A"],
         frame_start=params["frame_start"],
         frame_end=params["frame_end"],
         frame_step=params["frame_step"],
@@ -119,6 +125,7 @@ def _cmd_104(params: dict) -> int:
         xyz_path=params["xyz"],
         cell_abc=params["cell_abc"],
         output_dir=outdir,
+        dz_A=params["dz_A"],
         frame_start=params["frame_start"],
         frame_end=params["frame_end"],
         frame_step=params["frame_step"],
@@ -137,6 +144,7 @@ def _cmd_105(params: dict) -> int:
         xyz_path=Path(params["xyz"]),
         cell_abc=params["cell_abc"],
         output_dir=Path(params["outdir"]),
+        dz_A=params["dz_A"],
         frame_start=params["frame_start"],
         frame_end=params["frame_end"],
         frame_step=params["frame_step"],

@@ -74,8 +74,9 @@
     - ✅ RestartParser：`parse_abc_from_restart()` 从 CP2K `.restart` 文件解析正交 cell 参数
     - ✅ ColvarParser：解析 CP2K COLVAR restart 元数据（COLLECTIVE、CONSTRAINT、FIXED_ATOMS）和 LagrangeMultLog（单约束/多约束自动检测），重建 ξ(t) 目标序列
   - 持久化用户配置（`config.py`）：
-    - ✅ `load_config`、`save_config`、`get_config`、`set_config`
-    - ✅ CLI 设置菜单（901/902）支持查看和修改配置
+    - ✅ `load_config`、`save_config`、`get_config`、`set_config`、`delete_config`
+    - ✅ `CONFIGURABLE_DEFAULTS` 注册表：`layer_tol_A`、`z_bin_width_A`、`theta_bin_deg`、`water_oh_cutoff_A`
+    - ✅ CLI 设置菜单（901-907）支持查看/修改配置和分析参数默认值
   - Mulliken 电荷：按元素/分组/分层统计（优先级低于 Bader，待后续明确需求）
 - **工程化（可复现与易用性）**
   - 依赖与环境说明（固定最小依赖集合与安装方式）

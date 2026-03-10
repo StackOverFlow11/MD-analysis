@@ -7,7 +7,13 @@ import json
 import pytest
 
 from md_analysis.config import (
+    CONFIGURABLE_DEFAULTS,
     ConfigError,
+    KEY_LAYER_TOL_A,
+    KEY_THETA_BIN_DEG,
+    KEY_WATER_OH_CUTOFF_A,
+    KEY_Z_BIN_WIDTH_A,
+    delete_config,
     get_config,
     load_config,
     save_config,
@@ -60,3 +66,45 @@ def test_load_corrupt_file_raises(tmp_path):
     cfg_path.write_text("not valid json {{{")
     with pytest.raises(ConfigError):
         load_config(cfg_path)
+
+
+# ---------- delete_config ----------
+
+def test_delete_config_removes_key(tmp_path):
+    """delete_config removes an existing key."""
+    cfg_path = tmp_path / "config.json"
+    set_config("a", 1, config_path=cfg_path)
+    set_config("b", 2, config_path=cfg_path)
+    delete_config("a", config_path=cfg_path)
+    assert load_config(cfg_path) == {"b": 2}
+
+
+def test_delete_config_noop_missing_key(tmp_path):
+    """delete_config is a no-op when the key does not exist."""
+    cfg_path = tmp_path / "config.json"
+    set_config("x", 10, config_path=cfg_path)
+    delete_config("nonexistent", config_path=cfg_path)
+    assert load_config(cfg_path) == {"x": 10}
+
+
+def test_delete_config_noop_no_file(tmp_path):
+    """delete_config is a no-op when the config file does not exist."""
+    cfg_path = tmp_path / "config.json"
+    delete_config("anything", config_path=cfg_path)
+    assert not cfg_path.exists()
+
+
+# ---------- CONFIGURABLE_DEFAULTS registry ----------
+
+def test_configurable_defaults_keys():
+    """CONFIGURABLE_DEFAULTS contains exactly the expected keys."""
+    expected = {KEY_LAYER_TOL_A, KEY_Z_BIN_WIDTH_A, KEY_THETA_BIN_DEG, KEY_WATER_OH_CUTOFF_A}
+    assert set(CONFIGURABLE_DEFAULTS.keys()) == expected
+
+
+def test_configurable_defaults_have_required_fields():
+    """Each entry has 'default' (float) and 'label' (str)."""
+    for key, entry in CONFIGURABLE_DEFAULTS.items():
+        assert isinstance(entry["default"], float), f"{key}: default is not float"
+        assert isinstance(entry["label"], str), f"{key}: label is not str"
+        assert entry["default"] > 0, f"{key}: default must be positive"

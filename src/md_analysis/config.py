@@ -11,6 +11,21 @@ CONFIG_FILE = CONFIG_DIR / "config.json"
 
 KEY_VASP_SCRIPT_PATH = "vasp_script_path"
 
+# Keys for configurable analysis defaults (persisted in user config)
+KEY_LAYER_TOL_A = "layer_tol_A"
+KEY_Z_BIN_WIDTH_A = "z_bin_width_A"
+KEY_THETA_BIN_DEG = "theta_bin_deg"
+KEY_WATER_OH_CUTOFF_A = "water_oh_cutoff_A"
+
+# Registry of configurable defaults: maps config key → metadata.
+# The "default" values mirror the hardcoded constants in utils/config.py.
+CONFIGURABLE_DEFAULTS: dict[str, dict] = {
+    KEY_LAYER_TOL_A: {"default": 0.6, "label": "Layer clustering tolerance (A)"},
+    KEY_Z_BIN_WIDTH_A: {"default": 0.1, "label": "Z-axis bin width (A)"},
+    KEY_THETA_BIN_DEG: {"default": 5.0, "label": "Theta bin width (deg)"},
+    KEY_WATER_OH_CUTOFF_A: {"default": 1.25, "label": "Water O-H cutoff (A)"},
+}
+
 
 from .exceptions import MDAnalysisError
 
@@ -52,3 +67,11 @@ def set_config(key: str, value: Any, *, config_path: Path | None = None) -> None
     cfg = load_config(config_path)
     cfg[key] = value
     save_config(cfg, config_path)
+
+
+def delete_config(key: str, *, config_path: Path | None = None) -> None:
+    """Remove *key* from the persisted config. No-op if absent."""
+    cfg = load_config(config_path)
+    if key in cfg:
+        del cfg[key]
+        save_config(cfg, config_path)

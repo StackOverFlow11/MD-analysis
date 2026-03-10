@@ -103,20 +103,21 @@
 ### 6) `md_analysis.config`（持久化用户配置）
 
 - `config.py`：用户偏好持久化（`~/.config/md_analysis/config.json`）
-  - `load_config()`、`save_config()`、`get_config()`、`set_config()`
-  - 配置键常量：`KEY_VASP_SCRIPT_PATH`
+  - `load_config()`、`save_config()`、`get_config()`、`set_config()`、`delete_config()`
+  - 配置键常量：`KEY_VASP_SCRIPT_PATH`、`KEY_LAYER_TOL_A`、`KEY_Z_BIN_WIDTH_A`、`KEY_THETA_BIN_DEG`、`KEY_WATER_OH_CUTOFF_A`
+  - `CONFIGURABLE_DEFAULTS`：可配置分析参数注册表（键 → 硬编码默认值 + 标签）
 
 ### 7) `md_analysis.main` / `md_analysis.cli`（集成入口）
 
 - `main.py`：编程入口 `run_water_analysis()`、`run_potential_analysis()`、`run_charge_analysis()`、`run_all()`
 - `cli/`：VASPKIT 风格交互式 CLI 包，注册为 `md-analysis` console script
   - `__init__.py`：`main()` 入口 + banner + 顶层菜单分发
-  - `_prompt.py`：可复用的输入提示辅助函数
+  - `_prompt.py`：可复用的输入提示辅助函数（含 `_get_effective_default` 用于读取用户配置或硬编码默认值）
   - `_water.py`：水分析子菜单（101-105）+ 参数采集 + 处理函数
   - `_potential.py`：电势分析子菜单（201-206）+ 参数采集 + 处理函数
   - `_charge.py`：电荷分析子菜单（301-303）+ 参数采集 + 处理函数
   - `_scripts.py`：脚本/工具子菜单（401）+ Bader 工作目录生成
-  - `_settings.py`：设置子菜单（901-902）+ 持久化配置管理
+  - `_settings.py`：设置子菜单（901-907）+ 持久化配置管理（903-906: 分析参数默认值，907: 重置所有默认值）
 
 ### 8) `md_analysis.scripts`（自动化脚本工具）
 
