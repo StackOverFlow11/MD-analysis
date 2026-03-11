@@ -38,7 +38,13 @@ from ..utils.CubeParser import (
     read_cube_header_and_values,
     slab_average_potential_ev,
 )
-from ..utils.StructureParser.ClusterUtils import cluster_1d_periodic, find_largest_gap_periodic, gap_midpoint_periodic
+from ..utils.StructureParser.ClusterUtils import gap_midpoint_periodic
+from ..utils.StructureParser.LayerParser import detect_interface_layers
+
+try:
+    from ase import Atoms
+except ImportError:  # pragma: no cover
+    Atoms = object  # type: ignore[misc]
 from .config import (
     DEFAULT_CENTER_POTENTIAL_CSV_NAME,
     DEFAULT_CENTER_POTENTIAL_PNG_NAME,
@@ -94,18 +100,23 @@ def _parse_md_out_fermi(md_out_path: Path) -> list[dict]:
     return [r for r in records if r["fermi_raw"] is not None]
 
 
-def _read_xyz_metal_z_for_steps(
+def _read_xyz_atoms_for_steps(
     xyz_path: Path,
     steps: set[int],
     *,
     metal_elements: Optional[set[str]] = None,
-) -> tuple[dict[int, np.ndarray], set[str]]:
-    """Stream-parse a CP2K xyz trajectory and extract metal-atom z (Å) for given steps."""
+) -> tuple[dict[int, Atoms], set[str]]:
+    """Stream-parse a CP2K xyz trajectory and build Atoms for given steps.
+
+    Returns ``(atoms_by_step, inferred_metal_elements)``.
+    Atoms objects have **no cell** set — the caller must set it per frame
+    from the cube header.
+    """
     if not xyz_path.exists():
         raise FileNotFoundError(xyz_path)
 
     steps = {int(s) for s in steps}
-    out: dict[int, np.ndarray] = {}
+    out: dict[int, Atoms] = {}
     inferred_metal: Optional[set[str]] = set(metal_elements) if metal_elements is not None else None
     inferred_done = inferred_metal is not None
 
@@ -129,9 +140,10 @@ def _read_xyz_metal_z_for_steps(
             step = int(m.group(1)) if m else None
             need_this = (step is not None) and (step in steps)
 
-            if not inferred_done:
-                symbols: set[str] = set()
-                z_by_symbol: dict[str, list[float]] = {}
+            need_parse = need_this or not inferred_done
+            if need_parse:
+                symbols: list[str] = []
+                positions: list[list[float]] = []
                 for _ in range(natoms):
                     line = f.readline()
                     if not line:
@@ -139,35 +151,16 @@ def _read_xyz_metal_z_for_steps(
                     parts = line.split()
                     if len(parts) < 4:
                         continue
-                    sym = parts[0]
-                    symbols.add(sym)
+                    symbols.append(parts[0])
                     if need_this:
-                        z_by_symbol.setdefault(sym, []).append(_float(parts[3]))
+                        positions.append([_float(parts[1]), _float(parts[2]), _float(parts[3])])
 
-                inferred_metal = set(symbols) & set(TRANSITION_METAL_SYMBOLS)
-                inferred_done = True
+                if not inferred_done:
+                    inferred_metal = set(symbols) & set(TRANSITION_METAL_SYMBOLS)
+                    inferred_done = True
 
                 if need_this and step is not None:
-                    z_list: list[float] = []
-                    for sym in inferred_metal:
-                        z_list.extend(z_by_symbol.get(sym, []))
-                    out[int(step)] = np.array(z_list, dtype=float)
-                continue
-
-            if need_this:
-                z_list = []
-                assert inferred_metal is not None
-                for _ in range(natoms):
-                    line = f.readline()
-                    if not line:
-                        break
-                    parts = line.split()
-                    if len(parts) < 4:
-                        continue
-                    if parts[0] in inferred_metal:
-                        z_list.append(_float(parts[3]))
-                if step is not None:
-                    out[int(step)] = np.array(z_list, dtype=float)
+                    out[int(step)] = Atoms(symbols=symbols, positions=positions)
             else:
                 for _ in range(natoms):
                     if not f.readline():
@@ -178,38 +171,29 @@ def _read_xyz_metal_z_for_steps(
     return out, inferred_metal
 
 
-def _detect_metal_water_interfaces_z_ang(
-    metal_z_ang: np.ndarray,
-    lz_ang: float,
-    *,
-    layer_tol_ang: float = DEFAULT_LAYER_TOL_A,
-) -> dict:
-    """Identify two metal/water interfaces from metal z-coordinates (Å).
+def _extract_interface_geometry(detection, axis_length_ang: float) -> dict:
+    """Extract interface geometry from a ``SurfaceDetectionResult``.
 
-    Uses ``cluster_1d_periodic`` + ``find_largest_gap_periodic`` from ClusterUtils.
+    Returns a dict with the same keys as the former
+    ``_detect_metal_water_interfaces_z_ang`` so downstream CSV writing
+    is unaffected.
     """
-    if metal_z_ang.size == 0:
-        raise ValueError("Empty metal_z array")
-    if lz_ang <= 0:
-        raise ValueError(f"Invalid Lz: {lz_ang}")
-
-    clusters = cluster_1d_periodic(metal_z_ang, period=lz_ang, tol=layer_tol_ang)
-    centers = np.array([c for c, _ in clusters], dtype=float)
-
-    if centers.size < 2:
-        raise ValueError(f"Need >= 2 metal layers to detect two interfaces; got {centers.size}")
-
-    low_idx, high_idx, water_gap = find_largest_gap_periodic(centers, period=lz_ang)
-    z_lower = float(centers[low_idx])
-    z_upper = float(centers[high_idx])
-    z_mid = gap_midpoint_periodic(z_lower, z_upper, period=lz_ang)
-
+    aligned = detection.interface_normal_aligned()
+    opposed = detection.interface_normal_opposed()
+    z_lower_ang = aligned.center_frac * axis_length_ang
+    z_upper_ang = opposed.center_frac * axis_length_ang
+    z_mid_ang = gap_midpoint_periodic(
+        aligned.center_frac, opposed.center_frac, 1.0,
+    ) * axis_length_ang
+    water_gap_ang = (
+        (opposed.center_frac - aligned.center_frac) % 1.0
+    ) * axis_length_ang
     return {
-        "z_lower_ang": z_lower,
-        "z_upper_ang": z_upper,
-        "z_mid_ang": z_mid,
-        "water_gap_ang": water_gap,
-        "n_layers": int(centers.size),
+        "z_lower_ang": z_lower_ang,
+        "z_upper_ang": z_upper_ang,
+        "z_mid_ang": z_mid_ang,
+        "water_gap_ang": water_gap_ang,
+        "n_layers": len(detection.metal_layers_sorted),
     }
 
 
@@ -292,7 +276,7 @@ def center_slab_potential_analysis(
 
     # Optional interface detection from xyz
     use_interface_center = center_mode == "interface"
-    metal_z_by_step: dict[int, np.ndarray] = {}
+    atoms_by_step: dict[int, Atoms] = {}
     metal_elements_used: Optional[set[str]] = None
 
     if use_interface_center:
@@ -306,7 +290,7 @@ def center_slab_potential_analysis(
         needed_steps = {
             s for s in (extract_step_from_cube_filename(cp) for cp in cube_paths) if s is not None
         }
-        metal_z_by_step, inferred_metal = _read_xyz_metal_z_for_steps(
+        atoms_by_step, inferred_metal = _read_xyz_atoms_for_steps(
             xyz_path, needed_steps, metal_elements=metal_elements,
         )
         metal_elements_used = metal_elements or inferred_metal
@@ -341,12 +325,19 @@ def center_slab_potential_analysis(
         iface: Optional[dict] = None
         center_source = "cell"
 
-        if use_interface_center and int(step) in metal_z_by_step:
-            iface = _detect_metal_water_interfaces_z_ang(
-                metal_z_by_step[int(step)],
-                lz_ang,
-                layer_tol_ang=layer_tol_ang,
+        if use_interface_center and int(step) in atoms_by_step:
+            frame_atoms = atoms_by_step[int(step)]
+            frame_atoms.set_cell([
+                header.vx_bohr * header.nx * BOHR_TO_ANG,
+                header.vy_bohr * header.ny * BOHR_TO_ANG,
+                header.vz_bohr * header.nz * BOHR_TO_ANG,
+            ])
+            frame_atoms.set_pbc(True)
+            detection = detect_interface_layers(
+                frame_atoms, metal_symbols=metal_elements_used,
+                normal="c", layer_tol_A=layer_tol_ang,
             )
+            iface = _extract_interface_geometry(detection, lz_ang)
             z_center_ang = origin_z_ang + float(iface["z_mid_ang"])
             center_source = "interface"
 
@@ -607,7 +598,7 @@ def thickness_sensitivity_analysis(
 
     # --- Interface detection (same logic as center_slab_potential_analysis) ---
     use_interface_center = center_mode == "interface"
-    metal_z_by_step: dict[int, np.ndarray] = {}
+    atoms_by_step: dict[int, Atoms] = {}
 
     if use_interface_center:
         if xyz_path is None:
@@ -620,7 +611,7 @@ def thickness_sensitivity_analysis(
         needed_steps = {
             s for s in (extract_step_from_cube_filename(cp) for cp in cube_paths) if s is not None
         }
-        metal_z_by_step, inferred_metal = _read_xyz_metal_z_for_steps(
+        atoms_by_step, inferred_metal = _read_xyz_atoms_for_steps(
             xyz_path, needed_steps, metal_elements=metal_elements,
         )
         metal_elements_used = metal_elements or inferred_metal
@@ -650,12 +641,19 @@ def thickness_sensitivity_analysis(
         origin_z_ang = float(header.origin_bohr[2]) * BOHR_TO_ANG
 
         z_center_ang: Optional[float] = None
-        if use_interface_center and int(step) in metal_z_by_step:
-            iface = _detect_metal_water_interfaces_z_ang(
-                metal_z_by_step[int(step)],
-                lz_ang,
-                layer_tol_ang=layer_tol_ang,
+        if use_interface_center and int(step) in atoms_by_step:
+            frame_atoms = atoms_by_step[int(step)]
+            frame_atoms.set_cell([
+                header.vx_bohr * header.nx * BOHR_TO_ANG,
+                header.vy_bohr * header.ny * BOHR_TO_ANG,
+                header.vz_bohr * header.nz * BOHR_TO_ANG,
+            ])
+            frame_atoms.set_pbc(True)
+            detection = detect_interface_layers(
+                frame_atoms, metal_symbols=metal_elements_used,
+                normal="c", layer_tol_A=layer_tol_ang,
             )
+            iface = _extract_interface_geometry(detection, lz_ang)
             z_center_ang = origin_z_ang + float(iface["z_mid_ang"])
 
         frame_cache.append((header, values, z_center_ang, fermi_ev))

@@ -26,9 +26,10 @@ Flat structure (no sub-packages):
 
 ## Interface detection for slab centering
 
-Uses `ClusterUtils.cluster_1d_periodic` + `find_largest_gap_periodic` to
-detect metal layers from xyz trajectory z-coordinates, then finds the
-water region midpoint as the slab center.
+Delegates to `LayerParser.detect_interface_layers` for metal layer clustering
+and interface labeling. `_extract_interface_geometry` extracts interface layer
+Cartesian coordinates and water gap midpoint from the `SurfaceDetectionResult`.
+`gap_midpoint_periodic` is still imported directly from `ClusterUtils`.
 
 ## Electrode potential formula (cSHE)
 
