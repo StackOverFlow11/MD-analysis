@@ -14,7 +14,7 @@ import logging
 from pathlib import Path
 from typing import Any, Iterable
 
-from .potential.config import DEFAULT_THICKNESS_ANG
+from .electrochemical.potential.config import DEFAULT_THICKNESS_ANG
 from .utils.config import CHARGE_METHOD_COUNTERION, DEFAULT_LAYER_TOL_A
 
 logger = logging.getLogger(__name__)
@@ -107,7 +107,7 @@ def run_potential_analysis(
     """
     logger.info("Starting potential analysis: output_dir=%s", output_dir)
 
-    from .potential import (
+    from .electrochemical.potential import (
         center_slab_potential_analysis,
         fermi_energy_analysis,
         electrode_potential_analysis,
@@ -230,8 +230,8 @@ def run_charge_analysis(
     """
     logger.info("Starting charge analysis: method=%s, output_dir=%s", method, output_dir)
 
-    from .charge import surface_charge_analysis
-    from .charge.config import (
+    from .electrochemical.charge import surface_charge_analysis
+    from .electrochemical.charge.config import (
         DEFAULT_SURFACE_CHARGE_CSV_NAME,
         DEFAULT_SURFACE_CHARGE_PNG_NAME,
     )

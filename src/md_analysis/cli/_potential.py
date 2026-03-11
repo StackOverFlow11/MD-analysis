@@ -29,7 +29,7 @@ class CenterPotentialCmd(MenuCommand):
     output_subdir = "potential/center"
 
     def execute(self, ctx: dict) -> None:
-        analyze = lazy_import("md_analysis.potential",
+        analyze = lazy_import("md_analysis.electrochemical.potential",
                               "center_slab_potential_analysis")
         csv = analyze(
             ctx[K.CUBE_PATTERN],
@@ -53,7 +53,7 @@ class FermiEnergyCmd(MenuCommand):
     output_subdir = "potential/fermi"
 
     def execute(self, ctx: dict) -> None:
-        analyze = lazy_import("md_analysis.potential",
+        analyze = lazy_import("md_analysis.electrochemical.potential",
                               "fermi_energy_analysis")
         csv = analyze(
             Path(ctx[K.MD_OUT]),
@@ -73,7 +73,7 @@ class ElectrodePotentialCmd(MenuCommand):
     output_subdir = "potential/electrode"
 
     def execute(self, ctx: dict) -> None:
-        analyze = lazy_import("md_analysis.potential",
+        analyze = lazy_import("md_analysis.electrochemical.potential",
                               "electrode_potential_analysis")
         csv = analyze(
             ctx[K.CUBE_PATTERN],
@@ -99,7 +99,7 @@ class PhiZProfileCmd(MenuCommand):
     output_subdir = "potential/phi_z"
 
     def execute(self, ctx: dict) -> None:
-        analyze = lazy_import("md_analysis.potential",
+        analyze = lazy_import("md_analysis.electrochemical.potential",
                               "phi_z_planeavg_analysis")
         png = analyze(
             ctx[K.CUBE_PATTERN],
@@ -121,7 +121,7 @@ class ThicknessSensitivityCmd(MenuCommand):
     output_subdir = "potential/thickness_sensitivity"
 
     def execute(self, ctx: dict) -> None:
-        analyze = lazy_import("md_analysis.potential",
+        analyze = lazy_import("md_analysis.electrochemical.potential",
                               "thickness_sensitivity_analysis")
         csv = analyze(
             ctx[K.CUBE_PATTERN],

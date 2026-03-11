@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 from ase import Atoms
 
-from md_analysis.charge.BaderAnalysis import (
+from md_analysis.electrochemical.charge.BaderAnalysis import (
     _extract_t_value,
     _sorted_frame_dirs,
     compute_frame_surface_charge,
@@ -16,7 +16,7 @@ from md_analysis.charge.BaderAnalysis import (
     trajectory_indexed_atom_charges,
     trajectory_surface_charge,
 )
-from md_analysis.charge.config import E_PER_A2_TO_UC_PER_CM2
+from md_analysis.electrochemical.charge.config import E_PER_A2_TO_UC_PER_CM2
 from md_analysis.utils.BaderParser import load_bader_atoms
 from md_analysis.utils.StructureParser.LayerParser import detect_interface_layers
 

@@ -21,7 +21,7 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-from ..utils.config import (
+from ...utils.config import (
     BOHR_TO_ANG,
     DEFAULT_LAYER_TOL_A,
     DP_A_H3O_W_EV,
@@ -30,16 +30,16 @@ from ..utils.config import (
     MU_HPLUS_G0_EV,
     TRANSITION_METAL_SYMBOLS,
 )
-from ..utils._io_helpers import _cumulative_average, _write_csv
-from ..utils.CubeParser import (
+from ...utils._io_helpers import _cumulative_average, _write_csv
+from ...utils.CubeParser import (
     _float,
     discover_cube_files,
     extract_step_from_cube_filename,
     read_cube_header_and_values,
     slab_average_potential_ev,
 )
-from ..utils.StructureParser.ClusterUtils import gap_midpoint_periodic
-from ..utils.StructureParser.LayerParser import detect_interface_layers
+from ...utils.StructureParser.ClusterUtils import gap_midpoint_periodic
+from ...utils.StructureParser.LayerParser import detect_interface_layers
 
 try:
     from ase import Atoms

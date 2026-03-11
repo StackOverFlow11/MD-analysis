@@ -16,7 +16,7 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-from ..utils.CubeParser import (
+from ...utils.CubeParser import (
     discover_cube_files,
     extract_step_from_cube_filename,
     plane_avg_phi_z_ev,

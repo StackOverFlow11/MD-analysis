@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from md_analysis.charge.BaderAnalysis import (
+from md_analysis.electrochemical.charge.BaderAnalysis import (
     compute_frame_surface_charge,
     surface_charge_analysis,
     trajectory_indexed_atom_charges,
