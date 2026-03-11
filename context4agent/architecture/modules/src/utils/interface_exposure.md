@@ -177,6 +177,12 @@
   - restart 文件元数据：`project_name`、`step_start`、`time_start_fs`、`timestep_fs`、`total_steps`、`colvars: ColvarInfo`、`lagrange_filename`、`cell_abc_ang`、`fixed_atom_indices`
 - `LagrangeMultLog`
   - 拉格朗日乘子时序：`shake`、`rattle`、`n_steps`、`n_constraints`；属性 `collective_shake`/`collective_rattle` 提取 CV 乘子
+- `ColvarMDInfo`
+  - 完整慢增长 MD 会话：组合 `ColvarRestart`（输入配置）+ `LagrangeMultLog`（输出乘子数据）
+  - 字段：`restart: ColvarRestart`、`lagrange: LagrangeMultLog`
+  - 属性：`n_steps`、`steps`（绝对步数 `[0, 1, ..., n_steps-1]`）、`times_fs`（绝对时间）
+  - 方法：`target_series_au(colvar_id=None)` 返回正确对齐的 ξ(k) 序列
+  - 工厂方法：`ColvarMDInfo.from_paths(restart_path, log_path)` 一步解析两个文件
 
 函数：
 
@@ -186,6 +192,7 @@
   - 解析 LagrangeMultLog 文件，自动检测单约束/多约束格式
 - `compute_target_series(restart, n_steps, *, colvar_id=None) -> np.ndarray`
   - 重建 ξ(t) 序列（原子单位），`xi(k) = target_au + (k - step_start) * target_growth_au`
+  - `k` 为绝对步数 `[0, 1, ..., n_steps-1]`；`target_au` 是 `step_start` 时刻的快照值
   - `colvar_id` 可选参数：指定使用哪个约束，默认使用 primary（第一个）
 
 ## 3. 推荐导入方式

@@ -92,6 +92,60 @@ class LagrangeMultLog:
         return self.rattle if self.n_constraints == 1 else self.rattle[:, 0]
 
 
+@dataclass(frozen=True)
+class ColvarMDInfo:
+    """Complete slow-growth MD session: restart config + Lagrange multiplier data.
+
+    Combines :class:`ColvarRestart` (input configuration) with
+    :class:`LagrangeMultLog` (output multiplier data) and provides
+    correctly aligned step/time/target arrays.
+    """
+
+    restart: ColvarRestart
+    lagrange: LagrangeMultLog
+
+    @property
+    def n_steps(self) -> int:
+        """Number of MD steps (from Lagrange multiplier log)."""
+        return self.lagrange.n_steps
+
+    @property
+    def steps(self) -> np.ndarray:
+        """Absolute step numbers, shape ``(n_steps,)``: ``[0, 1, ..., n_steps-1]``."""
+        return np.arange(self.n_steps)
+
+    @property
+    def times_fs(self) -> np.ndarray:
+        """Absolute times in fs, shape ``(n_steps,)``."""
+        return self.steps * self.restart.timestep_fs
+
+    def target_series_au(self, colvar_id: int | None = None) -> np.ndarray:
+        """Target CV series in atomic units, shape ``(n_steps,)``.
+
+        ``xi(k) = target_au + (k - step_start) * target_growth_au``
+
+        where *k* are absolute step numbers ``[0, 1, ..., n_steps-1]``.
+        """
+        c = (
+            self.restart.colvars[colvar_id]
+            if colvar_id is not None
+            else self.restart.colvars.primary
+        )
+        return c.target_au + (self.steps - self.restart.step_start) * c.target_growth_au
+
+    @classmethod
+    def from_paths(
+        cls,
+        restart_path: str | Path,
+        log_path: str | Path,
+    ) -> ColvarMDInfo:
+        """Parse restart and LagrangeMultLog files into a single object."""
+        return cls(
+            restart=parse_colvar_restart(restart_path),
+            lagrange=parse_lagrange_mult_log(log_path),
+        )
+
+
 # ---------------------------------------------------------------------------
 # Private helpers — restart parsing
 # ---------------------------------------------------------------------------
@@ -367,12 +421,13 @@ def compute_target_series(
     """Reconstruct the target CV series in atomic units.
 
     ``xi(k) = target_au + (k - step_start) * target_growth_au``
-    where *k* = 1, 2, ..., *n_steps*.
+    where *k* = 0, 1, ..., *n_steps* - 1 (absolute step numbers).
 
     Parameters
     ----------
     restart : ColvarRestart
-        Parsed restart metadata.
+        Parsed restart metadata.  ``target_au`` is the target value
+        **at** ``step_start`` (the restart snapshot), not the initial value.
     n_steps : int
         Number of steps to generate.
     colvar_id : int, optional
@@ -383,7 +438,7 @@ def compute_target_series(
         constraint = restart.colvars[colvar_id]
     else:
         constraint = restart.colvars.primary
-    k = np.arange(1, n_steps + 1)
+    k = np.arange(n_steps)
     return (
         constraint.target_au
         + (k - restart.step_start) * constraint.target_growth_au

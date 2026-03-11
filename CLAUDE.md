@@ -57,7 +57,7 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 | `StructureParser/LayerParser.py` | `Layer` (dataclass: `atom_indices`, `center_frac`, `is_interface`, `interface_label`, `normal_unit`), `SurfaceDetectionResult` (`.interface_normal_aligned()`, `.interface_normal_opposed()`), `SurfaceGeometryError`, `detect_interface_layers(atoms, *, metal_symbols, normal, layer_tol_A)`, `format_detection_summary()`, `_circular_mean_fractional()`, `_mic_delta_fractional()` | Metal layer detection + interface labeling |
 | `StructureParser/WaterParser.py` | `detect_water_molecule_indices(atoms)` → `(n_water, 3)`, `get_water_oxygen_indices_array()`, `WaterTopologyError`, `_compute_bisector_cos_theta_vec()`, `_oxygen_to_hydrogen_map()`, `_compute_water_mass_density_z_distribution()`, `_compute_water_orientation_weighted_density_z_distribution()`, `_compute_water_orientation_theta_pdf_in_c_fraction_window()` | Water topology + single-frame z-profiles |
 | `RestartParser/CellParser.py` | `parse_abc_from_restart(restart_path)` → `(a, b, c)`, `parse_abc_from_md_inp(md_inp_path)` → `(a, b, c)`, `CellParseError` | CP2K cell parameter parsing (`.restart` + `md.inp`) |
-| `RestartParser/ColvarParser.py` | `ColvarParseError`, `ConstraintInfo`, `ColvarInfo`, `ColvarRestart`, `LagrangeMultLog`, `parse_colvar_restart(restart_path)` → `ColvarRestart`, `parse_lagrange_mult_log(log_path)` → `LagrangeMultLog`, `compute_target_series(restart, n_steps)` → `np.ndarray` | CP2K COLVAR restart + LagrangeMultLog parsing |
+| `RestartParser/ColvarParser.py` | `ColvarParseError`, `ConstraintInfo`, `ColvarInfo`, `ColvarRestart`, `LagrangeMultLog`, `ColvarMDInfo` (restart+log session), `parse_colvar_restart(restart_path)` → `ColvarRestart`, `parse_lagrange_mult_log(log_path)` → `LagrangeMultLog`, `compute_target_series(restart, n_steps)` → `np.ndarray` | CP2K COLVAR restart + LagrangeMultLog parsing |
 
 ### `src/md_analysis/water/` — Water Analysis Workflows
 
@@ -119,7 +119,7 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 | `test/unit/utils/test_bader_parser.py` | `_read_acf`, `_read_potcar_zval`, `load_bader_atoms` |
 | `test/unit/utils/test_cube_parser.py` | `read_cube_header_and_values`, `slab_average_potential_ev`, `plane_avg_phi_z_ev`, `discover_cube_files` |
 | `test/unit/utils/test_cell_parser.py` | `parse_abc_from_restart` + `parse_abc_from_md_inp`: valid/missing/error cases |
-| `test/unit/utils/test_slowgrowth_parser.py` | `ColvarInfo`, `parse_colvar_restart` (4 scenarios), `parse_lagrange_mult_log` (single/multi), `compute_target_series`, multi-COLLECTIVE blocks, edge cases |
+| `test/unit/utils/test_slowgrowth_parser.py` | `ColvarInfo`, `ColvarMDInfo`, `parse_colvar_restart` (4 scenarios), `parse_lagrange_mult_log` (single/multi), `compute_target_series`, multi-COLLECTIVE blocks, edge cases |
 | `test/unit/test_config.py` | `load_config`, `save_config`, `get_config`, `set_config`, `delete_config`, `ConfigError`, `CONFIGURABLE_DEFAULTS` |
 | `test/unit/test_logging_setup.py` | NullHandler on library logger, StreamHandler setup in CLI |
 | `test/unit/cli/test_handle_cmd_error.py` | `_handle_cmd_error` decorator: known/unexpected exceptions, normal return |

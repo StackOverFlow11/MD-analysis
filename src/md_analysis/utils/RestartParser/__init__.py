@@ -6,6 +6,7 @@ from .CellParser import CellParseError
 from .CellParser import parse_abc_from_md_inp
 from .CellParser import parse_abc_from_restart
 from .ColvarParser import ColvarInfo
+from .ColvarParser import ColvarMDInfo
 from .ColvarParser import ColvarParseError
 from .ColvarParser import ColvarRestart
 from .ColvarParser import ConstraintInfo
@@ -19,6 +20,7 @@ __all__ = [
     "parse_abc_from_md_inp",
     "parse_abc_from_restart",
     "ColvarInfo",
+    "ColvarMDInfo",
     "ColvarParseError",
     "ColvarRestart",
     "ConstraintInfo",

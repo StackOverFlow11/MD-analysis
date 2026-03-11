@@ -9,6 +9,7 @@ import pytest
 
 from md_analysis.utils.RestartParser import (
     ColvarInfo,
+    ColvarMDInfo,
     ColvarParseError,
     ColvarRestart,
     ConstraintInfo,
@@ -276,9 +277,9 @@ class TestComputeTargetSeries:
         )
         xi = compute_target_series(r, log.n_steps)
         assert xi.shape == (log.n_steps,)
-        # At k = step_start, xi should equal target_au
-        if r.step_start <= log.n_steps:
-            assert xi[r.step_start - 1] == pytest.approx(
+        # At k = step_start, xi[step_start] should equal target_au
+        if r.step_start < log.n_steps:
+            assert xi[r.step_start] == pytest.approx(
                 r.colvars.primary.target_au, rel=1e-10,
             )
 
@@ -325,13 +326,15 @@ class TestComputeTargetSeries:
             "&END MOTION\n"
         )
         r = parse_colvar_restart(restart)
-        # Default uses primary (colvar_id=1)
+        # Default uses primary (colvar_id=1); step_start=0, so xi[0]=target_au
         xi_default = compute_target_series(r, 10)
-        assert xi_default[0] == pytest.approx(1.0 + (1 - 0) * 0.01)
+        assert xi_default[0] == pytest.approx(1.0)
+        assert xi_default[1] == pytest.approx(1.0 + 0.01)
 
         # Explicit colvar_id=2
         xi_cv2 = compute_target_series(r, 10, colvar_id=2)
-        assert xi_cv2[0] == pytest.approx(5.0 + (1 - 0) * (-0.05))
+        assert xi_cv2[0] == pytest.approx(5.0)
+        assert xi_cv2[1] == pytest.approx(5.0 + (-0.05))
 
 
 # =========================================================================
@@ -371,3 +374,132 @@ class TestEdgeCases:
         )
         result = _parse_fixed_atoms_list(text)
         assert result == (1, 3, 4, 5, 10)
+
+
+# =========================================================================
+# ColvarMDInfo
+# =========================================================================
+
+class TestColvarMDInfo:
+    """Test ColvarMDInfo — combined restart + log session object."""
+
+    def _restart_path(self, scenario: str) -> Path:
+        mapping = {
+            "angle": "slowgrowth-1.restart",
+            "distance": "slowgrowth-1.restart.bak-1",
+            "distance_combinedCV": "slowgrowth-1.restart",
+            "more_constrain": "slowgrowth-1.restart",
+        }
+        return DATA / scenario / mapping[scenario]
+
+    def _log_path(self, scenario: str) -> Path:
+        return (
+            DATA / scenario
+            / "slowgrowth-constraint_force.dat-1.LagrangeMultLog"
+        )
+
+    def test_from_paths(self):
+        info = ColvarMDInfo.from_paths(
+            self._restart_path("angle"), self._log_path("angle"),
+        )
+        assert isinstance(info.restart, ColvarRestart)
+        assert isinstance(info.lagrange, LagrangeMultLog)
+        assert info.n_steps == info.lagrange.n_steps
+
+    def test_steps_start_from_zero(self):
+        info = ColvarMDInfo.from_paths(
+            self._restart_path("angle"), self._log_path("angle"),
+        )
+        steps = info.steps
+        assert steps[0] == 0
+        assert steps[-1] == info.n_steps - 1
+        assert len(steps) == info.n_steps
+
+    def test_times_fs(self):
+        info = ColvarMDInfo.from_paths(
+            self._restart_path("angle"), self._log_path("angle"),
+        )
+        dt = info.restart.timestep_fs
+        times = info.times_fs
+        assert times[0] == pytest.approx(0.0)
+        assert times[1] == pytest.approx(dt)
+        assert times[-1] == pytest.approx((info.n_steps - 1) * dt)
+
+    def test_target_at_step_start(self):
+        """xi(step_start) == target_au — the restart snapshot anchor."""
+        info = ColvarMDInfo.from_paths(
+            self._restart_path("angle"), self._log_path("angle"),
+        )
+        s0 = info.restart.step_start
+        if s0 < info.n_steps:
+            xi = info.target_series_au()
+            assert xi[s0] == pytest.approx(
+                info.restart.colvars.primary.target_au, rel=1e-10,
+            )
+
+    def test_target_linear_growth(self):
+        """Verify linearity: xi(k+1) - xi(k) == target_growth_au."""
+        info = ColvarMDInfo.from_paths(
+            self._restart_path("distance"), self._log_path("distance"),
+        )
+        xi = info.target_series_au()
+        diffs = np.diff(xi)
+        np.testing.assert_allclose(
+            diffs, info.restart.colvars.primary.target_growth_au, rtol=1e-10,
+        )
+
+    def test_target_with_colvar_id(self, tmp_path):
+        """target_series_au with explicit colvar_id."""
+        restart = tmp_path / "multi.restart"
+        restart.write_text(
+            "&GLOBAL\n  PROJECT_NAME test\n&END GLOBAL\n"
+            "&FORCE_EVAL\n  &SUBSYS\n"
+            "    &CELL\n"
+            "      A 10.0 0.0 0.0\n      B 0.0 10.0 0.0\n      C 0.0 0.0 20.0\n"
+            "    &END CELL\n"
+            "  &END SUBSYS\n"
+            "&END FORCE_EVAL\n"
+            "&MOTION\n"
+            "  &MD\n    STEPS 100\n    TIMESTEP 1.0\n"
+            "    STEP_START_VAL 0\n    TIME_START_VAL 0.0\n  &END MD\n"
+            "  &CONSTRAINT\n"
+            "    &COLLECTIVE\n      COLVAR 1\n      TARGET 1.0\n      TARGET_GROWTH 0.01\n"
+            "    &END COLLECTIVE\n"
+            "    &COLLECTIVE\n      COLVAR 2\n      TARGET 5.0\n      TARGET_GROWTH -0.05\n"
+            "    &END COLLECTIVE\n"
+            "    &LAGRANGE_MULTIPLIERS\n      FILENAME f.dat\n"
+            "    &END LAGRANGE_MULTIPLIERS\n"
+            "  &END CONSTRAINT\n"
+            "&END MOTION\n"
+        )
+        log_file = tmp_path / "f.dat"
+        # 5 steps, single-constraint format (Shake/Rattle labels per line)
+        log_file.write_text(
+            "Step: 0\n"
+            "Shake Lagrangian Multipliers: 0.1\n"
+            "Rattle Lagrangian Multipliers: 0.2\n"
+            "Step: 1\n"
+            "Shake Lagrangian Multipliers: 0.3\n"
+            "Rattle Lagrangian Multipliers: 0.4\n"
+            "Step: 2\n"
+            "Shake Lagrangian Multipliers: 0.5\n"
+            "Rattle Lagrangian Multipliers: 0.6\n"
+        )
+        info = ColvarMDInfo.from_paths(restart, log_file)
+        # step_start=0, so xi[0] = target_au
+        xi1 = info.target_series_au()
+        assert xi1[0] == pytest.approx(1.0)
+        assert xi1[1] == pytest.approx(1.01)
+
+        xi2 = info.target_series_au(colvar_id=2)
+        assert xi2[0] == pytest.approx(5.0)
+        assert xi2[1] == pytest.approx(4.95)
+
+    def test_consistent_with_compute_target_series(self):
+        """ColvarMDInfo.target_series_au matches standalone compute_target_series."""
+        info = ColvarMDInfo.from_paths(
+            self._restart_path("angle"), self._log_path("angle"),
+        )
+        xi_method = info.target_series_au()
+        xi_func = compute_target_series(info.restart, info.n_steps)
+        np.testing.assert_array_equal(xi_method, xi_func)
