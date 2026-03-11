@@ -1,8 +1,11 @@
-"""Tests for the logging infrastructure (NullHandler, CLI config, error logging)."""
+"""Tests for the logging infrastructure (NullHandler, CLI error logging)."""
 
 import logging
 
 import pytest
+
+from md_analysis.cli._framework import MenuCommand
+from md_analysis.exceptions import MDAnalysisError
 
 
 class TestNullHandler:
@@ -21,18 +24,20 @@ class TestNullHandler:
         assert captured.err == ""
 
 
-class TestHandleCmdErrorLogging:
+class TestMenuCommandErrorLogging:
     def test_unexpected_exception_logs_error(self, caplog):
-        from md_analysis.cli._prompt import _handle_cmd_error
 
-        @_handle_cmd_error
-        def _raise_type():
-            raise TypeError("log me")
+        class _RaiseTypeCmd(MenuCommand):
+            def _collect_all_params(self):
+                return {}
 
-        with caplog.at_level(logging.ERROR, logger="md_analysis.cli._prompt"):
-            result = _raise_type()
+            def execute(self, ctx):
+                raise TypeError("log me")
 
-        assert result == 1
+        cmd = _RaiseTypeCmd("t", "test")
+        with caplog.at_level(logging.ERROR, logger="md_analysis.cli._framework"):
+            cmd.run()
+
         assert any("log me" in r.message for r in caplog.records)
         assert any(r.levelno == logging.ERROR for r in caplog.records)
         assert any(r.exc_info is not None and r.exc_info[0] is TypeError for r in caplog.records)

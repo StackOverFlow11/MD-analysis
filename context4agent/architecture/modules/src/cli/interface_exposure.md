@@ -17,8 +17,10 @@
 
 ## Menu structure
 
-- Top menu: 1=Water, 2=Potential, 3=Charge, 4=Scripts/Tools, 9=Settings, 0=Exit
-- Sub-menus use numbered codes: 1xx=Water, 2xx=Potential, 3xx=Charge, 4xx=Scripts, 9xx=Settings
+- Top menu: 1=Water, 2=Electrochemical, 4=Scripts/Tools, 9=Settings, 0=Exit
+- Electrochemical sub-groups: 21=Potential, 22=Charge
+- Leaf codes use numbered codes: 1xx=Water, 2xx=Potential, 3xx=Charge, 4xx=Scripts, 9xx=Settings
+- Flat index allows direct jump to any leaf code from the root menu
 - After one analysis completes, the program exits (no loop)
 
 ## Entry point registration
