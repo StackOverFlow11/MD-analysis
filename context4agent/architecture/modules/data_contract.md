@@ -155,7 +155,7 @@ $$
 
 - `method` 参数选择计算逻辑：
   - `"counterion"`：排除水分子和金属原子，仅非水非金属物种（反离子/溶质）的净电荷贡献 σ
-  - `"layer"`：直接对界面层金属原子的净电荷求和除以面积
+  - `"layer"`：对界面层金属原子的净电荷求和除以面积。`n_surface_layers` 参数控制每侧取几层金属层（默认 1 = 仅最外层；设为 N 则取最外 N 层）
 - 结果存入 `atoms.info`（原地修改）
 - `atoms.info["surface_charge_density_e_A2"]`：`[σ_aligned, σ_opposed]`，单位 e/Å²
 - `atoms.info["surface_charge_density_uC_cm2"]`：`[σ_aligned, σ_opposed]`，单位 μC/cm²

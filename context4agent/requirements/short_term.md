@@ -56,7 +56,7 @@
   - Bader 电荷下游分析（已实现表面电荷密度，`charge/BaderAnalysis.py`）：
     - ✅ 表面电荷密度（双方法）：
       - `method="counterion"`：排除水分子和金属原子，仅反离子/溶质物种净电荷贡献 σ
-      - `method="layer"`：界面层金属原子净电荷求和 / 面积
+      - `method="layer"`：界面层金属原子净电荷求和 / 面积（`n_surface_layers` 参数控制每侧取几层，默认 1）
       - CLI 通过 `--charge-method counterion|layer` 选择；输出目录按方法分离 `<outdir>/charge/<method>/`
     - ✅ 单帧原子净电荷提取：`frame_indexed_atom_charges` 传入 `(N,)` 索引，返回 `(N, 2)` 的索引+净电荷数组
     - ✅ 轨迹原子净电荷提取：`trajectory_indexed_atom_charges` 按帧传入 `(t, N)` 索引矩阵，返回 `(t, N, 2)` 的索引+净电荷数组（内部调用 `frame_indexed_atom_charges`）

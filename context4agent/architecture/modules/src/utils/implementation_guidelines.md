@@ -105,8 +105,8 @@
 ### 3.1 输入与默认值
 
 - `metal_symbols=None` 时，必须回退到 `DEFAULT_METAL_SYMBOLS`
-- `normal` 支持 `"a" / "b" / "c"` 与显式向量
-- 界面层策略固定为每侧 1 层（共 2 层），不提供 `n_interface_layers` 配置参数
+- `normal` 仅支持 `"a" / "b" / "c"` 轴标签（自定义向量不支持，ValueError）
+- 界面层默认每侧 1 层（共 2 层）；下游模块（`charge/BaderAnalysis.py`）通过 `n_surface_layers` 参数支持每侧多层
 
 ### 3.2 分层与界面判定
 

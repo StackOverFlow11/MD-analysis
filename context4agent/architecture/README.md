@@ -121,7 +121,7 @@
 
 ### 8) `md_analysis.scripts`（自动化脚本工具）
 
-- `scripts/__init__.py`：re-exports `BaderGenError`, `generate_bader_workdir`
+- `scripts/__init__.py`：re-exports `BaderGenError`, `generate_bader_workdir`, `batch_generate_bader_workdirs`
 - `scripts/BaderGen.py`：从单帧 MD 结构生成 VASP Bader 工作目录（POSCAR + INCAR + KPOINTS + POTCAR + script.sh）
 - `scripts/template/`：VASP 模板文件（INCAR、KPOINTS），通过 `importlib.resources` 访问
 - `scripts/utils/IndexMapper.py`

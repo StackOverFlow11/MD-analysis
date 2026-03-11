@@ -34,7 +34,7 @@ Interactive CLI package providing a VASPKIT-style numbered menu interface. Repla
 
 ## Handler naming convention
 
-All sub-menu handler functions follow a unified `_cmd_<code>()` naming pattern, where `<code>` is the menu code number (e.g., `_cmd_101()`, `_cmd_201()`). This applies to all 20 handler functions across `_water.py`, `_potential.py`, `_charge.py`, `_scripts.py`, and `_settings.py`. Each handler is decorated with `@_handle_cmd_error` for unified error handling.
+Most sub-menu handler functions follow a `_cmd_<code>()` naming pattern, where `<code>` is the menu code number (e.g., `_cmd_101()`, `_cmd_201()`). This applies across `_water.py`, `_potential.py`, `_scripts.py`, and `_settings.py`. Exception: `_charge.py` uses a shared `_run_charge(params)` handler (with `_collect_params()` for parameter gathering) instead of per-code `_cmd_301()/302()/303()` functions. All handlers are decorated with `@_handle_cmd_error` for unified error handling.
 
 ## Cell parameter acquisition
 
