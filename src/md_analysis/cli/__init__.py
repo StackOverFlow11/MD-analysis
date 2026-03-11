@@ -58,8 +58,10 @@ def build_menu_tree() -> MenuGroup:
         WaterThreePanelCmd("105", "Full Water Three-Panel Analysis  (includes 101-104)"),
     )
 
-    # --- Potential ---
-    potential = MenuGroup("2", "Potential Analysis")
+    # --- Electrochemical ---
+    electrochemical = MenuGroup("2", "Electrochemical Analysis")
+
+    potential = MenuGroup("21", "Potential Analysis")
     potential.add(
         CenterPotentialCmd("201", "Center Slab Potential (phi_center)"),
         FermiEnergyCmd("202", "Fermi Energy Time Series"),
@@ -69,13 +71,14 @@ def build_menu_tree() -> MenuGroup:
         FullPotentialCmd("206", "Full Potential Analysis  (includes 201-205)"),
     )
 
-    # --- Charge ---
-    charge = MenuGroup("3", "Charge Analysis")
+    charge = MenuGroup("22", "Charge Analysis")
     charge.add(
         SurfaceChargeCmd("301", "Surface Charge (Counterion)", method="counterion"),
         SurfaceChargeCmd("302", "Surface Charge (Layer)", method="layer"),
         SurfaceChargeCmd("303", "Full Charge Analysis with Plots", method=None),
     )
+
+    electrochemical.add(potential, charge)
 
     # --- Scripts ---
     scripts = MenuGroup("4", "Scripts / Tools")
@@ -101,7 +104,7 @@ def build_menu_tree() -> MenuGroup:
         ResetDefaultsCmd("907", "Reset All Defaults"),
     )
 
-    root.add(water, potential, charge, scripts, "", settings)
+    root.add(water, electrochemical, scripts, "", settings)
     root.build_flat_index()
     return root
 
