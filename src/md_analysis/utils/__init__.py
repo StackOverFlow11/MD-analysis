@@ -14,6 +14,7 @@ from .config import AREA_VECTOR_INDICES
 from .config import AXIS_MAP
 from .config import CHARGE_METHOD_COUNTERION
 from .config import CHARGE_METHOD_LAYER
+from .config import DEFAULT_LAYER_TOL_A
 from .config import DEFAULT_METAL_SYMBOLS
 from .config import DEFAULT_THETA_BIN_DEG
 from .config import DEFAULT_WATER_OH_CUTOFF_A
@@ -23,8 +24,10 @@ from .config import WATER_MOLAR_MASS_G_PER_MOL
 from .StructureParser.LayerParser import Layer
 from .StructureParser.LayerParser import SurfaceDetectionResult
 from .StructureParser.LayerParser import SurfaceGeometryError
+from .StructureParser.LayerParser import circular_mean_fractional
 from .StructureParser.LayerParser import detect_interface_layers
 from .StructureParser.LayerParser import format_detection_summary
+from .StructureParser.LayerParser import mic_delta_fractional
 from .StructureParser.WaterParser import WaterTopologyError
 from .StructureParser.WaterParser import detect_water_molecule_indices
 from .StructureParser.WaterParser import get_water_oxygen_indices_array
@@ -68,6 +71,7 @@ __all__ = [
     "INTERFACE_NORMAL_ALIGNED",
     "INTERFACE_NORMAL_OPPOSED",
     "TRANSITION_METAL_SYMBOLS",
+    "DEFAULT_LAYER_TOL_A",
     "DEFAULT_METAL_SYMBOLS",
     "DEFAULT_Z_BIN_WIDTH_A",
     "DEFAULT_THETA_BIN_DEG",
@@ -76,8 +80,10 @@ __all__ = [
     "Layer",
     "SurfaceDetectionResult",
     "SurfaceGeometryError",
+    "circular_mean_fractional",
     "detect_interface_layers",
     "format_detection_summary",
+    "mic_delta_fractional",
     "WaterTopologyError",
     "detect_water_molecule_indices",
     "get_water_oxygen_indices_array",

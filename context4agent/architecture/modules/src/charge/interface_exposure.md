@@ -11,6 +11,7 @@
 | `surface_charge_analysis`           | BaderAnalysis.py    | End-to-end surface charge analysis → CSV + PNG output           |
 | `E_PER_A2_TO_UC_PER_CM2`           | config.py           | Unit conversion: 1 e/Å² = 1.602176634×10³ μC/cm²               |
 | `DEFAULT_SURFACE_CHARGE_CSV_NAME`   | config.py           | Default CSV output filename                                     |
+| `DEFAULT_N_SURFACE_LAYERS`          | config.py           | Default number of surface layers per interface (1)              |
 | `DEFAULT_SURFACE_CHARGE_PNG_NAME`   | config.py           | Default PNG output filename                                     |
 
 ## Config Constants
@@ -25,6 +26,7 @@ All default filenames and constants are defined in `config.py`:
 | `DEFAULT_ACF_FILENAME`            | `ACF.dat`            |
 | `DEFAULT_POTCAR_FILENAME`         | `POTCAR`             |
 | `DEFAULT_SURFACE_CHARGE_CSV_NAME` | `surface_charge.csv` |
+| `DEFAULT_N_SURFACE_LAYERS`        | `1`                  |
 | `DEFAULT_SURFACE_CHARGE_PNG_NAME` | `surface_charge.png` |
 
 ## `compute_frame_surface_charge` Signature
@@ -37,12 +39,13 @@ def compute_frame_surface_charge(
     normal: str = "c",   # "a" | "b" | "c"
     method: str = "counterion",  # "counterion" | "layer"
     layer_tol_A: float = DEFAULT_LAYER_TOL_A,
+    n_surface_layers: int = DEFAULT_N_SURFACE_LAYERS,
 ) -> Atoms
 ```
 
 `method` options (validated against `CHARGE_METHOD_COUNTERION` / `CHARGE_METHOD_LAYER` constants from `utils.config`):
-- `"counterion"` — excludes water and metal; only counterion/solute species contribute to σ.
-- `"layer"` — sums net charges of interface-layer metal atoms / area.
+- `"counterion"` — excludes water and metal; only counterion/solute species contribute to σ. `n_surface_layers` is ignored.
+- `"layer"` — sums net charges of the N outermost metal layers per interface / area. `n_surface_layers` controls how many layers inward from each interface are included (default 1 = outermost layer only).
 
 Results in `atoms.info`:
 - `surface_charge_density_e_A2`: `[σ_aligned, σ_opposed]` (e/Å²)
@@ -83,6 +86,7 @@ def trajectory_surface_charge(
     normal: str = "c",
     method: str = "counterion",
     layer_tol_A: float = DEFAULT_LAYER_TOL_A,
+    n_surface_layers: int = DEFAULT_N_SURFACE_LAYERS,
     dir_pattern: str = DEFAULT_DIR_PATTERN,
     structure_filename: str = DEFAULT_STRUCTURE_FILENAME,
     acf_filename: str = DEFAULT_ACF_FILENAME,
@@ -100,6 +104,7 @@ def surface_charge_analysis(
     normal: str = "c",
     method: str = "counterion",
     layer_tol_A: float = DEFAULT_LAYER_TOL_A,
+    n_surface_layers: int = DEFAULT_N_SURFACE_LAYERS,
     dir_pattern: str = DEFAULT_DIR_PATTERN,
     structure_filename: str = DEFAULT_STRUCTURE_FILENAME,
     acf_filename: str = DEFAULT_ACF_FILENAME,

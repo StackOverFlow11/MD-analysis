@@ -35,10 +35,13 @@ Only non-water, non-metal species (counterions, adsorbates) with non-zero net ch
 
 ### `method="layer"` (`_compute_surface_charge_layer`)
 
-Sum net charges of the interface-layer metal atoms directly:
+Sum net charges of surface-layer metal atoms (configurable depth via `n_surface_layers`):
 
-1. `detect_interface_layers(atoms, layer_tol_A=layer_tol_A)` → `interface_normal_aligned()` / `interface_normal_opposed()`
-2. For each layer: σ = Σ(net_charge[layer_atoms]) / area
+1. `detect_interface_layers(atoms, layer_tol_A=layer_tol_A)` → `metal_layers_sorted` ordered `[aligned, interior…, opposed]`
+2. Validate `1 <= n_surface_layers <= len(metal_layers_sorted)`
+3. aligned side = `layers[:n_surface_layers]`，opposed side = `layers[-n_surface_layers:]`
+4. For each side: σ = Σ(net_charge[all_layer_atoms]) / area
+5. When `n_surface_layers=1` (default), behavior matches the single-interface-layer case
 
 ### Output column ordering
 

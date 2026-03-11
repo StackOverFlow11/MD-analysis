@@ -50,7 +50,7 @@
 - 不负责水分子拓扑识别、角度 PDF 统计。
 - 使用 `config.py` 中的 `AXIS_MAP` 常量（取代原有的模块局部 `_AXIS_MAP` 字典）。
 - 使用 `config.py` 中的 `INTERFACE_NORMAL_ALIGNED`/`INTERFACE_NORMAL_OPPOSED` 常量作为界面标签。
-- `_circular_mean_fractional()` 委托给 `ClusterUtils._circular_mean(values, period=1.0)`。
+- `circular_mean_fractional()` 委托给 `ClusterUtils._circular_mean(values, period=1.0)`。
 
 ### `RestartParser/CellParser.py`
 
@@ -113,7 +113,7 @@
 - 先按法向投影做 1D 聚类
 - 界面层仅保留直接面向非金属环境的一层（normal_aligned/normal_opposed 各一层）
 - 对 `"a" / "b" / "c"` 轴采用分数坐标 MIC 判法向；自定义向量法向不支持（ValueError）
-- `Layer.center_frac`：层中心的分数坐标（[0,1)），由 `_circular_mean_fractional` 计算
+- `Layer.center_frac`：层中心的分数坐标（[0,1)），由 `circular_mean_fractional` 计算
 - `Layer.interface_label`：`"normal_aligned"` | `"normal_opposed"` | `None`
 - `metal_layers_sorted` 排列：`[normal_aligned, slab_interior…, normal_opposed]`（穿过 slab 遍历）
 - `SurfaceDetectionResult` 提供 `.interface_normal_aligned()` 和 `.interface_normal_opposed()` 访问器

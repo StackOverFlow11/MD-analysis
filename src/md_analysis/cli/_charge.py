@@ -6,6 +6,7 @@ from pathlib import Path
 
 from ..config import KEY_LAYER_TOL_A
 from ..utils.config import CHARGE_METHOD_COUNTERION, CHARGE_METHOD_LAYER
+from ..charge.config import DEFAULT_N_SURFACE_LAYERS
 from ._prompt import (
     _get_effective_default,
     _handle_cmd_error,
@@ -14,6 +15,7 @@ from ._prompt import (
     _prompt_choice,
     _prompt_float,
     _prompt_global_params,
+    _prompt_int,
     _prompt_str,
 )
 
@@ -60,6 +62,11 @@ def _collect_params(*, method: str | None = None) -> dict:
             "Layer clustering tolerance (A)",
             default=_get_effective_default(KEY_LAYER_TOL_A),
         )
+        if params["method"] == CHARGE_METHOD_LAYER:
+            params["n_surface_layers"] = _prompt_int(
+                "Number of surface layers per interface",
+                default=DEFAULT_N_SURFACE_LAYERS,
+            )
         params.update(_prompt_global_params())
     else:
         params["root_dir"] = "."
@@ -67,6 +74,7 @@ def _collect_params(*, method: str | None = None) -> dict:
         params["normal"] = "c"
         params["metal_elements"] = None
         params["layer_tol"] = _get_effective_default(KEY_LAYER_TOL_A)
+        params["n_surface_layers"] = DEFAULT_N_SURFACE_LAYERS
         params["outdir"] = "analysis"
         params["frame_start"] = None
         params["frame_end"] = None
@@ -110,6 +118,7 @@ def _run_charge(params: dict) -> int:
         normal=params["normal"],
         method=params["method"],
         layer_tol_A=params["layer_tol"],
+        n_surface_layers=params.get("n_surface_layers", DEFAULT_N_SURFACE_LAYERS),
         dir_pattern=params["dir_pattern"],
         frame_start=params["frame_start"],
         frame_end=params["frame_end"],

@@ -26,6 +26,6 @@
 
 ### 3.2 `LayerParser.py` 补充
 
-- `_circular_mean_fractional()` 不再独立实现圆周均值逻辑，而是委托给 `ClusterUtils._circular_mean(values, period=1.0)`，避免重复实现。
+- `circular_mean_fractional()` 已提升为公开 API（去除 `_` 前缀），委托给 `ClusterUtils._circular_mean(values, period=1.0)`，避免重复实现。
 - 轴映射使用 `config.py` 中的集中式常量 `AXIS_MAP`（取代原有的模块局部 `_AXIS_MAP`）。
 - 界面标签使用 `config.py` 中的 `INTERFACE_NORMAL_ALIGNED` / `INTERFACE_NORMAL_OPPOSED` 常量（取代硬编码字符串）。

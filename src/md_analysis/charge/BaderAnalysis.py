@@ -22,14 +22,15 @@ from ..utils.config import (
     DEFAULT_LAYER_TOL_A,
 )
 from ..utils.StructureParser.LayerParser import (
-    _circular_mean_fractional,
-    _mic_delta_fractional,
+    circular_mean_fractional,
     detect_interface_layers,
+    mic_delta_fractional,
 )
 from ..utils.StructureParser.WaterParser import detect_water_molecule_indices
 from .config import (
     DEFAULT_ACF_FILENAME,
     DEFAULT_DIR_PATTERN,
+    DEFAULT_N_SURFACE_LAYERS,
     DEFAULT_POTCAR_FILENAME,
     DEFAULT_STRUCTURE_FILENAME,
     DEFAULT_SURFACE_CHARGE_CSV_NAME,
@@ -70,6 +71,7 @@ def compute_frame_surface_charge(
     normal: str = "c",
     method: str = "counterion",
     layer_tol_A: float = DEFAULT_LAYER_TOL_A,
+    n_surface_layers: int = DEFAULT_N_SURFACE_LAYERS,
 ) -> Atoms:
     """Compute surface charge density for a single frame.
 
@@ -86,6 +88,9 @@ def compute_frame_surface_charge(
         ``"layer"`` — sum net charges of the interface-layer metal atoms.
     layer_tol_A
         Layer clustering tolerance in Ångströms for ``detect_interface_layers``.
+    n_surface_layers
+        Number of metal layers (counted inward from each interface) whose net
+        charge is summed to compute σ. Only used when ``method="layer"``.
 
     Returns
     -------
@@ -99,7 +104,7 @@ def compute_frame_surface_charge(
     if method == CHARGE_METHOD_LAYER:
         return _compute_surface_charge_layer(
             atoms, metal_symbols=metal_symbols, normal=normal,
-            layer_tol_A=layer_tol_A,
+            layer_tol_A=layer_tol_A, n_surface_layers=n_surface_layers,
         )
     return _compute_surface_charge_counterion(
         atoms, metal_symbols=metal_symbols, normal=normal,
@@ -113,8 +118,9 @@ def _compute_surface_charge_layer(
     metal_symbols: Iterable[str] | None = None,
     normal: str = "c",
     layer_tol_A: float = DEFAULT_LAYER_TOL_A,
+    n_surface_layers: int = DEFAULT_N_SURFACE_LAYERS,
 ) -> Atoms:
-    """Surface charge = Σ(net charge of interface-layer atoms) / area."""
+    """Surface charge = Σ(net charge of surface-layer atoms) / area."""
     if normal not in AREA_VECTOR_INDICES:
         raise ValueError(
             f"normal must be one of {set(AREA_VECTOR_INDICES)}, got {normal!r}"
@@ -126,26 +132,38 @@ def _compute_surface_charge_layer(
             "Use load_bader_atoms() first."
         )
 
+    if n_surface_layers < 1:
+        raise ValueError(
+            f"n_surface_layers must be >= 1, got {n_surface_layers}"
+        )
+
     net_charge = atoms.arrays["bader_net_charge"]
 
     det = detect_interface_layers(
         atoms, metal_symbols=metal_symbols, normal=normal,
         layer_tol_A=layer_tol_A,
     )
-    iface_aligned = det.interface_normal_aligned()
-    iface_opposed = det.interface_normal_opposed()
+
+    layers = det.metal_layers_sorted
+    n_total = len(layers)
+    if n_surface_layers > n_total:
+        raise ValueError(
+            f"n_surface_layers={n_surface_layers} exceeds total "
+            f"metal layers={n_total}"
+        )
+
+    aligned_layers = layers[:n_surface_layers]
+    opposed_layers = layers[-n_surface_layers:]
 
     i0, i1 = AREA_VECTOR_INDICES[normal]
     cell = np.asarray(atoms.cell.array, dtype=float)
     area_A2 = float(np.linalg.norm(np.cross(cell[i0], cell[i1])))
 
-    ordered_iface = [iface_aligned, iface_opposed]
-
     sigma_e_A2 = np.empty(2)
     n_atoms_per_surface = []
     q_per_surface = []
-    for i, layer in enumerate(ordered_iface):
-        idx = np.array(list(layer.atom_indices))
+    for i, side_layers in enumerate([aligned_layers, opposed_layers]):
+        idx = np.concatenate([np.array(L.atom_indices) for L in side_layers])
         q = float(net_charge[idx].sum())
         sigma_e_A2[i] = q / area_A2
         n_atoms_per_surface.append(len(idx))
@@ -217,19 +235,19 @@ def _compute_surface_charge_counterion(
     frac_opposed = iface_opposed.center_frac
 
     metal_frac = scaled[list(det.metal_indices), axis_idx]
-    midplane = _circular_mean_fractional(metal_frac)
+    midplane = circular_mean_fractional(metal_frac)
     gap_frac = (midplane + 0.5) % 1.0
 
     frac_charged = scaled[charged_idx, axis_idx]
 
-    gap_dir_aligned = _mic_delta_fractional(gap_frac - frac_aligned)
-    delta_aligned = _mic_delta_fractional(frac_charged - frac_aligned)
+    gap_dir_aligned = mic_delta_fractional(gap_frac - frac_aligned)
+    delta_aligned = mic_delta_fractional(frac_charged - frac_aligned)
     assigned_aligned = (delta_aligned * gap_dir_aligned > 0) & (
         np.abs(delta_aligned) < np.abs(gap_dir_aligned)
     )
 
-    gap_dir_opposed = _mic_delta_fractional(gap_frac - frac_opposed)
-    delta_opposed = _mic_delta_fractional(frac_charged - frac_opposed)
+    gap_dir_opposed = mic_delta_fractional(gap_frac - frac_opposed)
+    delta_opposed = mic_delta_fractional(frac_charged - frac_opposed)
     assigned_opposed = (delta_opposed * gap_dir_opposed > 0) & (
         np.abs(delta_opposed) < np.abs(gap_dir_opposed)
     )
@@ -418,6 +436,7 @@ def trajectory_surface_charge(
     normal: str = "c",
     method: str = "counterion",
     layer_tol_A: float = DEFAULT_LAYER_TOL_A,
+    n_surface_layers: int = DEFAULT_N_SURFACE_LAYERS,
     dir_pattern: str = DEFAULT_DIR_PATTERN,
     structure_filename: str = DEFAULT_STRUCTURE_FILENAME,
     acf_filename: str = DEFAULT_ACF_FILENAME,
@@ -477,7 +496,7 @@ def trajectory_surface_charge(
         atoms = load_bader_atoms(poscar, acf, potcar)
         compute_frame_surface_charge(
             atoms, metal_symbols=metal_symbols, normal=normal, method=method,
-            layer_tol_A=layer_tol_A,
+            layer_tol_A=layer_tol_A, n_surface_layers=n_surface_layers,
         )
         sigma = atoms.info["surface_charge_density_uC_cm2"]
         rows.append(sigma)
@@ -530,6 +549,7 @@ def surface_charge_analysis(
     normal: str = "c",
     method: str = "counterion",
     layer_tol_A: float = DEFAULT_LAYER_TOL_A,
+    n_surface_layers: int = DEFAULT_N_SURFACE_LAYERS,
     dir_pattern: str = DEFAULT_DIR_PATTERN,
     structure_filename: str = DEFAULT_STRUCTURE_FILENAME,
     acf_filename: str = DEFAULT_ACF_FILENAME,
@@ -612,7 +632,7 @@ def surface_charge_analysis(
         atoms = load_bader_atoms(poscar, acf, potcar)
         compute_frame_surface_charge(
             atoms, metal_symbols=metal_symbols, normal=normal, method=method,
-            layer_tol_A=layer_tol_A,
+            layer_tol_A=layer_tol_A, n_surface_layers=n_surface_layers,
         )
         sigma = atoms.info["surface_charge_density_uC_cm2"]
         step = _extract_t_value(fname)

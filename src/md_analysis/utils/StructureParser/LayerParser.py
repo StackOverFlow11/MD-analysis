@@ -116,7 +116,7 @@ def _normal_unit_from_atoms(atoms: Atoms, normal: NormalSpec) -> np.ndarray:
     return v / norm
 
 
-def _circular_mean_fractional(f: np.ndarray) -> float:
+def circular_mean_fractional(f: np.ndarray) -> float:
     """
     Mean of fractional coordinates on a circle (robust near 0/1 wrap).
 
@@ -126,7 +126,7 @@ def _circular_mean_fractional(f: np.ndarray) -> float:
     return _circular_mean(np.asarray(f, dtype=float).ravel(), period=1.0)
 
 
-def _mic_delta_fractional(df: np.ndarray) -> np.ndarray:
+def mic_delta_fractional(df: np.ndarray) -> np.ndarray:
     """
     Minimum-image delta for fractional coordinates in 1D.
 

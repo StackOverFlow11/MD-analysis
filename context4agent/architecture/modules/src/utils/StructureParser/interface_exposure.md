@@ -23,7 +23,8 @@
 ```python
 "cluster_1d_periodic", "find_largest_gap_periodic", "gap_midpoint_periodic",
 "Layer", "SurfaceDetectionResult", "SurfaceGeometryError",
-"detect_interface_layers", "format_detection_summary",
+"circular_mean_fractional", "detect_interface_layers",
+"format_detection_summary", "mic_delta_fractional",
 "WaterTopologyError", "detect_water_molecule_indices", "get_water_oxygen_indices_array",
 ```
 

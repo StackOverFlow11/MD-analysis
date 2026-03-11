@@ -18,6 +18,7 @@
 - `DEFAULT_METAL_SYMBOLS`
 - `DEFAULT_Z_BIN_WIDTH_A`
 - `DEFAULT_THETA_BIN_DEG`
+- `DEFAULT_LAYER_TOL_A`
 - `DEFAULT_WATER_OH_CUTOFF_A`
 - `WATER_MOLAR_MASS_G_PER_MOL`
 - `HA_TO_EV`
@@ -90,6 +91,14 @@
 
 函数：
 
+- `circular_mean_fractional(f)`
+  - 输入：分数坐标数组
+  - 输出：`float`，[0, 1) 范围的圆周均值
+  - 语义：委托给 `ClusterUtils._circular_mean(values, period=1.0)`
+- `mic_delta_fractional(df)`
+  - 输入：分数坐标差分数组
+  - 输出：`np.ndarray`，[-0.5, 0.5) 范围的最小镜像差
+  - 语义：1D 分数坐标的最小镜像约定
 - `detect_interface_layers(...)`
   - 输入：单帧 `ase.Atoms` + 金属符号/法向/聚类参数
   - 输出：`SurfaceDetectionResult`
