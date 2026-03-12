@@ -122,6 +122,10 @@ def plot_slowgrowth_quick(
     )
     ax_top.set_xlabel("MD Step")
 
+    # Ensure time flows left-to-right: invert x-axis when CV is decreasing
+    if len(sg.target_au) > 1 and sg.target_au[-1] < sg.target_au[0]:
+        ax_left.invert_xaxis()
+
     # Barrier annotation — arrow pointing to peak with absolute step
     peak_idx = int(np.nanargmax(fe_ev))
     delta_f_barrier = float(fe_ev[peak_idx] - fe_ev[0])
@@ -202,6 +206,10 @@ def plot_slowgrowth_publication(
         )
         ax_right.set_ylabel("Free Energy (eV)", color="tab:red")
         ax_right.tick_params(axis="y", labelcolor="tab:red")
+
+        # Ensure time flows left-to-right: invert x-axis when CV is decreasing
+        if len(sg.target_au) > 1 and sg.target_au[-1] < sg.target_au[0]:
+            ax_left.invert_xaxis()
 
         # Legend with energy values (invisible handles)
         peak_idx = int(np.nanargmax(fe_ev))
