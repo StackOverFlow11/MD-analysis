@@ -9,6 +9,7 @@
   - 单帧工具（`utils/`）：金属界面层识别、H2O 拓扑识别、密度/取向/角度 PDF、cube 文件解析、slab-averaged potential
   - 水分析（`water/`）：从选定界面到两界面中点的系综平均（A 口径）、吸附层自动识别、吸附层角度分布、三联图输出
   - 电势分析（`potential/`）：center slab potential、Fermi energy、electrode potential U vs SHE、φ(z) overlay、thickness sensitivity
+  - 增强抽样（`enhanced_sampling/`）：慢增长自由能绘图（quick / publication）+ CSV 导出 + CLI 集成
   - 集成入口：CLI（`md-analysis` 命令）、编程入口（`main.py`）
 - Bader 电荷解析（`utils/BaderParser.py`）：从 VASP Bader 输出（ACF.dat + POTCAR）读取原始电子数与净电荷，附加到 ASE Atoms
   - Bader 电荷下游分析（`charge/BaderAnalysis.py`）：
@@ -29,11 +30,14 @@
   - `md-analysis potential --cube-pattern "md-POTENTIAL-*.cube"`
   - `md-analysis charge --root-dir . --charge-method counterion|layer` （Bader 表面电荷密度时序分析，CSV + PNG 输出）
   - `md-analysis all --xyz ... --md-inp ... --cube-pattern ...`
+  - CLI 501: Slow-Growth Quick Plot
+  - CLI 502: Slow-Growth Publication Plot
 - **编程入口**：
   - `md_analysis.main.run_water_analysis(xyz_path, md_inp_path, ...)`
   - `md_analysis.main.run_potential_analysis(cube_pattern=..., md_out_path=..., ...)`
   - `md_analysis.main.run_charge_analysis(output_dir=..., root_dir=..., ...)`
   - `md_analysis.main.run_all(...)`
+  - `md_analysis.enhanced_sampling.slowgrowth.slowgrowth_analysis(restart_path, log_path, ...)`
 - **水分析**：
   - `plot_water_three_panel_analysis(xyz_path, md_inp_path, ...)`
     - 输出：密度/取向 CSV、吸附层 profile CSV、吸附层 range TXT、吸附层角度分布 CSV、三联图 PNG
@@ -72,7 +76,7 @@
     - ✅ 多帧批量生成：`batch_generate_bader_workdirs(xyz_path, cell_abc, output_dir, *, frame_start/end/step, ...)`
     - ✅ CLI 支持：401（单帧）+ 402（批量），cell 来源支持 `.restart` 和 `md.inp`
     - ✅ RestartParser：`parse_abc_from_restart()` 从 CP2K `.restart` 文件解析正交 cell 参数
-    - ✅ ColvarParser：解析 CP2K COLVAR restart 元数据（COLLECTIVE、CONSTRAINT、FIXED_ATOMS）和 LagrangeMultLog（单约束/多约束自动检测），重建 ξ(t) 目标序列
+    - ✅ ColvarParser：解析 CP2K COLVAR restart 元数据（COLLECTIVE、CONSTRAINT、FIXED_ATOMS）和 LagrangeMultLog（单约束/多约束自动检测），重建 ξ(t) 目标序列；溢出值 `***` 自动处理为 `np.nan`
   - 持久化用户配置（`config.py`）：
     - ✅ `load_config`、`save_config`、`get_config`、`set_config`、`delete_config`
     - ✅ `CONFIGURABLE_DEFAULTS` 注册表：`layer_tol_A`、`z_bin_width_A`、`theta_bin_deg`、`water_oh_cutoff_A`

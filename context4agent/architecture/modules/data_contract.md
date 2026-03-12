@@ -227,3 +227,35 @@ $$
   - 左轴：`mean U vs SHE (V)` — 系综平均电极电势
   - 右轴：`spatial std of φ(z) in slab (eV)` — slab 区间内 Hartree 势沿 z 的空间标准差（帧系综平均）
 - 需要 `md.out`（Fermi 能级）；无 `md.out` 时跳过
+
+## Enhanced Sampling 层输出契约
+
+### `slowgrowth_analysis(...)` 输出
+
+- 统一入口：解析 restart + log 文件，切片/反转，输出 CSV + PNG
+- 返回 `dict[str, Path]`，键可包含 `"csv"`、`"quick_png"`、`"publication_png"`
+
+### CSV 输出
+
+- 默认文件名：`slowgrowth_data.csv`（`DEFAULT_SG_CSV_NAME`）
+- CSV 列（header 与顺序固定）：`step,time_fs,target_au,lagrange_au,free_energy_au,free_energy_ev`
+- `free_energy_ev = free_energy_au * HA_TO_EV`
+
+### PNG 输出
+
+- Quick plot：`slowgrowth_quick.png`（`DEFAULT_SG_QUICK_PNG_NAME`）
+  - 双轴图：左轴 Lagrange 乘子 (a.u.)，右轴自由能 (eV)
+  - 顶轴：MD 步编号
+  - 标注：barrier peak + 总自由能变
+- Publication plot：`slowgrowth_publication.png`（`DEFAULT_SG_PUBLICATION_PNG_NAME`）
+  - 双轴图：同上布局，legend 标注能量值
+
+### 积分公式与单位
+
+$$
+\Delta A_k = -\sum_{i=0}^{k-1} \frac{\lambda_i + \lambda_{i+1}}{2} \Delta\xi
+$$
+
+- $\lambda_i$：Lagrange 乘子（a.u.）
+- $\Delta\xi$：CV 步长（a.u.）= `target_growth_au`
+- 内部计算单位：Hartree；输出同时提供 Hartree 和 eV（`HA_TO_EV` 转换）

@@ -119,7 +119,17 @@
   - `_scripts.py`：脚本/工具子菜单（401）+ Bader 工作目录生成
   - `_settings.py`：设置子菜单（901-907）+ 持久化配置管理（903-906: 分析参数默认值，907: 重置所有默认值）
 
-### 8) `md_analysis.scripts`（自动化脚本工具）
+### 8) `md_analysis.enhanced_sampling`（增强抽样分析工作流）
+
+- `enhanced_sampling/__init__.py`：空包（re-export 预留）
+- `enhanced_sampling/slowgrowth/`：慢增长热力学积分子包
+  - `SlowGrowth.py`：数据类（`Slowgrowth`、`SlowgrowthFull`、`SlowgrowthSegment`）+ 自由能积分（midpoint rule，CP2K 约定取负号）
+  - `SlowGrowthPlot.py`：双轴绘图（quick / publication）+ CSV 导出 + 统一入口 `slowgrowth_analysis`
+  - `config.py`：输出文件名常量
+- 依赖方向：`enhanced_sampling` → `utils`（`ColvarParser`、`config`、`_io_helpers`）；无反向依赖
+- CLI 集成：501（quick plot）、502（publication plot），通过 `cli/_enhanced_sampling.py` 实现
+
+### 9) `md_analysis.scripts`（自动化脚本工具）
 
 - `scripts/__init__.py`：re-exports `BaderGenError`, `generate_bader_workdir`, `batch_generate_bader_workdirs`
 - `scripts/BaderGen.py`：从单帧 MD 结构生成 VASP Bader 工作目录（POSCAR + INCAR + KPOINTS + POTCAR + script.sh）

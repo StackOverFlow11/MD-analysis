@@ -29,19 +29,23 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 
 | File | Purpose | Key Functions |
 |---|---|---|
-| `__init__.py` | Top menu (1=Water, 2=Potential, 3=Charge, 4=Scripts, 9=Settings, 0=Exit) | `main()` |
-| `_prompt.py` | Reusable input helpers + error decorator | `_get_effective_default`, `_prompt_str`, `_prompt_int`, `_prompt_float`, `_prompt_choice`, `_prompt_bool`, `_parse_metal_elements`, `_prompt_global_params`, `_handle_cmd_error` (decorator: catches exceptions in `_cmd_*` handlers, prints user-friendly message, returns 1) |
+| `__init__.py` | Top menu (1=Water, 2=Electrochemical, 3=Enhanced Sampling, 4=Scripts, 9=Settings, 0=Exit) | `main()`, `build_menu_tree()` |
+| `_prompt.py` | Reusable input helpers | `prompt_str`, `prompt_int`, `prompt_float`, `prompt_choice`, `prompt_bool`, `prompt_str_required`, `_read` |
 | `_water.py` | Water sub-menu (101-105) | `water_menu()`, dispatches to `water` module or `main.run_water_analysis` |
 | `_potential.py` | Potential sub-menu (201-206) | `potential_menu()`, dispatches to `potential` module or `main.run_potential_analysis` |
 | `_charge.py` | Charge sub-menu (301-303) | `charge_menu()`, `_collect_params()`, `_run_charge()`, `_print_ensemble_summary()` |
+| `_enhanced_sampling.py` | Enhanced sampling sub-menu (501-502) | `SGQuickPlotCmd`, `SGPublicationPlotCmd`: slow-growth plot commands via `lazy_import` |
 | `_scripts.py` | Scripts/Tools sub-menu (401-402) | `scripts_menu()`, 401: single-frame Bader workdir, 402: batch Bader workdirs |
 | `_settings.py` | Settings sub-menu (901-907) | `settings_menu()`, 901: set VASP script path, 902: show config, 903-906: set analysis defaults, 907: reset all defaults |
+| `_framework.py` | Core framework | `MenuNode`, `MenuGroup`, `MenuCommand`, `lazy_import()` |
+| `_params.py` | Parameter collection hierarchy | `K` (key constants), `ParamCollector` ABC, generic param classes (`StrParam`, `FloatParam`, `IntParam`, `ChoiceParam`, etc.) |
 
 **Menu codes:**
 - 101: mass density, 102: orientation-weighted density, 103: adsorbed orientation, 104: theta distribution, 105: full three-panel
 - 201: center slab potential, 202: Fermi energy, 203: electrode potential (U vs SHE), 204: phi(z) profile, 205: thickness sensitivity, 206: full potential
 - 301: surface charge (counterion), 302: surface charge (layer), 303: full charge (method prompted)
 - 401: generate Bader work directory (single frame), 402: batch generate Bader work directories
+- 501: slow-growth quick plot, 502: slow-growth publication plot
 - 901: set VASP submission script path, 902: show current configuration
 - 903: set layer clustering tolerance, 904: set z-axis bin width, 905: set theta bin width, 906: set water O-H cutoff, 907: reset all analysis defaults
 
@@ -94,6 +98,19 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 **Charge methods:** `"counterion"` (exclude water+metal, use solute species) / `"layer"` (net charge of interface metal layers).
 **atoms.info keys set:** `surface_charge_density_e_A2`, `surface_charge_density_uC_cm2`, `n_charged_atoms_per_surface`, `charge_per_surface_e` — all `[aligned, opposed]`.
 
+### `src/md_analysis/enhanced_sampling/` — Enhanced Sampling Workflows
+
+| File | Key Exports | Purpose |
+|---|---|---|
+| `__init__.py` | (empty) | Package marker (re-export reserved for future) |
+| `slowgrowth/__init__.py` | Re-exports `Slowgrowth`, `SlowgrowthFull`, `SlowgrowthSegment`, `slowgrowth_analysis`, `plot_slowgrowth_quick`, `plot_slowgrowth_publication`, `write_slowgrowth_csv` | Sub-package interface |
+| `slowgrowth/config.py` | `DEFAULT_SG_QUICK_PNG_NAME`, `DEFAULT_SG_PUBLICATION_PNG_NAME`, `DEFAULT_SG_CSV_NAME` | Output filename constants |
+| `slowgrowth/SlowGrowth.py` | `Slowgrowth` (frozen dataclass), `SlowgrowthFull` (`.from_paths()`, `.segment()`), `SlowgrowthSegment`, `_integrate_midpoint()` | Data classes + free-energy integration (midpoint rule, CP2K sign convention) |
+| `slowgrowth/SlowGrowthPlot.py` | `plot_slowgrowth_quick(sg, *, output_dir, png_name, absolute_steps)` → Path, `plot_slowgrowth_publication(sg, *, output_dir, png_name)` → Path, `write_slowgrowth_csv(sg, *, output_dir, csv_name)` → Path, `slowgrowth_analysis(restart_path, log_path, *, initial_step, final_step, output_dir, plot_style, colvar_id)` → `dict[str, Path]` | Plotting (quick/publication dual-axis), CSV export, unified entry point |
+
+**Integration formula:** $\Delta A_k = -\sum_{i=0}^{k-1} \frac{\lambda_i + \lambda_{i+1}}{2} \Delta\xi$ (CP2K convention: negative integral)
+**Not re-exported** from top-level `md_analysis.__init__`.
+
 ### `src/md_analysis/scripts/` — Automation Scripts & Utilities
 
 | File | Key Exports | Purpose |
@@ -134,6 +151,7 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 | `test/integration/potential/test_center_potential.py` | `center_slab_potential_analysis` with real cube files |
 | `test/integration/potential/test_phi_z_profile.py` | `phi_z_planeavg_analysis` with real cube files |
 | `test/integration/water/test_water_*.py` | Water density/orientation/theta plots, three-panel integration |
+| `test/integration/enhanced_sampling/test_slowgrowth_plot.py` | `SlowgrowthFull` parsing, CSV export, quick/publication plots, `slowgrowth_analysis` (forward/reverse/sub-segment) |
 | `test/conftest.py` | Exports `parse_abc_from_md_inp` helper |
 
 **Test data:** `data_example/bader/bader_work_dir/` (POSCAR, ACF.dat, POTCAR — 274 atoms: 62 Cu + 2 Ag + 70 O + 140 H), `data_example/potential/` (cube files, md.out, xyz), `data_example/sg/` (COLVAR restart + LagrangeMultLog, 4 scenarios).

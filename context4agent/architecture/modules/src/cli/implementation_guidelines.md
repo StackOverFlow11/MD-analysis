@@ -9,7 +9,7 @@ Interactive CLI package providing a VASPKIT-style numbered menu interface. Repla
 ## Design principles
 
 - Pure interactive: no command-line arguments, all input via `input()` prompts
-- Each sub-menu module (`_water.py`, `_potential.py`, `_charge.py`, `_scripts.py`, `_settings.py`) is self-contained with its own menu display, parameter collection, and handler dispatch
+- Each sub-menu module (`_water.py`, `_potential.py`, `_charge.py`, `_enhanced_sampling.py`, `_scripts.py`, `_settings.py`) is self-contained with its own menu display, parameter collection, and handler dispatch
 - Prompt helpers in `_prompt.py` are shared across all sub-menus
 - Handlers delegate to `main.py` workflow functions or directly to sub-package analysis functions
 - `KeyboardInterrupt` / `EOFError` caught at top level for clean exit
@@ -21,7 +21,9 @@ Interactive CLI package providing a VASPKIT-style numbered menu interface. Repla
 - `cli` -> `water`, `potential`, `charge` (for individual analysis functions)
 - `cli` -> `potential.config` (for default constants)
 - `cli` -> `scripts` (for `generate_bader_workdir`, `batch_generate_bader_workdirs`)
+- `cli` -> `enhanced_sampling.slowgrowth` (via `lazy_import` for `slowgrowth_analysis`)
 - `cli` -> `utils.CellParser` (for `parse_abc_from_restart`, `parse_abc_from_md_inp`)
+- `cli` -> `utils.RestartParser.ColvarParser` (via `lazy_import` for `ColvarMDInfo`, used by `_enhanced_sampling.py` info display)
 - `cli` -> `config` (for persistent user configuration, `CONFIGURABLE_DEFAULTS` registry, and `delete_config`)
 - No reverse dependencies: no other module imports from `cli`
 
@@ -65,3 +67,15 @@ Settings menu 903-907 allow users to persistently override algorithm defaults fr
 - 907: reset all analysis defaults
 
 The `_get_effective_default(key)` helper in `_prompt.py` reads the user config first, falling back to the hardcoded default from `CONFIGURABLE_DEFAULTS` registry. Analysis sub-menus (`_potential.py`, `_water.py`, `_charge.py`) use this helper to populate prompt defaults. Library function signatures remain unchanged — persistence only affects CLI prompt defaults.
+
+## Enhanced sampling CLI (`_enhanced_sampling.py`)
+
+`_enhanced_sampling.py` 通过 `MenuCommand` 子类（`SGQuickPlotCmd`、`SGPublicationPlotCmd`）实现 501/502 菜单项，共享基类 `_SlowgrowthPlotCmd`：
+
+- **文件发现**：
+  - `_discover_restart_file(workdir)`：glob `*.restart`，排除 `_\d+\.restart` 检查点文件
+  - `_discover_log_file(workdir)`：glob `*.LagrangeMultLog`
+  - 两者均要求恰好 1 个匹配；否则回退到用户手动输入
+- **轨迹信息预览**：`_print_sg_info()` 通过 `lazy_import` 获取 `ColvarMDInfo`，显示步数、时间步、CV 范围，并检测 NaN（溢出）步
+- **参数采集**：restart path、log path、initial/final step、colvar ID、output dir
+- **执行**：通过 `lazy_import` 调用 `slowgrowth_analysis`，`_plot_style` 由子类决定（`"quick"` 或 `"publication"`）

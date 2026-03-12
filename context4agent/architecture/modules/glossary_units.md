@@ -45,6 +45,10 @@
 | 路径坐标 | 无量纲 `[0,1]` | 界面 → 两界面中点路径的归一化值 |
 | 表面电荷密度（内部） | `e/Å²` | 计算中间量；$\sigma = \sum q_i / A_{\mathrm{surface}}$ |
 | 表面电荷密度（输出） | `μC/cm²` | 最终输出量纲，与实验对齐；$1\;\mathrm{e/Å^2} = 1.602176634 \times 10^{3}\;\mathrm{μC/cm^2}$ |
+| 自由能（内部） | Hartree | $\Delta A = -\int \lambda\,d\xi$（CP2K 约定取负号） |
+| 自由能（输出） | eV | `HA_TO_EV` 转换；CSV 同时提供 Hartree 和 eV 两列 |
+| 集体变量 (CV) | a.u. | 保持原子单位（与 CP2K COLVAR 一致） |
+| Lagrange 乘子 | a.u. | CP2K 约束力（Shake 方法） |
 
 ## 界面法向（已确认）
 

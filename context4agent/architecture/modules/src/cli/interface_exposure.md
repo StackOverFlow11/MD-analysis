@@ -12,14 +12,15 @@
 - `_water.py` -- water analysis sub-menu (codes 101-105) + parameter collection + dispatch
 - `_potential.py` -- potential analysis sub-menu (codes 201-206) + parameter collection + dispatch
 - `_charge.py` -- charge analysis sub-menu (codes 301-303) + parameter collection + dispatch
+- `_enhanced_sampling.py` -- enhanced sampling sub-menu (codes 501-502) + slow-growth plot commands (lazy import of `enhanced_sampling.slowgrowth`)
 - `_scripts.py` -- scripts/tools sub-menu (codes 401-402) + single-frame and batch Bader work directory generation
 - `_settings.py` -- settings sub-menu (codes 901-907) + persistent config management (903-906: configurable analysis defaults, 907: reset all defaults)
 
 ## Menu structure
 
-- Top menu: 1=Water, 2=Electrochemical, 4=Scripts/Tools, 9=Settings, 0=Exit
+- Top menu: 1=Water, 2=Electrochemical, 3=Enhanced Sampling, 4=Scripts/Tools, 9=Settings, 0=Exit
 - Electrochemical sub-groups: 21=Potential, 22=Charge
-- Leaf codes use numbered codes: 1xx=Water, 2xx=Potential, 3xx=Charge, 4xx=Scripts, 9xx=Settings
+- Leaf codes use numbered codes: 1xx=Water, 2xx=Potential, 3xx=Charge, 4xx=Scripts, 5xx=Enhanced Sampling, 9xx=Settings
 - Flat index allows direct jump to any leaf code from the root menu
 - After one analysis completes, the program exits (no loop)
 
