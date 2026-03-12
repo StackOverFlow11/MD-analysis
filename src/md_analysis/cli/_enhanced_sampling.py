@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import numpy as np
+
 from ._framework import MenuCommand, lazy_import
 from ._params import K
 from ._prompt import prompt_int, prompt_str
@@ -55,6 +57,17 @@ def _print_sg_info(restart_path: str, log_path: str) -> None:
     target_end = cv.target_au + (info.n_steps - 1 - info.restart.step_start) * cv.target_growth_au
     print(f"    CV range:     [{target_start:.6f}, {target_end:.6f}] a.u.")
     print(f"    Valid index:   0 .. {info.n_steps - 1}")
+
+    # Warn about overflow (nan) steps
+    nan_mask = np.isnan(info.lagrange.collective_shake)
+    n_nan = int(np.sum(nan_mask))
+    if n_nan > 0:
+        nan_indices = np.where(nan_mask)[0]
+        preview = ", ".join(str(i) for i in nan_indices[:10])
+        if n_nan > 10:
+            preview += f", ... ({n_nan} total)"
+        print(f"    WARNING: {n_nan} overflow (***) steps: [{preview}]")
+        print(f"    Use initial/final step to avoid these indices.")
     print()
 
 

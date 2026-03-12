@@ -281,6 +281,14 @@ def _parse_fixed_atoms_list(text: str) -> tuple[int, ...] | None:
 # ---------------------------------------------------------------------------
 
 _LABEL_RE = re.compile(r"^(Shake|Rattle)\s+Lagrangian\s+Multipliers:", re.IGNORECASE)
+_OVERFLOW_RE = re.compile(r"^\*+$")
+
+
+def _safe_float(token: str) -> float:
+    """Convert a token to float, returning nan for CP2K overflow (``***``)."""
+    if _OVERFLOW_RE.match(token.strip()):
+        return float("nan")
+    return float(token)
 
 
 def _detect_log_format(lines: list[str]) -> str:
@@ -299,9 +307,9 @@ def _parse_single_constraint_log(
     for line in lines:
         stripped = line.strip()
         if stripped.startswith("Shake"):
-            shake_vals.append(float(stripped.split(":")[1].strip()))
+            shake_vals.append(_safe_float(stripped.split(":")[1].strip()))
         elif stripped.startswith("Rattle"):
-            rattle_vals.append(float(stripped.split(":")[1].strip()))
+            rattle_vals.append(_safe_float(stripped.split(":")[1].strip()))
     n = min(len(shake_vals), len(rattle_vals))
     return np.array(shake_vals[:n]), np.array(rattle_vals[:n]), n
 
@@ -323,9 +331,9 @@ def _parse_multi_constraint_log(
                 blocks.append((current_type, current_values))
             current_type = label_m.group(1).lower()
             after_colon = stripped.split(":", 1)[1]
-            current_values = [float(x) for x in after_colon.split()]
+            current_values = [_safe_float(x) for x in after_colon.split()]
         else:
-            current_values.extend(float(x) for x in stripped.split())
+            current_values.extend(_safe_float(x) for x in stripped.split())
 
     if current_type is not None:
         blocks.append((current_type, current_values))
