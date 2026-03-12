@@ -205,8 +205,12 @@ def _integrate_midpoint(
 ) -> np.ndarray:
     r"""Cumulative free-energy change via midpoint rectangle rule.
 
+    CP2K convention: the free-energy change is the *negative* integral
+    of the constraint force (Lagrange multiplier) over the collective
+    variable:
+
     .. math::
-        \Delta F_k = \sum_{i=0}^{k-1}
+        \Delta A_k = -\sum_{i=0}^{k-1}
             \frac{\lambda_i + \lambda_{i+1}}{2} \, \Delta\xi
 
     where :math:`\Delta\xi` = *target_growth_au* (constant step size).
@@ -219,5 +223,5 @@ def _integrate_midpoint(
     free_energy[0] = 0.0
     if n > 1:
         midpoints = 0.5 * (lagrange_shake[:-1] + lagrange_shake[1:])
-        np.cumsum(midpoints * target_growth_au, out=free_energy[1:])
+        np.cumsum(-midpoints * target_growth_au, out=free_energy[1:])
     return free_energy
