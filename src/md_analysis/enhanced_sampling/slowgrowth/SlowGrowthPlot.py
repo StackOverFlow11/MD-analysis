@@ -70,10 +70,17 @@ def plot_slowgrowth_quick(
     *,
     output_dir: Path | None = None,
     png_name: str = DEFAULT_SG_QUICK_PNG_NAME,
+    absolute_steps: np.ndarray | None = None,
 ) -> Path:
     """Dual-axis quick plot with CV bottom axis and MD-step top axis.
 
     Left y-axis: Lagrange multiplier (a.u.), right y-axis: free energy (eV).
+
+    Parameters
+    ----------
+    absolute_steps : np.ndarray, optional
+        Original (pre-reversal) step indices for annotating the barrier
+        peak with its absolute MD step number.  Falls back to ``sg.steps``.
     """
     import matplotlib
     matplotlib.use("Agg")
@@ -83,13 +90,14 @@ def plot_slowgrowth_quick(
     outdir.mkdir(parents=True, exist_ok=True)
 
     fe_ev = sg.free_energy_au * HA_TO_EV
+    abs_steps = absolute_steps if absolute_steps is not None else sg.steps
 
     fig, ax_left = plt.subplots(figsize=(8, 5), dpi=180)
 
     # Left axis — Lagrange multiplier
-    line_lm, = ax_left.plot(
+    ax_left.plot(
         sg.target_au, sg.lagrange_shake,
-        color="tab:blue", lw=0.8, alpha=0.7, label="Lagrange multiplier",
+        color="tab:blue", lw=0.8, alpha=0.7,
     )
     ax_left.set_xlabel("Collective Variable (a.u.)")
     ax_left.set_ylabel("Lagrange Multiplier (a.u.)", color="tab:blue")
@@ -97,9 +105,9 @@ def plot_slowgrowth_quick(
 
     # Right axis — free energy
     ax_right = ax_left.twinx()
-    line_fe, = ax_right.plot(
+    ax_right.plot(
         sg.target_au, fe_ev,
-        color="tab:red", lw=2.0, label="Free energy",
+        color="tab:red", lw=2.0,
     )
     ax_right.set_ylabel("Free Energy (eV)", color="tab:red")
     ax_right.tick_params(axis="y", labelcolor="tab:red")
@@ -114,24 +122,27 @@ def plot_slowgrowth_quick(
     )
     ax_top.set_xlabel("MD Step")
 
-    # Barrier and total free-energy change
-    delta_f_barrier = float(np.max(fe_ev) - fe_ev[0])
-    delta_f_total = float(fe_ev[-1] - fe_ev[0])
-    textbox = (
-        f"$\\Delta F^\\dagger$ = {delta_f_barrier:.4f} eV\n"
-        f"$\\Delta F$ = {delta_f_total:.4f} eV"
-    )
-    ax_right.text(
-        0.97, 0.05, textbox,
-        transform=ax_right.transAxes,
-        fontsize=9, verticalalignment="bottom", horizontalalignment="right",
-        bbox=dict(boxstyle="round,pad=0.4", facecolor="wheat", alpha=0.8),
+    # Barrier annotation — arrow pointing to peak with absolute step
+    peak_idx = int(np.nanargmax(fe_ev))
+    delta_f_barrier = float(fe_ev[peak_idx] - fe_ev[0])
+    peak_abs_step = int(abs_steps[peak_idx])
+    ax_right.annotate(
+        f"$\\Delta F^\\dagger$ = {delta_f_barrier:.4f} eV\n(step {peak_abs_step})",
+        xy=(sg.target_au[peak_idx], fe_ev[peak_idx]),
+        xytext=(sg.target_au[peak_idx], fe_ev[peak_idx] + 0.15 * abs(delta_f_barrier or 0.01)),
+        arrowprops=dict(arrowstyle="->", color="tab:red", lw=1.5),
+        fontsize=9, color="tab:red", ha="center",
     )
 
-    # Legend
-    lines = [line_lm, line_fe]
-    labels = [l.get_label() for l in lines]
-    ax_left.legend(lines, labels, loc="upper left", frameon=True)
+    # Total free-energy annotation — arrow pointing to endpoint
+    delta_f_total = float(fe_ev[-1] - fe_ev[0])
+    ax_right.annotate(
+        f"$\\Delta F$ = {delta_f_total:.4f} eV",
+        xy=(sg.target_au[-1], fe_ev[-1]),
+        xytext=(sg.target_au[-1], fe_ev[-1] + 0.15 * abs(delta_f_total or 0.01)),
+        arrowprops=dict(arrowstyle="->", color="darkred", lw=1.5),
+        fontsize=9, color="darkred", ha="center",
+    )
 
     ax_left.grid(True, alpha=0.25)
     fig.tight_layout()
@@ -153,10 +164,11 @@ def plot_slowgrowth_publication(
     output_dir: Path | None = None,
     png_name: str = DEFAULT_SG_PUBLICATION_PNG_NAME,
 ) -> Path:
-    """Publication-quality dual-axis plot with arrow annotations."""
+    """Publication-quality dual-axis plot with energy values in legend."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+    from matplotlib.lines import Line2D
     from matplotlib import rc_context
 
     outdir = (output_dir or Path(".")).resolve()
@@ -174,9 +186,9 @@ def plot_slowgrowth_publication(
         fig, ax_left = plt.subplots(figsize=(8, 5), dpi=180)
 
         # Left axis — Lagrange multiplier
-        line_lm, = ax_left.plot(
+        ax_left.plot(
             sg.target_au, sg.lagrange_shake,
-            color="tab:blue", lw=0.8, alpha=0.7, label="Lagrange multiplier",
+            color="tab:blue", lw=0.8, alpha=0.7,
         )
         ax_left.set_xlabel("Collective Variable (a.u.)")
         ax_left.set_ylabel("Lagrange Multiplier (a.u.)", color="tab:blue")
@@ -184,38 +196,25 @@ def plot_slowgrowth_publication(
 
         # Right axis — free energy
         ax_right = ax_left.twinx()
-        line_fe, = ax_right.plot(
+        ax_right.plot(
             sg.target_au, fe_ev,
-            color="tab:red", lw=2.0, label="Free energy",
+            color="tab:red", lw=2.0,
         )
         ax_right.set_ylabel("Free Energy (eV)", color="tab:red")
         ax_right.tick_params(axis="y", labelcolor="tab:red")
 
-        # Barrier annotation — arrow pointing to peak
-        peak_idx = int(np.argmax(fe_ev))
+        # Legend with energy values (invisible handles)
+        peak_idx = int(np.nanargmax(fe_ev))
         delta_f_barrier = float(fe_ev[peak_idx] - fe_ev[0])
-        ax_right.annotate(
-            f"$\\Delta F^\\dagger$ = {delta_f_barrier:.4f} eV",
-            xy=(sg.target_au[peak_idx], fe_ev[peak_idx]),
-            xytext=(sg.target_au[peak_idx], fe_ev[peak_idx] + 0.15 * abs(delta_f_barrier or 0.01)),
-            arrowprops=dict(arrowstyle="->", color="tab:red", lw=1.5),
-            fontsize=10, color="tab:red", ha="center",
-        )
-
-        # Total free-energy annotation — arrow pointing to endpoint
         delta_f_total = float(fe_ev[-1] - fe_ev[0])
-        ax_right.annotate(
-            f"$\\Delta F$ = {delta_f_total:.4f} eV",
-            xy=(sg.target_au[-1], fe_ev[-1]),
-            xytext=(sg.target_au[-1], fe_ev[-1] + 0.15 * abs(delta_f_total or 0.01)),
-            arrowprops=dict(arrowstyle="->", color="darkred", lw=1.5),
-            fontsize=10, color="darkred", ha="center",
-        )
-
-        # Legend
-        lines = [line_lm, line_fe]
-        labels = [l.get_label() for l in lines]
-        ax_left.legend(lines, labels, loc="upper left", frameon=True)
+        legend_handles = [
+            Line2D([], [], color="none",
+                   label=f"$\\Delta F^\\dagger$ = {delta_f_barrier:.4f} eV"),
+            Line2D([], [], color="none",
+                   label=f"$\\Delta F$ = {delta_f_total:.4f} eV"),
+        ]
+        ax_right.legend(handles=legend_handles, loc="best",
+                        frameon=True, handlelength=0)
 
         ax_left.grid(True, alpha=0.25)
         fig.tight_layout()
@@ -309,12 +308,15 @@ def slowgrowth_analysis(
         final_step = full.n_steps
 
     if initial_step > final_step:
-        seg = full.segment(final_step, initial_step).reversed()
+        pre_rev = full.segment(final_step, initial_step)
+        absolute_steps = pre_rev.steps[::-1].copy()  # preserve original indices
+        seg = pre_rev.reversed()
         logger.info(
             "Reversed segment [%d, %d) → %d steps", final_step, initial_step, seg.n_steps,
         )
     else:
         seg = full.segment(initial_step, final_step)
+        absolute_steps = seg.steps.copy()
         logger.info("Segment [%d, %d) → %d steps", initial_step, final_step, seg.n_steps)
 
     outdir = (output_dir or Path(".")).resolve()
@@ -323,7 +325,9 @@ def slowgrowth_analysis(
     results["csv"] = write_slowgrowth_csv(seg, output_dir=outdir)
 
     if plot_style in ("quick", "both"):
-        results["quick_png"] = plot_slowgrowth_quick(seg, output_dir=outdir)
+        results["quick_png"] = plot_slowgrowth_quick(
+            seg, output_dir=outdir, absolute_steps=absolute_steps,
+        )
     if plot_style in ("publication", "both"):
         results["publication_png"] = plot_slowgrowth_publication(seg, output_dir=outdir)
 
