@@ -1,4 +1,4 @@
-"""Enhanced Sampling command classes (501-502)."""
+"""Enhanced Sampling command classes (301-302)."""
 
 from __future__ import annotations
 

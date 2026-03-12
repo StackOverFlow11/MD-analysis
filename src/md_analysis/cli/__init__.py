@@ -64,19 +64,19 @@ def build_menu_tree() -> MenuGroup:
 
     potential = MenuGroup("21", "Potential Analysis")
     potential.add(
-        CenterPotentialCmd("201", "Center Slab Potential (phi_center)"),
-        FermiEnergyCmd("202", "Fermi Energy Time Series"),
-        ElectrodePotentialCmd("203", "Electrode Potential (U vs SHE)  (includes 201+202)"),
-        PhiZProfileCmd("204", "Phi(z) Plane-Averaged Profile"),
-        ThicknessSensitivityCmd("205", "Thickness Sensitivity Sweep"),
-        FullPotentialCmd("206", "Full Potential Analysis  (includes 201-205)"),
+        CenterPotentialCmd("211", "Center Slab Potential (phi_center)"),
+        FermiEnergyCmd("212", "Fermi Energy Time Series"),
+        ElectrodePotentialCmd("213", "Electrode Potential (U vs SHE)  (includes 211+212)"),
+        PhiZProfileCmd("214", "Phi(z) Plane-Averaged Profile"),
+        ThicknessSensitivityCmd("215", "Thickness Sensitivity Sweep"),
+        FullPotentialCmd("216", "Full Potential Analysis  (includes 211-215)"),
     )
 
     charge = MenuGroup("22", "Charge Analysis")
     charge.add(
-        SurfaceChargeCmd("301", "Surface Charge (Counterion)", method="counterion"),
-        SurfaceChargeCmd("302", "Surface Charge (Layer)", method="layer"),
-        SurfaceChargeCmd("303", "Full Charge Analysis with Plots", method=None),
+        SurfaceChargeCmd("221", "Surface Charge (Counterion)", method="counterion"),
+        SurfaceChargeCmd("222", "Surface Charge (Layer)", method="layer"),
+        SurfaceChargeCmd("223", "Full Charge Analysis with Plots", method=None),
     )
 
     electrochemical.add(potential, charge)
@@ -84,8 +84,8 @@ def build_menu_tree() -> MenuGroup:
     # --- Enhanced Sampling ---
     enhanced = MenuGroup("3", "Enhanced Sampling")
     enhanced.add(
-        SGQuickPlotCmd("501", "Slow-Growth Quick Plot"),
-        SGPublicationPlotCmd("502", "Slow-Growth Publication Plot"),
+        SGQuickPlotCmd("301", "Slow-Growth Quick Plot"),
+        SGPublicationPlotCmd("302", "Slow-Growth Publication Plot"),
     )
 
     # --- Scripts ---

@@ -1,4 +1,4 @@
-"""Potential analysis command classes (201-206)."""
+"""Potential analysis command classes (211-216)."""
 
 from __future__ import annotations
 

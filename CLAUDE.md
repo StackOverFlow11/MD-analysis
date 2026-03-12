@@ -32,9 +32,9 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 | `__init__.py` | Top menu (1=Water, 2=Electrochemical, 3=Enhanced Sampling, 4=Scripts, 9=Settings, 0=Exit) | `main()`, `build_menu_tree()` |
 | `_prompt.py` | Reusable input helpers | `prompt_str`, `prompt_int`, `prompt_float`, `prompt_choice`, `prompt_bool`, `prompt_str_required`, `_read` |
 | `_water.py` | Water sub-menu (101-105) | `water_menu()`, dispatches to `water` module or `main.run_water_analysis` |
-| `_potential.py` | Potential sub-menu (201-206) | `potential_menu()`, dispatches to `potential` module or `main.run_potential_analysis` |
-| `_charge.py` | Charge sub-menu (301-303) | `charge_menu()`, `_collect_params()`, `_run_charge()`, `_print_ensemble_summary()` |
-| `_enhanced_sampling.py` | Enhanced sampling sub-menu (501-502) | `SGQuickPlotCmd`, `SGPublicationPlotCmd`: slow-growth plot commands via `lazy_import` |
+| `_potential.py` | Potential sub-menu (211-216) | `potential_menu()`, dispatches to `potential` module or `main.run_potential_analysis` |
+| `_charge.py` | Charge sub-menu (221-223) | `charge_menu()`, `_collect_params()`, `_run_charge()`, `_print_ensemble_summary()` |
+| `_enhanced_sampling.py` | Enhanced sampling sub-menu (301-302) | `SGQuickPlotCmd`, `SGPublicationPlotCmd`: slow-growth plot commands via `lazy_import` |
 | `_scripts.py` | Scripts/Tools sub-menu (401-402) | `scripts_menu()`, 401: single-frame Bader workdir, 402: batch Bader workdirs |
 | `_settings.py` | Settings sub-menu (901-907) | `settings_menu()`, 901: set VASP script path, 902: show config, 903-906: set analysis defaults, 907: reset all defaults |
 | `_framework.py` | Core framework | `MenuNode`, `MenuGroup`, `MenuCommand`, `lazy_import()` |
@@ -42,10 +42,10 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 
 **Menu codes:**
 - 101: mass density, 102: orientation-weighted density, 103: adsorbed orientation, 104: theta distribution, 105: full three-panel
-- 201: center slab potential, 202: Fermi energy, 203: electrode potential (U vs SHE), 204: phi(z) profile, 205: thickness sensitivity, 206: full potential
-- 301: surface charge (counterion), 302: surface charge (layer), 303: full charge (method prompted)
+- 211: center slab potential, 212: Fermi energy, 213: electrode potential (U vs SHE), 214: phi(z) profile, 215: thickness sensitivity, 216: full potential
+- 221: surface charge (counterion), 222: surface charge (layer), 223: full charge (method prompted)
+- 301: slow-growth quick plot, 302: slow-growth publication plot
 - 401: generate Bader work directory (single frame), 402: batch generate Bader work directories
-- 501: slow-growth quick plot, 502: slow-growth publication plot
 - 901: set VASP submission script path, 902: show current configuration
 - 903: set layer clustering tolerance, 904: set z-axis bin width, 905: set theta bin width, 906: set water O-H cutoff, 907: reset all analysis defaults
 

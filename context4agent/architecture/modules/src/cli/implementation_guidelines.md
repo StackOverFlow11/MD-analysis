@@ -36,7 +36,7 @@ Interactive CLI package providing a VASPKIT-style numbered menu interface. Repla
 
 ## Handler naming convention
 
-Most sub-menu handler functions follow a `_cmd_<code>()` naming pattern, where `<code>` is the menu code number (e.g., `_cmd_101()`, `_cmd_201()`). This applies across `_water.py`, `_potential.py`, `_scripts.py`, and `_settings.py`. Exception: `_charge.py` uses a shared `_run_charge(params)` handler (with `_collect_params()` for parameter gathering) instead of per-code `_cmd_301()/302()/303()` functions. All handlers are decorated with `@_handle_cmd_error` for unified error handling.
+Most sub-menu handler functions follow a `_cmd_<code>()` naming pattern, where `<code>` is the menu code number (e.g., `_cmd_101()`, `_cmd_211()`). This applies across `_water.py`, `_potential.py`, `_scripts.py`, and `_settings.py`. Exception: `_charge.py` uses a shared `_run_charge(params)` handler (with `_collect_params()` for parameter gathering) instead of per-code `_cmd_221()/222()/223()` functions. All handlers are decorated with `@_handle_cmd_error` for unified error handling.
 
 ## Cell parameter acquisition
 
@@ -70,7 +70,7 @@ The `_get_effective_default(key)` helper in `_prompt.py` reads the user config f
 
 ## Enhanced sampling CLI (`_enhanced_sampling.py`)
 
-`_enhanced_sampling.py` 通过 `MenuCommand` 子类（`SGQuickPlotCmd`、`SGPublicationPlotCmd`）实现 501/502 菜单项，共享基类 `_SlowgrowthPlotCmd`：
+`_enhanced_sampling.py` 通过 `MenuCommand` 子类（`SGQuickPlotCmd`、`SGPublicationPlotCmd`）实现 301/302 菜单项，共享基类 `_SlowgrowthPlotCmd`：
 
 - **文件发现**：
   - `_discover_restart_file(workdir)`：glob `*.restart`，排除 `_\d+\.restart` 检查点文件

@@ -114,8 +114,8 @@
   - `__init__.py`：`main()` 入口 + banner + 顶层菜单分发
   - `_prompt.py`：可复用的输入提示辅助函数（含 `_get_effective_default` 用于读取用户配置或硬编码默认值）
   - `_water.py`：水分析子菜单（101-105）+ 参数采集 + 处理函数
-  - `_potential.py`：电势分析子菜单（201-206）+ 参数采集 + 处理函数
-  - `_charge.py`：电荷分析子菜单（301-303）+ 参数采集 + 处理函数
+  - `_potential.py`：电势分析子菜单（211-216）+ 参数采集 + 处理函数
+  - `_charge.py`：电荷分析子菜单（221-223）+ 参数采集 + 处理函数
   - `_scripts.py`：脚本/工具子菜单（401）+ Bader 工作目录生成
   - `_settings.py`：设置子菜单（901-907）+ 持久化配置管理（903-906: 分析参数默认值，907: 重置所有默认值）
 
@@ -127,7 +127,7 @@
   - `SlowGrowthPlot.py`：双轴绘图（quick / publication）+ CSV 导出 + 统一入口 `slowgrowth_analysis`
   - `config.py`：输出文件名常量
 - 依赖方向：`enhanced_sampling` → `utils`（`ColvarParser`、`config`、`_io_helpers`）；无反向依赖
-- CLI 集成：501（quick plot）、502（publication plot），通过 `cli/_enhanced_sampling.py` 实现
+- CLI 集成：301（quick plot）、302（publication plot），通过 `cli/_enhanced_sampling.py` 实现
 
 ### 9) `md_analysis.scripts`（自动化脚本工具）
 

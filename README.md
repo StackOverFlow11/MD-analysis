@@ -54,8 +54,10 @@ md-analysis
 The VASPKIT-style numbered menu guides you through:
 
 - **1) Water Analysis** — density (101), orientation (102), adsorbed-layer (103/104), full three-panel (105)
-- **2) Potential Analysis** — center slab (201), Fermi (202), electrode U vs SHE (203), φ(z) (204), thickness sweep (205), full (206)
-- **3) Charge Analysis** — counterion method (301), layer method (302), full with plots (303)
+- **2) Electrochemical Analysis**
+  - **21) Potential** — center slab (211), Fermi (212), electrode U vs SHE (213), φ(z) (214), thickness sweep (215), full (216)
+  - **22) Charge** — counterion method (221), layer method (222), full with plots (223)
+- **3) Enhanced Sampling** — slow-growth quick plot (301), publication plot (302)
 - **4) Scripts / Tools** — single-frame Bader workdir (401), batch Bader workdirs (402)
 - **9) Settings** — set VASP submission script path (901), show config (902), set analysis defaults (903-906), reset defaults (907)
 
@@ -122,8 +124,9 @@ src/md_analysis/
 │   ├── __init__.py         #   main() entry point, banner, top menu
 │   ├── _prompt.py          #   reusable input prompt helpers + _handle_cmd_error decorator
 │   ├── _water.py           #   water sub-menu (101-105)
-│   ├── _potential.py       #   potential sub-menu (201-206)
-│   ├── _charge.py          #   charge sub-menu (301-303)
+│   ├── _potential.py       #   potential sub-menu (211-216)
+│   ├── _charge.py          #   charge sub-menu (221-223)
+│   ├── _enhanced_sampling.py #   enhanced sampling sub-menu (301-302)
 │   ├── _scripts.py         #   scripts/tools sub-menu (401-402)
 │   └── _settings.py        #   settings sub-menu (901-907)
 ├── utils/                  # single-frame low-level tools

@@ -30,8 +30,8 @@
   - `md-analysis potential --cube-pattern "md-POTENTIAL-*.cube"`
   - `md-analysis charge --root-dir . --charge-method counterion|layer` （Bader 表面电荷密度时序分析，CSV + PNG 输出）
   - `md-analysis all --xyz ... --md-inp ... --cube-pattern ...`
-  - CLI 501: Slow-Growth Quick Plot
-  - CLI 502: Slow-Growth Publication Plot
+  - CLI 301: Slow-Growth Quick Plot
+  - CLI 302: Slow-Growth Publication Plot
 - **编程入口**：
   - `md_analysis.main.run_water_analysis(xyz_path, md_inp_path, ...)`
   - `md_analysis.main.run_potential_analysis(cube_pattern=..., md_out_path=..., ...)`
