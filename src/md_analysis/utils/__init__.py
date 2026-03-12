@@ -43,6 +43,7 @@ from .CubeParser import z_coords_ang
 from .CubeParser import extract_step_from_cube_filename
 from .config import INTERFACE_NORMAL_ALIGNED
 from .config import INTERFACE_NORMAL_OPPOSED
+from .config import AU_TIME_TO_FS
 from .config import HA_TO_EV
 from .config import BOHR_TO_ANG
 from .config import DP_A_H3O_W_EV
@@ -98,6 +99,7 @@ __all__ = [
     "plane_avg_phi_z_ev",
     "z_coords_ang",
     "extract_step_from_cube_filename",
+    "AU_TIME_TO_FS",
     "HA_TO_EV",
     "BOHR_TO_ANG",
     "DP_A_H3O_W_EV",

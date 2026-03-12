@@ -18,7 +18,9 @@ $$
 \Delta A_k = -\sum_{i=0}^{k-1} \frac{\lambda_i + \lambda_{i+1}}{2} \Delta\xi
 $$
 
-其中 $\Delta\xi$ = `target_growth_au`（常数步长），$\lambda_i$ = `lagrange_shake[i]`。
+其中 $\Delta\xi$ = `target_growth_au`（常数步长，a.u./step），$\lambda_i$ = `lagrange_shake[i]`。
+
+**单位转换**：CP2K restart 中的 `TARGET_GROWTH` 单位为 per a.u. time，需乘以 `dt_au = timestep_fs / AU_TIME_TO_FS` 转换为 per-step。此转换在 `SlowgrowthFull.from_md_info()` 中完成。
 
 返回长度为 $n$ 的数组，`result[0] = 0`。
 

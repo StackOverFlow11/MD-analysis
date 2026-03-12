@@ -168,7 +168,7 @@
 数据结构（frozen dataclass）：
 
 - `ConstraintInfo`
-  - COLLECTIVE 约束参数：`colvar_id`、`target_au`、`target_growth_au`、`intermolecular`
+  - COLLECTIVE 约束参数：`colvar_id`、`target_au`、`target_growth_au`（per a.u. time，非 per step）、`intermolecular`
 - `ColvarInfo`
   - 约束集合容器：`constraints: tuple[ConstraintInfo, ...]`
   - 支持 `__len__`、`__getitem__(colvar_id)`（按 colvar_id 查找，KeyError 如未找到）、`__iter__`
@@ -191,7 +191,8 @@
 - `parse_lagrange_mult_log(log_path) -> LagrangeMultLog`
   - 解析 LagrangeMultLog 文件，自动检测单约束/多约束格式
 - `compute_target_series(restart, n_steps, *, colvar_id=None) -> np.ndarray`
-  - 重建 ξ(t) 序列（原子单位），`xi(k) = target_au + (k - step_start) * target_growth_au`
+  - 重建 ξ(t) 序列（原子单位），`xi(k) = target_au + (k - step_start) * target_growth_au * dt_au`
+  - `dt_au = timestep_fs / AU_TIME_TO_FS`（将 fs 时间步转换为原子时间单位）
   - `k` 为绝对步数 `[0, 1, ..., n_steps-1]`；`target_au` 是 `step_start` 时刻的快照值
   - `colvar_id` 可选参数：指定使用哪个约束，默认使用 primary（第一个）
 

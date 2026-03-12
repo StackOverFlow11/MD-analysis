@@ -13,6 +13,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from ...utils.config import AU_TIME_TO_FS
 from ...utils.RestartParser.ColvarParser import ColvarMDInfo
 
 
@@ -114,14 +115,16 @@ class SlowgrowthFull(Slowgrowth):
             if colvar_id is not None
             else md_info.restart.colvars.primary
         )
-        target_growth_au = constraint.target_growth_au
+        # Convert growth rate from per-a.u.-time to per-step (dξ/step)
+        dt_au = md_info.restart.timestep_fs / AU_TIME_TO_FS
+        target_growth_per_step = constraint.target_growth_au * dt_au
 
         steps = md_info.steps
         times_fs = md_info.times_fs
         target_au = md_info.target_series_au(colvar_id)
         lagrange_shake = md_info.lagrange.collective_shake
 
-        free_energy_au = _integrate_midpoint(lagrange_shake, target_growth_au)
+        free_energy_au = _integrate_midpoint(lagrange_shake, target_growth_per_step)
 
         return cls(
             steps=steps,
@@ -130,7 +133,7 @@ class SlowgrowthFull(Slowgrowth):
             lagrange_shake=lagrange_shake,
             free_energy_au=free_energy_au,
             timestep_fs=md_info.restart.timestep_fs,
-            target_growth_au=target_growth_au,
+            target_growth_au=target_growth_per_step,
             md_info=md_info,
         )
 

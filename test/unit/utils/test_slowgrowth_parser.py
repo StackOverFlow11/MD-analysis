@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from md_analysis.utils.config import AU_TIME_TO_FS
 from md_analysis.utils.RestartParser import (
     ColvarInfo,
     ColvarMDInfo,
@@ -284,15 +285,15 @@ class TestComputeTargetSeries:
             )
 
     def test_linear_growth(self):
-        """Verify linearity: xi(k+1) - xi(k) == target_growth_au."""
+        """Verify linearity: xi(k+1) - xi(k) == growth_per_step."""
         r = parse_colvar_restart(
             DATA / "distance" / "slowgrowth-1.restart.bak-1"
         )
         xi = compute_target_series(r, 100)
         diffs = np.diff(xi)
-        np.testing.assert_allclose(
-            diffs, r.colvars.primary.target_growth_au, rtol=1e-10,
-        )
+        dt_au = r.timestep_fs / AU_TIME_TO_FS
+        expected_step = r.colvars.primary.target_growth_au * dt_au
+        np.testing.assert_allclose(diffs, expected_step, rtol=1e-10)
 
     def test_shape(self):
         r = parse_colvar_restart(
@@ -326,15 +327,16 @@ class TestComputeTargetSeries:
             "&END MOTION\n"
         )
         r = parse_colvar_restart(restart)
+        dt_au = r.timestep_fs / AU_TIME_TO_FS
         # Default uses primary (colvar_id=1); step_start=0, so xi[0]=target_au
         xi_default = compute_target_series(r, 10)
         assert xi_default[0] == pytest.approx(1.0)
-        assert xi_default[1] == pytest.approx(1.0 + 0.01)
+        assert xi_default[1] == pytest.approx(1.0 + 0.01 * dt_au)
 
         # Explicit colvar_id=2
         xi_cv2 = compute_target_series(r, 10, colvar_id=2)
         assert xi_cv2[0] == pytest.approx(5.0)
-        assert xi_cv2[1] == pytest.approx(5.0 + (-0.05))
+        assert xi_cv2[1] == pytest.approx(5.0 + (-0.05) * dt_au)
 
 
 # =========================================================================
@@ -438,15 +440,15 @@ class TestColvarMDInfo:
             )
 
     def test_target_linear_growth(self):
-        """Verify linearity: xi(k+1) - xi(k) == target_growth_au."""
+        """Verify linearity: xi(k+1) - xi(k) == growth_per_step."""
         info = ColvarMDInfo.from_paths(
             self._restart_path("distance"), self._log_path("distance"),
         )
         xi = info.target_series_au()
         diffs = np.diff(xi)
-        np.testing.assert_allclose(
-            diffs, info.restart.colvars.primary.target_growth_au, rtol=1e-10,
-        )
+        dt_au = info.restart.timestep_fs / AU_TIME_TO_FS
+        expected_step = info.restart.colvars.primary.target_growth_au * dt_au
+        np.testing.assert_allclose(diffs, expected_step, rtol=1e-10)
 
     def test_target_with_colvar_id(self, tmp_path):
         """target_series_au with explicit colvar_id."""
@@ -486,14 +488,15 @@ class TestColvarMDInfo:
             "Rattle Lagrangian Multipliers: 0.6\n"
         )
         info = ColvarMDInfo.from_paths(restart, log_file)
+        dt_au = info.restart.timestep_fs / AU_TIME_TO_FS
         # step_start=0, so xi[0] = target_au
         xi1 = info.target_series_au()
         assert xi1[0] == pytest.approx(1.0)
-        assert xi1[1] == pytest.approx(1.01)
+        assert xi1[1] == pytest.approx(1.0 + 0.01 * dt_au)
 
         xi2 = info.target_series_au(colvar_id=2)
         assert xi2[0] == pytest.approx(5.0)
-        assert xi2[1] == pytest.approx(4.95)
+        assert xi2[1] == pytest.approx(5.0 + (-0.05) * dt_au)
 
     def test_consistent_with_compute_target_series(self):
         """ColvarMDInfo.target_series_au matches standalone compute_target_series."""

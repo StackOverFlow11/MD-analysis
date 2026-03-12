@@ -53,7 +53,7 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 
 | File | Key Exports | Purpose |
 |---|---|---|
-| `config.py` | `TRANSITION_METAL_SYMBOLS`, `DEFAULT_METAL_SYMBOLS`, `DEFAULT_Z_BIN_WIDTH_A`, `DEFAULT_THETA_BIN_DEG`, `DEFAULT_WATER_OH_CUTOFF_A`, `WATER_MOLAR_MASS_G_PER_MOL`, `HA_TO_EV`, `BOHR_TO_ANG`, `DP_A_H3O_W_EV`, `MU_HPLUS_G0_EV`, `DELTA_E_ZP_EV`, `AXIS_MAP`, `AREA_VECTOR_INDICES`, `INTERFACE_NORMAL_ALIGNED`, `INTERFACE_NORMAL_OPPOSED`, `CHARGE_METHOD_COUNTERION`, `CHARGE_METHOD_LAYER` | Physical constants + defaults |
+| `config.py` | `TRANSITION_METAL_SYMBOLS`, `DEFAULT_METAL_SYMBOLS`, `DEFAULT_Z_BIN_WIDTH_A`, `DEFAULT_THETA_BIN_DEG`, `DEFAULT_WATER_OH_CUTOFF_A`, `WATER_MOLAR_MASS_G_PER_MOL`, `AU_TIME_TO_FS`, `HA_TO_EV`, `BOHR_TO_ANG`, `DP_A_H3O_W_EV`, `MU_HPLUS_G0_EV`, `DELTA_E_ZP_EV`, `AXIS_MAP`, `AREA_VECTOR_INDICES`, `INTERFACE_NORMAL_ALIGNED`, `INTERFACE_NORMAL_OPPOSED`, `CHARGE_METHOD_COUNTERION`, `CHARGE_METHOD_LAYER` | Physical constants + defaults |
 | `_io_helpers.py` | `_cumulative_average(values)`, `_write_csv(path, rows, fieldnames)` | Private shared I/O helpers (used by potential + charge workflows) |
 | `CubeParser.py` | `CubeHeader` (dataclass), `read_cube_header_and_values(path)`, `slab_average_potential_ev(header, values, thickness, *, z_center)`, `plane_avg_phi_z_ev()`, `z_coords_ang()`, `discover_cube_files(cube_pattern, *, workdir, frame_start, frame_end, frame_step)`, `extract_step_from_cube_filename()` | Gaussian cube file I/O + potential utilities |
 | `BaderParser.py` | `load_bader_atoms(structure, acf, potcar)` → Atoms with `bader_charge`/`bader_net_charge` arrays, `BaderParseError`, `_read_acf()`, `_read_potcar_zval()` | VASP Bader charge parsing |
@@ -109,6 +109,7 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 | `slowgrowth/SlowGrowthPlot.py` | `plot_slowgrowth_quick(sg, *, output_dir, png_name, absolute_steps)` → Path, `plot_slowgrowth_publication(sg, *, output_dir, png_name)` → Path, `write_slowgrowth_csv(sg, *, output_dir, csv_name)` → Path, `slowgrowth_analysis(restart_path, log_path, *, initial_step, final_step, output_dir, plot_style, colvar_id)` → `dict[str, Path]` | Plotting (quick/publication dual-axis), CSV export, unified entry point |
 
 **Integration formula:** $\Delta A_k = -\sum_{i=0}^{k-1} \frac{\lambda_i + \lambda_{i+1}}{2} \Delta\xi$ (CP2K convention: negative integral)
+**Unit note:** CP2K restart stores `TARGET_GROWTH` per a.u. time; `Slowgrowth.target_growth_au` is per step (converted via `× timestep_fs / AU_TIME_TO_FS`).
 **Not re-exported** from top-level `md_analysis.__init__`.
 
 ### `src/md_analysis/scripts/` — Automation Scripts & Utilities

@@ -30,7 +30,7 @@ Slowgrowth (frozen dataclass)
 ├── lagrange_shake: np.ndarray  # Shake Lagrange 乘子
 ├── free_energy_au: np.ndarray  # 累积自由能变 (Hartree)
 ├── timestep_fs: float          # MD 时间步 (fs)
-├── target_growth_au: float     # 每步 CV 增量 (a.u./step)
+├── target_growth_au: float     # 每步 CV 增量 (a.u./step)，已从 ConstraintInfo 的 per-a.u.-time 值转换
 ├── n_steps -> int (property)
 └── reversed() -> Slowgrowth    # 反转初末态
 

@@ -71,6 +71,9 @@ WATER_MOLAR_MASS_G_PER_MOL: float = 18.01528
 # Unit conversion constants (potential analysis)
 # --------------------------------------------------------------------------
 
+# Atomic unit of time (ℏ/E_h) in femtoseconds (CODATA 2018).
+AU_TIME_TO_FS: float = 0.02418884326585
+
 # Hartree to electron-volt (CODATA 2018).
 HA_TO_EV: float = 27.211386245988
 

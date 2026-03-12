@@ -257,5 +257,5 @@ $$
 $$
 
 - $\lambda_i$：Lagrange 乘子（a.u.）
-- $\Delta\xi$：CV 步长（a.u.）= `target_growth_au`
+- $\Delta\xi$：CV 步长（a.u./step）= `target_growth_au`（`Slowgrowth` 中已转换为 per-step；原始 `ConstraintInfo.target_growth_au` 为 per a.u. time，需乘 `dt_au = timestep_fs / AU_TIME_TO_FS`）
 - 内部计算单位：Hartree；输出同时提供 Hartree 和 eV（`HA_TO_EV` 转换）
