@@ -70,6 +70,7 @@ def plot_slowgrowth_quick(
     output_dir: Path | None = None,
     png_name: str = DEFAULT_SG_QUICK_PNG_NAME,
     absolute_steps: np.ndarray | None = None,
+    ma_window: int = 50,
 ) -> Path
 ```
 
