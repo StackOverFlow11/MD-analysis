@@ -39,6 +39,12 @@ class K:
     WORKDIR_NAME = "workdir_name"
     SCRIPT_PATH = "script_path"
     GEN_POTCAR = "gen_potcar"
+    # enhanced-sampling-specific
+    RESTART_PATH = "restart_path"
+    LOG_PATH = "log_path"
+    INITIAL_STEP = "initial_step"
+    FINAL_STEP = "final_step"
+    COLVAR_ID = "colvar_id"
 
 
 # ---------------------------------------------------------------------------

@@ -13,6 +13,7 @@ from ..config import (
     KEY_Z_BIN_WIDTH_A,
 )
 from ._charge import SurfaceChargeCmd
+from ._enhanced_sampling import SGPublicationPlotCmd, SGQuickPlotCmd
 from ._framework import MenuGroup
 from ._potential import (
     CenterPotentialCmd,
@@ -80,6 +81,13 @@ def build_menu_tree() -> MenuGroup:
 
     electrochemical.add(potential, charge)
 
+    # --- Enhanced Sampling ---
+    enhanced = MenuGroup("3", "Enhanced Sampling")
+    enhanced.add(
+        SGQuickPlotCmd("501", "Slow-Growth Quick Plot"),
+        SGPublicationPlotCmd("502", "Slow-Growth Publication Plot"),
+    )
+
     # --- Scripts ---
     scripts = MenuGroup("4", "Scripts / Tools")
     scripts.add(
@@ -104,7 +112,7 @@ def build_menu_tree() -> MenuGroup:
         ResetDefaultsCmd("907", "Reset All Defaults"),
     )
 
-    root.add(water, electrochemical, scripts, "", settings)
+    root.add(water, electrochemical, enhanced, scripts, "", settings)
     root.build_flat_index()
     return root
 
