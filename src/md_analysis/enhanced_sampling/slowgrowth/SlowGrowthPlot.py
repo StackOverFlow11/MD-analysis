@@ -71,6 +71,7 @@ def plot_slowgrowth_quick(
     output_dir: Path | None = None,
     png_name: str = DEFAULT_SG_QUICK_PNG_NAME,
     absolute_steps: np.ndarray | None = None,
+    ma_window: int = 50,
 ) -> Path:
     """Dual-axis quick plot with CV bottom axis and MD-step top axis.
 
@@ -81,6 +82,8 @@ def plot_slowgrowth_quick(
     absolute_steps : np.ndarray, optional
         Original (pre-reversal) step indices for annotating the barrier
         peak with its absolute MD step number.  Falls back to ``sg.steps``.
+    ma_window : int, optional
+        Window size for the Lagrange multiplier moving average (default 50).
     """
     import matplotlib
     matplotlib.use("Agg")
@@ -99,6 +102,21 @@ def plot_slowgrowth_quick(
         sg.target_au, sg.lagrange_shake,
         color="tab:blue", lw=0.8, alpha=0.7,
     )
+    # Moving average of Lagrange multiplier
+    if ma_window > 1 and len(sg.lagrange_shake) >= ma_window:
+        kernel = np.ones(ma_window) / ma_window
+        lm_ma = np.convolve(sg.lagrange_shake, kernel, mode="valid")
+        ma_x = sg.target_au[ma_window - 1:]
+        ax_left.plot(ma_x, lm_ma, color="darkblue", lw=1.5, label=f"MA({ma_window})")
+        # Annotate last MA value
+        last_ma = float(lm_ma[-1])
+        ax_left.annotate(
+            f"MA = {last_ma:.4f}",
+            xy=(ma_x[-1], last_ma),
+            xytext=(ma_x[-1], last_ma + 0.1 * (ax_left.get_ylim()[1] - ax_left.get_ylim()[0])),
+            arrowprops=dict(arrowstyle="->", color="darkblue", lw=1.5),
+            fontsize=9, color="darkblue", ha="center",
+        )
     ax_left.set_xlabel("Collective Variable (a.u.)")
     ax_left.set_ylabel("Lagrange Multiplier (a.u.)", color="tab:blue")
     ax_left.tick_params(axis="y", labelcolor="tab:blue")
