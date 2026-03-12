@@ -1,72 +1,79 @@
-"""Settings sub-menu for persistent user configuration."""
+"""Settings command classes (901-907)."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from ._prompt import _prompt_str
-
-_MENU = """\
-
- ---------- Settings ----------
-
- 901) Set VASP Submission Script Path
- 902) Show Current Configuration
-
-   0) Back / Exit
-
-"""
+from ._framework import MenuCommand, lazy_import
+from ._prompt import prompt_float, prompt_str
 
 
-def settings_menu() -> int:
-    """Display the settings sub-menu and dispatch."""
-    print(_MENU)
-    choice = input(" Input: ").strip()
+class SetVaspScriptCmd(MenuCommand):
+    def execute(self, ctx: dict) -> None:
+        from ..config import KEY_VASP_SCRIPT_PATH, get_config, set_config
 
-    if choice == "0":
-        print("\n Bye!")
-        return 0
+        current = get_config(KEY_VASP_SCRIPT_PATH)
+        if current:
+            print(f"  Current: {current}")
 
-    if choice == "901":
-        return _cmd_901()
-    elif choice == "902":
-        return _cmd_902()
-    else:
-        print(f"\n Invalid choice: {choice!r}")
-        return 1
+        raw = prompt_str("VASP submission script path", default=current)
+        if raw is None:
+            print("  No path provided, skipping.")
+            return
 
+        p = Path(raw).expanduser().resolve()
+        if not p.is_file():
+            print(f"  Warning: file does not exist: {p}")
+            return
 
-def _cmd_901() -> int:
-    from ..config import KEY_VASP_SCRIPT_PATH, get_config, set_config
-
-    current = get_config(KEY_VASP_SCRIPT_PATH)
-    print()
-    if current:
-        print(f"  Current: {current}")
-
-    raw = _prompt_str("VASP submission script path", default=current)
-    if raw is None:
-        print("  No path provided, skipping.")
-        return 0
-
-    p = Path(raw).expanduser().resolve()
-    if not p.is_file():
-        print(f"  Warning: file does not exist: {p}")
-        return 1
-
-    set_config(KEY_VASP_SCRIPT_PATH, str(p))
-    print(f"  Saved: {KEY_VASP_SCRIPT_PATH} = {p}")
-    return 0
+        set_config(KEY_VASP_SCRIPT_PATH, str(p))
+        print(f"  Saved: {KEY_VASP_SCRIPT_PATH} = {p}")
 
 
-def _cmd_902() -> int:
-    from ..config import load_config
+class ShowConfigCmd(MenuCommand):
+    def execute(self, ctx: dict) -> None:
+        from ..config import CONFIGURABLE_DEFAULTS, get_config, load_config
 
-    cfg = load_config()
-    print()
-    if not cfg:
-        print("  (no configuration set)")
-    else:
-        for key, val in cfg.items():
-            print(f"  {key} = {val}")
-    return 0
+        cfg = load_config()
+        if not cfg:
+            print("  (no user configuration set)")
+        else:
+            for key, val in cfg.items():
+                print(f"  {key} = {val}")
+
+        print("\n  --- Analysis Defaults ---")
+        for key, entry in CONFIGURABLE_DEFAULTS.items():
+            user_val = get_config(key)
+            if user_val is not None:
+                print(f"  {entry['label']}: {user_val}  (custom)")
+            else:
+                print(f"  {entry['label']}: {entry['default']}  (default)")
+
+
+class SetAnalysisDefaultCmd(MenuCommand):
+    """Generic command for setting one configurable analysis default."""
+
+    def __init__(self, code: str, label: str, *, config_key: str):
+        super().__init__(code, label)
+        self.config_key = config_key
+
+    def execute(self, ctx: dict) -> None:
+        from ..config import CONFIGURABLE_DEFAULTS, get_config, set_config
+
+        entry = CONFIGURABLE_DEFAULTS[self.config_key]
+        current = get_config(self.config_key, entry["default"])
+        value = prompt_float(entry["label"], default=current)
+        if value <= 0:
+            print("  Value must be > 0, skipping.")
+            return
+        set_config(self.config_key, value)
+        print(f"  Saved: {self.config_key} = {value}")
+
+
+class ResetDefaultsCmd(MenuCommand):
+    def execute(self, ctx: dict) -> None:
+        from ..config import CONFIGURABLE_DEFAULTS, delete_config
+
+        for key in CONFIGURABLE_DEFAULTS:
+            delete_config(key)
+        print("\n  All analysis defaults reset to hardcoded values.")

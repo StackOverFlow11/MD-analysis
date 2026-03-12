@@ -6,6 +6,7 @@ potential extraction φ(z), and slab-averaged potential computation.
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -14,6 +15,8 @@ from typing import Optional
 import numpy as np
 
 from .config import BOHR_TO_ANG, HA_TO_EV
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -182,6 +185,46 @@ def z_coords_ang(header: CubeHeader) -> np.ndarray:
     dz_ang = dz_bohr * BOHR_TO_ANG
     origin_z_ang = float(header.origin_bohr[2]) * BOHR_TO_ANG
     return origin_z_ang + (np.arange(header.nz, dtype=float) + 0.5) * dz_ang
+
+
+def discover_cube_files(
+    cube_pattern: str,
+    *,
+    workdir: Path | None = None,
+    frame_start: int | None = None,
+    frame_end: int | None = None,
+    frame_step: int | None = None,
+) -> list[Path]:
+    """Discover and slice cube files matching *cube_pattern*.
+
+    Parameters
+    ----------
+    cube_pattern
+        Glob pattern relative to *workdir*.
+    workdir
+        Base directory. Defaults to ``Path(".").resolve()``.
+    frame_start, frame_end, frame_step
+        Optional slice parameters applied to the sorted file list.
+
+    Returns
+    -------
+    list[Path]
+        Sorted (lexicographic) list of matched cube file paths,
+        after slicing.
+
+    Raises
+    ------
+    FileNotFoundError
+        If no files match the pattern.
+    """
+    workdir = (workdir or Path(".")).resolve()
+    cube_paths = [Path(p) for p in sorted(workdir.glob(cube_pattern))]
+    logger.debug("Discovered %d cube files matching %r", len(cube_paths), cube_pattern)
+    if not cube_paths:
+        raise FileNotFoundError(
+            f"No cube files matched pattern: {cube_pattern!r} in {workdir}"
+        )
+    return cube_paths[frame_start:frame_end:frame_step]
 
 
 _CUBE_STEP_RE = re.compile(r"_(\d+)\.cube$")

@@ -1,2 +1,2 @@
-data_example/bader_work_dir/CHG filter=lfs diff=lfs merge=lfs -text
-data_example/bader_work_dir/CHGCAR filter=lfs diff=lfs merge=lfs -text
+data_example/bader/bader_work_dir/CHG filter=lfs diff=lfs merge=lfs -text
+data_example/bader/bader_work_dir/CHGCAR filter=lfs diff=lfs merge=lfs -text

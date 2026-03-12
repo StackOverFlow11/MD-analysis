@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import shutil
 import subprocess
 from importlib.resources import as_file, files
@@ -13,10 +14,15 @@ from ase.io import iread
 from ..config import KEY_VASP_SCRIPT_PATH, get_config
 from .utils.IndexMapper import compute_index_map, write_poscar_with_map
 
+logger = logging.getLogger(__name__)
+
 DEFAULT_WORKDIR_NAME = "bader"
 
 
-class BaderGenError(Exception):
+from ..exceptions import MDAnalysisError
+
+
+class BaderGenError(MDAnalysisError):
     """Raised when Bader work directory generation fails."""
 
 
@@ -68,6 +74,8 @@ def generate_bader_workdir(
     FileNotFoundError
         If *script_path* does not exist.
     """
+    logger.info("Generating Bader workdir: frame=%d", frame)
+
     workdir = Path(output_dir) / workdir_name
     workdir.mkdir(parents=True, exist_ok=True)
 
@@ -186,6 +194,8 @@ def batch_generate_bader_workdirs(
             atoms.set_pbc(True)
             frames.append((idx, atoms))
             next_yield += frame_step
+
+    logger.info("Batch Bader: %d frames from %s", len(frames), xyz_path)
 
     iterator: list[tuple[int, Atoms]] | object = frames
     if verbose:

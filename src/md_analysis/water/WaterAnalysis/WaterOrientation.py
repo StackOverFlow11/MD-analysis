@@ -7,7 +7,7 @@ from typing import Iterable
 
 import numpy as np
 
-from ...utils.config import DEFAULT_Z_BIN_WIDTH_A
+from ...utils.config import DEFAULT_LAYER_TOL_A, DEFAULT_Z_BIN_WIDTH_A
 from ..config import DEFAULT_OUTPUT_DIR, DEFAULT_WATER_ORIENTATION_WEIGHTED_DENSITY_CSV_NAME
 from ..config import DEFAULT_START_INTERFACE
 from ._common import StartInterface, _compute_density_orientation_ensemble
@@ -17,13 +17,15 @@ __all__ = ["water_orientation_weighted_density_z_distribution_analysis"]
 
 def water_orientation_weighted_density_z_distribution_analysis(
     xyz_path: str | Path,
-    md_inp_path: str | Path,
+    md_inp_path: str | Path | None = None,
     *,
+    cell_abc: tuple[float, float, float] | None = None,
     output_dir: str | Path | None = None,
     output_csv_name: str = DEFAULT_WATER_ORIENTATION_WEIGHTED_DENSITY_CSV_NAME,
     start_interface: StartInterface = DEFAULT_START_INTERFACE,
     dz_A: float = DEFAULT_Z_BIN_WIDTH_A,
     metal_symbols: Iterable[str] | None = None,
+    layer_tol_A: float = DEFAULT_LAYER_TOL_A,
     frame_start: int | None = None,
     frame_end: int | None = None,
     frame_step: int | None = None,
@@ -38,16 +40,18 @@ def water_orientation_weighted_density_z_distribution_analysis(
     - orientation_ensemble_avg_g_cm3: ensemble-averaged orientation-weighted mass density
     """
     xyz_path = Path(xyz_path)
-    md_inp_path = Path(md_inp_path)
+    md_inp_path = Path(md_inp_path) if md_inp_path is not None else None
     output_dir_path = Path(output_dir) if output_dir is not None else Path.cwd()
     output_dir_path.mkdir(parents=True, exist_ok=True)
 
     common_centers_u, mean_path_A, _, orient_ensemble = _compute_density_orientation_ensemble(
         xyz_path,
         md_inp_path,
+        cell_abc=cell_abc,
         start_interface=start_interface,
         dz_A=dz_A,
         metal_symbols=metal_symbols,
+        layer_tol_A=layer_tol_A,
         frame_start=frame_start,
         frame_end=frame_end,
         frame_step=frame_step,

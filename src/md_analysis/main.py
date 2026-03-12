@@ -10,17 +10,23 @@ Public API
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any, Iterable
 
-from .potential.config import DEFAULT_THICKNESS_ANG
+from .electrochemical.potential.config import DEFAULT_THICKNESS_ANG
+from .utils.config import CHARGE_METHOD_COUNTERION, DEFAULT_LAYER_TOL_A
+
+logger = logging.getLogger(__name__)
 
 
 def run_water_analysis(
     xyz_path: Path,
-    md_inp_path: Path,
+    md_inp_path: Path | None = None,
     *,
+    cell_abc: tuple[float, float, float] | None = None,
     output_dir: Path,
+    layer_tol_A: float = DEFAULT_LAYER_TOL_A,
     frame_start: int | None = None,
     frame_end: int | None = None,
     frame_step: int | None = None,
@@ -34,6 +40,8 @@ def run_water_analysis(
 
     Returns a dict mapping output names to file paths.
     """
+    logger.info("Starting water analysis: xyz=%s, output_dir=%s", xyz_path, output_dir)
+
     from .water import plot_water_three_panel_analysis
     from .water.config import (
         DEFAULT_WATER_MASS_DENSITY_CSV_NAME,
@@ -50,7 +58,9 @@ def run_water_analysis(
     png_path = plot_water_three_panel_analysis(
         xyz_path=xyz_path,
         md_inp_path=md_inp_path,
+        cell_abc=cell_abc,
         output_dir=water_dir,
+        layer_tol_A=layer_tol_A,
         frame_start=frame_start,
         frame_end=frame_end,
         frame_step=frame_step,
@@ -77,7 +87,7 @@ def run_potential_analysis(
     thickness_ang: float = DEFAULT_THICKNESS_ANG,
     center_mode: str = "interface",
     metal_elements: set[str] | None = None,
-    layer_tol_ang: float = 0.6,
+    layer_tol_ang: float = DEFAULT_LAYER_TOL_A,
     fermi_unit: str = "au",
     compute_u: bool = True,
     compute_phi_z: bool = True,
@@ -95,7 +105,9 @@ def run_potential_analysis(
 
     Returns a dict mapping output names to file paths.
     """
-    from .potential import (
+    logger.info("Starting potential analysis: output_dir=%s", output_dir)
+
+    from .electrochemical.potential import (
         center_slab_potential_analysis,
         fermi_energy_analysis,
         electrode_potential_analysis,
@@ -202,7 +214,9 @@ def run_charge_analysis(
     root_dir: str | Path = ".",
     metal_symbols: Iterable[str] | None = None,
     normal: str = "c",
-    method: str = "counterion",
+    method: str = CHARGE_METHOD_COUNTERION,
+    layer_tol_A: float = DEFAULT_LAYER_TOL_A,
+    n_surface_layers: int = 1,
     dir_pattern: str = "bader_t*_i*",
     frame_start: int | None = None,
     frame_end: int | None = None,
@@ -214,8 +228,10 @@ def run_charge_analysis(
     Outputs are written under ``output_dir/charge/<method>/``.
     Returns a dict mapping output names to file paths.
     """
-    from .charge import surface_charge_analysis
-    from .charge.config import (
+    logger.info("Starting charge analysis: method=%s, output_dir=%s", method, output_dir)
+
+    from .electrochemical.charge import surface_charge_analysis
+    from .electrochemical.charge.config import (
         DEFAULT_SURFACE_CHARGE_CSV_NAME,
         DEFAULT_SURFACE_CHARGE_PNG_NAME,
     )
@@ -228,6 +244,8 @@ def run_charge_analysis(
         metal_symbols=metal_symbols,
         normal=normal,
         method=method,
+        layer_tol_A=layer_tol_A,
+        n_surface_layers=n_surface_layers,
         dir_pattern=dir_pattern,
         output_dir=charge_dir,
         frame_start=frame_start,
@@ -244,8 +262,9 @@ def run_charge_analysis(
 
 def run_all(
     xyz_path: Path,
-    md_inp_path: Path,
+    md_inp_path: Path | None = None,
     *,
+    cell_abc: tuple[float, float, float] | None = None,
     output_dir: Path,
     cube_pattern: str = "md-POTENTIAL-v_hartree-1_*.cube",
     md_out_path: Path | None = None,
@@ -259,10 +278,12 @@ def run_all(
 
     Returns a merged dict of all output file paths.
     """
+    logger.info("Starting full analysis: output_dir=%s", output_dir)
+
     results: dict[str, Path] = {}
 
     results.update(run_water_analysis(
-        xyz_path, md_inp_path, output_dir=output_dir,
+        xyz_path, md_inp_path, cell_abc=cell_abc, output_dir=output_dir,
         frame_start=frame_start, frame_end=frame_end, frame_step=frame_step,
         verbose=verbose,
     ))

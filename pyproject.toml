@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "md-analysis"
 version = "0.1.0"
 description = "Lightweight analysis utilities for periodic metal-water interfaces"
+license = "MIT"
 requires-python = ">=3.10"
 dependencies = [
     "numpy",

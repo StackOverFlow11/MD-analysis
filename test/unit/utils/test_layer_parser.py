@@ -1,0 +1,81 @@
+"""Unit tests for layer parsing utilities."""
+
+from __future__ import annotations
+
+import numpy as np
+import pytest
+
+ase = pytest.importorskip("ase")
+from ase import Atoms
+
+from md_analysis.utils.StructureParser.LayerParser import detect_interface_layers
+
+
+@pytest.fixture
+def simple_slab_with_environment() -> Atoms:
+    """
+    Build two Cu layers plus non-metal atoms on both sides along z.
+    """
+    symbols = [
+        # Layer 1 (low z)
+        "Cu",
+        "Cu",
+        "Cu",
+        "Cu",
+        # Layer 2 (high z)
+        "Cu",
+        "Cu",
+        "Cu",
+        "Cu",
+        # Environment atoms near both sides
+        "O",
+        "O",
+    ]
+    positions = np.array(
+        [
+            [2.0, 2.0, 2.0],
+            [2.0, 8.0, 2.0],
+            [8.0, 2.0, 2.0],
+            [8.0, 8.0, 2.0],
+            [2.0, 2.0, 8.0],
+            [2.0, 8.0, 8.0],
+            [8.0, 2.0, 8.0],
+            [8.0, 8.0, 8.0],
+            [5.0, 5.0, 0.8],
+            [5.0, 5.0, 9.2],
+        ],
+        dtype=float,
+    )
+    return Atoms(symbols=symbols, positions=positions, cell=[10.0, 10.0, 10.0], pbc=[True, True, True])
+
+
+def test_detect_interface_layers_marks_two_sides(simple_slab_with_environment: Atoms) -> None:
+    result = detect_interface_layers(
+        simple_slab_with_environment,
+        metal_symbols={"Cu"},
+        normal="c",
+        layer_tol_A=0.6,
+    )
+    assert len(result.metal_indices) == 8
+    assert len(result.metal_layers_sorted) == 2
+
+    interfaces = result.interface_layers()
+    assert len(interfaces) == 2
+    z_signs = {int(np.sign(layer.normal_unit[2])) for layer in interfaces if layer.normal_unit is not None}
+    assert z_signs == {-1, 1}
+
+    # Verify center_frac and interface_label fields
+    for layer in result.metal_layers_sorted:
+        assert 0.0 <= layer.center_frac < 1.0
+    labels = {layer.interface_label for layer in interfaces}
+    assert labels == {"normal_aligned", "normal_opposed"}
+
+    # Ordering: first layer is normal_aligned, last is normal_opposed
+    assert result.metal_layers_sorted[0].interface_label == "normal_aligned"
+    assert result.metal_layers_sorted[-1].interface_label == "normal_opposed"
+
+    # Accessor methods
+    aligned = result.interface_normal_aligned()
+    opposed = result.interface_normal_opposed()
+    assert aligned.interface_label == "normal_aligned"
+    assert opposed.interface_label == "normal_opposed"

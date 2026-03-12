@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from md_analysis.charge.BaderAnalysis import (
+from md_analysis.electrochemical.charge.BaderAnalysis import (
     compute_frame_surface_charge,
     surface_charge_analysis,
     trajectory_indexed_atom_charges,
@@ -15,7 +15,7 @@ from md_analysis.charge.BaderAnalysis import (
 )
 from md_analysis.utils.BaderParser import load_bader_atoms
 
-DATA_DIR = Path(__file__).resolve().parents[3] / "data_example" / "bader_work_dir"
+DATA_DIR = Path(__file__).resolve().parents[3] / "data_example" / "bader" / "bader_work_dir"
 
 # Files needed per frame
 _FRAME_FILES = ["POSCAR", "ACF.dat", "POTCAR"]

@@ -1,0 +1,235 @@
+&GLOBAL
+  PROJECT slowgrowth
+  RUN_TYPE MD
+  PRINT_LEVEL low
+&END GLOBAL
+
+&MOTION
+  &MD  
+    ENSEMBLE NVT
+    STEPS    10000
+    TIMESTEP 1.0
+    TEMPERATURE 300.15
+#     ANGVEL_TOL 0.000000001
+#     COMVEL_TOL 0.000000001
+#     ANGVEL_ZERO TRUE 
+     &THERMOSTAT
+       TYPE  NOSE
+       REGION  GLOBAL
+       &NOSE
+         LENGTH   3
+         TIMECON  2.2237606346543473E+01
+       &END NOSE
+     &END THERMOSTAT
+     &PRINT
+       &ENERGY  SILENT
+       &END ENERGY
+     &END PRINT
+  &END MD
+   &CONSTRAINT
+      &COLLECTIVE
+       COLVAR  1
+       INTERMOLECULAR .TRUE.
+       TARGET [angstrom] -1.77871 
+       TARGET_GROWTH [fs^-1*angstrom] 1E-3
+      &END COLLECTIVE
+   
+      &FIXED_ATOMS
+         List 1,2,7,8,9,10,15,16,17,18,23,24,25,26,31,32,33,34,39,40,41,42,46,47,48,49,54,55,56,57,62,63
+      &END FIXED_ATOMS
+	&LAGRANGE_MULTIPLIERS  SILENT
+	    COMMON_ITERATION_LEVELS 1
+	    FILENAME constraint_force.dat	    
+	&END LAGRANGE_MULTIPLIERS
+   &END CONSTRAINT
+  &PRINT
+     &TRAJECTORY  SILENT
+       &EACH
+         MD               5
+       &END EACH
+     &END TRAJECTORY
+     &VELOCITIES  SILENT
+       &EACH
+         MD               5
+       &END EACH
+     &END VELOCITIES
+     &RESTART  SILENT
+       &EACH
+         MD               10
+       &END EACH
+     &END RESTART
+  &END PRINT
+&END MOTION
+
+&FORCE_EVAL
+  METHOD Quickstep
+  &DFT
+		 UKS  T
+     CHARGE 0
+     POTENTIAL_FILE_NAME  GTH_POTENTIALS
+     BASIS_SET_FILE_NAME  BASIS_MOLOPT
+     WFN_RESTART_FILE_NAME ./1-RESTART.wfn 
+#    &POISSON
+#     PERIODIC XYZ
+#     POISSON_SOLVER wavelet #MT 
+#    &END POISSON
+    &MGRID
+      CUTOFF 400
+      NGRIDS 20
+      REL_CUTOFF 40
+    &END MGRID
+    &QS
+      EPS_DEFAULT 1.0E-12
+      EPS_PGF_ORB 1.0E-6
+      EXTRAPOLATION ASPC
+      EXTRAPOLATION_ORDER 3 # find the best for your system
+    &END QS
+    &SCF
+      EPS_SCF 1.0E-5
+      MAX_SCF 80  
+      SCF_GUESS RESTART
+ 
+       &OT
+#         MINIMIZER DIIS
+#         N_DIIS 5
+          PRECONDITIONER FULL_ALL #change it when a bulk is too big
+#         ENERGY_GAP 0.001
+#         EPS_IRAC 1.0E-10
+#         STEPSIZE 0.1
+#          MINIMIZER  CG
+         MINIMIZER  BROYDEN
+         BROYDEN_BETA     0.9
+         BROYDEN_SIGMA     0.1
+         LINESEARCH  2PNT
+         #PRECONDITIONER FULL_KINETIC
+       &END OT
+
+
+#         MINIMIZER DIIS
+#         N_DIIS 5
+#         PRECONDITIONER FULL_ALL
+#         ENERGY_GAP 0.001
+#         EPS_IRAC 1.0E-10
+#         STEPSIZE 0.1
+#          MINIMIZER  CG
+       &OUTER_SCF
+         EPS_SCF 1.0E-5
+         MAX_SCF 50
+#         STEP_SIZE 0.5
+#         EXTRAPOLATION_ORDER 4
+       &END OUTER_SCF
+       &MIXING ON
+       METHOD BROYDEN_MIXING
+         ALPHA 0.2
+         BETA  1.5  
+         NBROYDEN 32
+       &END MIXING
+       &PRINT
+          &RESTART_HISTORY
+            FILENAME = MD_RESTART_HISTORY.wfn
+            ADD_LAST NUMERIC
+            BACKUP_COPIES 5
+            &EACH
+            &END EACH
+          &END RESTART_HISTORY
+      &END PRINT 
+    &END SCF
+
+    &XC
+      &XC_FUNCTIONAL PBE
+      &END XC_FUNCTIONAL
+      &XC_GRID
+        XC_SMOOTH_RHO NN10
+        XC_DERIV SPLINE2_SMOOTH
+      &END XC_GRID
+      &vdW_POTENTIAL
+         POTENTIAL_TYPE PAIR_POTENTIAL
+         &PAIR_POTENTIAL
+            TYPE DFTD3
+#            LONG_RANGE_CORRECTION .T.
+#            D3_SCALING 1.0 1.094 1.682
+#            CALCULATE_C9_TERM .TRUE.
+            PARAMETER_FILE_NAME dftd3.dat
+            REFERENCE_FUNCTIONAL PBE
+            R_CUTOFF 10.
+#            EPS_CN 0.01
+         &END PAIR_POTENTIAL
+      &END vdW_POTENTIAL 
+    &END XC
+    &PRINT
+      &MULLIKEN  SILENT
+        FILENAME =CHARGE.mulliken
+        &EACH
+           MD               5
+        &END EACH
+      &END MULLIKEN
+    &END PRINT
+  &END DFT
+  &SUBSYS
+    &CELL
+      ABC [angstrom] 10.2239    8.8542     27.1231 
+      ALPHA_BETA_GAMMA 90.0000   90.0000   90.0000
+      PERIODIC XYZ
+    &END CELL
+
+    &TOPOLOGY
+      COORD_FILE_NAME init.xyz
+      COORD_FILE_FORMAT xyz
+#Do not center here!
+#      &CENTER_COORDINATES
+#      &END
+    &END TOPOLOGY
+
+    &COLVAR
+      &COMBINE_COLVAR
+        FUNCTION D1-D2
+	    VARIABLES D1 D2
+        &COLVAR
+          &DISTANCE
+            ATOMS 82 80
+          &END DISTANCE
+        &END COLVAR
+        &COLVAR
+          &DISTANCE
+            ATOMS 82 221
+          &END DISTANCE
+        &END COLVAR
+      &END COMBINE_COLVAR
+   &END COLVAR
+
+    &KIND O
+       BASIS_SET DZVP-MOLOPT-SR-GTH
+       POTENTIAL GTH-PBE-q6
+    &END KIND
+    &KIND Cu
+      BASIS_SET DZVP-MOLOPT-SR-GTH
+      POTENTIAL GTH-PBE-q11
+    &END KIND
+    &KIND C
+      BASIS_SET DZVP-MOLOPT-SR-GTH
+      POTENTIAL GTH-PBE-q4
+    &END KIND
+    &KIND H
+      BASIS_SET DZVP-MOLOPT-SR-GTH
+      POTENTIAL GTH-PBE-q1
+      MASS 2.0
+    &END KIND
+	  &KIND Zn
+      BASIS_SET DZVP-MOLOPT-SR-GTH
+      POTENTIAL GTH-PBE-q12
+    &END KIND
+
+  &END SUBSYS
+&END FORCE_EVAL
+
+
+
+
+#&EXT_RESTART
+#  RESTART_DEFAULT F
+#  RESTART_FILE_NAME  test-1.restart  
+#  RESTART_COUNTERS F
+#  RESTART_POS T
+#  RESTART_VEL  T
+#&END EXT_RESTART
+

@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Iterable
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 from ...utils import (
     _compute_bisector_cos_theta_vec,
@@ -14,7 +17,7 @@ from ...utils import (
     detect_water_molecule_indices,
     get_water_oxygen_indices_array,
 )
-from ...utils.config import DEFAULT_THETA_BIN_DEG, DEFAULT_Z_BIN_WIDTH_A
+from ...utils.config import DEFAULT_LAYER_TOL_A, DEFAULT_THETA_BIN_DEG, DEFAULT_Z_BIN_WIDTH_A, INTERFACE_NORMAL_ALIGNED
 from ..config import (
     DEFAULT_ADSORBED_WATER_PROFILE_CSV_NAME,
     DEFAULT_ADSORBED_WATER_RANGE_TXT_NAME,
@@ -42,6 +45,7 @@ __all__ = [
 # ---------------------------------------------------------------------------
 
 def _smooth_1d(values: np.ndarray, window_bins: int) -> np.ndarray:
+    """Apply 1D moving-average smoothing with odd window size."""
     values = np.asarray(values, dtype=float).reshape(-1)
     if values.size == 0:
         return values.copy()
@@ -121,14 +125,16 @@ def detect_adsorbed_layer_range_from_density_profile(
 
 def compute_adsorbed_water_theta_distribution(
     xyz_path: str | Path,
-    md_inp_path: str | Path,
+    md_inp_path: str | Path | None = None,
     *,
+    cell_abc: tuple[float, float, float] | None = None,
     adsorbed_range_A: tuple[float, float] | None = None,
     output_dir: str | Path | None = None,
     output_csv_name: str = DEFAULT_ADSORBED_WATER_THETA_DISTRIBUTION_CSV_NAME,
     start_interface: StartInterface = DEFAULT_START_INTERFACE,
     dz_A: float = DEFAULT_Z_BIN_WIDTH_A,
     ndeg: float = DEFAULT_THETA_BIN_DEG,
+    layer_tol_A: float = DEFAULT_LAYER_TOL_A,
     near_zero_ratio: float = 0.05,
     smoothing_window_bins: int = 5,
     frame_start: int | None = None,
@@ -142,8 +148,15 @@ def compute_adsorbed_water_theta_distribution(
     - If adsorbed_range_A is None, auto-detect range from density profile.
     - Returns (theta_centers_deg, theta_pdf_degree_inv, csv_path).
     """
+    d_start_display = adsorbed_range_A[0] if adsorbed_range_A is not None else 0.0
+    d_end_display = adsorbed_range_A[1] if adsorbed_range_A is not None else 0.0
+    logger.info(
+        "Computing adsorbed-water theta distribution, range=[%.3f, %.3f] A",
+        d_start_display, d_end_display,
+    )
+
     xyz_path = Path(xyz_path)
-    md_inp_path = Path(md_inp_path)
+    md_inp_path = Path(md_inp_path) if md_inp_path is not None else None
     output_dir_path = Path(output_dir) if output_dir is not None else Path.cwd()
     output_dir_path.mkdir(parents=True, exist_ok=True)
 
@@ -152,8 +165,10 @@ def compute_adsorbed_water_theta_distribution(
         common_centers_u, mean_path_A, rho_ensemble, _ = _compute_density_orientation_ensemble(
             xyz_path,
             md_inp_path,
+            cell_abc=cell_abc,
             start_interface=start_interface,
             dz_A=dz_A,
+            layer_tol_A=layer_tol_A,
             frame_start=frame_start,
             frame_end=frame_end,
             frame_step=frame_step,
@@ -171,7 +186,12 @@ def compute_adsorbed_water_theta_distribution(
     if d_end_A <= d_start_A:
         raise ValueError("adsorbed_range_A must satisfy end > start")
 
-    a_A, b_A, c_A = _parse_abc_from_md_inp(md_inp_path)
+    if cell_abc is not None:
+        a_A, b_A, c_A = cell_abc
+    elif md_inp_path is not None:
+        a_A, b_A, c_A = _parse_abc_from_md_inp(md_inp_path)
+    else:
+        raise ValueError("Either cell_abc or md_inp_path must be provided.")
     n_bins = _theta_bin_count_from_ndeg(float(ndeg))
     theta_values_deg: list[np.ndarray] = []
 
@@ -184,7 +204,7 @@ def compute_adsorbed_water_theta_distribution(
         iterator = tqdm(iterator, desc="Adsorbed water theta", unit="frame", ascii=" =")
 
     for atoms in iterator:
-        aligned_frac, opposed_frac = _detect_interface_fractions(atoms)
+        aligned_frac, opposed_frac = _detect_interface_fractions(atoms, layer_tol_A=layer_tol_A)
         water_idx = detect_water_molecule_indices(atoms)
         oxygen_indices = get_water_oxygen_indices_array(water_idx).reshape(-1)
         o_to_h = _oxygen_to_hydrogen_map(water_idx)
@@ -197,7 +217,7 @@ def compute_adsorbed_water_theta_distribution(
 
         scaled = np.asarray(atoms.get_scaled_positions(wrap=True), dtype=float)
         oxygen_c = scaled[oxygen_indices, 2]
-        if start_interface == "normal_aligned":
+        if start_interface == INTERFACE_NORMAL_ALIGNED:
             delta_c = np.mod(oxygen_c - aligned_frac, 1.0)
         else:
             delta_c = np.mod(opposed_frac - oxygen_c, 1.0)
@@ -240,13 +260,15 @@ def compute_adsorbed_water_theta_distribution(
 
 def ad_water_orientation_analysis(
     xyz_path: str | Path,
-    md_inp_path: str | Path,
+    md_inp_path: str | Path | None = None,
     *,
+    cell_abc: tuple[float, float, float] | None = None,
     output_dir: str | Path | None = None,
     output_profile_csv_name: str = DEFAULT_ADSORBED_WATER_PROFILE_CSV_NAME,
     output_range_txt_name: str = DEFAULT_ADSORBED_WATER_RANGE_TXT_NAME,
     start_interface: StartInterface = DEFAULT_START_INTERFACE,
     dz_A: float = DEFAULT_Z_BIN_WIDTH_A,
+    layer_tol_A: float = DEFAULT_LAYER_TOL_A,
     near_zero_ratio: float = 0.05,
     smoothing_window_bins: int = 5,
     frame_start: int | None = None,
@@ -263,7 +285,7 @@ def ad_water_orientation_analysis(
     - range TXT path (start/end/peak)
     """
     xyz_path = Path(xyz_path)
-    md_inp_path = Path(md_inp_path)
+    md_inp_path = Path(md_inp_path) if md_inp_path is not None else None
     output_dir_path = Path(output_dir) if output_dir is not None else Path.cwd()
     output_dir_path.mkdir(parents=True, exist_ok=True)
 
@@ -271,8 +293,10 @@ def ad_water_orientation_analysis(
     common_centers_u, mean_path_A, rho_ensemble, orient_ensemble = _compute_density_orientation_ensemble(
         xyz_path,
         md_inp_path,
+        cell_abc=cell_abc,
         start_interface=start_interface,
         dz_A=dz_A,
+        layer_tol_A=layer_tol_A,
         frame_start=frame_start,
         frame_end=frame_end,
         frame_step=frame_step,

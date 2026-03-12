@@ -13,10 +13,13 @@ the public API in WaterAnalysis/__init__.py.
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Generator, Iterable, Literal
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 try:
     from ase import Atoms
@@ -31,15 +34,21 @@ from ...utils import (
     _compute_bisector_cos_theta_vec,
     _oxygen_to_hydrogen_map,
 )
-from ...utils.WaterParser import (
+from ...utils.StructureParser.WaterParser import (
     AVOGADRO_NUMBER,
     ANGSTROM3_TO_CM3,
     WaterTopologyError,
     detect_water_molecule_indices,
     get_water_oxygen_indices_array,
 )
-from ...utils.CellParser import parse_abc_from_md_inp as _parse_abc_from_md_inp
-from ...utils.config import DEFAULT_Z_BIN_WIDTH_A, WATER_MOLAR_MASS_G_PER_MOL
+from ...utils.RestartParser.CellParser import parse_abc_from_md_inp as _parse_abc_from_md_inp
+from ...utils.config import (
+    DEFAULT_LAYER_TOL_A,
+    DEFAULT_Z_BIN_WIDTH_A,
+    INTERFACE_NORMAL_ALIGNED,
+    INTERFACE_NORMAL_OPPOSED,
+    WATER_MOLAR_MASS_G_PER_MOL,
+)
 
 StartInterface = Literal["normal_aligned", "normal_opposed"]
 
@@ -52,6 +61,7 @@ def _detect_interface_fractions(
     atoms: Atoms,
     *,
     metal_symbols: Iterable[str] | None = None,
+    layer_tol_A: float = DEFAULT_LAYER_TOL_A,
 ) -> tuple[float, float]:
     """
     Return (aligned_frac, opposed_frac) of the two water-facing metal layers.
@@ -66,6 +76,7 @@ def _detect_interface_fractions(
         atoms,
         normal="c",
         metal_symbols=metal_symbols,
+        layer_tol_A=layer_tol_A,
     )
 
     aligned_frac = detection.interface_normal_aligned().center_frac
@@ -129,6 +140,7 @@ def _single_frame_density_and_orientation(
     start_interface: StartInterface,
     dz_A: float,
     metal_symbols: Iterable[str] | None,
+    layer_tol_A: float = DEFAULT_LAYER_TOL_A,
     compute_orientation: bool = True,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, float]:
     """
@@ -147,10 +159,10 @@ def _single_frame_density_and_orientation(
     """
     if dz_A <= 0.0:
         raise ValueError("dz_A must be > 0")
-    if start_interface not in {"normal_aligned", "normal_opposed"}:
+    if start_interface not in {INTERFACE_NORMAL_ALIGNED, INTERFACE_NORMAL_OPPOSED}:
         raise ValueError(f"start_interface must be 'normal_aligned' or 'normal_opposed', got {start_interface!r}")
 
-    aligned_frac, opposed_frac = _detect_interface_fractions(atoms, metal_symbols=metal_symbols)
+    aligned_frac, opposed_frac = _detect_interface_fractions(atoms, metal_symbols=metal_symbols, layer_tol_A=layer_tol_A)
     gap_frac = (opposed_frac - aligned_frac) % 1.0
     if gap_frac <= 0.0:
         raise SurfaceGeometryError("Water gap fractional width must be positive.")
@@ -165,7 +177,7 @@ def _single_frame_density_and_orientation(
     scaled = np.asarray(atoms.get_scaled_positions(wrap=True), dtype=float)
     oxygen_c = scaled[oxygen_indices, 2]
 
-    if start_interface == "normal_aligned":
+    if start_interface == INTERFACE_NORMAL_ALIGNED:
         delta_c = np.mod(oxygen_c - aligned_frac, 1.0)
     else:
         delta_c = np.mod(opposed_frac - oxygen_c, 1.0)
@@ -221,11 +233,13 @@ def _single_frame_density_and_orientation(
 
 def _compute_density_orientation_ensemble(
     xyz_path: Path,
-    md_inp_path: Path,
+    md_inp_path: Path | None = None,
     *,
+    cell_abc: tuple[float, float, float] | None = None,
     start_interface: StartInterface = "normal_aligned",
     dz_A: float = DEFAULT_Z_BIN_WIDTH_A,
     metal_symbols: Iterable[str] | None = None,
+    layer_tol_A: float = DEFAULT_LAYER_TOL_A,
     compute_orientation: bool = True,
     frame_start: int | None = None,
     frame_end: int | None = None,
@@ -234,6 +248,12 @@ def _compute_density_orientation_ensemble(
 ) -> tuple[np.ndarray, float, np.ndarray, np.ndarray]:
     """
     Read the trajectory **once** and compute ensemble-averaged density and orientation.
+
+    Parameters
+    ----------
+    cell_abc : tuple[float, float, float] | None
+        Pre-parsed cell lengths ``(a, b, c)`` in angstrom.  When provided,
+        *md_inp_path* is ignored and no file parsing is performed.
 
     Returns
     -------
@@ -246,7 +266,14 @@ def _compute_density_orientation_ensemble(
     orient_ensemble : np.ndarray, shape (nbins,)
         Equal-weight ensemble-averaged orientation-weighted mass density (g/cm³).
     """
-    a_A, b_A, c_A = _parse_abc_from_md_inp(md_inp_path)
+    logger.info("Computing density+orientation ensemble")
+
+    if cell_abc is not None:
+        a_A, b_A, c_A = cell_abc
+    elif md_inp_path is not None:
+        a_A, b_A, c_A = _parse_abc_from_md_inp(md_inp_path)
+    else:
+        raise ValueError("Either cell_abc or md_inp_path must be provided.")
 
     iterator = _iter_trajectory(
         xyz_path, a_A, b_A, c_A,
@@ -264,6 +291,7 @@ def _compute_density_orientation_ensemble(
                 start_interface=start_interface,
                 dz_A=dz_A,
                 metal_symbols=metal_symbols,
+                layer_tol_A=layer_tol_A,
                 compute_orientation=compute_orientation,
             )
         )

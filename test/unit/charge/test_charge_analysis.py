@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 from ase import Atoms
 
-from md_analysis.charge.BaderAnalysis import (
+from md_analysis.electrochemical.charge.BaderAnalysis import (
     _extract_t_value,
     _sorted_frame_dirs,
     compute_frame_surface_charge,
@@ -16,11 +16,11 @@ from md_analysis.charge.BaderAnalysis import (
     trajectory_indexed_atom_charges,
     trajectory_surface_charge,
 )
-from md_analysis.charge.config import E_PER_A2_TO_UC_PER_CM2
+from md_analysis.electrochemical.charge.config import E_PER_A2_TO_UC_PER_CM2
 from md_analysis.utils.BaderParser import load_bader_atoms
-from md_analysis.utils.LayerParser import detect_interface_layers
+from md_analysis.utils.StructureParser.LayerParser import detect_interface_layers
 
-DATA_DIR = Path(__file__).resolve().parents[3] / "data_example" / "bader_work_dir"
+DATA_DIR = Path(__file__).resolve().parents[3] / "data_example" / "bader" / "bader_work_dir"
 
 
 # ---------------------------------------------------------------------------
@@ -157,6 +157,107 @@ class TestComputeFrameSurfaceCharge:
         )
 
         np.testing.assert_allclose(sigma_shifted, sigma_ref, atol=1e-12)
+
+    def test_layer_method_n_surface_layers_2(self):
+        """n_surface_layers=2 sums 2 layers per interface side."""
+        cell_c = 30.0
+        cell_a = 5.0
+        n_per_layer = 4
+        positions = []
+        symbols = []
+        layer_fracs = [0.1, 0.2, 0.3, 0.4]
+        for layer_frac in layer_fracs:
+            z = layer_frac * cell_c
+            for ix in range(2):
+                for iy in range(2):
+                    positions.append([ix * cell_a / 2, iy * cell_a / 2, z])
+                    symbols.append("Cu")
+
+        atoms = Atoms(
+            symbols=symbols,
+            positions=positions,
+            cell=[cell_a, cell_a, cell_c],
+            pbc=True,
+        )
+        # Assign distinct charges per layer to verify grouping
+        net_charge = np.zeros(len(atoms))
+        # Layer 0 (frac 0.1): +0.1 each → sum 0.4
+        net_charge[0:4] = 0.1
+        # Layer 1 (frac 0.2): +0.2 each → sum 0.8
+        net_charge[4:8] = 0.2
+        # Layer 2 (frac 0.3): +0.3 each → sum 1.2
+        net_charge[8:12] = 0.3
+        # Layer 3 (frac 0.4): +0.4 each → sum 1.6
+        net_charge[12:16] = 0.4
+        atoms.arrays["bader_net_charge"] = net_charge
+
+        # n_surface_layers=1: only outermost layers
+        result1 = compute_frame_surface_charge(
+            atoms.copy(), metal_symbols={"Cu"}, normal="c",
+            method="layer", n_surface_layers=1,
+        )
+        q1 = result1.info["charge_per_surface_e"]
+        n1 = result1.info["n_charged_atoms_per_surface"]
+
+        # n_surface_layers=2: two layers per side
+        result2 = compute_frame_surface_charge(
+            atoms.copy(), metal_symbols={"Cu"}, normal="c",
+            method="layer", n_surface_layers=2,
+        )
+        q2 = result2.info["charge_per_surface_e"]
+        n2 = result2.info["n_charged_atoms_per_surface"]
+
+        # Each side should have 2× the atoms
+        assert n2[0] == 2 * n1[0]
+        assert n2[1] == 2 * n1[1]
+
+        # The 2-layer charge should be strictly larger in magnitude
+        assert abs(q2[0]) > abs(q1[0])
+        assert abs(q2[1]) > abs(q1[1])
+
+    def test_layer_method_n_surface_layers_default_matches_single(self, bader_atoms):
+        """n_surface_layers=1 (default) matches omitting the parameter."""
+        result_default = compute_frame_surface_charge(
+            bader_atoms.copy(), normal="c", method="layer",
+        )
+        result_explicit = compute_frame_surface_charge(
+            bader_atoms.copy(), normal="c", method="layer", n_surface_layers=1,
+        )
+        np.testing.assert_allclose(
+            result_default.info["surface_charge_density_e_A2"],
+            result_explicit.info["surface_charge_density_e_A2"],
+            atol=1e-15,
+        )
+
+    def test_layer_method_n_surface_layers_exceeds_total_raises(self):
+        """n_surface_layers > total layers raises ValueError."""
+        atoms = Atoms(
+            "Cu4",
+            positions=[[0, 0, 3], [0, 0, 6], [0, 0, 9], [0, 0, 12]],
+            cell=[5, 5, 30],
+            pbc=True,
+        )
+        atoms.arrays["bader_net_charge"] = np.array([0.1, 0.1, 0.1, 0.1])
+        with pytest.raises(ValueError, match="exceeds total metal layers"):
+            compute_frame_surface_charge(
+                atoms, metal_symbols={"Cu"}, normal="c",
+                method="layer", n_surface_layers=10,
+            )
+
+    def test_layer_method_n_surface_layers_zero_raises(self):
+        """n_surface_layers=0 raises ValueError."""
+        atoms = Atoms(
+            "Cu4",
+            positions=[[0, 0, 3], [0, 0, 6], [0, 0, 9], [0, 0, 12]],
+            cell=[5, 5, 30],
+            pbc=True,
+        )
+        atoms.arrays["bader_net_charge"] = np.array([0.1, 0.1, 0.1, 0.1])
+        with pytest.raises(ValueError, match="n_surface_layers must be >= 1"):
+            compute_frame_surface_charge(
+                atoms, metal_symbols={"Cu"}, normal="c",
+                method="layer", n_surface_layers=0,
+            )
 
     def test_normal_a(self, bader_atoms):
         """normal='a' uses cell vectors b × c for area."""

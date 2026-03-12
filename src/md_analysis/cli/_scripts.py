@@ -1,50 +1,20 @@
-"""Scripts / Tools sub-menu."""
+"""Scripts / Tools command classes (401-402)."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from ._prompt import _prompt_bool, _prompt_choice, _prompt_int, _prompt_str, _prompt_str_required
-
-_MENU = """\
-
- ---------- Scripts / Tools ----------
-
- 401) Generate Bader Work Directory (single frame)
- 402) Batch Generate Bader Work Directories
-
-   0) Back / Exit
-
-"""
-
-
-def scripts_menu() -> int:
-    """Display the scripts sub-menu and dispatch."""
-    print(_MENU)
-    choice = input(" Input: ").strip()
-
-    if choice == "0":
-        print("\n Bye!")
-        return 0
-
-    if choice == "401":
-        return _cmd_401()
-    elif choice == "402":
-        return _cmd_402()
-    else:
-        print(f"\n Invalid choice: {choice!r}")
-        return 1
+from ._framework import MenuCommand, lazy_import
+from ._params import K, cell_abc
+from ._prompt import prompt_bool, prompt_int, prompt_str, prompt_str_required
 
 
 def _print_trajectory_info(xyz_path: str) -> None:
     """Peek at XYZ trajectory and print frame/step/time metadata."""
-    from pathlib import Path
-
     p = Path(xyz_path)
     if not p.is_file():
         return
 
-    # Count total frames via line count (fast, no parsing).
     with open(p) as fh:
         first_line = fh.readline().strip()
         try:
@@ -55,7 +25,6 @@ def _print_trajectory_info(xyz_path: str) -> None:
     block_size = natoms + 2
     total_frames = total_lines // block_size
 
-    # Read first 2 frames for step/time interval.
     from ase.io import iread
 
     frames_meta: list[tuple[int, float]] = []
@@ -73,135 +42,99 @@ def _print_trajectory_info(xyz_path: str) -> None:
         time_interval = frames_meta[1][1] - frames_meta[0][1]
         if step_interval > 0:
             dt = time_interval / step_interval
-            print(f"  Frame interval: {step_interval} MD steps, {time_interval:.1f} fs/frame (dt = {dt:.1f} fs/step)")
+            print(f"  Frame interval: {step_interval} MD steps, "
+                  f"{time_interval:.1f} fs/frame (dt = {dt:.1f} fs/step)")
     print()
 
 
-def _read_cell_abc(cell_source: str) -> tuple[float, float, float] | None:
-    """Read cell parameters from the chosen source. Returns None on error."""
-    from ..utils.CellParser import CellParseError, parse_abc_from_md_inp, parse_abc_from_restart
-    if cell_source == ".restart":
-        restart_path = _prompt_str_required("CP2K .restart file")
-        try:
-            abc = parse_abc_from_restart(restart_path)
-        except CellParseError as exc:
-            print(f"\n  Error: {exc}")
-            return None
-    else:
-        md_inp_path = _prompt_str_required("CP2K input file (e.g. md.inp)")
-        try:
-            abc = parse_abc_from_md_inp(md_inp_path)
-        except CellParseError as exc:
-            print(f"\n  Error: {exc}")
-            return None
-    print(f"  Cell: a={abc[0]:.4f}, b={abc[1]:.4f}, c={abc[2]:.4f} A")
-    return abc
-
-
-def _cmd_401() -> int:
-    print()
-    xyz_path = _prompt_str_required("XYZ trajectory file (e.g. md-pos-1.xyz)")
-    _print_trajectory_info(xyz_path)
-    cell_source = _prompt_choice("Cell source", ["md.inp", ".restart"], default=".restart")
-    abc = _read_cell_abc(cell_source)
-    if abc is None:
-        return 1
-
-    frame = _prompt_int("Frame number (0-based)", default=0) or 0
-    output_dir = _prompt_str("Output directory", default=".") or "."
-    workdir_name = _prompt_str("Work directory name", default="bader") or "bader"
-
+def _resolve_script_path() -> str | None:
+    """Prompt for VASP submission script path with config default."""
     from ..config import KEY_VASP_SCRIPT_PATH, get_config
 
     default_script = get_config(KEY_VASP_SCRIPT_PATH)
-    script_path = _prompt_str(
-        "Submission script path",
-        default=default_script,
-    )
+    return prompt_str("Submission script path", default=default_script)
 
-    gen_potcar = _prompt_bool("Generate POTCAR via vaspkit?", default=True)
 
-    # Read frame from trajectory
-    from ase.io import iread
+class BaderSingleCmd(MenuCommand):
+    output_subdir = ""
 
-    print(f"\n Reading frame {frame} from {xyz_path} ...")
-    atoms = None
-    for i, a in enumerate(iread(xyz_path, index=":")):
-        if i == frame:
-            atoms = a
-            break
-    if atoms is None:
-        print(f"  Error: frame {frame} not found in {xyz_path}")
-        return 1
+    def _collect_all_params(self) -> dict:
+        """Custom flow: show trajectory info between prompts."""
+        print()
+        ctx: dict = {}
+        ctx[K.XYZ] = prompt_str_required("XYZ trajectory file (e.g. md-pos-1.xyz)")
+        _print_trajectory_info(ctx[K.XYZ])
+        cell_abc.collect(ctx)
+        ctx[K.FRAME] = prompt_int("Frame number (0-based)", default=0) or 0
+        ctx[K.OUTDIR] = prompt_str("Output directory", default=".") or "."
+        ctx[K.WORKDIR_NAME] = prompt_str("Work directory name", default="bader") or "bader"
+        ctx[K.SCRIPT_PATH] = _resolve_script_path()
+        ctx[K.GEN_POTCAR] = prompt_bool("Generate POTCAR via vaspkit?", default=True)
+        return ctx
 
-    atoms.set_cell(abc)
-    atoms.set_pbc(True)
+    def execute(self, ctx: dict) -> None:
+        iread = lazy_import("ase.io", "iread")
+        generate = lazy_import("md_analysis.scripts", "generate_bader_workdir")
 
-    from ..scripts import generate_bader_workdir
+        print(f"\n Reading frame {ctx[K.FRAME]} from {ctx[K.XYZ]} ...")
+        atoms = None
+        for i, a in enumerate(iread(ctx[K.XYZ], index=":")):
+            if i == ctx[K.FRAME]:
+                atoms = a
+                break
+        if atoms is None:
+            print(f"  Error: frame {ctx[K.FRAME]} not found in {ctx[K.XYZ]}")
+            return
 
-    try:
-        workdir = generate_bader_workdir(
+        atoms.set_cell(ctx[K.CELL_ABC])
+        atoms.set_pbc(True)
+
+        workdir = generate(
             atoms,
-            output_dir,
-            script_path=script_path,
-            workdir_name=workdir_name,
-            frame=frame,
-            source=xyz_path,
-            generate_potcar=gen_potcar,
+            ctx[K.OUTDIR],
+            script_path=ctx[K.SCRIPT_PATH],
+            workdir_name=ctx[K.WORKDIR_NAME],
+            frame=ctx[K.FRAME],
+            source=ctx[K.XYZ],
+            generate_potcar=ctx[K.GEN_POTCAR],
         )
-    except Exception as exc:
-        print(f"\n  Error: {exc}")
-        return 1
 
-    print(f"\n Bader work directory created: {workdir}")
-    contents = sorted(p.name for p in workdir.iterdir())
-    print(f"  Contents: {', '.join(contents)}")
-    return 0
+        print(f"\n Bader work directory created: {workdir}")
+        contents = sorted(p.name for p in workdir.iterdir())
+        print(f"  Contents: {', '.join(contents)}")
 
 
-def _cmd_402() -> int:
-    print()
-    xyz_path = _prompt_str_required("XYZ trajectory file (e.g. md-pos-1.xyz)")
-    _print_trajectory_info(xyz_path)
-    cell_source = _prompt_choice("Cell source", ["md.inp", ".restart"], default=".restart")
-    abc = _read_cell_abc(cell_source)
-    if abc is None:
-        return 1
+class BaderBatchCmd(MenuCommand):
+    output_subdir = ""
 
-    frame_start = _prompt_int("Frame start (0-based)", default=0) or 0
-    frame_end = _prompt_int("Frame end (exclusive, empty=all)", default=None)
-    frame_step = _prompt_int("Frame step", default=1) or 1
-    output_dir = _prompt_str("Output directory", default=".") or "."
+    def _collect_all_params(self) -> dict:
+        """Custom flow: show trajectory info between prompts."""
+        print()
+        ctx: dict = {}
+        ctx[K.XYZ] = prompt_str_required("XYZ trajectory file (e.g. md-pos-1.xyz)")
+        _print_trajectory_info(ctx[K.XYZ])
+        cell_abc.collect(ctx)
+        ctx[K.FRAME_START] = prompt_int("Frame start (0-based)", default=0) or 0
+        ctx[K.FRAME_END] = prompt_int("Frame end (exclusive, empty=all)", default=None)
+        ctx[K.FRAME_STEP] = prompt_int("Frame step", default=1) or 1
+        ctx[K.OUTDIR] = prompt_str("Output directory", default=".") or "."
+        ctx[K.SCRIPT_PATH] = _resolve_script_path()
+        ctx[K.GEN_POTCAR] = prompt_bool("Generate POTCAR via vaspkit?", default=True)
+        return ctx
 
-    from ..config import KEY_VASP_SCRIPT_PATH, get_config
-
-    default_script = get_config(KEY_VASP_SCRIPT_PATH)
-    script_path = _prompt_str(
-        "Submission script path",
-        default=default_script,
-    )
-
-    gen_potcar = _prompt_bool("Generate POTCAR via vaspkit?", default=True)
-
-    from ..scripts import batch_generate_bader_workdirs
-
-    try:
-        dirs = batch_generate_bader_workdirs(
-            xyz_path,
-            abc,
-            output_dir,
-            frame_start=frame_start,
-            frame_end=frame_end,
-            frame_step=frame_step,
-            script_path=script_path,
-            generate_potcar=gen_potcar,
+    def execute(self, ctx: dict) -> None:
+        batch = lazy_import("md_analysis.scripts", "batch_generate_bader_workdirs")
+        dirs = batch(
+            ctx[K.XYZ],
+            ctx[K.CELL_ABC],
+            ctx[K.OUTDIR],
+            frame_start=ctx[K.FRAME_START],
+            frame_end=ctx[K.FRAME_END],
+            frame_step=ctx[K.FRAME_STEP],
+            script_path=ctx[K.SCRIPT_PATH],
+            generate_potcar=ctx[K.GEN_POTCAR],
             verbose=True,
         )
-    except Exception as exc:
-        print(f"\n  Error: {exc}")
-        return 1
-
-    print(f"\n Created {len(dirs)} Bader work directories:")
-    for d in dirs:
-        print(f"  {d}")
-    return 0
+        print(f"\n Created {len(dirs)} Bader work directories:")
+        for d in dirs:
+            print(f"  {d}")
