@@ -66,7 +66,7 @@ class Slowgrowth:
         - ``times_fs``: reset to start from 0
         - ``steps``: reset to ``[0, 1, ..., n-1]``
         """
-        fe_reversed = -self.free_energy_au[::-1]
+        fe_reversed = self.free_energy_au[::-1].copy()
         fe_reversed = fe_reversed - fe_reversed[0]
 
         return Slowgrowth(

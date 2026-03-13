@@ -156,6 +156,37 @@ class TestSlowgrowthAnalysis:
         # Free energy should start at 0 after reversal
         assert float(rows[0]["free_energy_au"]) == pytest.approx(0.0)
 
+    def test_reversed_free_energy_sign(self):
+        """Reversed free energy should have opposite sign at endpoint."""
+        full = SlowgrowthFull.from_paths(_RESTART, _LOG)
+        fwd = full.segment(10, 100)
+        rev = fwd.reversed()
+
+        # ΔA(B→A) = -ΔA(A→B)
+        assert rev.free_energy_au[-1] == pytest.approx(
+            -fwd.free_energy_au[-1], abs=1e-12,
+        )
+        # target_growth_au should be negated
+        assert rev.target_growth_au == pytest.approx(
+            -fwd.target_growth_au, abs=1e-15,
+        )
+        # target_au should be reversed
+        np.testing.assert_allclose(rev.target_au, fwd.target_au[::-1])
+
+    def test_reversed_matches_reintegration(self):
+        """Algebraic reversal must match direct re-integration."""
+        from md_analysis.enhanced_sampling.slowgrowth.SlowGrowth import _integrate_midpoint
+
+        full = SlowgrowthFull.from_paths(_RESTART, _LOG)
+        fwd = full.segment(10, 100)
+        rev = fwd.reversed()
+
+        # Re-integrate with reversed lagrange and negated growth
+        fe_reintegrated = _integrate_midpoint(
+            fwd.lagrange_shake[::-1], -fwd.target_growth_au,
+        )
+        np.testing.assert_allclose(rev.free_energy_au, fe_reintegrated, atol=1e-12)
+
 
 # ---------------------------------------------------------------------------
 # Preview output (optional manual inspection)
