@@ -120,8 +120,9 @@ class TestComputeFrameSurfaceCharge:
         # Layers at frac 0.1..0.4; gap 0.4→0.1 wrapping.
         # normal_aligned = frac 0.4, normal_opposed = frac 0.1.
         # K at frac 0.05 is near the normal_opposed surface (index 1).
+        # K has net charge +0.8e → surface charge = -0.8e (charge neutrality).
         assert n_ch[1] == 1
-        assert q_ch[1] == pytest.approx(0.8)
+        assert q_ch[1] == pytest.approx(-0.8)
         assert sigma[1] != 0.0
         # Water and metal are excluded → no atoms assigned to aligned surface
         assert n_ch[0] == 0

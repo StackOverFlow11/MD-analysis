@@ -252,8 +252,12 @@ def _compute_surface_charge_counterion(
         np.abs(delta_opposed) < np.abs(gap_dir_opposed)
     )
 
-    q_aligned = float(net_charge[charged_idx[assigned_aligned]].sum()) if assigned_aligned.any() else 0.0
-    q_opposed = float(net_charge[charged_idx[assigned_opposed]].sum()) if assigned_opposed.any() else 0.0
+    q_ci_aligned = float(net_charge[charged_idx[assigned_aligned]].sum()) if assigned_aligned.any() else 0.0
+    q_ci_opposed = float(net_charge[charged_idx[assigned_opposed]].sum()) if assigned_opposed.any() else 0.0
+
+    # Surface charge = negative of counterion charge (charge neutrality)
+    q_aligned = -q_ci_aligned
+    q_opposed = -q_ci_opposed
 
     sigma_e_A2 = np.array([q_aligned / area_A2, q_opposed / area_A2])
     sigma_uC_cm2 = sigma_e_A2 * E_PER_A2_TO_UC_PER_CM2
