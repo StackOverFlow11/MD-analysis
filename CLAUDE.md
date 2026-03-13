@@ -20,7 +20,7 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 
 | File | Purpose |
 |---|---|
-| `__init__.py` | Re-exports sub-packages (`utils`, `water`, `potential`, `charge`), `MDAnalysisError`; `__version__ = "0.1.0"` |
+| `__init__.py` | Re-exports sub-packages (`utils`, `water`, `electrochemical`), plus `potential`, `charge` from `electrochemical`; `MDAnalysisError`; `__version__ = "0.1.0"` |
 | `exceptions.py` | `MDAnalysisError(Exception)` — base class for all domain-specific errors; all 9 custom exceptions inherit from it |
 | `config.py` | Persistent user configuration (`~/.config/md_analysis/config.json`): `load_config`, `save_config`, `get_config`, `set_config`, `delete_config`, `ConfigError`, `KEY_VASP_SCRIPT_PATH`, `KEY_LAYER_TOL_A`, `KEY_Z_BIN_WIDTH_A`, `KEY_THETA_BIN_DEG`, `KEY_WATER_OH_CUTOFF_A`, `CONFIGURABLE_DEFAULTS` |
 | `main.py` | Programmatic entry points: `run_water_analysis()`, `run_potential_analysis()`, `run_charge_analysis()`, `run_all()` |
@@ -31,12 +31,12 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 |---|---|---|
 | `__init__.py` | Top menu (1=Water, 2=Electrochemical, 3=Enhanced Sampling, 4=Scripts, 9=Settings, 0=Exit) | `main()`, `build_menu_tree()` |
 | `_prompt.py` | Reusable input helpers | `prompt_str`, `prompt_int`, `prompt_float`, `prompt_choice`, `prompt_bool`, `prompt_str_required`, `_read` |
-| `_water.py` | Water sub-menu (101-105) | `water_menu()`, dispatches to `water` module or `main.run_water_analysis` |
-| `_potential.py` | Potential sub-menu (211-216) | `potential_menu()`, dispatches to `potential` module or `main.run_potential_analysis` |
-| `_charge.py` | Charge sub-menu (221-223) | `charge_menu()`, `_collect_params()`, `_run_charge()`, `_print_ensemble_summary()` |
+| `_water.py` | Water sub-menu (101-105) | `WaterDensityCmd`, `WaterOrientationCmd`, `AdWaterOrientationCmd`, `AdWaterThetaCmd`, `WaterThreePanelCmd` |
+| `_potential.py` | Potential sub-menu (211-216) | `CenterPotentialCmd`, `FermiEnergyCmd`, `ElectrodePotentialCmd`, `PhiZProfileCmd`, `ThicknessSensitivityCmd`, `FullPotentialCmd` |
+| `_charge.py` | Charge sub-menu (221-223) | `SurfaceChargeCmd` (method param dispatches counterion/layer/prompted), `_print_ensemble_summary()` |
 | `_enhanced_sampling.py` | Enhanced sampling sub-menu (301-302) | `SGQuickPlotCmd`, `SGPublicationPlotCmd`: slow-growth plot commands via `lazy_import` |
-| `_scripts.py` | Scripts/Tools sub-menu (401-402) | `scripts_menu()`, 401: single-frame Bader workdir, 402: batch Bader workdirs |
-| `_settings.py` | Settings sub-menu (901-907) | `settings_menu()`, 901: set VASP script path, 902: show config, 903-906: set analysis defaults, 907: reset all defaults |
+| `_scripts.py` | Scripts/Tools sub-menu (401-402) | `BaderSingleCmd`, `BaderBatchCmd` |
+| `_settings.py` | Settings sub-menu (901-907) | `SetVaspScriptCmd`, `ShowConfigCmd`, `SetAnalysisDefaultCmd` (config_key param), `ResetDefaultsCmd` |
 | `_framework.py` | Core framework | `MenuNode`, `MenuGroup`, `MenuCommand`, `lazy_import()` |
 | `_params.py` | Parameter collection hierarchy | `K` (key constants), `ParamCollector` ABC, generic param classes (`StrParam`, `FloatParam`, `IntParam`, `ChoiceParam`, etc.) |
 
@@ -76,7 +76,11 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 | `WaterAnalysis/WaterOrientation.py` | `water_orientation_weighted_density_z_distribution_analysis(xyz, md_inp, *, output_dir, ...)` → CSV path | Ensemble-averaged orientation-weighted density |
 | `WaterAnalysis/AdWaterOrientation.py` | `ad_water_orientation_analysis(xyz, md_inp, *, output_dir, ...)` → (CSV, TXT), `compute_adsorbed_water_theta_distribution(...)` → (centers, pdf, CSV), `detect_adsorbed_layer_range_from_density_profile(distance, rho)` | Adsorbed-layer orientation analysis |
 
-### `src/md_analysis/potential/` — Potential Analysis Workflows
+### `src/md_analysis/electrochemical/` — Electrochemical Analysis (Grouping Package)
+
+`__init__.py` re-exports `potential` and `charge` sub-packages; `__all__ = ["potential", "charge"]`. No analysis logic lives here — it is a namespace aggregator.
+
+### `src/md_analysis/electrochemical/potential/` — Potential Analysis Workflows
 
 | File | Key Exports | Purpose |
 |---|---|---|
@@ -87,7 +91,7 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 
 **cSHE formula:** `U = -E_Fermi + phi_center + DP_A(H3O+/w) - mu(H+,g0) - DELTA_E_ZP`
 
-### `src/md_analysis/charge/` — Bader Charge Analysis
+### `src/md_analysis/electrochemical/charge/` — Bader Charge Analysis
 
 | File | Key Exports | Purpose |
 |---|---|---|

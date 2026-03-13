@@ -8,11 +8,12 @@
 
 - `md_analysis` 是**顶层命名空间与聚合入口**，不是业务计算层。
 - 顶层负责"把子包暴露出来"，不负责"执行分析逻辑"。
-- 业务实现下沉到四个子包：
+- 业务实现下沉到子包：
   - `md_analysis.utils`：单帧底层工具
   - `md_analysis.water`：水分析多帧工作流
-  - `md_analysis.potential`：电势分析多帧工作流
-  - `md_analysis.charge`：电荷分析多帧工作流
+  - `md_analysis.electrochemical`：电化学分析分组包
+    - `md_analysis.electrochemical.potential`：电势分析多帧工作流
+    - `md_analysis.electrochemical.charge`：电荷分析多帧工作流
 - 顶层辅助模块：
   - `md_analysis.config`：持久化用户配置（`~/.config/md_analysis/config.json`）
   - `md_analysis.scripts`：自动化脚本工具（Bader 工作目录生成等）
@@ -25,7 +26,7 @@
 - 顶层导出按"稳定接口"管理：
   - 已进入 `src/md_analysis/__init__.py` 且在 `__all__` 中声明的符号，视为对外契约。
   - 未进入 `__all__` 的符号，不承诺稳定性。
-- 当前顶层暴露四个子包：`utils`、`water`、`potential`、`charge`。
+- 当前顶层暴露：`utils`、`water`、`electrochemical`、`potential`（从 `electrochemical` re-export）、`charge`（从 `electrochemical` re-export）。
 
 ## 3. `__init__.py` 实现准则
 
@@ -40,17 +41,17 @@
 
 ## 4. 依赖方向约束
 
-- 允许方向：`md_analysis` -> `md_analysis.utils` / `md_analysis.water` / `md_analysis.potential` / `md_analysis.charge`
+- 允许方向：`md_analysis` -> `md_analysis.utils` / `md_analysis.water` / `md_analysis.electrochemical`
 - 允许方向：`md_analysis.water` -> `md_analysis.utils`
-- 允许方向：`md_analysis.potential` -> `md_analysis.utils`
-- 允许方向：`md_analysis.charge` -> `md_analysis.utils`
+- 允许方向：`md_analysis.electrochemical.potential` -> `md_analysis.utils`
+- 允许方向：`md_analysis.electrochemical.charge` -> `md_analysis.utils`
 - 允许方向：`md_analysis.scripts` -> `md_analysis.config`（持久化配置读取）
 - 允许方向：`md_analysis.scripts` -> `md_analysis.scripts.utils`（IndexMapper）
 - 允许方向：`md_analysis.cli` -> `md_analysis.config`（设置菜单）
 - 允许方向：`md_analysis.cli` -> `md_analysis.scripts`（脚本/工具菜单）
 - 禁止反向依赖：子包不应依赖 `md_analysis` 顶层内部状态
 - 禁止跨层耦合：
-  - `md_analysis.water`、`md_analysis.potential`、`md_analysis.charge` 之间不互相依赖
+  - `md_analysis.water`、`md_analysis.electrochemical.potential`、`md_analysis.electrochemical.charge` 之间不互相依赖
   - 顶层不得感知具体实现文件（如 `WaterParser.py`）
 
 ## 5. 导出变更规则

@@ -70,29 +70,35 @@
   - 导出吸附层 profile（密度/取向/掩码）与区间文本
   - 二次遍历轨迹统计吸附层内的 $\theta$ 分布并导出 CSV
 
-### 3) `md_analysis.charge`（多帧/电荷分析工作流）
+### 3) `md_analysis.electrochemical`（电化学分析分组包）
+
+分组命名空间，包含 `potential` 和 `charge` 两个子包。自身不含业务逻辑，仅做 re-export。
+
+顶层 `md_analysis` 通过 `from .electrochemical import potential, charge` 提供向后兼容的便捷访问。
+
+### 3a) `md_analysis.electrochemical.charge`（多帧/电荷分析工作流）
 
 输入：根目录下 `bader_t*_i*` 子目录，每帧各含 POSCAR + ACF.dat + POTCAR
 
-- `charge/config.py`：单位换算常量（`E_PER_A2_TO_UC_PER_CM2`）、默认文件名
-- `charge/BaderAnalysis.py`
+- `electrochemical/charge/config.py`：单位换算常量（`E_PER_A2_TO_UC_PER_CM2`）、默认文件名
+- `electrochemical/charge/BaderAnalysis.py`
   - `compute_frame_surface_charge(method=...)`：单帧表面电荷密度（`method="counterion"` 或 `"layer"`；结果存入 `atoms.info`）
   - `frame_indexed_atom_charges()`：单帧指定原子索引提取净电荷 → `(N, 2)` ndarray
   - `trajectory_indexed_atom_charges()`：按帧指定原子索引提取净电荷 → `(t, N, 2)` ndarray（内部调用 `frame_indexed_atom_charges`）
   - `trajectory_surface_charge(method=...)`：多帧表面电荷密度时序 → `(t, 2)` ndarray
   - `surface_charge_analysis(method=...)`：端到端表面电荷密度分析（CSV + PNG 输出，含累积平均）
 
-### 4) `md_analysis.potential`（多帧/电势分析工作流）
+### 3b) `md_analysis.electrochemical.potential`（多帧/电势分析工作流）
 
 输入：cube 文件 glob pattern + CP2K `md.out` + 可选 xyz 轨迹
 
-- `potential/config.py`：电势分析输出文件名常量
-- `potential/CenterPotential.py`
+- `electrochemical/potential/config.py`：电势分析输出文件名常量
+- `electrochemical/potential/CenterPotential.py`
   - `center_slab_potential_analysis()`：逐帧 slab-averaged Hartree potential
   - `fermi_energy_analysis()`：从 md.out 提取 Fermi 能级时间序列
   - `electrode_potential_analysis()`：完整 U vs SHE 流程（调用以上二者并合并）
   - `thickness_sensitivity_analysis()`：扫描 slab 厚度，双轴图（U vs SHE + spatial std φ(z)）
-- `potential/PhiZProfile.py`
+- `electrochemical/potential/PhiZProfile.py`
   - `phi_z_planeavg_analysis()`：所有帧的 φ(z) overlay 可视化
 
 ### 5) `md_analysis.exceptions`（异常基类）
@@ -113,11 +119,14 @@
 - `cli/`：VASPKIT 风格交互式 CLI 包，注册为 `md-analysis` console script
   - `__init__.py`：`main()` 入口 + banner + 顶层菜单分发
   - `_prompt.py`：可复用的输入提示辅助函数（含 `_get_effective_default` 用于读取用户配置或硬编码默认值）
-  - `_water.py`：水分析子菜单（101-105）+ 参数采集 + 处理函数
-  - `_potential.py`：电势分析子菜单（211-216）+ 参数采集 + 处理函数
-  - `_charge.py`：电荷分析子菜单（221-223）+ 参数采集 + 处理函数
-  - `_scripts.py`：脚本/工具子菜单（401）+ Bader 工作目录生成
-  - `_settings.py`：设置子菜单（901-907）+ 持久化配置管理（903-906: 分析参数默认值，907: 重置所有默认值）
+  - `_framework.py`：核心框架（`MenuNode`、`MenuGroup`、`MenuCommand`、`lazy_import()`）
+  - `_params.py`：参数采集层次（`K` 键常量、`ParamCollector` ABC、泛型参数类）
+  - `_water.py`：水分析命令类（101-105）：`WaterDensityCmd`、`WaterOrientationCmd`、`AdWaterOrientationCmd`、`AdWaterThetaCmd`、`WaterThreePanelCmd`
+  - `_potential.py`：电势分析命令类（211-216）：`CenterPotentialCmd`、`FermiEnergyCmd`、`ElectrodePotentialCmd`、`PhiZProfileCmd`、`ThicknessSensitivityCmd`、`FullPotentialCmd`
+  - `_charge.py`：电荷分析命令类（221-223）：`SurfaceChargeCmd`（通过 `method` 参数区分）、`_print_ensemble_summary()`
+  - `_enhanced_sampling.py`：增强抽样命令类（301-302）：`SGQuickPlotCmd`、`SGPublicationPlotCmd`
+  - `_scripts.py`：脚本/工具命令类（401-402）：`BaderSingleCmd`、`BaderBatchCmd`
+  - `_settings.py`：设置命令类（901-907）：`SetVaspScriptCmd`、`ShowConfigCmd`、`SetAnalysisDefaultCmd`、`ResetDefaultsCmd`
 
 ### 8) `md_analysis.enhanced_sampling`（增强抽样分析工作流）
 

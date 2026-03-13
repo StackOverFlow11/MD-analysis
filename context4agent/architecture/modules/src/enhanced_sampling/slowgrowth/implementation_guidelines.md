@@ -28,12 +28,12 @@ $$
 
 `slowgrowth_analysis` 中：
 - `initial_step <= final_step`（或 `final_step=None`）：正向切片 `[initial, final)`
-- `initial_step > final_step`：先取 `[final, initial)` 切片，再调用 `.reversed()` 反转（交换初末态、翻转数组、取负自由能并重新归零）
+- `initial_step > final_step`：先取 `[final, initial)` 切片，再调用 `.reversed()` 反转（交换初末态、翻转数组、自由能翻转并重新归零）
 
 ## 反转逻辑（`Slowgrowth.reversed()`）
 
 - `target_au`、`lagrange_shake`：翻转顺序
-- `free_energy_au`：取负 → 翻转 → 减去新起点值（重新归零）
+- `free_energy_au`：翻转 → 减去新起点值（重新归零）。归零操作自然产生符号反转：`ΔA(B→A) = -ΔA(A→B)`
 - `target_growth_au`：取负
 - `steps`：重置为 `[0, 1, ..., n-1]`
 - `times_fs`：重置为 `[0, dt, 2dt, ...]`

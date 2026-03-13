@@ -8,7 +8,7 @@
 
 - `md_analysis` 是顶层命名空间入口，只负责暴露子包。
 - `md_analysis` 不直接暴露业务算法函数、数据结构或配置常量。
-- 业务能力通过 `md_analysis.utils`、`md_analysis.water`、`md_analysis.potential`、`md_analysis.charge` 向下访问。
+- 业务能力通过 `md_analysis.utils`、`md_analysis.water`、`md_analysis.electrochemical`（含 `potential`、`charge` 子包）向下访问。顶层通过 `from .electrochemical import potential, charge` 提供向后兼容的便捷访问。
 - CLI 入口通过 `md_analysis.cli:main` 注册为 `md-analysis` console script（VASPKIT 风格交互式菜单）。
 - 编程入口通过 `md_analysis.main` 提供 `run_water_analysis`、`run_potential_analysis`、`run_all`。
 - 目录治理硬约束见：`context4agent/architecture/modules/README.md`（镜像对齐 + 双文档）。
@@ -19,15 +19,16 @@
 
 - `utils`
 - `water`
-- `potential`
-- `charge`
+- `electrochemical`（分组包，含 `potential` 和 `charge` 子包）
+- `potential`（从 `electrochemical` re-export，向后兼容）
+- `charge`（从 `electrochemical` re-export，向后兼容）
 - `__version__`（`str`，当前 `"0.1.0"`）
 - `MDAnalysisError`（`Exception` 子类，所有领域异常的基类，来自 `md_analysis.exceptions`）
 
 与代码一致性基线：
 
 - `src/md_analysis/__init__.py` 中已导入并写入 `__all__` 的符号，视为顶层稳定接口。
-- 当前 `__all__ = ["utils", "water", "potential", "charge", "__version__", "MDAnalysisError"]`。
+- 当前 `__all__ = ["utils", "water", "electrochemical", "potential", "charge", "__version__", "MDAnalysisError"]`。
 
 ### 2.2 非公开符号（Non-public）
 
@@ -39,6 +40,7 @@
 - `import md_analysis`
 - `from md_analysis import utils`
 - `from md_analysis import water`
+- `from md_analysis import electrochemical`
 - `from md_analysis import potential`
 - `from md_analysis import charge`
 
@@ -52,8 +54,9 @@
 
 - `md_analysis.utils`：**稳定（Stable）**
 - `md_analysis.water`：**稳定（Stable）**
-- `md_analysis.potential`：**稳定（Stable）**
-- `md_analysis.charge`：**稳定（Stable）**
+- `md_analysis.electrochemical`：**稳定（Stable）**
+- `md_analysis.electrochemical.potential`：**稳定（Stable）**
+- `md_analysis.electrochemical.charge`：**稳定（Stable）**
 
 ### 4.2 兼容承诺
 

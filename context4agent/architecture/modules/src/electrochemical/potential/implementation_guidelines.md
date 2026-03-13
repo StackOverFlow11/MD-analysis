@@ -66,3 +66,13 @@ Sweeps slab-averaging thickness to evaluate sensitivity of U vs SHE:
 3. **Output**: CSV (`thickness_ang, mean_U_vs_SHE_V, mean_phi_z_spatial_std_eV, n_frames`) + dual-axis PNG
 
 Right axis = ensemble-averaged spatial std of φ(z) within the slab window (measures Hartree potential flatness in the averaging region).
+
+## PhiZProfile slab centering
+
+`phi_z_planeavg_analysis` 使用**单次移位**策略对 slab 进行居中：
+
+- `shift_n: int | None = None`，在帧循环前初始化
+- 仅在**第一帧**通过 `_slab_center_roll()` 检测 slab 中心并计算 roll 偏移量
+- 后续所有帧复用同一 `shift_n` 值
+- 目的：避免 MD 原子热涨落导致逐帧偏移量不同，从而造成 min/max envelope 在 overlay 图中错位
+- 若未检测到金属元素，`shift_n = 0`（不做 roll）

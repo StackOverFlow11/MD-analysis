@@ -31,7 +31,7 @@ Only non-water, non-metal species (counterions, adsorbates) with non-zero net ch
 2. `detect_water_molecule_indices(atoms)` → water atom set
 3. Exclude = water ∪ metal → remaining charged atoms only
 4. MIC-based directional assignment to nearest surface within half-gap
-5. σ = Σq_assigned / area
+5. σ = -Σq_assigned / area（表面电荷 = 反离子电荷的负值，电荷中性原理）
 
 ### `method="layer"` (`_compute_surface_charge_layer`)
 
