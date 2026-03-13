@@ -153,6 +153,8 @@ def phi_z_planeavg_analysis(
         from tqdm import tqdm
         cube_iter = tqdm(cube_paths, desc="φ(z) plane-avg", unit="cube", ascii=" =")
 
+    shift_n: int | None = None          # computed once from the first frame
+
     for cp in cube_iter:
         header, values = read_cube_header_and_values(cp)
         z = z_coords_ang(header)
@@ -165,16 +167,21 @@ def phi_z_planeavg_analysis(
                 phi_z_ev = np.interp(z_ang_ref, z, phi_z_ev)
 
         # --- slab centering: roll φ(z) so slab midpoint → cell_c/2 ---
-        atoms = _read_cube_atoms(cp, header)
-        if metal_symbols is None:
-            metal_symbols = set(atoms.get_chemical_symbols()) & set(TRANSITION_METAL_SYMBOLS)
+        # Use the first frame's shift for all frames to keep profiles aligned.
+        if shift_n is None:
+            atoms = _read_cube_atoms(cp, header)
+            if metal_symbols is None:
+                metal_symbols = set(atoms.get_chemical_symbols()) & set(TRANSITION_METAL_SYMBOLS)
+                if metal_symbols:
+                    logger.info("Auto-detected metal elements: %s", metal_symbols)
             if metal_symbols:
-                logger.info("Auto-detected metal elements: %s", metal_symbols)
-        if metal_symbols:
-            shift_n = _slab_center_roll(
-                atoms, header.nz,
-                metal_symbols=metal_symbols, layer_tol_A=layer_tol_ang,
-            )
+                shift_n = _slab_center_roll(
+                    atoms, header.nz,
+                    metal_symbols=metal_symbols, layer_tol_A=layer_tol_ang,
+                )
+            else:
+                shift_n = 0
+        if shift_n:
             phi_z_ev = np.roll(phi_z_ev, shift_n)
 
         s = extract_step_from_cube_filename(cp)
