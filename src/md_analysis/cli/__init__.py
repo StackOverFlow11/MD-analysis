@@ -27,6 +27,7 @@ from ._scripts import BaderBatchCmd, BaderSingleCmd, TIBatchCmd, TISingleCmd
 from ._settings import (
     ResetDefaultsCmd,
     SetAnalysisDefaultCmd,
+    SetCp2kScriptCmd,
     SetVaspScriptCmd,
     ShowConfigCmd,
 )
@@ -109,6 +110,7 @@ def build_menu_tree() -> MenuGroup:
     settings = MenuGroup("9", "Settings")
     settings.add(
         SetVaspScriptCmd("901", "Set VASP Submission Script Path"),
+        SetCp2kScriptCmd("908", "Set CP2K Submission Script Path"),
         ShowConfigCmd("902", "Show Current Configuration"),
         "Analysis Defaults",
         SetAnalysisDefaultCmd("903", "Layer Clustering Tolerance (A)",

@@ -10,6 +10,7 @@ CONFIG_DIR = Path.home() / ".config" / "md_analysis"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 
 KEY_VASP_SCRIPT_PATH = "vasp_script_path"
+KEY_CP2K_SCRIPT_PATH = "cp2k_script_path"
 
 # Keys for configurable analysis defaults (persisted in user config)
 KEY_LAYER_TOL_A = "layer_tol_A"

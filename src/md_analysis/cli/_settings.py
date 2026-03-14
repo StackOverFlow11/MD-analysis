@@ -30,6 +30,28 @@ class SetVaspScriptCmd(MenuCommand):
         print(f"  Saved: {KEY_VASP_SCRIPT_PATH} = {p}")
 
 
+class SetCp2kScriptCmd(MenuCommand):
+    def execute(self, ctx: dict) -> None:
+        from ..config import KEY_CP2K_SCRIPT_PATH, get_config, set_config
+
+        current = get_config(KEY_CP2K_SCRIPT_PATH)
+        if current:
+            print(f"  Current: {current}")
+
+        raw = prompt_str("CP2K submission script path", default=current)
+        if raw is None:
+            print("  No path provided, skipping.")
+            return
+
+        p = Path(raw).expanduser().resolve()
+        if not p.is_file():
+            print(f"  Warning: file does not exist: {p}")
+            return
+
+        set_config(KEY_CP2K_SCRIPT_PATH, str(p))
+        print(f"  Saved: {KEY_CP2K_SCRIPT_PATH} = {p}")
+
+
 class ShowConfigCmd(MenuCommand):
     def execute(self, ctx: dict) -> None:
         from ..config import CONFIGURABLE_DEFAULTS, get_config, load_config

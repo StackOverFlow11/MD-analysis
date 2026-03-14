@@ -62,6 +62,14 @@ def _resolve_script_path() -> str | None:
     return prompt_str("Submission script path", default=default_script)
 
 
+def _resolve_cp2k_script_path() -> str | None:
+    """Prompt for CP2K submission script path with config default."""
+    from ..config import KEY_CP2K_SCRIPT_PATH, get_config
+
+    default_script = get_config(KEY_CP2K_SCRIPT_PATH)
+    return prompt_str("Submission script path", default=default_script)
+
+
 class BaderSingleCmd(MenuCommand):
     output_subdir = ""
 
@@ -203,6 +211,7 @@ class TISingleCmd(MenuCommand):
         ctx[K.WORKDIR_NAME] = prompt_str(
             "Work directory name (empty=auto)", default=None,
         )
+        ctx[K.SCRIPT_PATH] = _resolve_cp2k_script_path()
         return ctx
 
     def execute(self, ctx: dict) -> None:
@@ -216,6 +225,7 @@ class TISingleCmd(MenuCommand):
             steps=ctx[K.STEPS],
             colvar_id=ctx[K.COLVAR_ID],
             workdir_name=ctx[K.WORKDIR_NAME],
+            script_path=ctx[K.SCRIPT_PATH],
         )
         print(f"\n TI work directory created: {workdir}")
         contents = sorted(p.name for p in workdir.iterdir())
@@ -271,6 +281,7 @@ class TIBatchCmd(MenuCommand):
         ctx[K.STEPS] = prompt_int("MD steps for constrained-MD", default=10000) or 10000
         ctx[K.COLVAR_ID] = prompt_int("Colvar ID (empty=primary)", default=None)
         ctx[K.OUTDIR] = prompt_str("Output directory", default=".") or "."
+        ctx[K.SCRIPT_PATH] = _resolve_cp2k_script_path()
         return ctx
 
     def execute(self, ctx: dict) -> None:
@@ -286,6 +297,7 @@ class TIBatchCmd(MenuCommand):
             n_points=ctx[K.N_POINTS],
             steps=ctx[K.STEPS],
             colvar_id=ctx[K.COLVAR_ID],
+            script_path=ctx[K.SCRIPT_PATH],
             verbose=True,
         )
         print(f"\n Created {len(dirs)} TI work directories:")

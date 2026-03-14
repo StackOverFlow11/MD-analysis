@@ -1,4 +1,16 @@
-# Enhanced Sampling — 开发备忘
+# enhanced_sampling — 开发备忘
+
+## 定位
+
+增强采样工作流包。当前包含 slowgrowth 子包。不从 `md_analysis.__init__` re-export — 需直接 `from md_analysis.enhanced_sampling.slowgrowth import ...`。
+
+TIGen 工作目录生成在 `scripts/TIGen.py`（不在此包中）。
+
+## 子目录
+
+| 目录 | 用途 |
+|---|---|
+| `slowgrowth/` | SG 数据结构、积分、绘图 → `slowgrowth/CLAUDE.md` |
 
 ## 慢增长 (SG) → 热力学积分 (TI) 工作流
 

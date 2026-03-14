@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import logging
 import re
+import shutil
 from pathlib import Path
 
 import numpy as np
 from ase import Atoms
 from ase.io import iread, write
 
+from ..config import KEY_CP2K_SCRIPT_PATH, get_config
 from ..exceptions import MDAnalysisError
 from ..utils.config import AU_TIME_TO_FS
 from ..utils.RestartParser.ColvarParser import (
@@ -228,6 +230,7 @@ def generate_ti_workdir(
     steps: int = 10000,
     colvar_id: int | None = None,
     workdir_name: str | None = None,
+    script_path: str | Path | None = None,
     _preloaded: list[tuple[int, float, Atoms]] | None = None,
     _restart: ColvarRestart | None = None,
     _inp_text: str | None = None,
@@ -255,6 +258,9 @@ def generate_ti_workdir(
     workdir_name : str or None
         Name of the work directory.  Auto-generated from the snapped CV
         value if ``None``.
+    script_path : str, Path or None
+        Path to a job submission script to copy as ``script.sh``.
+        If ``None``, falls back to the persisted config value.
 
     Returns
     -------
@@ -284,6 +290,20 @@ def generate_ti_workdir(
     # Write init.xyz
     write(str(workdir / "init.xyz"), atoms, format="xyz")
 
+    # Submission script
+    if script_path is None:
+        cfg_val = get_config(KEY_CP2K_SCRIPT_PATH)
+        if cfg_val is not None:
+            script_path = cfg_val
+
+    if script_path is not None:
+        script_path = Path(script_path)
+        if not script_path.is_file():
+            raise FileNotFoundError(
+                f"Submission script not found: {script_path}"
+            )
+        shutil.copy2(script_path, workdir / "script.sh")
+
     return workdir
 
 
@@ -299,6 +319,7 @@ def batch_generate_ti_workdirs(
     n_points: int | None = None,
     steps: int = 10000,
     colvar_id: int | None = None,
+    script_path: str | Path | None = None,
     verbose: bool = False,
 ) -> list[Path]:
     """Batch-generate TI constrained-MD work directories.
@@ -327,6 +348,8 @@ def batch_generate_ti_workdirs(
         Number of MD steps per TI point (default 10000).
     colvar_id : int or None
         Constraint colvar_id (default: primary).
+    script_path : str, Path or None
+        Submission script to copy (falls back to config).
     verbose : bool
         If True, show a tqdm progress bar.
 
@@ -385,6 +408,7 @@ def batch_generate_ti_workdirs(
             inp_path, xyz_path, restart_path, tgt, output_dir,
             steps=steps,
             colvar_id=colvar_id,
+            script_path=script_path,
             _preloaded=frames,
             _restart=restart,
             _inp_text=inp_text,
