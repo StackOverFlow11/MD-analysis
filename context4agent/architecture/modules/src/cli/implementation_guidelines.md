@@ -45,14 +45,14 @@ Interactive CLI package providing a VASPKIT-style numbered menu interface. Repla
 | `_potential.py` | `CenterPotentialCmd`, `FermiEnergyCmd`, `ElectrodePotentialCmd`, `PhiZProfileCmd`, `ThicknessSensitivityCmd`, `FullPotentialCmd` | 211-216 |
 | `_charge.py` | `SurfaceChargeCmd`（通过 `method` 参数区分 counterion/layer/prompted） | 221-223 |
 | `_enhanced_sampling.py` | `SGQuickPlotCmd`, `SGPublicationPlotCmd`（共享基类 `_SlowgrowthPlotCmd`） | 301-302 |
-| `_scripts.py` | `BaderSingleCmd`, `BaderBatchCmd` | 401-402 |
+| `_scripts.py` | `BaderSingleCmd`, `BaderBatchCmd`, `TISingleCmd`, `TIBatchCmd` | 411-412 (sub-group 41), 421-422 (sub-group 42) |
 | `_settings.py` | `SetVaspScriptCmd`, `ShowConfigCmd`, `SetAnalysisDefaultCmd`（通过 `config_key` 参数复用）, `ResetDefaultsCmd` | 901-907 |
 
 `_charge.py` 中 `_print_ensemble_summary()` 作为独立辅助函数保留，在 `SurfaceChargeCmd.execute()` 结束时调用。
 
 ## Cell parameter acquisition
 
-All sub-menus requiring cell parameters (water 101-105, scripts 401-402) use the shared `_prompt_cell_abc()` helper from `_prompt.py`:
+All sub-menus requiring cell parameters (water 101-105, scripts 411-412) use the shared `_prompt_cell_abc()` helper from `_prompt.py`:
 
 1. Prompt cell source: `.restart` (default) or `md.inp`
 2. Parse the chosen file (`parse_abc_from_restart` or `parse_abc_from_md_inp`)

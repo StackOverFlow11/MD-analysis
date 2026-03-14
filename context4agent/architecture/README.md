@@ -125,7 +125,7 @@
   - `_potential.py`：电势分析命令类（211-216）：`CenterPotentialCmd`、`FermiEnergyCmd`、`ElectrodePotentialCmd`、`PhiZProfileCmd`、`ThicknessSensitivityCmd`、`FullPotentialCmd`
   - `_charge.py`：电荷分析命令类（221-223）：`SurfaceChargeCmd`（通过 `method` 参数区分）、`_print_ensemble_summary()`
   - `_enhanced_sampling.py`：增强抽样命令类（301-302）：`SGQuickPlotCmd`、`SGPublicationPlotCmd`
-  - `_scripts.py`：脚本/工具命令类（401-402）：`BaderSingleCmd`、`BaderBatchCmd`
+  - `_scripts.py`：脚本/工具命令类（41=Bader 411-412，42=TI 421-422）：`BaderSingleCmd`、`BaderBatchCmd`、`TISingleCmd`、`TIBatchCmd`
   - `_settings.py`：设置命令类（901-907）：`SetVaspScriptCmd`、`ShowConfigCmd`、`SetAnalysisDefaultCmd`、`ResetDefaultsCmd`
 
 ### 8) `md_analysis.enhanced_sampling`（增强抽样分析工作流）

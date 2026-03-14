@@ -23,7 +23,7 @@ from ._potential import (
     PhiZProfileCmd,
     ThicknessSensitivityCmd,
 )
-from ._scripts import BaderBatchCmd, BaderSingleCmd
+from ._scripts import BaderBatchCmd, BaderSingleCmd, TIBatchCmd, TISingleCmd
 from ._settings import (
     ResetDefaultsCmd,
     SetAnalysisDefaultCmd,
@@ -90,10 +90,20 @@ def build_menu_tree() -> MenuGroup:
 
     # --- Scripts ---
     scripts = MenuGroup("4", "Scripts / Tools")
-    scripts.add(
-        BaderSingleCmd("401", "Generate Bader Work Directory (single frame)"),
-        BaderBatchCmd("402", "Batch Generate Bader Work Directories"),
+
+    bader = MenuGroup("41", "Bader Charge Preparation")
+    bader.add(
+        BaderSingleCmd("411", "Generate Bader Work Directory (single frame)"),
+        BaderBatchCmd("412", "Batch Generate Bader Work Directories"),
     )
+
+    ti = MenuGroup("42", "Thermodynamic Integration Preparation")
+    ti.add(
+        TISingleCmd("421", "Generate TI Work Directory (single target)"),
+        TIBatchCmd("422", "Batch Generate TI Work Directories"),
+    )
+
+    scripts.add(bader, ti)
 
     # --- Settings ---
     settings = MenuGroup("9", "Settings")

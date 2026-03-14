@@ -35,7 +35,7 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 | `_potential.py` | Potential sub-menu (211-216) | `CenterPotentialCmd`, `FermiEnergyCmd`, `ElectrodePotentialCmd`, `PhiZProfileCmd`, `ThicknessSensitivityCmd`, `FullPotentialCmd` |
 | `_charge.py` | Charge sub-menu (221-223) | `SurfaceChargeCmd` (method param dispatches counterion/layer/prompted), `_print_ensemble_summary()` |
 | `_enhanced_sampling.py` | Enhanced sampling sub-menu (301-302) | `SGQuickPlotCmd`, `SGPublicationPlotCmd`: slow-growth plot commands via `lazy_import` |
-| `_scripts.py` | Scripts/Tools sub-menu (401-402) | `BaderSingleCmd`, `BaderBatchCmd` |
+| `_scripts.py` | Scripts/Tools sub-menu; Bader 41 (411-412), TI 42 (421-422) | `BaderSingleCmd`, `BaderBatchCmd`, `TISingleCmd`, `TIBatchCmd` |
 | `_settings.py` | Settings sub-menu (901-907) | `SetVaspScriptCmd`, `ShowConfigCmd`, `SetAnalysisDefaultCmd` (config_key param), `ResetDefaultsCmd` |
 | `_framework.py` | Core framework | `MenuNode`, `MenuGroup`, `MenuCommand`, `lazy_import()` |
 | `_params.py` | Parameter collection hierarchy | `K` (key constants), `ParamCollector` ABC, generic param classes (`StrParam`, `FloatParam`, `IntParam`, `ChoiceParam`, etc.) |
@@ -45,7 +45,8 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 - 211: center slab potential, 212: Fermi energy, 213: electrode potential (U vs SHE), 214: phi(z) profile, 215: thickness sensitivity, 216: full potential
 - 221: surface charge (counterion), 222: surface charge (layer), 223: full charge (method prompted)
 - 301: slow-growth quick plot, 302: slow-growth publication plot
-- 401: generate Bader work directory (single frame), 402: batch generate Bader work directories
+- 411: generate Bader work directory (single frame), 412: batch generate Bader work directories
+- 421: generate TI work directory (single target), 422: batch generate TI work directories
 - 901: set VASP submission script path, 902: show current configuration
 - 903: set layer clustering tolerance, 904: set z-axis bin width, 905: set theta bin width, 906: set water O-H cutoff, 907: reset all analysis defaults
 
@@ -120,8 +121,9 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 
 | File | Key Exports | Purpose |
 |---|---|---|
-| `__init__.py` | Re-exports `BaderGenError`, `generate_bader_workdir`, `batch_generate_bader_workdirs` | Package interface |
+| `__init__.py` | Re-exports `BaderGenError`, `generate_bader_workdir`, `batch_generate_bader_workdirs`, `TIGenError`, `generate_ti_workdir`, `batch_generate_ti_workdirs` | Package interface |
 | `BaderGen.py` | `BaderGenError`, `DEFAULT_WORKDIR_NAME`, `generate_bader_workdir(atoms, output_dir, *, ...)` → `Path`, `batch_generate_bader_workdirs(xyz_path, cell_abc, output_dir, *, frame_start, frame_end, frame_step, ...)` → `list[Path]` | Generate VASP Bader work directories (single + batch) |
+| `TIGen.py` | `TIGenError`, `generate_ti_workdir(inp_path, xyz_path, restart_path, target_au, output_dir, *, steps, colvar_id, workdir_name)` → `Path`, `batch_generate_ti_workdirs(inp_path, xyz_path, restart_path, output_dir, *, targets_au, time_initial_fs, time_final_fs, n_points, steps, colvar_id)` → `list[Path]` | Generate CP2K constrained-MD work directories for TI (single + batch) |
 | `template/__init__.py` | (empty) | Package marker for `importlib.resources` |
 | `template/INCAR` | — | VASP INCAR template for Bader single-point |
 | `template/KPOINTS` | — | VASP KPOINTS template (Gamma-only) |
@@ -149,6 +151,7 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 | `test/unit/charge/test_charge_analysis.py` | All 5 charge public functions + internal `_extract_t_value`, `_sorted_frame_dirs` |
 | `test/unit/potential/test_single_frame_electrode.py` | Single-frame potential pipeline |
 | `test/unit/scripts/test_bader_gen.py` | `generate_bader_workdir` + `batch_generate_bader_workdirs`: directory structure, frame slicing, metadata |
+| `test/unit/scripts/test_ti_gen.py` | `generate_ti_workdir` + `batch_generate_ti_workdirs`: inp modification, frame snapping, numeric/time modes, directory structure |
 | `test/unit/scripts/utils/test_index_mapper.py` | `compute_index_map`, `encode/decode_comment_line`, `write/read_poscar_with_map`, `remap_array` |
 | `test/integration/test_main.py` | Programmatic entry points: `run_water_analysis`, `run_potential_analysis`, `run_charge_analysis` |
 | `test/integration/utils/test_water_layer_pipeline.py` | Water + layer detection combined pipeline |

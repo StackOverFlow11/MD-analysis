@@ -73,7 +73,71 @@ def batch_generate_bader_workdirs(
 
 **Sub-directory naming**: `bader_t{int(time_fs)}_i{step}` where `time` and `i` are read from XYZ comment line metadata (`atoms.info`).
 
+---
+
+## TI Work Directory Generation (TIGen.py)
+
+| Symbol                         | Module      | Description                                              |
+|--------------------------------|-------------|----------------------------------------------------------|
+| `TIGenError`                   | TIGen.py    | Exception for TI work directory generation failures      |
+| `generate_ti_workdir`          | TIGen.py    | Generate a CP2K constrained-MD work directory for one TI point |
+| `batch_generate_ti_workdirs`   | TIGen.py    | Batch-generate TI work directories (time or numeric mode) |
+
+### `generate_ti_workdir` Signature
+
+```python
+def generate_ti_workdir(
+    inp_path: str | Path,
+    xyz_path: str | Path,
+    restart_path: str | Path,
+    target_au: float,
+    output_dir: str | Path,
+    *,
+    steps: int = 10000,
+    colvar_id: int | None = None,
+    workdir_name: str | None = None,
+) -> Path:
+```
+
+**Returns** the created work directory path.
+
+### `batch_generate_ti_workdirs` Signature
+
+```python
+def batch_generate_ti_workdirs(
+    inp_path: str | Path,
+    xyz_path: str | Path,
+    restart_path: str | Path,
+    output_dir: str | Path,
+    *,
+    targets_au: list[float] | np.ndarray | None = None,
+    time_initial_fs: float | None = None,
+    time_final_fs: float | None = None,
+    n_points: int | None = None,
+    steps: int = 10000,
+    colvar_id: int | None = None,
+    verbose: bool = False,
+) -> list[Path]:
+```
+
+**Two mutually exclusive modes:**
+- **Numeric mode**: pass `targets_au` (CV values in a.u.)
+- **Time mode**: pass `time_initial_fs`, `time_final_fs`, `n_points`
+
+### Generated Directory Contents
+
+| File        | Source                          |
+|-------------|---------------------------------|
+| `cMD.inp`   | Modified SG inp file (PROJECT=cMD, TARGET=snapped a.u., TARGET_GROWTH=0, STEPS=user) |
+| `init.xyz`  | Extracted frame from SG trajectory (nearest to target CV) |
+
+### Directory Naming
+
+`ti_target_{cv_au:.6f}` (auto-generated) or user-specified `workdir_name`.
+
+---
+
 ## Stability
 
-- **Stable** — single-frame and batch APIs.
+- **Stable** — single-frame and batch APIs (Bader + TI).
 - Not re-exported from `md_analysis` top-level `__init__.py`.

@@ -45,6 +45,14 @@ class K:
     INITIAL_STEP = "initial_step"
     FINAL_STEP = "final_step"
     COLVAR_ID = "colvar_id"
+    # TI-specific
+    INP_PATH = "inp_path"
+    TARGET_AU = "target_au"
+    TARGETS_AU = "targets_au"
+    TIME_INITIAL_FS = "time_initial_fs"
+    TIME_FINAL_FS = "time_final_fs"
+    N_POINTS = "n_points"
+    STEPS = "steps"
 
 
 # ---------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-"""Scripts / Tools command classes (401-402)."""
+"""Scripts / Tools command classes (Bader 411-412, TI 421-422)."""
 
 from __future__ import annotations
 
@@ -6,7 +6,14 @@ from pathlib import Path
 
 from ._framework import MenuCommand, lazy_import
 from ._params import K, cell_abc
-from ._prompt import prompt_bool, prompt_int, prompt_str, prompt_str_required
+from ._prompt import (
+    prompt_bool,
+    prompt_choice,
+    prompt_float,
+    prompt_int,
+    prompt_str,
+    prompt_str_required,
+)
 
 
 def _print_trajectory_info(xyz_path: str) -> None:
@@ -136,5 +143,151 @@ class BaderBatchCmd(MenuCommand):
             verbose=True,
         )
         print(f"\n Created {len(dirs)} Bader work directories:")
+        for d in dirs:
+            print(f"  {d}")
+
+
+# ---------------------------------------------------------------------------
+# TI commands (42x)
+# ---------------------------------------------------------------------------
+
+def _print_sg_cv_info(restart_path: str, xyz_path: str) -> None:
+    """Display SG trajectory CV range and frame info for TI target selection."""
+    parse_colvar_restart = lazy_import(
+        "md_analysis.utils.RestartParser.ColvarParser", "parse_colvar_restart",
+    )
+    try:
+        restart = parse_colvar_restart(restart_path)
+    except Exception as exc:
+        print(f"  (Could not parse restart: {exc})")
+        return
+
+    cv = restart.colvars.primary
+    au_time_to_fs = lazy_import("md_analysis.utils.config", "AU_TIME_TO_FS")
+    dt_au = restart.timestep_fs / au_time_to_fs
+    growth_per_step = cv.target_growth_au * dt_au
+
+    print(f"\n  SG info:")
+    print(f"    Timestep:     {restart.timestep_fs} fs")
+    print(f"    CV target:    {cv.target_au:.6f} a.u. (at step {restart.step_start})")
+    print(f"    CV growth:    {growth_per_step:.6e} a.u./step")
+    print(f"    Cell:         {restart.cell_abc_ang[0]:.4f} x "
+          f"{restart.cell_abc_ang[1]:.4f} x {restart.cell_abc_ang[2]:.4f} A")
+    print()
+
+
+class TISingleCmd(MenuCommand):
+    """Generate one TI constrained-MD work directory."""
+
+    output_subdir = ""
+
+    def _collect_all_params(self) -> dict:
+        print()
+        ctx: dict = {}
+        ctx[K.RESTART_PATH] = prompt_str_required(
+            "SG restart file (e.g. slowgrowth-1.restart)"
+        )
+        ctx[K.INP_PATH] = prompt_str_required(
+            "SG input file (e.g. sg.inp)"
+        )
+        ctx[K.XYZ] = prompt_str_required(
+            "SG trajectory file (e.g. slowgrowth-pos-1.xyz)"
+        )
+        _print_trajectory_info(ctx[K.XYZ])
+        _print_sg_cv_info(ctx[K.RESTART_PATH], ctx[K.XYZ])
+
+        ctx[K.TARGET_AU] = prompt_float("Target CV value (a.u.)", default=0.0)
+        ctx[K.STEPS] = prompt_int("MD steps for constrained-MD", default=10000) or 10000
+        ctx[K.COLVAR_ID] = prompt_int("Colvar ID (empty=primary)", default=None)
+        ctx[K.OUTDIR] = prompt_str("Output directory", default=".") or "."
+        ctx[K.WORKDIR_NAME] = prompt_str(
+            "Work directory name (empty=auto)", default=None,
+        )
+        return ctx
+
+    def execute(self, ctx: dict) -> None:
+        generate = lazy_import("md_analysis.scripts", "generate_ti_workdir")
+        workdir = generate(
+            ctx[K.INP_PATH],
+            ctx[K.XYZ],
+            ctx[K.RESTART_PATH],
+            ctx[K.TARGET_AU],
+            ctx[K.OUTDIR],
+            steps=ctx[K.STEPS],
+            colvar_id=ctx[K.COLVAR_ID],
+            workdir_name=ctx[K.WORKDIR_NAME],
+        )
+        print(f"\n TI work directory created: {workdir}")
+        contents = sorted(p.name for p in workdir.iterdir())
+        print(f"  Contents: {', '.join(contents)}")
+
+
+class TIBatchCmd(MenuCommand):
+    """Batch-generate TI constrained-MD work directories."""
+
+    output_subdir = ""
+
+    def _collect_all_params(self) -> dict:
+        print()
+        ctx: dict = {}
+        ctx[K.RESTART_PATH] = prompt_str_required(
+            "SG restart file (e.g. slowgrowth-1.restart)"
+        )
+        ctx[K.INP_PATH] = prompt_str_required(
+            "SG input file (e.g. sg.inp)"
+        )
+        ctx[K.XYZ] = prompt_str_required(
+            "SG trajectory file (e.g. slowgrowth-pos-1.xyz)"
+        )
+        _print_trajectory_info(ctx[K.XYZ])
+        _print_sg_cv_info(ctx[K.RESTART_PATH], ctx[K.XYZ])
+
+        mode = prompt_choice(
+            "Target specification mode",
+            ["time", "values"],
+            default="time",
+        )
+
+        if mode == "time":
+            ctx[K.TIME_INITIAL_FS] = prompt_float(
+                "Initial time (fs)", default=0.0,
+            )
+            ctx[K.TIME_FINAL_FS] = prompt_float(
+                "Final time (fs)", default=0.0,
+            )
+            ctx[K.N_POINTS] = prompt_int(
+                "Number of TI points", default=10,
+            ) or 10
+            ctx[K.TARGETS_AU] = None
+        else:
+            raw = prompt_str_required(
+                "Target CV values in a.u. (space-separated)"
+            )
+            ctx[K.TARGETS_AU] = [float(x) for x in raw.split()]
+            ctx[K.TIME_INITIAL_FS] = None
+            ctx[K.TIME_FINAL_FS] = None
+            ctx[K.N_POINTS] = None
+
+        ctx[K.STEPS] = prompt_int("MD steps for constrained-MD", default=10000) or 10000
+        ctx[K.COLVAR_ID] = prompt_int("Colvar ID (empty=primary)", default=None)
+        ctx[K.OUTDIR] = prompt_str("Output directory", default=".") or "."
+        return ctx
+
+    def execute(self, ctx: dict) -> None:
+        batch = lazy_import("md_analysis.scripts", "batch_generate_ti_workdirs")
+        dirs = batch(
+            ctx[K.INP_PATH],
+            ctx[K.XYZ],
+            ctx[K.RESTART_PATH],
+            ctx[K.OUTDIR],
+            targets_au=ctx[K.TARGETS_AU],
+            time_initial_fs=ctx[K.TIME_INITIAL_FS],
+            time_final_fs=ctx[K.TIME_FINAL_FS],
+            n_points=ctx[K.N_POINTS],
+            steps=ctx[K.STEPS],
+            colvar_id=ctx[K.COLVAR_ID],
+            verbose=True,
+        )
+        print(f"\n Created {len(dirs)} TI work directories:")
         for d in dirs:
             print(f"  {d}")
