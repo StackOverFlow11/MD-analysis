@@ -1,4 +1,4 @@
-"""Charge analysis command classes (221-223)."""
+"""Charge analysis command classes (221-225)."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from ._framework import MenuCommand, lazy_import
 from ._params import (
     K,
     FixedParam,
+    atom_indices_xyz,
     charge_method,
     dir_pattern,
     frame_slice,
@@ -75,3 +76,53 @@ class SurfaceChargeCmd(MenuCommand):
             print(f"   {name}: {path}")
 
         _print_ensemble_summary(results["charge_csv"])
+
+
+class TrackedChargeCmd(MenuCommand):
+    """Track Bader net charges for specified XYZ atoms."""
+
+    params = (atom_indices_xyz,)
+    advanced_params = (root_dir, dir_pattern, outdir, frame_slice)
+    output_subdir = ""
+
+    def execute(self, ctx: dict) -> None:
+        analyze = lazy_import("md_analysis.main", "run_tracked_charge_analysis")
+        results = analyze(
+            output_dir=Path(ctx[K.OUTDIR]),
+            root_dir=ctx[K.ROOT_DIR],
+            atom_indices_xyz=ctx[K.ATOM_INDICES_XYZ],
+            dir_pattern=ctx[K.DIR_PATTERN],
+            frame_start=ctx[K.FRAME_START],
+            frame_end=ctx[K.FRAME_END],
+            frame_step=ctx[K.FRAME_STEP],
+            verbose=True,
+        )
+        print("\n Analysis complete. Outputs:")
+        for name, path in results.items():
+            print(f"   {name}: {path}")
+
+
+class CounterionChargeCmd(MenuCommand):
+    """Detect counterions per-frame and track their Bader charges."""
+
+    advanced_params = (root_dir, dir_pattern, normal_axis, metal_elements,
+                       layer_tol, outdir, frame_slice)
+    output_subdir = ""
+
+    def execute(self, ctx: dict) -> None:
+        analyze = lazy_import("md_analysis.main", "run_counterion_charge_analysis")
+        results = analyze(
+            output_dir=Path(ctx[K.OUTDIR]),
+            root_dir=ctx[K.ROOT_DIR],
+            metal_symbols=ctx[K.METAL_ELEMENTS],
+            normal=ctx[K.NORMAL],
+            layer_tol_A=ctx[K.LAYER_TOL],
+            dir_pattern=ctx[K.DIR_PATTERN],
+            frame_start=ctx[K.FRAME_START],
+            frame_end=ctx[K.FRAME_END],
+            frame_step=ctx[K.FRAME_STEP],
+            verbose=True,
+        )
+        print("\n Analysis complete. Outputs:")
+        for name, path in results.items():
+            print(f"   {name}: {path}")

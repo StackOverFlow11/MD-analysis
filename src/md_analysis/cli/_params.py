@@ -45,6 +45,8 @@ class K:
     INITIAL_STEP = "initial_step"
     FINAL_STEP = "final_step"
     COLVAR_ID = "colvar_id"
+    # Atom charge tracking
+    ATOM_INDICES_XYZ = "atom_indices_xyz"
     # TI-specific
     INP_PATH = "inp_path"
     TARGET_AU = "target_au"
@@ -214,6 +216,20 @@ class CellAbcParam(ParamCollector):
         pass  # CellAbc has no meaningful default
 
 
+class AtomIndicesParam(ParamCollector):
+    """Comma-separated integer atom indices (XYZ 0-based)."""
+
+    def collect(self, ctx: dict) -> None:
+        raw = prompt_str_required("Atom indices (XYZ, 0-based, comma-separated, e.g. 0,5,10)")
+        indices = [int(x.strip()) for x in raw.split(",") if x.strip()]
+        if not indices:
+            raise ValueError("At least one atom index is required")
+        ctx[K.ATOM_INDICES_XYZ] = indices
+
+    def apply_default(self, ctx: dict) -> None:
+        ctx[K.ATOM_INDICES_XYZ] = []
+
+
 class MetalElementsParam(ParamCollector):
     """Comma-separated input -> set[str] | None."""
 
@@ -284,3 +300,4 @@ dir_pattern = StrParam(K.DIR_PATTERN, "Frame subdirectory pattern",
                        default="bader_t*_i*")
 outdir = StrParam(K.OUTDIR, "Output directory", default="analysis")
 frame_slice = FrameSliceParam()
+atom_indices_xyz = AtomIndicesParam()

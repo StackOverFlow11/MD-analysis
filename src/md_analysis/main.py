@@ -260,6 +260,100 @@ def run_charge_analysis(
     }
 
 
+def run_tracked_charge_analysis(
+    *,
+    output_dir: Path,
+    root_dir: str | Path = ".",
+    atom_indices_xyz: Iterable[int],
+    dir_pattern: str = "bader_t*_i*",
+    frame_start: int | None = None,
+    frame_end: int | None = None,
+    frame_step: int | None = None,
+    verbose: bool = False,
+) -> dict[str, Path]:
+    """Track Bader net charges for specified XYZ atoms (CSV + PNG).
+
+    Outputs are written under ``output_dir/charge/tracked/``.
+    Returns a dict mapping output names to file paths.
+    """
+    logger.info("Starting tracked charge analysis: output_dir=%s", output_dir)
+
+    from .electrochemical.charge import tracked_atom_charge_analysis
+    from .electrochemical.charge.Bader.AtomCharges import (
+        DEFAULT_TRACKED_CHARGE_CSV,
+        DEFAULT_TRACKED_CHARGE_PNG,
+    )
+
+    tracked_dir = Path(output_dir) / "charge" / "tracked"
+    tracked_dir.mkdir(parents=True, exist_ok=True)
+
+    csv_path = tracked_atom_charge_analysis(
+        root_dir,
+        atom_indices_xyz=atom_indices_xyz,
+        dir_pattern=dir_pattern,
+        output_dir=tracked_dir,
+        frame_start=frame_start,
+        frame_end=frame_end,
+        frame_step=frame_step,
+        verbose=verbose,
+    )
+
+    return {
+        "tracked_charge_csv": csv_path,
+        "tracked_charge_png": csv_path.parent / DEFAULT_TRACKED_CHARGE_PNG,
+    }
+
+
+def run_counterion_charge_analysis(
+    *,
+    output_dir: Path,
+    root_dir: str | Path = ".",
+    metal_symbols: Iterable[str] | None = None,
+    normal: str = "c",
+    layer_tol_A: float = DEFAULT_LAYER_TOL_A,
+    dir_pattern: str = "bader_t*_i*",
+    frame_start: int | None = None,
+    frame_end: int | None = None,
+    frame_step: int | None = None,
+    verbose: bool = False,
+) -> dict[str, Path]:
+    """Detect counterions per-frame and track their Bader charges (CSV + PNG).
+
+    Outputs are written under ``output_dir/charge/counterion_tracking/``.
+    Returns a dict mapping output names to file paths.
+    """
+    logger.info("Starting counterion charge analysis: output_dir=%s", output_dir)
+
+    from .electrochemical.charge import counterion_charge_analysis
+    from .electrochemical.charge.Bader.AtomCharges import (
+        DEFAULT_COUNTERION_CHARGE_CSV,
+        DEFAULT_COUNTERION_CHARGE_PNG,
+        DEFAULT_COUNTERION_SUMMARY_CSV,
+    )
+
+    ci_dir = Path(output_dir) / "charge" / "counterion_tracking"
+    ci_dir.mkdir(parents=True, exist_ok=True)
+
+    csv_path = counterion_charge_analysis(
+        root_dir,
+        metal_symbols=metal_symbols,
+        normal=normal,
+        layer_tol_A=layer_tol_A,
+        dir_pattern=dir_pattern,
+        output_dir=ci_dir,
+        frame_start=frame_start,
+        frame_end=frame_end,
+        frame_step=frame_step,
+        verbose=verbose,
+    )
+
+    return {
+        "counterion_charge_csv": csv_path,
+        "counterion_summary_csv": csv_path.parent / DEFAULT_COUNTERION_SUMMARY_CSV,
+        "counterion_charge_png": csv_path.parent / DEFAULT_COUNTERION_CHARGE_PNG,
+    }
+
+
 def run_all(
     xyz_path: Path,
     md_inp_path: Path | None = None,

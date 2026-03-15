@@ -12,7 +12,7 @@ from ..config import (
     KEY_WATER_OH_CUTOFF_A,
     KEY_Z_BIN_WIDTH_A,
 )
-from ._charge import SurfaceChargeCmd
+from ._charge import CounterionChargeCmd, SurfaceChargeCmd, TrackedChargeCmd
 from ._enhanced_sampling import SGPublicationPlotCmd, SGQuickPlotCmd
 from ._framework import MenuGroup
 from ._potential import (
@@ -78,6 +78,8 @@ def build_menu_tree() -> MenuGroup:
         SurfaceChargeCmd("221", "Surface Charge (Counterion)", method="counterion"),
         SurfaceChargeCmd("222", "Surface Charge (Layer)", method="layer"),
         SurfaceChargeCmd("223", "Full Charge Analysis with Plots", method=None),
+        TrackedChargeCmd("224", "Tracked Atom Charges (XYZ indices)"),
+        CounterionChargeCmd("225", "Counterion Charge Tracking"),
     )
 
     electrochemical.add(potential, charge)

@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
-from .BaderAnalysis import (
+from .Bader import (
+    BaderTrajectoryData,
     compute_frame_surface_charge,
+    counterion_charge_analysis,
     frame_indexed_atom_charges,
+    load_bader_trajectory,
     surface_charge_analysis,
+    tracked_atom_charge_analysis,
     trajectory_indexed_atom_charges,
     trajectory_surface_charge,
 )
@@ -17,9 +21,13 @@ from .config import (
 )
 
 __all__ = [
+    "BaderTrajectoryData",
     "compute_frame_surface_charge",
+    "counterion_charge_analysis",
     "frame_indexed_atom_charges",
+    "load_bader_trajectory",
     "surface_charge_analysis",
+    "tracked_atom_charge_analysis",
     "trajectory_indexed_atom_charges",
     "trajectory_surface_charge",
     "DEFAULT_N_SURFACE_LAYERS",

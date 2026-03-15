@@ -7,15 +7,20 @@
 
 ## Module layout
 
-Flat structure (no sub-packages):
+`Bader/` sub-package with modular split:
 - `config.py` — unit conversion constant + default filenames + output file name constants
-- `BaderAnalysis.py` — single-frame surface charge (two methods), single-frame indexed atom charges, trajectory indexed atom charges, trajectory surface charge, end-to-end surface charge analysis
+- `Bader/_frame_utils.py` — frame directory discovery, numeric sorting, step/time extraction from dir names
+- `Bader/BaderData.py` — `BaderTrajectoryData` frozen dataclass + `load_bader_trajectory()` (loads all frames, remaps to XYZ order via IndexMap)
+- `Bader/SurfaceCharge.py` — single-frame surface charge (two methods), trajectory surface charge, end-to-end analysis (CSV+PNG)
+- `Bader/AtomCharges.py` — single-frame/trajectory indexed atom charges (POSCAR order), tracked atom charge analysis (XYZ order), counterion charge analysis (XYZ order, per-frame detection)
 
-## Key imports from `utils`
+## Key imports from `utils` (4-dot relative from Bader/)
 
-- `AXIS_MAP`, `AREA_VECTOR_INDICES` — 轴索引和面积计算向量索引，取代原有的模块局部映射字典
-- `CHARGE_METHOD_COUNTERION`, `CHARGE_METHOD_LAYER` — 电荷方法名称常量，取代硬编码字符串
-- `_cumulative_average`, `_write_csv` — 从 `utils._io_helpers` 导入的私有共享 helper，取代原有的模块内重复实现
+- `....utils.config`: `AXIS_MAP`, `AREA_VECTOR_INDICES` — 轴索引和面积计算向量索引
+- `....utils.config`: `CHARGE_METHOD_COUNTERION`, `CHARGE_METHOD_LAYER` — 电荷方法名称常量
+- `....utils._io_helpers`: `_cumulative_average`, `_write_csv` — 私有共享 helper
+- `....utils.BaderParser`: `load_bader_atoms` — 加载 Bader 数据到 ASE Atoms
+- `....scripts.utils.IndexMapper`: `read_index_map_from_poscar`, `remap_array` — XYZ↔POSCAR 索引映射（BaderData.py 和 AtomCharges.py 使用）
 
 ## Surface charge methods
 
@@ -97,9 +102,16 @@ Both methods output `[σ_aligned, σ_opposed]` — ordered by stable `interface_
 
 ## CLI
 
-`md-analysis charge --charge-method counterion|layer`
+- 221: Surface Charge (Counterion)
+- 222: Surface Charge (Layer)
+- 223: Full Charge Analysis with Plots
+- 224: Tracked Atom Charges (XYZ indices) — 指定 XYZ 原子电荷追踪
+- 225: Counterion Charge Tracking — 逐帧 counterion 自动检测追踪
 
-Output directory: `<outdir>/charge/<method>/`
+Output directories:
+- `<outdir>/charge/<method>/` — surface charge analysis
+- `<outdir>/charge/tracked/` — tracked atom charges
+- `<outdir>/charge/counterion_tracking/` — counterion charge tracking
 
 ## Directory sorting
 

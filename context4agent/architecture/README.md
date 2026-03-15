@@ -81,12 +81,18 @@
 输入：根目录下 `bader_t*_i*` 子目录，每帧各含 POSCAR + ACF.dat + POTCAR
 
 - `electrochemical/charge/config.py`：单位换算常量（`E_PER_A2_TO_UC_PER_CM2`）、默认文件名
-- `electrochemical/charge/BaderAnalysis.py`
-  - `compute_frame_surface_charge(method=...)`：单帧表面电荷密度（`method="counterion"` 或 `"layer"`；结果存入 `atoms.info`）
-  - `frame_indexed_atom_charges()`：单帧指定原子索引提取净电荷 → `(N, 2)` ndarray
-  - `trajectory_indexed_atom_charges()`：按帧指定原子索引提取净电荷 → `(t, N, 2)` ndarray（内部调用 `frame_indexed_atom_charges`）
-  - `trajectory_surface_charge(method=...)`：多帧表面电荷密度时序 → `(t, 2)` ndarray
-  - `surface_charge_analysis(method=...)`：端到端表面电荷密度分析（CSV + PNG 输出，含累积平均）
+- `electrochemical/charge/Bader/` 子包：
+  - `_frame_utils.py`：帧目录发现、排序、step/time 提取
+  - `BaderData.py`：`BaderTrajectoryData` frozen dataclass + `load_bader_trajectory()` — 加载轨迹并通过 IndexMap remap 回 XYZ 原子序
+  - `SurfaceCharge.py`：
+    - `compute_frame_surface_charge(method=...)`：单帧表面电荷密度（`method="counterion"` 或 `"layer"`；结果存入 `atoms.info`）
+    - `trajectory_surface_charge(method=...)`：多帧表面电荷密度时序 → `(t, 2)` ndarray
+    - `surface_charge_analysis(method=...)`：端到端表面电荷密度分析（CSV + PNG 输出，含累积平均）
+  - `AtomCharges.py`：
+    - `frame_indexed_atom_charges()`：单帧指定原子索引提取净电荷 → `(N, 2)` ndarray（POSCAR 序）
+    - `trajectory_indexed_atom_charges()`：按帧指定原子索引提取净电荷 → `(t, N, 2)` ndarray（POSCAR 序）
+    - `tracked_atom_charge_analysis()`：指定 XYZ 原子追踪 Bader 净电荷含时演化 + 系综平均（CSV + PNG）
+    - `counterion_charge_analysis()`：逐帧自动检测 counterion，输出含时演化 + 系综平均（CSV + PNG）
 
 ### 3b) `md_analysis.electrochemical.potential`（多帧/电势分析工作流）
 

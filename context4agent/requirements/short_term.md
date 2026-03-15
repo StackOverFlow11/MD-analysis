@@ -12,9 +12,12 @@
   - 增强抽样（`enhanced_sampling/`）：慢增长自由能绘图（quick / publication）+ CSV 导出 + CLI 集成
   - 集成入口：CLI（`md-analysis` 命令）、编程入口（`main.py`）
 - Bader 电荷解析（`utils/BaderParser.py`）：从 VASP Bader 输出（ACF.dat + POTCAR）读取原始电子数与净电荷，附加到 ASE Atoms
-  - Bader 电荷下游分析（`electrochemical/charge/BaderAnalysis.py`）：
+  - Bader 电荷下游分析（`electrochemical/charge/Bader/`）：
+    - 核心数据结构 `BaderTrajectoryData` + `load_bader_trajectory()` — 加载轨迹并通过 IndexMap remap 回 XYZ 原子序
     - 单帧表面电荷密度 `compute_frame_surface_charge(method=...)`，支持 `"counterion"`（反离子/溶质）和 `"layer"`（界面层净电荷）两种计算方法
     - 按帧指定原子索引提取净电荷（`trajectory_indexed_atom_charges`）
+    - 指定 XYZ 原子电荷追踪（`tracked_atom_charge_analysis`）— 含时演化 + 系综平均
+    - Counterion 逐帧自动检测追踪（`counterion_charge_analysis`）— 含时演化 + 系综平均
 - **当前未覆盖**：按层/按元素电荷转移统计；Mulliken 电荷分析仍未实现。
 
 ## 已确认的体系前提（用户声明，值得记录）
@@ -57,7 +60,7 @@
 - **I/O（读取与标准化）**
   - 统一记录单位、时间步、采样间隔等元数据（当前仅解析 `md.inp` 的 `ABC [angstrom]`）
 - **Analysis（扩展分析量）**
-  - Bader 电荷下游分析（已实现表面电荷密度，`electrochemical/charge/BaderAnalysis.py`）：
+  - Bader 电荷下游分析（`electrochemical/charge/Bader/`）：
     - ✅ 表面电荷密度（双方法）：
       - `method="counterion"`：排除水分子和金属原子，仅反离子/溶质物种净电荷贡献 σ
       - `method="layer"`：界面层金属原子净电荷求和 / 面积（`n_surface_layers` 参数控制每侧取几层，默认 1）

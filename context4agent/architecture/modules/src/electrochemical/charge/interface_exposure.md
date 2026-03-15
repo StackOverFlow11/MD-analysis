@@ -2,17 +2,21 @@
 
 ## Public API
 
-| Symbol                              | Module              | Description                                                     |
-|-------------------------------------|---------------------|-----------------------------------------------------------------|
-| `compute_frame_surface_charge`      | BaderAnalysis.py    | Single-frame surface charge density → `atoms.info` (`method` selects algorithm) |
-| `frame_indexed_atom_charges`        | BaderAnalysis.py    | Single-frame net charges for caller-specified atom indices → `(N, 2)` |
-| `trajectory_indexed_atom_charges`   | BaderAnalysis.py    | Per-frame net charges for caller-specified atom indices → `(t, N, 2)` |
-| `trajectory_surface_charge`         | BaderAnalysis.py    | Multi-frame surface charge density time series → `(t, 2)` μC/cm² |
-| `surface_charge_analysis`           | BaderAnalysis.py    | End-to-end surface charge analysis → CSV + PNG output           |
-| `E_PER_A2_TO_UC_PER_CM2`           | config.py           | Unit conversion: 1 e/Å² = 1.602176634×10³ μC/cm²               |
-| `DEFAULT_SURFACE_CHARGE_CSV_NAME`   | config.py           | Default CSV output filename                                     |
-| `DEFAULT_N_SURFACE_LAYERS`          | config.py           | Default number of surface layers per interface (1)              |
-| `DEFAULT_SURFACE_CHARGE_PNG_NAME`   | config.py           | Default PNG output filename                                     |
+| Symbol                              | Module                  | Description                                                     |
+|-------------------------------------|-------------------------|-----------------------------------------------------------------|
+| `compute_frame_surface_charge`      | Bader/SurfaceCharge.py  | Single-frame surface charge density → `atoms.info` (`method` selects algorithm) |
+| `trajectory_surface_charge`         | Bader/SurfaceCharge.py  | Multi-frame surface charge density time series → `(t, 2)` μC/cm² |
+| `surface_charge_analysis`           | Bader/SurfaceCharge.py  | End-to-end surface charge analysis → CSV + PNG output           |
+| `frame_indexed_atom_charges`        | Bader/AtomCharges.py    | Single-frame net charges for caller-specified atom indices → `(N, 2)` (POSCAR order) |
+| `trajectory_indexed_atom_charges`   | Bader/AtomCharges.py    | Per-frame net charges for caller-specified atom indices → `(t, N, 2)` (POSCAR order) |
+| `tracked_atom_charge_analysis`      | Bader/AtomCharges.py    | Track XYZ-indexed atoms across trajectory → CSV + PNG (XYZ order) |
+| `counterion_charge_analysis`        | Bader/AtomCharges.py    | Per-frame counterion detection + charge tracking → CSV + PNG (XYZ order) |
+| `BaderTrajectoryData`               | Bader/BaderData.py      | Frozen dataclass: steps, times, atom_indices_xyz, net_charges (XYZ order) |
+| `load_bader_trajectory`             | Bader/BaderData.py      | Load all frames → BaderTrajectoryData with IndexMap remap to XYZ order |
+| `E_PER_A2_TO_UC_PER_CM2`           | config.py               | Unit conversion: 1 e/Å² = 1.602176634×10³ μC/cm²               |
+| `DEFAULT_SURFACE_CHARGE_CSV_NAME`   | config.py               | Default CSV output filename                                     |
+| `DEFAULT_N_SURFACE_LAYERS`          | config.py               | Default number of surface layers per interface (1)              |
+| `DEFAULT_SURFACE_CHARGE_PNG_NAME`   | config.py               | Default PNG output filename                                     |
 
 ## Config Constants
 
@@ -115,4 +119,72 @@ def surface_charge_analysis(
     frame_step: int | None = None,
     verbose: bool = False,
 ) -> Path   # path to written CSV
+```
+
+## `BaderTrajectoryData` Dataclass
+
+```python
+@dataclass(frozen=True)
+class BaderTrajectoryData:
+    steps: np.ndarray            # (n_frames,) int — MD step
+    times: np.ndarray            # (n_frames,) int — time in fs
+    atom_indices_xyz: np.ndarray # (n_atoms,) int — [0, 1, ..., N-1] XYZ order
+    net_charges: np.ndarray      # (n_frames, n_atoms) float — XYZ order net charges
+```
+
+## `load_bader_trajectory` Signature
+
+```python
+def load_bader_trajectory(
+    root_dir: str | Path = ".",
+    *,
+    dir_pattern: str = DEFAULT_DIR_PATTERN,
+    structure_filename: str = DEFAULT_STRUCTURE_FILENAME,
+    acf_filename: str = DEFAULT_ACF_FILENAME,
+    potcar_filename: str = DEFAULT_POTCAR_FILENAME,
+    frame_start: int | None = None,
+    frame_end: int | None = None,
+    frame_step: int | None = None,
+    verbose: bool = False,
+) -> BaderTrajectoryData
+```
+
+## `tracked_atom_charge_analysis` Signature
+
+```python
+def tracked_atom_charge_analysis(
+    root_dir: str | Path = ".",
+    *,
+    atom_indices_xyz: Iterable[int],   # XYZ 0-based atom indices
+    dir_pattern: str = DEFAULT_DIR_PATTERN,
+    structure_filename: str = DEFAULT_STRUCTURE_FILENAME,
+    acf_filename: str = DEFAULT_ACF_FILENAME,
+    potcar_filename: str = DEFAULT_POTCAR_FILENAME,
+    output_dir: Path | None = None,
+    frame_start: int | None = None,
+    frame_end: int | None = None,
+    frame_step: int | None = None,
+    verbose: bool = False,
+) -> Path   # path to written CSV
+```
+
+## `counterion_charge_analysis` Signature
+
+```python
+def counterion_charge_analysis(
+    root_dir: str | Path = ".",
+    *,
+    metal_symbols: Iterable[str] | None = None,
+    normal: str = "c",
+    layer_tol_A: float = DEFAULT_LAYER_TOL_A,
+    dir_pattern: str = DEFAULT_DIR_PATTERN,
+    structure_filename: str = DEFAULT_STRUCTURE_FILENAME,
+    acf_filename: str = DEFAULT_ACF_FILENAME,
+    potcar_filename: str = DEFAULT_POTCAR_FILENAME,
+    output_dir: Path | None = None,
+    frame_start: int | None = None,
+    frame_end: int | None = None,
+    frame_step: int | None = None,
+    verbose: bool = False,
+) -> Path   # path to per-frame CSV
 ```
