@@ -188,8 +188,9 @@ $$
 
 ### `surface_charge_analysis(root_dir, *, method="counterion", ...)` 输出
 
-- CSV：`step,sigma_aligned_uC_cm2,sigma_opposed_uC_cm2,sigma_aligned_cumavg_uC_cm2,sigma_opposed_cumavg_uC_cm2`
-- PNG：9×4.8 inch, 160 DPI，aligned（蓝色）和 opposed（橙色）各两条线（inst. + cum. avg）
+- CSV 基础列：`step,sigma_aligned_uC_cm2,sigma_opposed_uC_cm2,sigma_aligned_cumavg_uC_cm2,sigma_opposed_cumavg_uC_cm2`
+- CSV 可选列（当 `~/.config/md_analysis/calibration.json` 存在时自动追加）：`phi_aligned_V_vs_SHE,phi_opposed_V_vs_SHE,phi_aligned_cumavg_V_vs_SHE,phi_opposed_cumavg_V_vs_SHE`
+- PNG：9×4.8 inch, 160 DPI，左轴 σ（aligned 蓝/opposed 橙，inst. + cum. avg）；右轴 φ（aligned 绿/opposed 红，仅有标定时显示）+ fit RMSE 标注
 - 默认文件名：`surface_charge.csv`、`surface_charge.png`
 - 返回 CSV 路径
 

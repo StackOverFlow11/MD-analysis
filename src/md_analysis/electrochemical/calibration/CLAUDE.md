@@ -28,3 +28,9 @@
 - 231：Calibrate from CSV File
 - 232：Calibrate from Manual Input
 - 233：Predict Potential from Charge
+
+## 与 charge 模块的集成
+
+`surface_charge_analysis()`（charge/Bader/SurfaceCharge.py）在分析完成后自动尝试加载 `~/.config/md_analysis/calibration.json`：
+- **有标定**：通过 `mapper_from_dict()` + `predict(σ)` 追加 φ 列到 CSV，PNG 添加右轴
+- **无标定**：log info 提示用户可通过菜单 23 标定，不影响 σ 输出

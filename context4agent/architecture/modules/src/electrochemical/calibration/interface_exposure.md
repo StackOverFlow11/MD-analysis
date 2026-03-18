@@ -22,3 +22,7 @@
 
 ### Visualization
 - `plot_calibration(sigma, phi, mapper, fitting_info, ...)` → Path（PNG）
+
+## Internal consumers
+
+- `electrochemical.charge.Bader.SurfaceCharge.surface_charge_analysis()` 内部调用 `load_calibration_json()` + `mapper_from_dict()` + `predict()` 实现自动电势外推

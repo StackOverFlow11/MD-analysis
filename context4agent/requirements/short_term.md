@@ -68,7 +68,7 @@
     - ✅ 单帧原子净电荷提取：`frame_indexed_atom_charges` 传入 `(N,)` 索引，返回 `(N, 2)` 的索引+净电荷数组
     - ✅ 轨迹原子净电荷提取：`trajectory_indexed_atom_charges` 按帧传入 `(t, N)` 索引矩阵，返回 `(t, N, 2)` 的索引+净电荷数组（内部调用 `frame_indexed_atom_charges`）
     - ✅ 轨迹表面电荷密度时序：`trajectory_surface_charge` 逐帧计算表面电荷密度，返回 `(t, 2)` 的 μC/cm² 数组
-    - ✅ 端到端表面电荷分析：`surface_charge_analysis` 输出 CSV（含累积平均）+ PNG，CLI 子命令 `md-analysis charge`
+    - ✅ 端到端表面电荷分析：`surface_charge_analysis` 输出 CSV（含累积平均）+ PNG；若存在标定文件（`calibration.json`）则自动追加外推电势列及 PNG 右轴
     - 按层/按元素电荷转移统计：分层聚合 `bader_net_charge`，输出每层各元素的平均净电荷（待实现）
     - 典型工作流：CP2K MD → 提取结构帧 → `generate_bader_workdir` 生成 VASP 工作目录 → VASP 单点 → Bader 分析 → `load_bader_atoms` → 表面电荷/电荷转移
   - Bader 工作目录生成（`scripts/BaderGen.py`）：

@@ -87,7 +87,7 @@
   - `SurfaceCharge.py`：
     - `compute_frame_surface_charge(method=...)`：单帧表面电荷密度（`method="counterion"` 或 `"layer"`；结果存入 `atoms.info`）
     - `trajectory_surface_charge(method=...)`：多帧表面电荷密度时序 → `(t, 2)` ndarray
-    - `surface_charge_analysis(method=...)`：端到端表面电荷密度分析（CSV + PNG 输出，含累积平均）
+    - `surface_charge_analysis(method=...)`：端到端表面电荷密度分析（CSV + PNG 输出，含累积平均；若存在标定文件则自动追加外推电势列和右轴）
   - `AtomCharges.py`：
     - `frame_indexed_atom_charges()`：单帧指定原子索引提取净电荷 → `(N, 2)` ndarray（POSCAR 序）
     - `trajectory_indexed_atom_charges()`：按帧指定原子索引提取净电荷 → `(t, N, 2)` ndarray（POSCAR 序）
