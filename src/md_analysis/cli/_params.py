@@ -55,6 +55,16 @@ class K:
     TIME_FINAL_FS = "time_final_fs"
     N_POINTS = "n_points"
     STEPS = "steps"
+    # Calibration-specific
+    CALIBRATION_CSV = "calibration_csv"
+    FITTING_METHOD = "fitting_method"
+    POLY_DEGREE = "poly_degree"
+    SIGMA_VALUE = "sigma_value"
+    CALIBRATION_JSON = "calibration_json"
+    POTENTIAL_REFERENCE = "potential_reference"
+    TEMPERATURE_K = "temperature_k"
+    PH = "ph"
+    PHI_PZC = "phi_pzc"
 
 
 # ---------------------------------------------------------------------------
@@ -301,3 +311,18 @@ dir_pattern = StrParam(K.DIR_PATTERN, "Frame subdirectory pattern",
 outdir = StrParam(K.OUTDIR, "Output directory", default="analysis")
 frame_slice = FrameSliceParam()
 atom_indices_xyz = AtomIndicesParam()
+
+# Calibration params
+calibration_csv_path = StrParam(K.CALIBRATION_CSV, "Calibration CSV file path")
+fitting_method = ChoiceParam(K.FITTING_METHOD, "Fitting method",
+                             ["linear", "polynomial", "spline"], default="linear")
+poly_degree = IntParam(K.POLY_DEGREE, "Polynomial degree", default=2)
+sigma_value = FloatParam(K.SIGMA_VALUE,
+                         "Surface charge density sigma (uC/cm^2)", default=0.0)
+calibration_json = StrParam(K.CALIBRATION_JSON, "Calibration JSON file path")
+potential_reference = ChoiceParam(K.POTENTIAL_REFERENCE,
+                                  "Output potential reference",
+                                  ["SHE", "RHE", "PZC"], default="SHE")
+temperature_k = FloatParam(K.TEMPERATURE_K, "Temperature (K)", default=298.15)
+ph_value = FloatParam(K.PH, "pH", default=0.0)
+phi_pzc = FloatParam(K.PHI_PZC, "Potential of zero charge (V vs SHE)", default=0.0)

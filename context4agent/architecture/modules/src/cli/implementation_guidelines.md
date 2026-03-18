@@ -20,7 +20,7 @@ Interactive CLI package providing a VASPKIT-style numbered menu interface. Repla
 ## Dependencies
 
 - `cli` -> `main` (for integrated workflow functions like `run_water_analysis`)
-- `cli` -> `water`, `electrochemical.potential`, `electrochemical.charge` (for individual analysis functions)
+- `cli` -> `water`, `electrochemical.potential`, `electrochemical.charge`, `electrochemical.calibration` (for individual analysis functions)
 - `cli` -> `electrochemical.potential.config` (for default constants)
 - `cli` -> `scripts` (for `generate_bader_workdir`, `batch_generate_bader_workdirs`)
 - `cli` -> `enhanced_sampling.slowgrowth` (via `lazy_import` for `slowgrowth_analysis`)

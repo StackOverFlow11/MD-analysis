@@ -12,6 +12,7 @@ from ..config import (
     KEY_WATER_OH_CUTOFF_A,
     KEY_Z_BIN_WIDTH_A,
 )
+from ._calibration import CalibrateFromCSVCmd, CalibrateManualCmd, PredictPotentialCmd
 from ._charge import CounterionChargeCmd, SurfaceChargeCmd, TrackedChargeCmd
 from ._enhanced_sampling import SGPublicationPlotCmd, SGQuickPlotCmd
 from ._framework import MenuGroup
@@ -83,7 +84,15 @@ def build_menu_tree() -> MenuGroup:
         CounterionChargeCmd("225", "Counterion Charge Tracking"),
     )
 
-    electrochemical.add(potential, charge)
+    calibration = MenuGroup("23", "Charge-Potential Calibration",
+                            output_name="calibration")
+    calibration.add(
+        CalibrateFromCSVCmd("231", "Calibrate from CSV File"),
+        CalibrateManualCmd("232", "Calibrate from Manual Input"),
+        PredictPotentialCmd("233", "Predict Potential from Charge"),
+    )
+
+    electrochemical.add(potential, charge, calibration)
 
     # --- Enhanced Sampling ---
     enhanced = MenuGroup("3", "Enhanced Sampling",

@@ -12,9 +12,10 @@
 |---|---|---|
 | `potential` | sub-package | 电势分析工作流（re-export） |
 | `charge` | sub-package | Bader 电荷分析工作流（re-export） |
+| `calibration` | sub-package | σ→φ 标定映射（re-export） |
 
 ```python
-__all__ = ["potential", "charge"]
+__all__ = ["potential", "charge", "calibration"]
 ```
 
 ## 推荐导入方式
