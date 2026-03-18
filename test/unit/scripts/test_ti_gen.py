@@ -346,6 +346,31 @@ class TestFrameSnapping:
         with pytest.raises(TIGenError, match="No frames found"):
             _load_trajectory_cv(xyz, restart)
 
+    def test_inconsistent_atoms_raises(self, tmp_path):
+        """Trajectory with different atom ordering raises TIGenError."""
+        xyz = tmp_path / "bad.xyz"
+        # Frame 0: Cu Cu O H H, Frame 1: O H H Cu Cu (reordered)
+        lines = [
+            "5",
+            " i =        0, time =        0.000, E = -1000.0",
+            "Cu  0.0 0.0 0.0",
+            "Cu  1.8 1.8 0.0",
+            "O   0.9 0.9 2.5",
+            "H   0.9 0.2 3.1",
+            "H   0.9 1.6 3.1",
+            "5",
+            " i =        5, time =        5.000, E = -1000.0",
+            "O   0.9 0.9 2.5",
+            "H   0.9 0.2 3.1",
+            "H   0.9 1.6 3.1",
+            "Cu  0.0 0.0 0.0",
+            "Cu  1.8 1.8 0.0",
+        ]
+        xyz.write_text("\n".join(lines) + "\n")
+        restart = _make_restart()
+        with pytest.raises(TIGenError, match="Atom ordering changed"):
+            _load_trajectory_cv(xyz, restart)
+
 
 # ---------------------------------------------------------------------------
 # Tests for generate_ti_workdir

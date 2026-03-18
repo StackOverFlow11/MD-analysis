@@ -81,7 +81,7 @@ def _print_sg_info(restart_path: str, log_path: str) -> None:
 class _SlowgrowthPlotCmd(MenuCommand):
     """Base for slow-growth plot commands."""
 
-    output_subdir = ""
+    output_name = "slowgrowth"
     _plot_style: str = "both"
 
     def _collect_all_params(self) -> dict:
@@ -127,7 +127,7 @@ class _SlowgrowthPlotCmd(MenuCommand):
             "md_analysis.enhanced_sampling.slowgrowth.SlowGrowthPlot",
             "slowgrowth_analysis",
         )
-        outdir = Path(ctx[K.OUTDIR]).resolve()
+        outdir = ctx[K.OUTDIR_RESOLVED]
         slowgrowth_analysis(
             ctx[K.RESTART_PATH],
             ctx[K.LOG_PATH],

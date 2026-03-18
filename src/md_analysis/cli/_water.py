@@ -22,7 +22,7 @@ _WATER_ADVANCED = (layer_tol, outdir, frame_slice)
 class WaterDensityCmd(MenuCommand):
     params = _WATER_PARAMS
     advanced_params = _WATER_ADVANCED
-    output_subdir = "water"
+    # output_name inherited from parent MenuGroup("1", output_name="water")
 
     def execute(self, ctx: dict) -> None:
         analyze = lazy_import("md_analysis.water",
@@ -43,7 +43,7 @@ class WaterDensityCmd(MenuCommand):
 class WaterOrientationCmd(MenuCommand):
     params = _WATER_PARAMS
     advanced_params = _WATER_ADVANCED
-    output_subdir = "water"
+    # output_name inherited from parent MenuGroup("1", output_name="water")
 
     def execute(self, ctx: dict) -> None:
         analyze = lazy_import(
@@ -66,7 +66,7 @@ class WaterOrientationCmd(MenuCommand):
 class AdWaterOrientationCmd(MenuCommand):
     params = _WATER_PARAMS
     advanced_params = _WATER_ADVANCED
-    output_subdir = "water"
+    # output_name inherited from parent MenuGroup("1", output_name="water")
 
     def execute(self, ctx: dict) -> None:
         analyze = lazy_import("md_analysis.water",
@@ -89,7 +89,7 @@ class AdWaterOrientationCmd(MenuCommand):
 class AdWaterThetaCmd(MenuCommand):
     params = _WATER_PARAMS
     advanced_params = _WATER_ADVANCED
-    output_subdir = "water"
+    # output_name inherited from parent MenuGroup("1", output_name="water")
 
     def execute(self, ctx: dict) -> None:
         analyze = lazy_import("md_analysis.water",
@@ -111,14 +111,15 @@ class AdWaterThetaCmd(MenuCommand):
 class WaterThreePanelCmd(MenuCommand):
     params = _WATER_PARAMS
     advanced_params = _WATER_ADVANCED
-    output_subdir = ""
+    # output_name inherited from parent MenuGroup("1", output_name="water")
 
     def execute(self, ctx: dict) -> None:
         analyze = lazy_import("md_analysis.main", "run_water_analysis")
         results = analyze(
             xyz_path=Path(ctx[K.XYZ]),
             cell_abc=ctx[K.CELL_ABC],
-            output_dir=Path(ctx[K.OUTDIR]),
+            output_dir=ctx[K.OUTDIR_RESOLVED],
+            _nest_water=False,
             dz_A=ctx[K.DZ_A],
             layer_tol_A=ctx[K.LAYER_TOL],
             frame_start=ctx[K.FRAME_START],

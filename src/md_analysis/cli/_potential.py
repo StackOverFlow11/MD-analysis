@@ -23,10 +23,10 @@ from ._params import (
 
 
 class CenterPotentialCmd(MenuCommand):
+    output_name = "center"
     params = (cube_pattern, xyz_path_opt, thickness, center_mode,
               metal_elements, layer_tol)
     advanced_params = (outdir, frame_slice)
-    output_subdir = "potential/center"
 
     def execute(self, ctx: dict) -> None:
         analyze = lazy_import("md_analysis.electrochemical.potential",
@@ -48,9 +48,9 @@ class CenterPotentialCmd(MenuCommand):
 
 
 class FermiEnergyCmd(MenuCommand):
+    output_name = "fermi"
     params = (md_out_path, fermi_unit)
     advanced_params = (outdir, frame_slice)
-    output_subdir = "potential/fermi"
 
     def execute(self, ctx: dict) -> None:
         analyze = lazy_import("md_analysis.electrochemical.potential",
@@ -67,10 +67,10 @@ class FermiEnergyCmd(MenuCommand):
 
 
 class ElectrodePotentialCmd(MenuCommand):
+    output_name = "electrode"
     params = (cube_pattern, xyz_path_opt, thickness, center_mode,
               metal_elements, layer_tol, md_out_path, fermi_unit)
     advanced_params = (outdir, frame_slice)
-    output_subdir = "potential/electrode"
 
     def execute(self, ctx: dict) -> None:
         analyze = lazy_import("md_analysis.electrochemical.potential",
@@ -94,9 +94,9 @@ class ElectrodePotentialCmd(MenuCommand):
 
 
 class PhiZProfileCmd(MenuCommand):
+    output_name = "phi_z"
     params = (cube_pattern, max_curves)
     advanced_params = (outdir, frame_slice)
-    output_subdir = "potential/phi_z"
 
     def execute(self, ctx: dict) -> None:
         analyze = lazy_import("md_analysis.electrochemical.potential",
@@ -114,11 +114,11 @@ class PhiZProfileCmd(MenuCommand):
 
 
 class ThicknessSensitivityCmd(MenuCommand):
+    output_name = "thickness_sensitivity"
     params = (cube_pattern, xyz_path_opt, thickness, center_mode,
               metal_elements, layer_tol, md_out_path, fermi_unit,
               thickness_end)
     advanced_params = (outdir, frame_slice)
-    output_subdir = "potential/thickness_sensitivity"
 
     def execute(self, ctx: dict) -> None:
         analyze = lazy_import("md_analysis.electrochemical.potential",
@@ -142,11 +142,11 @@ class ThicknessSensitivityCmd(MenuCommand):
 
 
 class FullPotentialCmd(MenuCommand):
+    # output_name not set → inherits "electrochemical/potential" from parent chain
     params = (cube_pattern, xyz_path_opt, thickness, center_mode,
               metal_elements, layer_tol, md_out_path, fermi_unit,
               max_curves, thickness_end)
     advanced_params = (outdir, frame_slice)
-    output_subdir = ""
 
     def execute(self, ctx: dict) -> None:
         analyze = lazy_import("md_analysis.main", "run_potential_analysis")
@@ -157,7 +157,8 @@ class FullPotentialCmd(MenuCommand):
             md_out = None
 
         results = analyze(
-            output_dir=Path(ctx[K.OUTDIR]),
+            output_dir=ctx[K.OUTDIR_RESOLVED],
+            _nest=False,
             cube_pattern=ctx[K.CUBE_PATTERN],
             md_out_path=md_out,
             xyz_path=Path(ctx[K.XYZ]),

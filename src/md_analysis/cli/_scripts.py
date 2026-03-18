@@ -71,7 +71,6 @@ def _resolve_cp2k_script_path() -> str | None:
 
 
 class BaderSingleCmd(MenuCommand):
-    output_subdir = ""
 
     def _collect_all_params(self) -> dict:
         """Custom flow: show trajectory info between prompts."""
@@ -120,7 +119,6 @@ class BaderSingleCmd(MenuCommand):
 
 
 class BaderBatchCmd(MenuCommand):
-    output_subdir = ""
 
     def _collect_all_params(self) -> dict:
         """Custom flow: show trajectory info between prompts."""
@@ -187,7 +185,6 @@ def _print_sg_cv_info(restart_path: str, xyz_path: str) -> None:
 class TISingleCmd(MenuCommand):
     """Generate one TI constrained-MD work directory."""
 
-    output_subdir = ""
 
     def _collect_all_params(self) -> dict:
         print()
@@ -235,7 +232,6 @@ class TISingleCmd(MenuCommand):
 class TIBatchCmd(MenuCommand):
     """Batch-generate TI constrained-MD work directories."""
 
-    output_subdir = ""
 
     def _collect_all_params(self) -> dict:
         print()

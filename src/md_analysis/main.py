@@ -31,12 +31,14 @@ def run_water_analysis(
     frame_end: int | None = None,
     frame_step: int | None = None,
     verbose: bool = False,
+    _nest_water: bool = True,
     **kwargs: Any,
 ) -> dict[str, Path]:
     """Run water analysis (three-panel plot + CSVs).
 
-    Outputs are written under ``output_dir/water/`` with sub-directories
-    for density, orientation, and adsorbed-layer results.
+    Outputs are written under ``output_dir/water/`` (when *_nest_water* is
+    True) or directly into *output_dir* (when False — used by the CLI which
+    already resolved the subdirectory).
 
     Returns a dict mapping output names to file paths.
     """
@@ -52,7 +54,7 @@ def run_water_analysis(
         DEFAULT_WATER_THREE_PANEL_PLOT_PNG_NAME,
     )
 
-    water_dir = Path(output_dir) / "water"
+    water_dir = Path(output_dir) / "water" if _nest_water else Path(output_dir)
     water_dir.mkdir(parents=True, exist_ok=True)
 
     png_path = plot_water_three_panel_analysis(
@@ -97,11 +99,13 @@ def run_potential_analysis(
     frame_end: int | None = None,
     frame_step: int | None = None,
     verbose: bool = False,
+    _nest: bool = True,
 ) -> dict[str, Path]:
     """Run all potential analysis workflows.
 
-    Outputs are written under ``output_dir/potential/`` with sub-directories
-    for center, fermi, electrode, and phi_z results.
+    Outputs are written under ``output_dir/electrochemical/potential/``
+    (when *_nest* is True) or directly under *output_dir* (when False —
+    used by the CLI which already resolved the subdirectory).
 
     Returns a dict mapping output names to file paths.
     """
@@ -115,7 +119,8 @@ def run_potential_analysis(
         thickness_sensitivity_analysis,
     )
 
-    pot_dir = Path(output_dir) / "potential"
+    pot_dir = (Path(output_dir) / "electrochemical" / "potential"
+               if _nest else Path(output_dir))
     results: dict[str, Path] = {}
 
     if compute_u and md_out_path is not None:
@@ -222,10 +227,14 @@ def run_charge_analysis(
     frame_end: int | None = None,
     frame_step: int | None = None,
     verbose: bool = False,
+    _nest: bool = True,
 ) -> dict[str, Path]:
     """Run surface charge density analysis (CSV + PNG).
 
-    Outputs are written under ``output_dir/charge/<method>/``.
+    Outputs are written under
+    ``output_dir/electrochemical/charge/<method>/`` (when *_nest* is True)
+    or ``output_dir/<method>/`` (when False).
+
     Returns a dict mapping output names to file paths.
     """
     logger.info("Starting charge analysis: method=%s, output_dir=%s", method, output_dir)
@@ -236,7 +245,9 @@ def run_charge_analysis(
         DEFAULT_SURFACE_CHARGE_PNG_NAME,
     )
 
-    charge_dir = Path(output_dir) / "charge" / method
+    base = (Path(output_dir) / "electrochemical" / "charge"
+            if _nest else Path(output_dir))
+    charge_dir = base / method
     charge_dir.mkdir(parents=True, exist_ok=True)
 
     csv_path = surface_charge_analysis(
@@ -270,10 +281,14 @@ def run_tracked_charge_analysis(
     frame_end: int | None = None,
     frame_step: int | None = None,
     verbose: bool = False,
+    _nest: bool = True,
 ) -> dict[str, Path]:
     """Track Bader net charges for specified XYZ atoms (CSV + PNG).
 
-    Outputs are written under ``output_dir/charge/tracked/``.
+    Outputs are written under
+    ``output_dir/electrochemical/charge/tracked/`` (when *_nest* is True)
+    or directly into *output_dir* (when False).
+
     Returns a dict mapping output names to file paths.
     """
     logger.info("Starting tracked charge analysis: output_dir=%s", output_dir)
@@ -284,7 +299,9 @@ def run_tracked_charge_analysis(
         DEFAULT_TRACKED_CHARGE_PNG,
     )
 
-    tracked_dir = Path(output_dir) / "charge" / "tracked"
+    base = (Path(output_dir) / "electrochemical" / "charge"
+            if _nest else Path(output_dir))
+    tracked_dir = base / "tracked"
     tracked_dir.mkdir(parents=True, exist_ok=True)
 
     csv_path = tracked_atom_charge_analysis(
@@ -316,10 +333,14 @@ def run_counterion_charge_analysis(
     frame_end: int | None = None,
     frame_step: int | None = None,
     verbose: bool = False,
+    _nest: bool = True,
 ) -> dict[str, Path]:
     """Detect counterions per-frame and track their Bader charges (CSV + PNG).
 
-    Outputs are written under ``output_dir/charge/counterion_tracking/``.
+    Outputs are written under
+    ``output_dir/electrochemical/charge/counterion_tracking/`` (when *_nest*
+    is True) or directly into *output_dir* (when False).
+
     Returns a dict mapping output names to file paths.
     """
     logger.info("Starting counterion charge analysis: output_dir=%s", output_dir)
@@ -331,7 +352,9 @@ def run_counterion_charge_analysis(
         DEFAULT_COUNTERION_SUMMARY_CSV,
     )
 
-    ci_dir = Path(output_dir) / "charge" / "counterion_tracking"
+    base = (Path(output_dir) / "electrochemical" / "charge"
+            if _nest else Path(output_dir))
+    ci_dir = base / "counterion_tracking"
     ci_dir.mkdir(parents=True, exist_ok=True)
 
     csv_path = counterion_charge_analysis(

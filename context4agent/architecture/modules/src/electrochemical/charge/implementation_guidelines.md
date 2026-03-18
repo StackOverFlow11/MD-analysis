@@ -108,10 +108,10 @@ Both methods output `[σ_aligned, σ_opposed]` — ordered by stable `interface_
 - 224: Tracked Atom Charges (XYZ indices) — 指定 XYZ 原子电荷追踪
 - 225: Counterion Charge Tracking — 逐帧 counterion 自动检测追踪
 
-Output directories:
-- `<outdir>/charge/<method>/` — surface charge analysis
-- `<outdir>/charge/tracked/` — tracked atom charges
-- `<outdir>/charge/counterion_tracking/` — counterion charge tracking
+Output directories (mirrors CLI menu tree):
+- `<outdir>/electrochemical/charge/<method>/` — surface charge analysis
+- `<outdir>/electrochemical/charge/tracked/` — tracked atom charges
+- `<outdir>/electrochemical/charge/counterion_tracking/` — counterion charge tracking
 
 ## Directory sorting
 

@@ -51,7 +51,7 @@ def build_menu_tree() -> MenuGroup:
     root = MenuGroup("0", "MD-Analysis")
 
     # --- Water ---
-    water = MenuGroup("1", "Water Analysis")
+    water = MenuGroup("1", "Water Analysis", output_name="water")
     water.add(
         WaterDensityCmd("101", "Water Mass Density Profile"),
         WaterOrientationCmd("102", "Water Orientation-Weighted Density Profile"),
@@ -61,9 +61,10 @@ def build_menu_tree() -> MenuGroup:
     )
 
     # --- Electrochemical ---
-    electrochemical = MenuGroup("2", "Electrochemical Analysis")
+    electrochemical = MenuGroup("2", "Electrochemical Analysis",
+                                output_name="electrochemical")
 
-    potential = MenuGroup("21", "Potential Analysis")
+    potential = MenuGroup("21", "Potential Analysis", output_name="potential")
     potential.add(
         CenterPotentialCmd("211", "Center Slab Potential (phi_center)"),
         FermiEnergyCmd("212", "Fermi Energy Time Series"),
@@ -73,7 +74,7 @@ def build_menu_tree() -> MenuGroup:
         FullPotentialCmd("216", "Full Potential Analysis  (includes 211-215)"),
     )
 
-    charge = MenuGroup("22", "Charge Analysis")
+    charge = MenuGroup("22", "Charge Analysis", output_name="charge")
     charge.add(
         SurfaceChargeCmd("221", "Surface Charge (Counterion)", method="counterion"),
         SurfaceChargeCmd("222", "Surface Charge (Layer)", method="layer"),
@@ -85,7 +86,8 @@ def build_menu_tree() -> MenuGroup:
     electrochemical.add(potential, charge)
 
     # --- Enhanced Sampling ---
-    enhanced = MenuGroup("3", "Enhanced Sampling")
+    enhanced = MenuGroup("3", "Enhanced Sampling",
+                         output_name="enhanced_sampling")
     enhanced.add(
         SGQuickPlotCmd("301", "Slow-Growth Quick Plot"),
         SGPublicationPlotCmd("302", "Slow-Growth Publication Plot"),

@@ -19,6 +19,15 @@ VASPKIT 风格交互式编号菜单。无 argparse，所有输入通过 `input()
 - `build_flat_index()` 使任意叶节点编号可从根直达（如直接输入 `421`）
 - **flat index 只索引 `MenuCommand`**，不索引 `MenuGroup` — 输入子菜单编号（如 `42`）必须先进入父菜单
 
+### 输出目录自动推导（output_name 机制）
+- 每个 `MenuNode` 拥有 `output_name: str` 属性，贡献一段路径
+- `MenuGroup` 通过构造参数 `output_name=` 设置（如 `MenuGroup("2", ..., output_name="electrochemical")`）
+- `MenuCommand` 通过类属性或 `__init__` 中设置 `self.output_name`
+- `MenuCommand.output_subdir` 是 `@property`，自动遍历父链拼接所有 `output_name` 段
+- `MenuGroup.add()` 自动建立 `node.parent` 引用
+- 移动命令到不同 `MenuGroup` 时输出路径自动更新
+- 无 `output_name` 的节点（Scripts、Settings）不参与路径推导
+
 ### lazy_import
 - 所有 `execute()` 方法通过 `lazy_import()` 延迟加载分析模块（36+ 处使用）
 - 目的：CLI 启动只加载框架代码，不触发 numpy/matplotlib/ase
@@ -38,7 +47,7 @@ VASPKIT 风格交互式编号菜单。无 argparse，所有输入通过 `input()
 
 ## 新增命令检查清单
 
-1. 在 `_<module>.py` 中创建 `MenuCommand` 子类，定义 `params`/`advanced_params`/`output_subdir`/`execute()`
+1. 在 `_<module>.py` 中创建 `MenuCommand` 子类，定义 `params`/`advanced_params`/`output_name`/`execute()`
 2. 在 `__init__.py` 中 import 并在 `build_menu_tree()` 中注册到对应 `MenuGroup`
 3. 如需新参数键 → 在 `_params.py` 的 `K` 类中添加常量
 4. 如需新参数类型 → 创建 `ParamCollector` 子类或使用现有泛型类

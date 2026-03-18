@@ -92,13 +92,26 @@ def _load_trajectory_cv(
     Each frame gets cell and PBC set from the restart metadata.
     """
     frames: list[tuple[int, float, Atoms]] = []
+    ref_symbols: tuple[str, ...] | None = None
     try:
         for atoms in iread(str(xyz_path), index=":"):
             step = int(atoms.info.get("i", 0))
+            symbols = tuple(atoms.get_chemical_symbols())
+            if ref_symbols is None:
+                ref_symbols = symbols
+            elif symbols != ref_symbols:
+                raise TIGenError(
+                    f"Atom ordering changed at step {step}: "
+                    f"expected {len(ref_symbols)} atoms "
+                    f"({ref_symbols[:3]}...), "
+                    f"got ({symbols[:3]}...)"
+                )
             cv = _cv_at_step(restart, step, colvar_id)
             atoms.set_cell(restart.cell_abc_ang)
             atoms.set_pbc(True)
             frames.append((step, cv, atoms))
+    except TIGenError:
+        raise
     except Exception as exc:
         if not frames:
             raise TIGenError(

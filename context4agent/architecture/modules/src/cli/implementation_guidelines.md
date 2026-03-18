@@ -11,7 +11,8 @@ Interactive CLI package providing a VASPKIT-style numbered menu interface. Repla
 - Pure interactive: no command-line arguments, all input via `input()` prompts
 - `_framework.py` 提供核心基础设施：`MenuNode`、`MenuGroup`、`MenuCommand`、`lazy_import()`
 - `_params.py` 提供声明式参数采集：`ParamCollector` ABC + 泛型参数类（`StrParam`、`FloatParam`、`IntParam`、`ChoiceParam` 等）
-- 每个子菜单模块通过 `MenuCommand` 子类实现，定义 `params`、`advanced_params`、`output_subdir` 和 `execute(self, ctx)` 方法
+- 每个子菜单模块通过 `MenuCommand` 子类实现，定义 `params`、`advanced_params`、`output_name` 和 `execute(self, ctx)` 方法
+- `output_subdir` 由 `@property` 自动遍历父链（`parent.output_name`）拼接，无需硬编码
 - `_prompt.py` 的共享 helper（`prompt_str`、`prompt_float` 等）由 `_params.py` 的参数类内部调用
 - 错误处理由 `MenuCommand` 框架统一应用 `_handle_cmd_error` 装饰器
 - `KeyboardInterrupt` / `EOFError` 在顶层 `main()` 中捕获以实现干净退出

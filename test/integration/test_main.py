@@ -200,8 +200,8 @@ class TestRunChargeAnalysis:
         assert "charge_csv" in results
         assert "charge_png" in results
         assert results["charge_csv"].exists()
-        # charge/counterion/ subdirectory was created
-        assert (out / "charge" / "counterion").is_dir()
+        # electrochemical/charge/counterion/ subdirectory was created
+        assert (out / "electrochemical" / "charge" / "counterion").is_dir()
 
 
 # ===========================================================================

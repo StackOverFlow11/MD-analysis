@@ -15,7 +15,11 @@
 - **NullHandler**：`__init__.py` 在 `md_analysis` logger 上设置 `NullHandler()`（PEP 282），CLI 或应用程序负责配置实际 handler
 - **异常层次**：所有领域异常继承 `MDAnalysisError`（在 `exceptions.py` 定义），调用方可 `except MDAnalysisError` 统一捕获
 - **编程入口**：`main.py` 提供 `run_water_analysis()`、`run_potential_analysis()`、`run_charge_analysis()`、`run_all()`
-- **输出目录结构**：`<outdir>/water/`、`<outdir>/potential/<sub>/`、`<outdir>/charge/<method>/`
+- **输出目录结构**（镜像 CLI 菜单树，由 `output_name` 自动推导）：
+  - `<outdir>/water/`
+  - `<outdir>/electrochemical/potential/<sub>/`
+  - `<outdir>/electrochemical/charge/<method>/`
+  - `<outdir>/enhanced_sampling/slowgrowth/`
 - **导入规范**：包内用相对导入（`.`/`..`/`...`），测试用绝对导入
 
 ## 陷阱与历史 Bug
