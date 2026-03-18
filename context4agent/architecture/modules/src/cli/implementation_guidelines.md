@@ -44,10 +44,11 @@ Interactive CLI package providing a VASPKIT-style numbered menu interface. Repla
 |------|--------|--------|
 | `_water.py` | `WaterDensityCmd`, `WaterOrientationCmd`, `AdWaterOrientationCmd`, `AdWaterThetaCmd`, `WaterThreePanelCmd` | 101-105 |
 | `_potential.py` | `CenterPotentialCmd`, `FermiEnergyCmd`, `ElectrodePotentialCmd`, `PhiZProfileCmd`, `ThicknessSensitivityCmd`, `FullPotentialCmd` | 211-216 |
-| `_charge.py` | `SurfaceChargeCmd`（通过 `method` 参数区分 counterion/layer/prompted） | 221-223 |
+| `_charge.py` | `SurfaceChargeCmd`（通过 `method` 参数区分 counterion/layer/prompted）, `TrackedChargeCmd`, `CounterionChargeCmd` | 221-225 |
+| `_calibration.py` | `CalibrateFromCSVCmd`, `CalibrateManualCmd`, `PredictPotentialCmd` | 231-233 |
 | `_enhanced_sampling.py` | `SGQuickPlotCmd`, `SGPublicationPlotCmd`（共享基类 `_SlowgrowthPlotCmd`） | 301-302 |
 | `_scripts.py` | `BaderSingleCmd`, `BaderBatchCmd`, `TISingleCmd`, `TIBatchCmd` | 411-412 (sub-group 41), 421-422 (sub-group 42) |
-| `_settings.py` | `SetVaspScriptCmd`, `ShowConfigCmd`, `SetAnalysisDefaultCmd`（通过 `config_key` 参数复用）, `ResetDefaultsCmd` | 901-907 |
+| `_settings.py` | `SetVaspScriptCmd`, `SetCp2kScriptCmd`, `ShowConfigCmd`, `SetAnalysisDefaultCmd`（通过 `config_key` 参数复用）, `ResetDefaultsCmd` | 901-908 |
 
 `_charge.py` 中 `_print_ensemble_summary()` 作为独立辅助函数保留，在 `SurfaceChargeCmd.execute()` 结束时调用。
 

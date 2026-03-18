@@ -1,5 +1,9 @@
 # CLI Composite + Command Refactoring Design
 
+> **NOTE (2026-03-18)**: 本文档中的 `output_subdir` 硬编码模式已被 `output_name` 树推导机制取代。
+> 菜单编号已更新：Charge 221-225、Calibration 231-233、Bader 411-412、TI 421-422。
+> 最新约定参见 `cli/CLAUDE.md`。
+
 ## Design Goals
 
 1. **Composite** tree structure: one `group.add(Cmd(...))` = menu text + dispatch + registration

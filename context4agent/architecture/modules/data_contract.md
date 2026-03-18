@@ -259,3 +259,47 @@ $$
 - $\lambda_i$：Lagrange 乘子（a.u.）
 - $\Delta\xi$：CV 步长（a.u./step）= `target_growth_au`（`Slowgrowth` 中已转换为 per-step；原始 `ConstraintInfo.target_growth_au` 为 per a.u. time，需乘 `dt_au = timestep_fs / AU_TIME_TO_FS`）
 - 内部计算单位：Hartree；输出同时提供 Hartree 和 eV（`HA_TO_EV` 转换）
+
+---
+
+## 标定模块（`electrochemical/calibration/`）
+
+### 输入
+
+- CSV 文件：列 1 = 电势 φ (V vs SHE)，列 2 = 表面电荷密度 σ (μC/cm²)
+  - 自动检测首行是否为表头（`_detect_header`：尝试 float 转换）
+- 或手动 `data_points: list[tuple[float, float]]`（(φ, σ) 对）
+
+### 标定 JSON（`calibration.json`）
+
+默认位置：`~/.config/md_analysis/calibration.json`
+
+```json
+{
+  "version": 1,
+  "created": "ISO 8601",
+  "reference": "SHE",
+  "metadata": {},
+  "data": {
+    "potentials_V": [float, ...],
+    "charge_densities_uC_cm2": [float, ...]
+  },
+  "fit": {
+    "method": "linear|polynomial|spline",
+    "params": { ... },
+    "r_squared": float,
+    "rmse": float,
+    "equation": "str"
+  }
+}
+```
+
+### 输出
+
+- CSV：`calibration_data.csv`（列 `potential_V`, `sigma_uC_cm2`）
+- PNG：`calibration_fit.png`（散点 + 拟合曲线 + R²/RMSE 标注，11×4.8 inch, 160 DPI）
+
+### 电势参考转换
+
+- SHE ↔ RHE：`φ_RHE = φ_SHE + (RT/F)·ln(10)·pH`
+- SHE ↔ PZC：`φ_PZC = φ_SHE − φ_pzc`

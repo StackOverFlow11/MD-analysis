@@ -72,9 +72,9 @@
 
 ### 3) `md_analysis.electrochemical`（电化学分析分组包）
 
-分组命名空间，包含 `potential` 和 `charge` 两个子包。自身不含业务逻辑，仅做 re-export。
+分组命名空间，包含 `potential`、`charge` 和 `calibration` 三个子包。自身不含业务逻辑，仅做 re-export。
 
-顶层 `md_analysis` 通过 `from .electrochemical import potential, charge` 提供向后兼容的便捷访问。
+顶层 `md_analysis` 通过 `from .electrochemical import potential, charge` 提供向后兼容的便捷访问。`calibration` 需通过 `from md_analysis.electrochemical import calibration` 访问。
 
 ### 3a) `md_analysis.electrochemical.charge`（多帧/电荷分析工作流）
 
@@ -106,6 +106,19 @@
   - `thickness_sensitivity_analysis()`：扫描 slab 厚度，双轴图（U vs SHE + spatial std φ(z)）
 - `electrochemical/potential/PhiZProfile.py`
   - `phi_z_planeavg_analysis()`：所有帧的 φ(z) overlay 可视化
+
+### 3c) `md_analysis.electrochemical.calibration`（σ→φ 标定映射）
+
+输入：(σ, φ) 数据点对（CSV 或手动输入），电势始终 V vs SHE
+
+- `calibration/config.py`：Nernst 常量、默认文件名、拟合方法常量
+- `calibration/_data.py`：`CalibrationData` 数据类、CSV/JSON I/O（自动检测表头）
+- `calibration/_mapper.py`：`ChargePotentialMapper` ABC + `LinearMapper`/`PolynomialMapper`/`SplineMapper`
+- `calibration/_plot.py`：标定拟合可视化（散点 + 拟合曲线 + R²/RMSE 标注）
+- `calibration/CalibrationWorkflow.py`：
+  - `calibrate()`：完整标定流程（加载数据→拟合→保存 JSON→出图）
+  - `predict_potential()`：从保存的标定预测电势
+  - `convert_reference()`：SHE ↔ RHE ↔ PZC 转换
 
 ### 5) `md_analysis.exceptions`（异常基类）
 
