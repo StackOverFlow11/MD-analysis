@@ -2,7 +2,7 @@
 
 ## 定位
 
-纯命名空间聚合包，不含任何分析逻辑。`__init__.py` 仅 re-export `potential` 和 `charge` 子包。
+纯命名空间聚合包，不含任何分析逻辑。`__init__.py` 仅 re-export `potential`、`charge` 和 `calibration` 子包。
 
 ## 子目录
 

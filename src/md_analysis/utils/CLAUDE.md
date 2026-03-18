@@ -6,7 +6,7 @@
 
 ## 约定
 
-- **`__init__.py` 是集中 re-export hub**：123 项在 `__all__` 中，包括部分下划线前缀的"私有"函数（如 `_compute_bisector_cos_theta_vec`）— 这些供 water 层内部使用
+- **`__init__.py` 是集中 re-export hub**：54 项在 `__all__` 中（均为公开符号）。下划线前缀函数（如 `_compute_bisector_cos_theta_vec`）在 `__init__.py` 中导入但不在 `__all__` 中，供 water 层内部 cross-layer 使用
 - **两个 config.py**（重要！）：
   - `utils/config.py`：物理常量（`AU_TIME_TO_FS`、`HA_TO_EV`、`BOHR_TO_ANG`）、cSHE 常量、默认参数、轴映射
   - `md_analysis/config.py`（上级目录）：用户持久化配置

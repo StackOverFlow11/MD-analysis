@@ -37,6 +37,7 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
   - `<outdir>/water/`
   - `<outdir>/electrochemical/potential/<sub>/`
   - `<outdir>/electrochemical/charge/<method>/`
+  - `<outdir>/electrochemical/calibration/{fit,predict}/`
   - `<outdir>/enhanced_sampling/slowgrowth/`
 - **Relative imports** inside `md_analysis/`; **absolute imports** in tests
 
