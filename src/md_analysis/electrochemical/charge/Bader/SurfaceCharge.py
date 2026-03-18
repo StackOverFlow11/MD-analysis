@@ -345,24 +345,64 @@ def _plot_surface_charge(
     sigma_opposed: np.ndarray,
     sigma_aligned_cum: np.ndarray,
     sigma_opposed_cum: np.ndarray,
+    *,
+    phi_aligned: np.ndarray | None = None,
+    phi_opposed: np.ndarray | None = None,
+    phi_aligned_cum: np.ndarray | None = None,
+    phi_opposed_cum: np.ndarray | None = None,
+    fit_rmse: float | None = None,
 ) -> None:
-    """Plot surface charge density with instantaneous and cumulative average."""
+    """Plot surface charge density with instantaneous and cumulative average.
+
+    If *phi_aligned* / *phi_opposed* are provided, a secondary y-axis shows
+    the extrapolated electrode potential.
+    """
     png_path.parent.mkdir(parents=True, exist_ok=True)
 
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
+    has_phi = phi_aligned is not None
+
     fig, ax = plt.subplots(figsize=(9, 4.8), dpi=160)
-    ax.plot(steps, sigma_aligned, lw=1.0, alpha=0.65, color="tab:blue", label="aligned (inst.)")
-    ax.plot(steps, sigma_aligned_cum, lw=2.0, color="tab:blue", ls="--", label="aligned (cum. avg)")
-    ax.plot(steps, sigma_opposed, lw=1.0, alpha=0.65, color="tab:orange", label="opposed (inst.)")
-    ax.plot(steps, sigma_opposed_cum, lw=2.0, color="tab:orange", ls="--", label="opposed (cum. avg)")
+    ax.plot(steps, sigma_aligned, lw=1.0, alpha=0.65, color="tab:blue", label="aligned σ (inst.)")
+    ax.plot(steps, sigma_aligned_cum, lw=2.0, color="tab:blue", ls="--", label="aligned σ (cum. avg)")
+    ax.plot(steps, sigma_opposed, lw=1.0, alpha=0.65, color="tab:orange", label="opposed σ (inst.)")
+    ax.plot(steps, sigma_opposed_cum, lw=2.0, color="tab:orange", ls="--", label="opposed σ (cum. avg)")
     ax.set_xlabel("MD step")
     ax.set_ylabel(r"$\sigma$ ($\mu$C/cm$^2$)")
-    ax.set_title("Surface charge density")
+    ax.set_title("Surface charge density" + (" + extrapolated potential" if has_phi else ""))
     ax.grid(True, alpha=0.25)
-    ax.legend()
+
+    if has_phi:
+        ax2 = ax.twinx()
+        ax2.plot(steps, phi_aligned, lw=1.0, alpha=0.45, color="tab:green",
+                 label="aligned φ (inst.)")
+        ax2.plot(steps, phi_aligned_cum, lw=2.0, color="tab:green", ls="--",
+                 label="aligned φ (cum. avg)")
+        ax2.plot(steps, phi_opposed, lw=1.0, alpha=0.45, color="tab:red",
+                 label="opposed φ (inst.)")
+        ax2.plot(steps, phi_opposed_cum, lw=2.0, color="tab:red", ls="--",
+                 label="opposed φ (cum. avg)")
+        ax2.set_ylabel("φ (V vs SHE)")
+
+        # Combine legends from both axes
+        h1, l1 = ax.get_legend_handles_labels()
+        h2, l2 = ax2.get_legend_handles_labels()
+        ax.legend(h1 + h2, l1 + l2, loc="best", fontsize=8)
+
+        # Annotate fit RMSE
+        if fit_rmse is not None:
+            ax2.annotate(
+                f"fit RMSE = {fit_rmse:.4e} V",
+                xy=(0.98, 0.02), xycoords="axes fraction",
+                ha="right", va="bottom", fontsize=8, fontfamily="monospace",
+                bbox=dict(boxstyle="round,pad=0.2", fc="wheat", alpha=0.5),
+            )
+    else:
+        ax.legend()
+
     fig.tight_layout()
     fig.savefig(png_path)
     plt.close(fig)
@@ -476,6 +516,37 @@ def surface_charge_analysis(
     sigma_aligned_cum = _cumulative_average(sigma_aligned)
     sigma_opposed_cum = _cumulative_average(sigma_opposed)
 
+    # --- Optional: extrapolate potential from calibration ---
+    phi_aligned: np.ndarray | None = None
+    phi_opposed: np.ndarray | None = None
+    phi_aligned_cum: np.ndarray | None = None
+    phi_opposed_cum: np.ndarray | None = None
+    fit_rmse: float | None = None
+
+    try:
+        from ...calibration._data import load_calibration_json
+        from ...calibration._mapper import mapper_from_dict
+
+        cal_data, fit_params = load_calibration_json()
+        mapper = mapper_from_dict(fit_params)
+        phi_aligned = mapper.predict(sigma_aligned)
+        phi_opposed = mapper.predict(sigma_opposed)
+        phi_aligned_cum = _cumulative_average(phi_aligned)
+        phi_opposed_cum = _cumulative_average(phi_opposed)
+        fit_rmse = fit_params.get("rmse")
+        logger.info(
+            "Calibration loaded — extrapolated potential appended "
+            "(fit RMSE=%.4e V)", fit_rmse or 0.0,
+        )
+    except FileNotFoundError:
+        logger.info(
+            "No calibration file found at default location. "
+            "Run 'Charge-Potential Calibration' (menu 23) to enable "
+            "automatic potential extrapolation from surface charge density."
+        )
+    except Exception as exc:
+        logger.warning("Failed to load calibration: %s", exc)
+
     # CSV
     fieldnames = [
         "step",
@@ -484,21 +555,56 @@ def surface_charge_analysis(
         "sigma_aligned_cumavg_uC_cm2",
         "sigma_opposed_cumavg_uC_cm2",
     ]
+    if phi_aligned is not None:
+        fieldnames.extend([
+            "phi_aligned_V_vs_SHE",
+            "phi_opposed_V_vs_SHE",
+            "phi_aligned_cumavg_V_vs_SHE",
+            "phi_opposed_cumavg_V_vs_SHE",
+        ])
+
     csv_rows: list[dict] = []
     for i in range(len(steps)):
-        csv_rows.append({
+        row: dict = {
             "step": int(steps[i]),
             "sigma_aligned_uC_cm2": float(sigma_aligned[i]),
             "sigma_opposed_uC_cm2": float(sigma_opposed[i]),
             "sigma_aligned_cumavg_uC_cm2": float(sigma_aligned_cum[i]),
             "sigma_opposed_cumavg_uC_cm2": float(sigma_opposed_cum[i]),
-        })
+        }
+        if phi_aligned is not None:
+            row["phi_aligned_V_vs_SHE"] = float(phi_aligned[i])
+            row["phi_opposed_V_vs_SHE"] = float(phi_opposed[i])
+            row["phi_aligned_cumavg_V_vs_SHE"] = float(phi_aligned_cum[i])
+            row["phi_opposed_cumavg_V_vs_SHE"] = float(phi_opposed_cum[i])
+        csv_rows.append(row)
     csv_path = output_dir / DEFAULT_SURFACE_CHARGE_CSV_NAME
     _write_csv(csv_path, csv_rows, fieldnames)
 
     # PNG
     png_path = output_dir / DEFAULT_SURFACE_CHARGE_PNG_NAME
-    _plot_surface_charge(png_path, steps, sigma_aligned, sigma_opposed,
-                         sigma_aligned_cum, sigma_opposed_cum)
+    _plot_surface_charge(
+        png_path, steps, sigma_aligned, sigma_opposed,
+        sigma_aligned_cum, sigma_opposed_cum,
+        phi_aligned=phi_aligned,
+        phi_opposed=phi_opposed,
+        phi_aligned_cum=phi_aligned_cum,
+        phi_opposed_cum=phi_opposed_cum,
+        fit_rmse=fit_rmse,
+    )
+
+    # Print potential summary if available
+    if phi_aligned is not None:
+        n = len(phi_aligned)
+        logger.info(
+            "Extrapolated potential (cum. avg over %d frames):\n"
+            "  aligned: %.6f ± %.6f V vs SHE (σ propagation)\n"
+            "  opposed: %.6f ± %.6f V vs SHE (σ propagation)\n"
+            "  fit RMSE: %.4e V",
+            n,
+            phi_aligned_cum[-1], float(np.std(phi_aligned)),
+            phi_opposed_cum[-1], float(np.std(phi_opposed)),
+            fit_rmse or 0.0,
+        )
 
     return csv_path
