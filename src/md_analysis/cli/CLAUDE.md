@@ -11,7 +11,7 @@ VASPKIT 风格交互式编号菜单。无 argparse，所有输入通过 `input()
 - `21x`：Potential (211-216), `22x`：Charge (221-225), `23x`：Calibration (231-233)
 - `3xx`：Enhanced Sampling (301-302)
 - `41x`：Bader (411-412), `42x`：TI (421-422)
-- `9xx`：Settings (901-908)
+- `9xx`：Settings (901-909)
 - 编号前缀必须与父 MenuGroup 编号匹配
 
 ### 框架模式
