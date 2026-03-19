@@ -351,6 +351,7 @@ def _plot_surface_charge(
     phi_aligned_cum: np.ndarray | None = None,
     phi_opposed_cum: np.ndarray | None = None,
     fit_rmse: float | None = None,
+    potential_reference: str = "SHE",
 ) -> None:
     """Plot surface charge density with instantaneous and cumulative average.
 
@@ -385,12 +386,12 @@ def _plot_surface_charge(
                  label="opposed φ (inst.)")
         ax2.plot(steps, phi_opposed_cum, lw=2.0, color="tab:red", ls="--",
                  label="opposed φ (cum. avg)")
-        ax2.set_ylabel("φ (V vs SHE)")
+        ax2.set_ylabel(f"φ (V vs {potential_reference})")
 
         # Combine legends from both axes
         h1, l1 = ax.get_legend_handles_labels()
         h2, l2 = ax2.get_legend_handles_labels()
-        ax.legend(h1 + h2, l1 + l2, loc="best", fontsize=8)
+        ax.legend(h1 + h2, l1 + l2, loc="upper left", fontsize=8)
 
         # Annotate fit RMSE
         if fit_rmse is not None:
@@ -429,6 +430,10 @@ def surface_charge_analysis(
     frame_end: int | None = None,
     frame_step: int | None = None,
     verbose: bool = False,
+    potential_reference: str = "SHE",
+    potential_pH: float = 0.0,
+    potential_temperature_K: float = 298.15,
+    potential_phi_pzc: float | None = None,
 ) -> Path:
     """End-to-end surface charge density analysis with CSV + PNG output.
 
@@ -450,6 +455,14 @@ def surface_charge_analysis(
         Slice parameters applied to the sorted frame list.
     verbose
         Print progress.
+    potential_reference
+        Output potential reference scale (``"SHE"``, ``"RHE"``, ``"PZC"``).
+    potential_pH
+        Solution pH for RHE conversion.
+    potential_temperature_K
+        Temperature in K for RHE conversion.
+    potential_phi_pzc
+        Potential of zero charge in V vs SHE for PZC conversion.
 
     Returns
     -------
@@ -523,6 +536,8 @@ def surface_charge_analysis(
     phi_opposed_cum: np.ndarray | None = None
     fit_rmse: float | None = None
 
+    ref_tag = potential_reference.upper()
+
     try:
         from ...calibration._data import load_calibration_json
         from ...calibration._mapper import mapper_from_dict
@@ -531,12 +546,28 @@ def surface_charge_analysis(
         mapper = mapper_from_dict(fit_params)
         phi_aligned = mapper.predict(sigma_aligned)
         phi_opposed = mapper.predict(sigma_opposed)
+
+        # Convert reference scale if needed
+        if ref_tag != "SHE":
+            from ...calibration.CalibrationWorkflow import convert_reference
+
+            phi_aligned = convert_reference(
+                phi_aligned, from_ref="SHE", to_ref=ref_tag,
+                temperature_K=potential_temperature_K, pH=potential_pH,
+                phi_pzc=potential_phi_pzc,
+            )
+            phi_opposed = convert_reference(
+                phi_opposed, from_ref="SHE", to_ref=ref_tag,
+                temperature_K=potential_temperature_K, pH=potential_pH,
+                phi_pzc=potential_phi_pzc,
+            )
+
         phi_aligned_cum = _cumulative_average(phi_aligned)
         phi_opposed_cum = _cumulative_average(phi_opposed)
         fit_rmse = fit_params.get("rmse")
         logger.info(
             "Calibration loaded — extrapolated potential appended "
-            "(fit RMSE=%.4e V)", fit_rmse or 0.0,
+            "(reference=%s, fit RMSE=%.4e V)", ref_tag, fit_rmse or 0.0,
         )
     except FileNotFoundError:
         logger.info(
@@ -557,10 +588,10 @@ def surface_charge_analysis(
     ]
     if phi_aligned is not None:
         fieldnames.extend([
-            "phi_aligned_V_vs_SHE",
-            "phi_opposed_V_vs_SHE",
-            "phi_aligned_cumavg_V_vs_SHE",
-            "phi_opposed_cumavg_V_vs_SHE",
+            f"phi_aligned_V_vs_{ref_tag}",
+            f"phi_opposed_V_vs_{ref_tag}",
+            f"phi_aligned_cumavg_V_vs_{ref_tag}",
+            f"phi_opposed_cumavg_V_vs_{ref_tag}",
         ])
 
     csv_rows: list[dict] = []
@@ -573,10 +604,10 @@ def surface_charge_analysis(
             "sigma_opposed_cumavg_uC_cm2": float(sigma_opposed_cum[i]),
         }
         if phi_aligned is not None:
-            row["phi_aligned_V_vs_SHE"] = float(phi_aligned[i])
-            row["phi_opposed_V_vs_SHE"] = float(phi_opposed[i])
-            row["phi_aligned_cumavg_V_vs_SHE"] = float(phi_aligned_cum[i])
-            row["phi_opposed_cumavg_V_vs_SHE"] = float(phi_opposed_cum[i])
+            row[f"phi_aligned_V_vs_{ref_tag}"] = float(phi_aligned[i])
+            row[f"phi_opposed_V_vs_{ref_tag}"] = float(phi_opposed[i])
+            row[f"phi_aligned_cumavg_V_vs_{ref_tag}"] = float(phi_aligned_cum[i])
+            row[f"phi_opposed_cumavg_V_vs_{ref_tag}"] = float(phi_opposed_cum[i])
         csv_rows.append(row)
     csv_path = output_dir / DEFAULT_SURFACE_CHARGE_CSV_NAME
     _write_csv(csv_path, csv_rows, fieldnames)
@@ -591,6 +622,7 @@ def surface_charge_analysis(
         phi_aligned_cum=phi_aligned_cum,
         phi_opposed_cum=phi_opposed_cum,
         fit_rmse=fit_rmse,
+        potential_reference=ref_tag,
     )
 
     # Print potential summary if available
@@ -598,12 +630,12 @@ def surface_charge_analysis(
         n = len(phi_aligned)
         logger.info(
             "Extrapolated potential (cum. avg over %d frames):\n"
-            "  aligned: %.6f ± %.6f V vs SHE (σ propagation)\n"
-            "  opposed: %.6f ± %.6f V vs SHE (σ propagation)\n"
+            "  aligned: %.6f ± %.6f V vs %s (σ propagation)\n"
+            "  opposed: %.6f ± %.6f V vs %s (σ propagation)\n"
             "  fit RMSE: %.4e V",
             n,
-            phi_aligned_cum[-1], float(np.std(phi_aligned)),
-            phi_opposed_cum[-1], float(np.std(phi_opposed)),
+            phi_aligned_cum[-1], float(np.std(phi_aligned)), ref_tag,
+            phi_opposed_cum[-1], float(np.std(phi_opposed)), ref_tag,
             fit_rmse or 0.0,
         )
 

@@ -98,7 +98,9 @@ Both methods output `[σ_aligned, σ_opposed]` — ordered by stable `interface_
 4. Per frame: `load_bader_atoms` → `compute_frame_surface_charge(..., method=method)` → collect `(step, σ_aligned, σ_opposed)`
 5. Compute cumulative average for both surfaces
 6. **Optional calibration**: try loading `~/.config/md_analysis/calibration.json`
-   - 成功：通过 `mapper_from_dict()` 恢复拟合器，`predict(σ)` 得到逐帧 φ + 累积平均，追加 4 列到 CSV，PNG 添加右轴
+   - 成功：通过 `mapper_from_dict()` 恢复拟合器，`predict(σ)` 得到逐帧 φ（V vs SHE）
+   - 若 `potential_reference` 非 SHE，通过 `convert_reference()` 转换参考标度后再计算累积平均
+   - 追加 4 列（`phi_{surface}_V_vs_{REF}` + cumavg）到 CSV，PNG 添加右轴（轴标签随 reference 变化）
    - 失败（FileNotFoundError）：log info 提示用户可通过菜单 23 标定，继续输出仅含 σ 的结果
 7. Write CSV (`_write_csv`) + PNG (`_plot_surface_charge`)
 8. Return CSV path

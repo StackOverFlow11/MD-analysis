@@ -15,7 +15,7 @@
 - `_calibration.py` -- calibration sub-menu (codes 231-233): CSV/manual calibrate + predict
 - `_enhanced_sampling.py` -- enhanced sampling sub-menu (codes 301-302) + slow-growth plot commands (lazy import of `enhanced_sampling.slowgrowth`)
 - `_scripts.py` -- scripts/tools sub-menu; Bader sub-group 41 (codes 411-412), TI sub-group 42 (codes 421-422)
-- `_settings.py` -- settings sub-menu (codes 901-908) + persistent config management (903-906: configurable analysis defaults, 907: reset all defaults)
+- `_settings.py` -- settings sub-menu (codes 901-909) + persistent config management (903-906: configurable analysis defaults, 907: reset all defaults, 909: potential output reference)
 
 ## Menu structure
 

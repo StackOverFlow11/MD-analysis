@@ -18,6 +18,12 @@ KEY_Z_BIN_WIDTH_A = "z_bin_width_A"
 KEY_THETA_BIN_DEG = "theta_bin_deg"
 KEY_WATER_OH_CUTOFF_A = "water_oh_cutoff_A"
 
+# Keys for potential output reference (managed by SetPotentialReferenceCmd)
+KEY_POTENTIAL_REFERENCE = "potential_reference"
+KEY_POTENTIAL_PH = "potential_ph"
+KEY_POTENTIAL_TEMPERATURE_K = "potential_temperature_K"
+KEY_POTENTIAL_PHI_PZC = "potential_phi_pzc"
+
 # Registry of configurable defaults: maps config key → metadata.
 # The "default" values mirror the hardcoded constants in utils/config.py.
 CONFIGURABLE_DEFAULTS: dict[str, dict] = {

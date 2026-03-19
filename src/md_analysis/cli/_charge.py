@@ -61,6 +61,13 @@ class SurfaceChargeCmd(MenuCommand):
             "md_analysis.electrochemical.charge",
             "surface_charge_analysis",
         )
+        from ..config import (
+            KEY_POTENTIAL_PH,
+            KEY_POTENTIAL_PHI_PZC,
+            KEY_POTENTIAL_REFERENCE,
+            KEY_POTENTIAL_TEMPERATURE_K,
+            get_config,
+        )
 
         # Static method (221/222): framework resolved via output_name
         # Dynamic method (223): resolve manually
@@ -84,6 +91,10 @@ class SurfaceChargeCmd(MenuCommand):
             frame_end=ctx[K.FRAME_END],
             frame_step=ctx[K.FRAME_STEP],
             verbose=True,
+            potential_reference=get_config(KEY_POTENTIAL_REFERENCE, "SHE"),
+            potential_pH=get_config(KEY_POTENTIAL_PH, 0.0),
+            potential_temperature_K=get_config(KEY_POTENTIAL_TEMPERATURE_K, 298.15),
+            potential_phi_pzc=get_config(KEY_POTENTIAL_PHI_PZC),
         )
         print(f"\n Analysis complete. Output:\n   charge_csv: {csv_path}")
         _print_ensemble_summary(csv_path)

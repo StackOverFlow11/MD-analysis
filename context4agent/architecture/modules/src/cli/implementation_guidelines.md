@@ -48,7 +48,7 @@ Interactive CLI package providing a VASPKIT-style numbered menu interface. Repla
 | `_calibration.py` | `CalibrateFromCSVCmd`, `CalibrateManualCmd`, `PredictPotentialCmd` | 231-233 |
 | `_enhanced_sampling.py` | `SGQuickPlotCmd`, `SGPublicationPlotCmd`（共享基类 `_SlowgrowthPlotCmd`） | 301-302 |
 | `_scripts.py` | `BaderSingleCmd`, `BaderBatchCmd`, `TISingleCmd`, `TIBatchCmd` | 411-412 (sub-group 41), 421-422 (sub-group 42) |
-| `_settings.py` | `SetVaspScriptCmd`, `SetCp2kScriptCmd`, `ShowConfigCmd`, `SetAnalysisDefaultCmd`（通过 `config_key` 参数复用）, `ResetDefaultsCmd` | 901-908 |
+| `_settings.py` | `SetVaspScriptCmd`, `SetCp2kScriptCmd`, `ShowConfigCmd`, `SetAnalysisDefaultCmd`（通过 `config_key` 参数复用）, `ResetDefaultsCmd`, `SetPotentialReferenceCmd` | 901-909 |
 
 `_charge.py` 中 `_print_ensemble_summary()` 作为独立辅助函数保留，在 `SurfaceChargeCmd.execute()` 结束时调用。
 
@@ -79,8 +79,19 @@ Settings menu 903-907 allow users to persistently override algorithm defaults fr
 - 905: `theta_bin_deg` (theta bin width)
 - 906: `water_oh_cutoff_A` (water O-H cutoff)
 - 907: reset all analysis defaults
+- 909: potential output reference (SHE/RHE/PZC) — `SetPotentialReferenceCmd`
 
 The `_get_effective_default(key)` helper in `_prompt.py` reads the user config first, falling back to the hardcoded default from `CONFIGURABLE_DEFAULTS` registry. Analysis sub-menus (`_potential.py`, `_water.py`, `_charge.py`) use this helper to populate prompt defaults. Library function signatures remain unchanged — persistence only affects CLI prompt defaults.
+
+### Potential output reference (909)
+
+`SetPotentialReferenceCmd` allows users to configure the default output potential reference scale for `surface_charge_analysis` extrapolation:
+
+- **SHE** (default): no conversion
+- **RHE**: prompts for pH and temperature (K), applies Nernst shift φ_RHE = φ_SHE + (RT/F)·ln(10)·pH
+- **PZC**: prompts for φ_PZC (V vs SHE), applies φ_PZC = φ_SHE − φ_pzc
+
+Config keys: `KEY_POTENTIAL_REFERENCE`, `KEY_POTENTIAL_PH`, `KEY_POTENTIAL_TEMPERATURE_K`, `KEY_POTENTIAL_PHI_PZC`. `ShowConfigCmd` displays these in a separate "Potential Output" section; `ResetDefaultsCmd` also clears them. `SurfaceChargeCmd.execute()` reads these from config and passes to `surface_charge_analysis()`.
 
 ## Enhanced sampling CLI (`_enhanced_sampling.py`)
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from ._framework import MenuCommand, lazy_import
-from ._prompt import prompt_float, prompt_str
+from ._prompt import prompt_choice, prompt_float, prompt_str
 
 
 class SetVaspScriptCmd(MenuCommand):
@@ -54,7 +54,15 @@ class SetCp2kScriptCmd(MenuCommand):
 
 class ShowConfigCmd(MenuCommand):
     def execute(self, ctx: dict) -> None:
-        from ..config import CONFIGURABLE_DEFAULTS, get_config, load_config
+        from ..config import (
+            CONFIGURABLE_DEFAULTS,
+            KEY_POTENTIAL_PH,
+            KEY_POTENTIAL_PHI_PZC,
+            KEY_POTENTIAL_REFERENCE,
+            KEY_POTENTIAL_TEMPERATURE_K,
+            get_config,
+            load_config,
+        )
 
         cfg = load_config()
         if not cfg:
@@ -70,6 +78,16 @@ class ShowConfigCmd(MenuCommand):
                 print(f"  {entry['label']}: {user_val}  (custom)")
             else:
                 print(f"  {entry['label']}: {entry['default']}  (default)")
+
+        print("\n  --- Potential Output ---")
+        ref = get_config(KEY_POTENTIAL_REFERENCE, "SHE")
+        is_custom = get_config(KEY_POTENTIAL_REFERENCE) is not None
+        print(f"  Reference: {ref}  {'(custom)' if is_custom else '(default)'}")
+        if ref == "RHE":
+            print(f"  pH: {get_config(KEY_POTENTIAL_PH, 0.0)}")
+            print(f"  Temperature: {get_config(KEY_POTENTIAL_TEMPERATURE_K, 298.15)} K")
+        elif ref == "PZC":
+            print(f"  φ_PZC: {get_config(KEY_POTENTIAL_PHI_PZC, 0.0)} V vs SHE")
 
 
 class SetAnalysisDefaultCmd(MenuCommand):
@@ -92,10 +110,58 @@ class SetAnalysisDefaultCmd(MenuCommand):
         print(f"  Saved: {self.config_key} = {value}")
 
 
+class SetPotentialReferenceCmd(MenuCommand):
+    """Configure default potential output reference (SHE/RHE/PZC)."""
+
+    def execute(self, ctx: dict) -> None:
+        from ..config import (
+            KEY_POTENTIAL_PH,
+            KEY_POTENTIAL_PHI_PZC,
+            KEY_POTENTIAL_REFERENCE,
+            KEY_POTENTIAL_TEMPERATURE_K,
+            get_config,
+            set_config,
+        )
+
+        current_ref = get_config(KEY_POTENTIAL_REFERENCE, "SHE")
+        print(f"  Current reference: {current_ref}")
+
+        ref = prompt_choice("Potential reference", ["SHE", "RHE", "PZC"],
+                            default=current_ref)
+        set_config(KEY_POTENTIAL_REFERENCE, ref)
+
+        if ref == "RHE":
+            current_pH = get_config(KEY_POTENTIAL_PH, 0.0)
+            current_T = get_config(KEY_POTENTIAL_TEMPERATURE_K, 298.15)
+            pH = prompt_float("pH", default=current_pH)
+            T = prompt_float("Temperature (K)", default=current_T)
+            set_config(KEY_POTENTIAL_PH, pH)
+            set_config(KEY_POTENTIAL_TEMPERATURE_K, T)
+            print(f"\n  Saved: reference={ref}, pH={pH}, T={T} K")
+        elif ref == "PZC":
+            current_pzc = get_config(KEY_POTENTIAL_PHI_PZC, 0.0)
+            pzc = prompt_float("Potential of zero charge (V vs SHE)",
+                               default=current_pzc)
+            set_config(KEY_POTENTIAL_PHI_PZC, pzc)
+            print(f"\n  Saved: reference={ref}, φ_PZC={pzc} V vs SHE")
+        else:
+            print(f"\n  Saved: reference={ref}")
+
+
 class ResetDefaultsCmd(MenuCommand):
     def execute(self, ctx: dict) -> None:
-        from ..config import CONFIGURABLE_DEFAULTS, delete_config
+        from ..config import (
+            CONFIGURABLE_DEFAULTS,
+            KEY_POTENTIAL_PH,
+            KEY_POTENTIAL_PHI_PZC,
+            KEY_POTENTIAL_REFERENCE,
+            KEY_POTENTIAL_TEMPERATURE_K,
+            delete_config,
+        )
 
         for key in CONFIGURABLE_DEFAULTS:
+            delete_config(key)
+        for key in (KEY_POTENTIAL_REFERENCE, KEY_POTENTIAL_PH,
+                    KEY_POTENTIAL_TEMPERATURE_K, KEY_POTENTIAL_PHI_PZC):
             delete_config(key)
         print("\n  All analysis defaults reset to hardcoded values.")

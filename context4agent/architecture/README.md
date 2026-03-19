@@ -130,6 +130,7 @@
 - `config.py`：用户偏好持久化（`~/.config/md_analysis/config.json`）
   - `load_config()`、`save_config()`、`get_config()`、`set_config()`、`delete_config()`
   - 配置键常量：`KEY_VASP_SCRIPT_PATH`、`KEY_LAYER_TOL_A`、`KEY_Z_BIN_WIDTH_A`、`KEY_THETA_BIN_DEG`、`KEY_WATER_OH_CUTOFF_A`
+  - 电势输出配置键：`KEY_POTENTIAL_REFERENCE`、`KEY_POTENTIAL_PH`、`KEY_POTENTIAL_TEMPERATURE_K`、`KEY_POTENTIAL_PHI_PZC`
   - `CONFIGURABLE_DEFAULTS`：可配置分析参数注册表（键 → 硬编码默认值 + 标签）
 
 ### 7) `md_analysis.main` / `md_analysis.cli`（集成入口）
@@ -145,7 +146,7 @@
   - `_charge.py`：电荷分析命令类（221-223）：`SurfaceChargeCmd`（通过 `method` 参数区分）、`_print_ensemble_summary()`
   - `_enhanced_sampling.py`：增强抽样命令类（301-302）：`SGQuickPlotCmd`、`SGPublicationPlotCmd`
   - `_scripts.py`：脚本/工具命令类（41=Bader 411-412，42=TI 421-422）：`BaderSingleCmd`、`BaderBatchCmd`、`TISingleCmd`、`TIBatchCmd`
-  - `_settings.py`：设置命令类（901-907）：`SetVaspScriptCmd`、`ShowConfigCmd`、`SetAnalysisDefaultCmd`、`ResetDefaultsCmd`
+  - `_settings.py`：设置命令类（901-909）：`SetVaspScriptCmd`、`SetCp2kScriptCmd`、`ShowConfigCmd`、`SetAnalysisDefaultCmd`、`ResetDefaultsCmd`、`SetPotentialReferenceCmd`
 
 ### 8) `md_analysis.enhanced_sampling`（增强抽样分析工作流）
 

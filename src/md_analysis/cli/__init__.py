@@ -29,6 +29,7 @@ from ._settings import (
     ResetDefaultsCmd,
     SetAnalysisDefaultCmd,
     SetCp2kScriptCmd,
+    SetPotentialReferenceCmd,
     SetVaspScriptCmd,
     ShowConfigCmd,
 )
@@ -135,6 +136,8 @@ def build_menu_tree() -> MenuGroup:
         SetAnalysisDefaultCmd("906", "Water O-H Cutoff (A)",
                               config_key=KEY_WATER_OH_CUTOFF_A),
         ResetDefaultsCmd("907", "Reset All Defaults"),
+        "Potential Output",
+        SetPotentialReferenceCmd("909", "Set Potential Output Reference"),
     )
 
     root.add(water, electrochemical, enhanced, scripts, "", settings)

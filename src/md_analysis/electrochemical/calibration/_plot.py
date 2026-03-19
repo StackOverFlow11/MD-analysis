@@ -84,7 +84,7 @@ def plot_calibration(
     ax.set_xlabel("σ (μC/cm²)")
     ax.set_ylabel(f"φ (V vs {reference})")
     ax.grid(True, alpha=0.25)
-    ax.legend(loc="best", frameon=True)
+    ax.legend(loc="lower right", frameon=True)
 
     fig.tight_layout()
 

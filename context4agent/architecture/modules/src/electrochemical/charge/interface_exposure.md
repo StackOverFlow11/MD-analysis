@@ -122,8 +122,9 @@ def surface_charge_analysis(
 ```
 
 > **Calibration integration**: 函数末尾自动尝试加载 `~/.config/md_analysis/calibration.json`。
-> 若存在有效标定，CSV 追加 `phi_aligned_V_vs_SHE`、`phi_opposed_V_vs_SHE` 及其累积平均列；
-> PNG 添加右轴显示外推电势。无标定时仅输出 σ 列。
+> 若存在有效标定，CSV 追加 `phi_aligned_V_vs_{REF}`、`phi_opposed_V_vs_{REF}` 及其累积平均列（REF 由 `potential_reference` 参数决定，默认 SHE）；
+> PNG 添加右轴显示外推电势（轴标签随 reference 变化）。无标定时仅输出 σ 列。
+> 当 `potential_reference` 非 SHE 时，通过 `calibration.CalibrationWorkflow.convert_reference()` 转换参考标度（SHE→RHE 需 pH + T；SHE→PZC 需 φ_PZC）。
 
 ## `BaderTrajectoryData` Dataclass
 
