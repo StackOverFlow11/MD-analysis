@@ -11,6 +11,7 @@ from pathlib import Path
 
 from .config import DEFAULT_DIAGNOSTICS_PNG_PREFIX, DEFAULT_FE_PROFILE_PNG_NAME
 from .models import ConstraintPointReport, TIReport
+from ...utils.config import HA_TO_EV
 
 
 def plot_point_diagnostics(
@@ -219,8 +220,8 @@ def plot_free_energy_profile(
     fig, ax1 = plt.subplots(figsize=(8, 5), dpi=180)
 
     xi = ti_report.xi_values
-    forces = ti_report.forces
-    errors = ti_report.force_errors
+    forces = ti_report.forces * HA_TO_EV
+    errors = ti_report.force_errors * HA_TO_EV
 
     # Left axis: dA/dxi with error bars
     colors = [
@@ -231,7 +232,7 @@ def plot_free_energy_profile(
     for i, (x, y) in enumerate(zip(xi, forces)):
         ax1.plot(x, y, "o", markersize=5, color=colors[i], zorder=5)
     ax1.set_xlabel("ξ (a.u.)")
-    ax1.set_ylabel("dA/dξ (Hartree/a.u.)", color="C0")
+    ax1.set_ylabel("dA/dξ (eV/a.u.)", color="C0")
     ax1.tick_params(axis="y", labelcolor="C0")
 
     # Right axis: integrated A(xi)
@@ -246,11 +247,13 @@ def plot_free_energy_profile(
         alpha=0.2,
         color="C1",
     )
-    ax2.set_ylabel("A(ξ) (Hartree)", color="C1")
+    ax2.set_ylabel("A(ξ) (eV)", color="C1")
     ax2.tick_params(axis="y", labelcolor="C1")
 
+    delta_A_eV = ti_report.delta_A * HA_TO_EV
+    sigma_A_eV = ti_report.sigma_A * HA_TO_EV
     title = (
-        f"ΔA = {ti_report.delta_A:.6f} ± {ti_report.sigma_A:.6f} Hartree"
+        f"ΔA = {delta_A_eV:.6f} ± {sigma_A_eV:.6f} eV"
         f"  ({'ALL PASS' if ti_report.all_passed else f'{len(ti_report.failing_indices)} FAILED'})"
     )
     ax1.set_title(title, fontsize=10)
