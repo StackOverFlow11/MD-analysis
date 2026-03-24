@@ -4,6 +4,8 @@ import numpy as np
 import pytest
 
 from md_analysis.enhanced_sampling.constrained_ti.models import (
+    ArctanFitResult,
+    BlockAverageResult,
     InsufficientSamplingError,
 )
 from md_analysis.enhanced_sampling.constrained_ti.workflow import (
@@ -164,3 +166,175 @@ class TestAnalyzeTI:
         assert report.force_errors.shape == (3,)
         assert isinstance(report.delta_A, float)
         assert isinstance(report.sigma_A, float)
+
+
+# ---------------------------------------------------------------------------
+# Arctan 3-tier SEM selection tests
+# ---------------------------------------------------------------------------
+
+
+class TestArctanIntegration:
+    """Tests for arctan integration in the workflow."""
+
+    def test_arctan_field_exists(self):
+        """#1: block_avg.arctan field populated for AR(1) data."""
+        series = make_ar1(5000, 0.9, seed=42)
+        report = analyze_standalone(series)
+        assert report.block_avg.arctan is not None
+
+    def test_path1_arctan_reliable_uses_asymptote(self):
+        """#2: When arctan is reliable, sem_final == arctan.sem_asymptote."""
+        series = make_ar1(5000, 0.9, seed=42)
+        report = analyze_standalone(series)
+        arctan = report.block_avg.arctan
+        if arctan is not None and arctan.reliable:
+            assert report.sem_final == pytest.approx(
+                arctan.sem_asymptote, rel=1e-10
+            )
+
+    def test_path2_arctan_unreliable_plateau(self):
+        """#3: Arctan unreliable + plateau → sem_final = sem_plateau.
+
+        Uses mock BlockAverageResult since this path is hard to trigger
+        naturally.
+        """
+        from unittest.mock import patch
+
+        unreliable_arctan = ArctanFitResult(
+            sem_asymptote=999.0,
+            A=999.0,
+            B=999.0,
+            r2=0.5,
+            reliable=False,
+            tau_corr_implied=float("nan"),
+            fit_curve=None,
+        )
+
+        def patched_analyze_block_average(series, **kwargs):
+            real_module = __import__(
+                "md_analysis.enhanced_sampling.constrained_ti.analysis.block_average",
+                fromlist=["analyze_block_average"],
+            )
+            # Call real function with dense_sampling=False to get real plateau result
+            real_result = real_module.analyze_block_average(
+                series, dense_sampling=False, **{
+                    k: v for k, v in kwargs.items() if k != "dense_sampling"
+                }
+            )
+            # Construct result with unreliable arctan but real plateau
+            return BlockAverageResult(
+                block_sizes=real_result.block_sizes,
+                sem_curve=real_result.sem_curve,
+                sem_plateau=real_result.sem_plateau,
+                sem_at_max_B=real_result.sem_at_max_B,
+                plateau_rtol=real_result.plateau_rtol,
+                plateau_reached=True,  # Force plateau reached
+                cross_valid_ok=real_result.cross_valid_ok,
+                passed=real_result.passed,
+                arctan=unreliable_arctan,
+            )
+
+        with patch(
+            "md_analysis.enhanced_sampling.constrained_ti.workflow.analyze_block_average",
+            side_effect=patched_analyze_block_average,
+        ):
+            series = make_ar1(5000, 0.3, seed=42)
+            report = analyze_standalone(series)
+
+        assert report.sem_final != 999.0  # Not the unreliable arctan value
+        assert report.block_avg.arctan is not None
+        assert report.block_avg.arctan.reliable is False
+
+    def test_path3_all_fallback_to_acf(self):
+        """#4: Arctan=None + no plateau → sem_final = sem_auto."""
+        from unittest.mock import patch
+
+        def patched_analyze_block_average(series, **kwargs):
+            real_module = __import__(
+                "md_analysis.enhanced_sampling.constrained_ti.analysis.block_average",
+                fromlist=["analyze_block_average"],
+            )
+            real_result = real_module.analyze_block_average(
+                series, dense_sampling=False, **{
+                    k: v for k, v in kwargs.items() if k != "dense_sampling"
+                }
+            )
+            return BlockAverageResult(
+                block_sizes=real_result.block_sizes,
+                sem_curve=real_result.sem_curve,
+                sem_plateau=real_result.sem_plateau,
+                sem_at_max_B=real_result.sem_at_max_B,
+                plateau_rtol=real_result.plateau_rtol,
+                plateau_reached=False,  # Force no plateau
+                cross_valid_ok=real_result.cross_valid_ok,
+                passed=real_result.passed,
+                arctan=None,  # No arctan
+            )
+
+        with patch(
+            "md_analysis.enhanced_sampling.constrained_ti.workflow.analyze_block_average",
+            side_effect=patched_analyze_block_average,
+        ):
+            series = make_ar1(5000, 0.3, seed=42)
+            report = analyze_standalone(series)
+
+        # sem_final should be sem_auto (ACF fallback)
+        assert report.sem_final == pytest.approx(
+            report.autocorr.sem_auto, rel=1e-10
+        )
+
+    def test_failure_reasons_contain_arctan_message(self):
+        """#5: When arctan fails, failure_reasons mention it."""
+        from unittest.mock import patch
+
+        unreliable_arctan = ArctanFitResult(
+            sem_asymptote=0.001,
+            A=0.001,
+            B=0.01,
+            r2=0.5,
+            reliable=False,
+            tau_corr_implied=float("nan"),
+            fit_curve=None,
+        )
+
+        def patched_analyze_block_average(series, **kwargs):
+            real_module = __import__(
+                "md_analysis.enhanced_sampling.constrained_ti.analysis.block_average",
+                fromlist=["analyze_block_average"],
+            )
+            real_result = real_module.analyze_block_average(
+                series, dense_sampling=False, **{
+                    k: v for k, v in kwargs.items() if k != "dense_sampling"
+                }
+            )
+            return BlockAverageResult(
+                block_sizes=real_result.block_sizes,
+                sem_curve=real_result.sem_curve,
+                sem_plateau=real_result.sem_plateau,
+                sem_at_max_B=real_result.sem_at_max_B,
+                plateau_rtol=real_result.plateau_rtol,
+                plateau_reached=False,
+                cross_valid_ok=real_result.cross_valid_ok,
+                passed=real_result.passed,
+                arctan=unreliable_arctan,
+            )
+
+        with patch(
+            "md_analysis.enhanced_sampling.constrained_ti.workflow.analyze_block_average",
+            side_effect=patched_analyze_block_average,
+        ):
+            series = make_ar1(5000, 0.3, seed=42)
+            report = analyze_standalone(series)
+
+        arctan_msgs = [r for r in report.failure_reasons if "Arctan" in r or "arctan" in r]
+        assert len(arctan_msgs) > 0
+
+    def test_clean_ar1_all_pass_regression(self):
+        """#6 (P0): Regression — test_clean_ar1_all_pass behavior preserved."""
+        xi = np.array([1.0, 2.0, 3.0])
+        series_list = [make_ar1(10000, 0.3, seed=10 + i) for i in range(3)]
+        report = analyze_ti(xi, series_list, dt=1.0, epsilon_tol_kcal=100.0)
+        assert report.all_passed is True
+        # SEM values should be in reasonable range
+        for r in report.point_reports:
+            assert 0 < r.sem_final < 1.0

@@ -5,12 +5,53 @@ from __future__ import annotations
 import numpy as np
 
 from ..config import (
+    DEFAULT_ARCTAN_MIN_POINTS,
+    DEFAULT_ARCTAN_R2_MIN,
     DEFAULT_CROSS_VALID_RTOL,
     DEFAULT_MIN_BLOCKS,
     DEFAULT_PLATEAU_RTOL,
     DEFAULT_PLATEAU_WINDOW,
 )
 from ..models import BlockAverageResult
+from ._arctan_fit import fit_arctan_sem
+
+
+# ---------------------------------------------------------------------------
+# Block-size generation strategies
+# ---------------------------------------------------------------------------
+
+
+def _generate_block_sizes(n: int, min_blocks: int = 4) -> np.ndarray:
+    """Mixed strategy: continuous integers for small B, geometric for large B.
+
+    B = 1..20 continuous integers + 1.25x geometric series starting at 21.
+    Covers the B ≈ 2τ transition region typical of MD data (τ ≈ 5–15).
+    """
+    max_b = n // min_blocks if min_blocks > 0 else n
+    if max_b < 1:
+        return np.array([1], dtype=int)
+    sizes: set[int] = set(range(1, min(21, max_b + 1)))  # B = 1..20
+    b = 21.0
+    while int(b) <= max_b:
+        sizes.add(int(b))
+        b *= 1.25
+    return np.array(sorted(sizes), dtype=int)
+
+
+def _generate_block_sizes_pow2(n: int, min_blocks: int = 4) -> np.ndarray:
+    """Legacy powers-of-2 strategy (for backward compatibility)."""
+    max_b = n // min_blocks if min_blocks > 0 else n
+    block_sizes = []
+    b = 1
+    while b <= max_b:
+        block_sizes.append(b)
+        b *= 2
+    return np.array(block_sizes, dtype=int) if block_sizes else np.array([1], dtype=int)
+
+
+# ---------------------------------------------------------------------------
+# Main analysis function
+# ---------------------------------------------------------------------------
 
 
 def analyze_block_average(
@@ -22,6 +63,9 @@ def analyze_block_average(
     plateau_window: int = DEFAULT_PLATEAU_WINDOW,
     plateau_rtol: float = DEFAULT_PLATEAU_RTOL,
     cross_valid_rtol: float = DEFAULT_CROSS_VALID_RTOL,
+    dense_sampling: bool = True,
+    arctan_r2_min: float = DEFAULT_ARCTAN_R2_MIN,
+    arctan_min_points: int = DEFAULT_ARCTAN_MIN_POINTS,
 ) -> BlockAverageResult:
     """Run block-averaging analysis on a Lagrange multiplier time series.
 
@@ -41,6 +85,13 @@ def analyze_block_average(
         Maximum relative spread for plateau detection.
     cross_valid_rtol : float
         Cross-validation tolerance between SEM_block and SEM_auto.
+    dense_sampling : bool
+        True = mixed continuous+geometric strategy (~30 points).
+        False = legacy powers-of-2 (~9 points).
+    arctan_r2_min : float
+        Minimum R² for arctan fit to be considered reliable.
+    arctan_min_points : int
+        Minimum number of non-NaN block sizes to attempt arctan fit.
 
     Returns
     -------
@@ -48,14 +99,11 @@ def analyze_block_average(
     """
     n = len(series)
 
-    # Generate block sizes B = 1, 2, 4, 8, ..., up to N // min_blocks
-    max_b = n // min_blocks if min_blocks > 0 else n
-    block_sizes = []
-    b = 1
-    while b <= max_b:
-        block_sizes.append(b)
-        b *= 2
-    block_sizes = np.array(block_sizes, dtype=int)
+    # Generate block sizes
+    if dense_sampling:
+        block_sizes = _generate_block_sizes(n, min_blocks)
+    else:
+        block_sizes = _generate_block_sizes_pow2(n, min_blocks)
 
     # Compute SEM(B) for each block size
     sem_curve = np.empty(len(block_sizes))
@@ -97,11 +145,22 @@ def analyze_block_average(
         relative_diff = abs(sem_plateau_val - sem_auto) / sem_plateau_val
         cross_valid_ok = relative_diff < cross_valid_rtol
 
-    # Pass/fail
+    # Pass/fail (plateau sub-step only)
     if sem_max is not None:
         passed: bool | None = plateau_reached and sem_plateau_val <= sem_max
     else:
         passed = None
+
+    # Arctan extrapolation
+    sigma = float(np.std(series, ddof=0))
+    arctan_result = fit_arctan_sem(
+        block_sizes,
+        sem_curve,
+        n_total=n,
+        sigma_series=sigma,
+        r2_min=arctan_r2_min,
+        min_points=arctan_min_points,
+    )
 
     return BlockAverageResult(
         block_sizes=block_sizes,
@@ -112,4 +171,5 @@ def analyze_block_average(
         plateau_reached=plateau_reached,
         cross_valid_ok=cross_valid_ok,
         passed=passed,
+        arctan=arctan_result,
     )

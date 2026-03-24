@@ -59,6 +59,19 @@ DEFAULT_PLATEAU_WINDOW: int = 4
 DEFAULT_CROSS_VALID_RTOL: float = 0.3
 
 # ---------------------------------------------------------------------------
+# Step 3b: Arctan extrapolation
+# ---------------------------------------------------------------------------
+
+# Minimum R² for arctan fit to be considered reliable.
+# Set below 0.95 because dense sampling (B=1..20 continuous) produces many
+# precise low-B points where the arctan model is weakest, lowering R²
+# without degrading the asymptotic estimate.
+DEFAULT_ARCTAN_R2_MIN: float = 0.75
+
+# Minimum number of (non-NaN) block sizes needed to attempt arctan fit.
+DEFAULT_ARCTAN_MIN_POINTS: int = 5
+
+# ---------------------------------------------------------------------------
 # Step 1: Running average drift
 # ---------------------------------------------------------------------------
 

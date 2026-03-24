@@ -79,7 +79,12 @@ def plot_point_diagnostics(
     # --- Bottom-left: Block average SEM(B) ---
     ax = axes[1, 0]
     ax.plot(report.block_avg.block_sizes, report.block_avg.sem_curve, "o-", markersize=3, color="C0")
-    ax.set_xscale("log", base=2)
+    # Dynamic x-axis base: log10 for dense sampling, log2 for legacy
+    arctan = report.block_avg.arctan
+    if arctan is not None:
+        ax.set_xscale("log", base=10)
+    else:
+        ax.set_xscale("log", base=2)
     ax.set_xlabel("Block size B")
     ax.set_ylabel("SEM(B)")
     if report.sem_max is not None:
@@ -101,8 +106,27 @@ def plot_point_diagnostics(
                 alpha=0.15,
                 color="C2",
             )
+    # Overlay arctan fit curve and asymptote
+    if arctan is not None:
+        if arctan.fit_curve is not None:
+            # Smooth curve via dense interpolation
+            bs_float = report.block_avg.block_sizes.astype(float)
+            x_dense = np.linspace(bs_float[0], bs_float[-1], 200)
+            y_dense = arctan.A * np.arctan(arctan.B * x_dense)
+            ax.plot(x_dense, y_dense, "-", color="C3", linewidth=1.2, label="arctan fit")
+        asym_color = "C2" if arctan.reliable else "0.6"
+        asym_style = "--" if arctan.reliable else ":"
+        ax.axhline(
+            arctan.sem_asymptote,
+            color=asym_color,
+            linestyle=asym_style,
+            linewidth=0.8,
+            label=f"SEM_arctan ({arctan.sem_asymptote:.2e})",
+        )
+    arctan_ok = arctan is not None and arctan.reliable
     ax.set_title(
-        f"Block Average (plateau={'yes' if report.block_avg.plateau_reached else 'no'})"
+        f"Block Average (arctan={'yes' if arctan_ok else 'no'}, "
+        f"plateau={'yes' if report.block_avg.plateau_reached else 'no'})"
     )
     ax.legend(fontsize=7)
 
@@ -120,6 +144,14 @@ def plot_point_diagnostics(
         f"SEM_block = {r.block_avg.sem_plateau:.6f}  (plateau: {'yes' if r.block_avg.plateau_reached else 'no'})",
         f"SEM_at_max_B = {r.block_avg.sem_at_max_B:.6f}",
         f"SEM_final = {r.sem_final:.6f}",
+        *(
+            [
+                f"SEM_arctan = {r.block_avg.arctan.sem_asymptote:.6f}  (R²={r.block_avg.arctan.r2:.3f})",
+                f"τ_implied = {r.block_avg.arctan.tau_corr_implied:.1f}",
+            ]
+            if r.block_avg.arctan is not None and r.block_avg.arctan.reliable
+            else []
+        ),
         "",
         f"SEM target: {r.sem_max:.6f}" if r.sem_max is not None else "SEM target: N/A",
         f"Drift D = {r.running_avg.drift_D:.6f}  ({'PASS' if r.running_avg.passed else 'FAIL'})",

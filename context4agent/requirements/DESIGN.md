@@ -53,8 +53,9 @@ src/md_analysis/enhanced_sampling/constrained_ti/
 ├── analysis/                  # four independent analysis engines
 │   ├── __init__.py            #   re-exports engine entry points
 │   ├── _acf_core.py           #   shared ACF computation (FFT-accelerated)
+│   ├── _arctan_fit.py         #   arctan SEM(B) extrapolation (pure function, WLS fit)
 │   ├── autocorrelation.py     #   Step 2: τ_corr, N_eff, SEM_auto
-│   ├── block_average.py       #   Step 3: SEM(B) plateau detection
+│   ├── block_average.py       #   Step 3: SEM(B) plateau detection + arctan extrapolation
 │   ├── running_average.py     #   Step 1: cumulative-mean drift check
 │   └── geweke.py              #   Step 4: stationarity test
 │
@@ -128,6 +129,17 @@ class AutocorrResult:
     t_min_frames: int | None     # if N_eff < 50, minimum frames needed; else None (meaning "sufficient")
 
 @dataclass(frozen=True)
+class ArctanFitResult:
+    """Result of arctan extrapolation on the SEM(B) curve (empirical model)."""
+    sem_asymptote: float         # A · π/2 — extrapolated asymptotic SEM
+    A: float                     # amplitude parameter
+    B: float                     # rate parameter
+    r2: float                    # goodness-of-fit R²
+    reliable: bool               # R² ≥ threshold AND A>0, B>0 AND pcov non-singular
+    tau_corr_implied: float      # back-calculated τ = N·SEM²/(2·σ²)
+    fit_curve: np.ndarray | None # fitted values at input block_sizes (for plotting)
+
+@dataclass(frozen=True)
 class BlockAverageResult:
     """Output of Step 3: block-averaging (Flyvbjerg–Petersen)."""
     block_sizes: np.ndarray      # B values tested
@@ -138,6 +150,7 @@ class BlockAverageResult:
     plateau_reached: bool        # plateau_rtol < PLATEAU_RTOL_MAX
     cross_valid_ok: bool         # |SEM_block − SEM_auto| / SEM_block < threshold
     passed: bool | None          # plateau_reached AND SEM_plateau ≤ SEM_max; None if sem_max not provided
+    arctan: ArctanFitResult | None = None  # None = not attempted (scipy unavailable / too few points)
 
 @dataclass(frozen=True)
 class GewekeResult:
@@ -186,7 +199,7 @@ class ConstraintPointReport:
     geweke: GewekeResult
 
     # Summary
-    sem_final: float             # SEM_block (primary) or SEM_auto (fallback)
+    sem_final: float             # 3-tier: arctan (primary) → plateau → SEM_auto (fallback)
     sem_max: float | None        # precision target for reference (None in standalone)
     passed: bool | None          # all four steps passed; None if sem_max not set
     failure_reasons: tuple[str, ...]   # empty if passed
@@ -596,7 +609,11 @@ Execution order (matches `convergence_criteria.md` §5 but respects the data dep
 └─────────────────────────────────────────────────────────┘
 ```
 
-**Note on SEM selection**: `sem_final` is `SEM_block` when the plateau is reached (the recommended estimator per §3), falling back to `SEM_auto` otherwise (with a warning appended to `failure_reasons`).
+**Note on SEM selection (3-tier hierarchy)**: `sem_final` is selected as:
+1. `SEM_arctan` (arctan asymptote) when `block_avg.arctan` is not None and reliable — the primary estimator.
+2. `SEM_block` (plateau mean) when arctan is unavailable/unreliable but plateau is reached.
+3. `SEM_auto` (ACF-based) as the final fallback when neither arctan nor plateau is usable.
+Each fallback appends a diagnostic message to `failure_reasons`.
 
 ### 6.2 Standalone single-point analysis (no TI context)
 

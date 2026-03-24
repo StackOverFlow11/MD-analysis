@@ -129,7 +129,10 @@ def _validate_and_trim(
 # ---------------------------------------------------------------------------
 
 _ACF_KEYS = {"alpha", "neff_min"}
-_BLOCK_KEYS = {"min_blocks", "plateau_window", "plateau_rtol", "cross_valid_rtol"}
+_BLOCK_KEYS = {
+    "min_blocks", "plateau_window", "plateau_rtol", "cross_valid_rtol",
+    "dense_sampling", "arctan_r2_min", "arctan_min_points",
+}
 _RUNNING_KEYS = {"drift_factor"}
 _GEWEKE_KEYS = {"f_a", "f_b", "z_crit", "alpha", "min_neff_subseries"}
 
@@ -186,14 +189,31 @@ def analyze_single_point(
         **dispatch["block"],
     )
 
-    # Determine sem_final: SEM_block (primary) or SEM_auto (fallback)
-    if block_avg.plateau_reached:
+    # Determine sem_final: 3-tier hierarchy (arctan → plateau → ACF)
+    if block_avg.arctan is not None and block_avg.arctan.reliable:
+        sem_final = block_avg.arctan.sem_asymptote
+    elif block_avg.plateau_reached:
         sem_final = block_avg.sem_plateau
+        if block_avg.arctan is not None:
+            failure_reasons.append(
+                f"Arctan fit unreliable (R²={block_avg.arctan.r2:.3f}); "
+                "using plateau SEM."
+            )
+        elif block_avg.arctan is None:
+            failure_reasons.append(
+                "Arctan fit not attempted; using plateau SEM."
+            )
     else:
         sem_final = autocorr.sem_auto
-        failure_reasons.append(
-            "Block-average plateau not reached; falling back to SEM_auto."
-        )
+        if block_avg.arctan is not None:
+            failure_reasons.append(
+                f"Arctan fit unreliable (R²={block_avg.arctan.r2:.3f}); "
+                "plateau not reached; falling back to SEM_auto."
+            )
+        else:
+            failure_reasons.append(
+                "Block-average plateau not reached; falling back to SEM_auto."
+            )
 
     # Step 3 (executed as step 4): Running average
     running_avg = analyze_running_average(
@@ -583,6 +603,10 @@ _POINT_CSV_COLUMNS = [
     "drift_D",
     "passed",
     "failure_reasons",
+    "sem_arctan",
+    "arctan_r2",
+    "arctan_reliable",
+    "tau_corr_implied",
 ]
 
 
@@ -603,6 +627,22 @@ def _point_to_row(r: ConstraintPointReport) -> dict:
         "drift_D": f"{r.running_avg.drift_D:.8f}",
         "passed": str(r.passed) if r.passed is not None else "N/A",
         "failure_reasons": "; ".join(r.failure_reasons),
+        "sem_arctan": (
+            f"{r.block_avg.arctan.sem_asymptote:.8f}"
+            if r.block_avg.arctan else "N/A"
+        ),
+        "arctan_r2": (
+            f"{r.block_avg.arctan.r2:.4f}"
+            if r.block_avg.arctan else "N/A"
+        ),
+        "arctan_reliable": (
+            str(r.block_avg.arctan.reliable)
+            if r.block_avg.arctan else "N/A"
+        ),
+        "tau_corr_implied": (
+            f"{r.block_avg.arctan.tau_corr_implied:.2f}"
+            if r.block_avg.arctan else "N/A"
+        ),
     }
 
 

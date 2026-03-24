@@ -58,6 +58,23 @@ class AutocorrResult:
 
 
 @dataclass(frozen=True)
+class ArctanFitResult:
+    """Result of arctan extrapolation on the SEM(B) curve.
+
+    The model SEM(B) = A · arctan(B · x) is an empirical fit (not exact
+    theory).  The asymptotic SEM estimate is A · π/2.
+    """
+
+    sem_asymptote: float  # A · π/2 — extrapolated asymptotic SEM
+    A: float  # amplitude parameter
+    B: float  # rate parameter
+    r2: float  # goodness-of-fit R²
+    reliable: bool  # R² ≥ threshold AND A>0, B>0 AND pcov non-singular
+    tau_corr_implied: float  # back-calculated τ = N·SEM²/(2·σ²)
+    fit_curve: np.ndarray | None  # fitted values at input block_sizes (for plotting)
+
+
+@dataclass(frozen=True)
 class BlockAverageResult:
     """Output of Step 3: block-averaging (Flyvbjerg-Petersen)."""
 
@@ -69,6 +86,9 @@ class BlockAverageResult:
     plateau_reached: bool  # plateau_rtol < PLATEAU_RTOL_MAX
     cross_valid_ok: bool  # |SEM_block - SEM_auto| / SEM_block < threshold
     passed: bool | None  # plateau_reached AND SEM <= SEM_max; None if no target
+
+    # Arctan extrapolation result (None = not attempted / scipy unavailable)
+    arctan: ArctanFitResult | None = None
 
 
 @dataclass(frozen=True)
