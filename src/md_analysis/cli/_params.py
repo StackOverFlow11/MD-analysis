@@ -65,6 +65,12 @@ class K:
     TEMPERATURE_K = "temperature_k"
     PH = "ph"
     PHI_PZC = "phi_pzc"
+    # Constrained-TI analysis
+    EQUILIBRATION = "equilibration"
+    SEM_TARGET = "sem_target"
+    TI_ROOT_DIR = "ti_root_dir"
+    TI_DIR_PATTERN = "ti_dir_pattern"  # distinct from DIR_PATTERN (Bader)
+    EPSILON_TOL_EV = "epsilon_tol_ev"
 
 
 # ---------------------------------------------------------------------------

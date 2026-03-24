@@ -24,6 +24,7 @@ Interactive CLI package providing a VASPKIT-style numbered menu interface. Repla
 - `cli` -> `electrochemical.potential.config` (for default constants)
 - `cli` -> `scripts` (for `generate_bader_workdir`, `batch_generate_bader_workdirs`)
 - `cli` -> `enhanced_sampling.slowgrowth` (via `lazy_import` for `slowgrowth_analysis`)
+- `cli` -> `enhanced_sampling.constrained_ti` (via `lazy_import` for `standalone_diagnostics`, `analyze_ti`, `discover_ti_points`, etc.)
 - `cli` -> `utils.CellParser` (for `parse_abc_from_restart`, `parse_abc_from_md_inp`)
 - `cli` -> `utils.RestartParser.ColvarParser` (via `lazy_import` for `ColvarMDInfo`, used by `_enhanced_sampling.py` info display)
 - `cli` -> `config` (for persistent user configuration, `CONFIGURABLE_DEFAULTS` registry, and `delete_config`)
@@ -46,7 +47,8 @@ Interactive CLI package providing a VASPKIT-style numbered menu interface. Repla
 | `_potential.py` | `CenterPotentialCmd`, `FermiEnergyCmd`, `ElectrodePotentialCmd`, `PhiZProfileCmd`, `ThicknessSensitivityCmd`, `FullPotentialCmd` | 211-216 |
 | `_charge.py` | `SurfaceChargeCmd`（通过 `method` 参数区分 counterion/layer/prompted）, `TrackedChargeCmd`, `CounterionChargeCmd` | 221-225 |
 | `_calibration.py` | `CalibrateFromCSVCmd`, `CalibrateManualCmd`, `PredictPotentialCmd` | 231-233 |
-| `_enhanced_sampling.py` | `SGQuickPlotCmd`, `SGPublicationPlotCmd`（共享基类 `_SlowgrowthPlotCmd`） | 301-302 |
+| `_enhanced_sampling.py` | `SGQuickPlotCmd`, `SGPublicationPlotCmd`（共享基类 `_SlowgrowthPlotCmd`） | 301-302 (sub-group 30) |
+| `_constrained_ti.py` | `TISingleDiagCmd`, `TIFullAnalysisCmd` | 311-312 (sub-group 31) |
 | `_scripts.py` | `BaderSingleCmd`, `BaderBatchCmd`, `TISingleCmd`, `TIBatchCmd` | 411-412 (sub-group 41), 421-422 (sub-group 42) |
 | `_settings.py` | `SetVaspScriptCmd`, `SetCp2kScriptCmd`, `ShowConfigCmd`, `SetAnalysisDefaultCmd`（通过 `config_key` 参数复用）, `ResetDefaultsCmd`, `SetPotentialReferenceCmd` | 901-909 |
 
@@ -93,9 +95,13 @@ The `_get_effective_default(key)` helper in `_prompt.py` reads the user config f
 
 Config keys: `KEY_POTENTIAL_REFERENCE`, `KEY_POTENTIAL_PH`, `KEY_POTENTIAL_TEMPERATURE_K`, `KEY_POTENTIAL_PHI_PZC`. `ShowConfigCmd` displays these in a separate "Potential Output" section; `ResetDefaultsCmd` also clears them. `SurfaceChargeCmd.execute()` reads these from config and passes to `surface_charge_analysis()`.
 
-## Enhanced sampling CLI (`_enhanced_sampling.py`)
+## Enhanced sampling CLI (`_enhanced_sampling.py` + `_constrained_ti.py`)
 
-`_enhanced_sampling.py` 通过 `MenuCommand` 子类（`SGQuickPlotCmd`、`SGPublicationPlotCmd`）实现 301/302 菜单项，共享基类 `_SlowgrowthPlotCmd`：
+菜单 3 下分两个子组：`30)` Slow-Growth、`31)` Constrained TI Analysis。
+
+### Slow-Growth（`_enhanced_sampling.py`，sub-group 30）
+
+301/302 共享基类 `_SlowgrowthPlotCmd`（注意：`output_name` 由父 `MenuGroup("30", output_name="slowgrowth")` 提供，命令自身无 `output_name`）：
 
 - **文件发现**：
   - `_discover_restart_file(workdir)`：glob `*.restart`，排除 `_\d+\.restart` 检查点文件
@@ -104,3 +110,8 @@ Config keys: `KEY_POTENTIAL_REFERENCE`, `KEY_POTENTIAL_PH`, `KEY_POTENTIAL_TEMPE
 - **轨迹信息预览**：`_print_sg_info()` 通过 `lazy_import` 获取 `ColvarMDInfo`，显示步数、时间步、CV 范围，并检测 NaN（溢出）步
 - **参数采集**：restart path、log path、initial/final step、colvar ID、output dir
 - **执行**：通过 `lazy_import` 调用 `slowgrowth_analysis`，`_plot_style` 由子类决定（`"quick"` 或 `"publication"`）
+
+### Constrained TI（`_constrained_ti.py`，sub-group 31）
+
+- **311 `TISingleDiagCmd`**：单点收敛诊断。复用 SG 的 `_discover_restart_file` / `_discover_log_file`。覆写 `_collect_all_params()`（SEM target 为可空 float，用 `prompt_str` + 手动转换）。调用 `standalone_diagnostics()`。
+- **312 `TIFullAnalysisCmd`**：多点 TI 分析。调用 `discover_ti_points()` → `load_ti_series()` → `analyze_ti()`，含 dt 一致性校验。TI_DIR_PATTERN 限制为 `"ti_target"/"xi"/"auto"`。仅对失败点生成诊断图。

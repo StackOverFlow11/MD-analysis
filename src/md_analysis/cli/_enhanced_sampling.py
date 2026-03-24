@@ -81,7 +81,6 @@ def _print_sg_info(restart_path: str, log_path: str) -> None:
 class _SlowgrowthPlotCmd(MenuCommand):
     """Base for slow-growth plot commands."""
 
-    output_name = "slowgrowth"
     _plot_style: str = "both"
 
     def _collect_all_params(self) -> dict:

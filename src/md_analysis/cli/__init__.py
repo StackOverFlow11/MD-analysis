@@ -14,6 +14,7 @@ from ..config import (
 )
 from ._calibration import CalibrateFromCSVCmd, CalibrateManualCmd, PredictPotentialCmd
 from ._charge import CounterionChargeCmd, SurfaceChargeCmd, TrackedChargeCmd
+from ._constrained_ti import TIFullAnalysisCmd, TISingleDiagCmd
 from ._enhanced_sampling import SGPublicationPlotCmd, SGQuickPlotCmd
 from ._framework import MenuGroup
 from ._potential import (
@@ -98,10 +99,21 @@ def build_menu_tree() -> MenuGroup:
     # --- Enhanced Sampling ---
     enhanced = MenuGroup("3", "Enhanced Sampling",
                          output_name="enhanced_sampling")
-    enhanced.add(
-        SGQuickPlotCmd("301", "Slow-Growth Quick Plot"),
-        SGPublicationPlotCmd("302", "Slow-Growth Publication Plot"),
+
+    slowgrowth = MenuGroup("30", "Slow-Growth", output_name="slowgrowth")
+    slowgrowth.add(
+        SGQuickPlotCmd("301", "Quick Plot"),
+        SGPublicationPlotCmd("302", "Publication Plot"),
     )
+
+    constrained_ti = MenuGroup("31", "Constrained TI Analysis",
+                               output_name="constrained_ti")
+    constrained_ti.add(
+        TISingleDiagCmd("311", "Single-Point Diagnostics"),
+        TIFullAnalysisCmd("312", "Full TI Analysis"),
+    )
+
+    enhanced.add(slowgrowth, constrained_ti)
 
     # --- Scripts ---
     scripts = MenuGroup("4", "Scripts / Tools")
