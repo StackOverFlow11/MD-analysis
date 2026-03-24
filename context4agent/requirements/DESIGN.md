@@ -814,18 +814,19 @@ write_convergence_csv(
     *,
     output_dir: Path | None = None,
 ) → Path
-    One row per constraint point. Energy quantities in eV. Columns:
-    xi, lambda_mean_eV, sigma_lambda_eV, tau_corr, n_eff,
-    sem_auto_eV, sem_block_eV, delta_sem_block_eV, plateau_B, plateau_reached,
-    sem_final_eV, sem_final_method, sem_max_eV, geweke_z, geweke_reliable,
-    drift_D_eV, passed, failure_reasons
+    One row per constraint point. λ-related quantities in a.u. Columns:
+    xi, lambda_mean, sigma_lambda, tau_corr, n_eff,
+    sem_auto, sem_block, delta_sem_block, plateau_B, plateau_reached,
+    sem_final, sem_final_method, sem_max, geweke_z, geweke_reliable,
+    drift_D, passed, failure_reasons
 
 write_free_energy_csv(
     ti_report: TIReport,
     *,
     output_dir: Path | None = None,
 ) → Path
-    Columns: xi, weight, dA_dxi_eV, sem_eV, A_integrated_eV, sigma_A_cumulative_eV
+    dA/dξ in a.u.; integrated A in eV.
+    Columns: xi, weight, dA_dxi, sem, A_integrated_eV, sigma_A_cumulative_eV
 
 write_single_point_csv(
     report: ConstraintPointReport,
@@ -835,10 +836,10 @@ write_single_point_csv(
     Single-row CSV with all diagnostic quantities for one point.
     Used by standalone_diagnostics (§8.2) and optionally by the
     per-point loop in the multi-point pipeline.
-    Columns: xi, lambda_mean_eV, sigma_lambda_eV, tau_corr, n_eff,
-    sem_auto_eV, sem_block_eV, delta_sem_block_eV, plateau_B, plateau_reached,
-    sem_final_eV, sem_final_method, sem_max_eV, geweke_z, geweke_reliable,
-    drift_D_eV, passed, failure_reasons
+    Columns: xi, lambda_mean, sigma_lambda, tau_corr, n_eff,
+    sem_auto, sem_block, delta_sem_block, plateau_B, plateau_reached,
+    sem_final, sem_final_method, sem_max, geweke_z, geweke_reliable,
+    drift_D, passed, failure_reasons
 ```
 
 ---

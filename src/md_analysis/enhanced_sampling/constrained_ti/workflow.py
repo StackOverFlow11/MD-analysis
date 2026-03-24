@@ -577,21 +577,21 @@ def standalone_diagnostics(
 
 _POINT_CSV_COLUMNS = [
     "xi",
-    "lambda_mean_eV",
-    "sigma_lambda_eV",
+    "lambda_mean",
+    "sigma_lambda",
     "tau_corr",
     "n_eff",
-    "sem_auto_eV",
-    "sem_block_eV",
-    "delta_sem_block_eV",
+    "sem_auto",
+    "sem_block",
+    "delta_sem_block",
     "plateau_B",
     "plateau_reached",
-    "sem_final_eV",
+    "sem_final",
     "sem_final_method",
-    "sem_max_eV",
+    "sem_max",
     "geweke_z",
     "geweke_reliable",
-    "drift_D_eV",
+    "drift_D",
     "passed",
     "failure_reasons",
 ]
@@ -600,7 +600,8 @@ _POINT_CSV_COLUMNS = [
 def _point_to_row(r: ConstraintPointReport) -> dict:
     """Convert a ConstraintPointReport to a CSV row dict.
 
-    Energy-like quantities (lambda_mean, sigma, SEM) are converted to eV.
+    λ = dA/dξ is NOT pure energy; its unit is Hartree/(ξ_unit).
+    All λ-related quantities are kept in a.u. (matching CP2K output).
     """
     ba = r.block_avg
     if ba.plateau_reached:
@@ -609,24 +610,24 @@ def _point_to_row(r: ConstraintPointReport) -> dict:
         method = "acf"
     return {
         "xi": f"{r.xi:.6f}",
-        "lambda_mean_eV": f"{r.lambda_mean * HA_TO_EV:.8f}",
-        "sigma_lambda_eV": f"{r.sigma_lambda * HA_TO_EV:.8f}",
+        "lambda_mean": f"{r.lambda_mean:.8f}",
+        "sigma_lambda": f"{r.sigma_lambda:.8f}",
         "tau_corr": f"{r.autocorr.tau_corr:.2f}",
         "n_eff": f"{r.autocorr.n_eff:.1f}",
-        "sem_auto_eV": f"{r.autocorr.sem_auto * HA_TO_EV:.8f}",
-        "sem_block_eV": f"{ba.plateau_sem * HA_TO_EV:.8f}",
-        "delta_sem_block_eV": f"{ba.plateau_delta * HA_TO_EV:.8f}",
+        "sem_auto": f"{r.autocorr.sem_auto:.8f}",
+        "sem_block": f"{ba.plateau_sem:.8f}",
+        "delta_sem_block": f"{ba.plateau_delta:.8f}",
         "plateau_B": (
             str(ba.plateau_block_size) if ba.plateau_block_size is not None
             else "N/A"
         ),
         "plateau_reached": str(ba.plateau_reached),
-        "sem_final_eV": f"{r.sem_final * HA_TO_EV:.8f}",
+        "sem_final": f"{r.sem_final:.8f}",
         "sem_final_method": method,
-        "sem_max_eV": f"{r.sem_max * HA_TO_EV:.8f}" if r.sem_max is not None else "N/A",
+        "sem_max": f"{r.sem_max:.8f}" if r.sem_max is not None else "N/A",
         "geweke_z": f"{r.geweke.z:.4f}",
         "geweke_reliable": str(r.geweke.reliable),
-        "drift_D_eV": f"{r.running_avg.drift_D * HA_TO_EV:.8f}",
+        "drift_D": f"{r.running_avg.drift_D:.8f}",
         "passed": str(r.passed) if r.passed is not None else "N/A",
         "failure_reasons": "; ".join(r.failure_reasons),
     }
@@ -683,12 +684,12 @@ def write_free_energy_csv(
     out.mkdir(parents=True, exist_ok=True)
     path = out / DEFAULT_FE_CSV_NAME
 
-    columns = ["xi", "weight", "dA_dxi_eV", "sem_eV", "A_integrated_eV", "sigma_A_cumulative_eV"]
+    columns = ["xi", "weight", "dA_dxi", "sem", "A_integrated_eV", "sigma_A_cumulative_eV"]
     with open(path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=columns)
         writer.writeheader()
 
-        # Cumulative integral for A(xi)
+        # dA/dxi and sem in a.u.; integrated A in eV
         cumul_A = np.cumsum(ti_report.weights * ti_report.forces) * HA_TO_EV
         cumul_sigma = np.sqrt(
             np.cumsum(ti_report.weights**2 * ti_report.force_errors**2)
@@ -699,8 +700,8 @@ def write_free_energy_csv(
                 {
                     "xi": f"{ti_report.xi_values[i]:.6f}",
                     "weight": f"{ti_report.weights[i]:.8f}",
-                    "dA_dxi_eV": f"{ti_report.forces[i] * HA_TO_EV:.8f}",
-                    "sem_eV": f"{ti_report.force_errors[i] * HA_TO_EV:.8f}",
+                    "dA_dxi": f"{ti_report.forces[i]:.8f}",
+                    "sem": f"{ti_report.force_errors[i]:.8f}",
                     "A_integrated_eV": f"{cumul_A[i]:.8f}",
                     "sigma_A_cumulative_eV": f"{cumul_sigma[i]:.8f}",
                 }

@@ -158,20 +158,15 @@ def plot_point_diagnostics(
         tau_block = float("nan")
         neff_block = float("nan")
 
-    # Convert energy quantities to eV for display
-    mean_ev = r.lambda_mean * HA_TO_EV
-    sem_final_ev = r.sem_final * HA_TO_EV
-    sem_auto_ev = r.autocorr.sem_auto * HA_TO_EV
-    sem_block_ev = ba.plateau_sem * HA_TO_EV
-    dsem_block_ev = ba.plateau_delta * HA_TO_EV
-    sem_max_ev = r.sem_max * HA_TO_EV if r.sem_max is not None else None
+    # λ = dA/dξ has units of Hartree/(ξ unit), NOT pure energy.
+    # Keep λ-related quantities in a.u. (consistent with plot axes).
 
     # Section 1: Overview
     sec1 = [
         "── Overview ──",
         f"ξ = {r.xi:.6f}    N = {n}",
-        f"⟨λ⟩ = {mean_ev:.6f} eV",
-        f"SEM  = {sem_final_ev:.6f} eV",
+        f"⟨λ⟩ = {r.lambda_mean:.6f} a.u.",
+        f"SEM  = {r.sem_final:.6f} a.u.",
     ]
     if r.passed is not None:
         sec1.append(f"OVERALL: {'PASS' if r.passed else 'FAIL'}")
@@ -183,7 +178,7 @@ def plot_point_diagnostics(
         "── ACF ──",
         f"τ_corr = {r.autocorr.tau_corr:.1f} frames",
         f"N_eff  = {r.autocorr.n_eff:.1f}  ({'PASS' if r.autocorr.passed_neff else 'FAIL'})",
-        f"SEM    = {sem_auto_ev:.6f} eV",
+        f"SEM    = {r.autocorr.sem_auto:.6f} a.u.",
     ]
 
     # Section 3: Block Average (F&P)
@@ -193,7 +188,7 @@ def plot_point_diagnostics(
     sec3 = [
         "── Block Average ──",
         f"plateau: {plat_info}",
-        f"SEM    = {sem_block_ev:.6f} ± {dsem_block_ev:.6f} eV",
+        f"SEM    = {ba.plateau_sem:.6f} ± {ba.plateau_delta:.6f} a.u.",
         f"τ_impl = {tau_block:.1f} frames",
         f"N_impl = {neff_block:.1f}",
     ]
@@ -203,8 +198,8 @@ def plot_point_diagnostics(
         "── Geweke ──",
         f"|z| = {abs(r.geweke.z):.3f}  ({'PASS' if r.geweke.passed else 'FAIL'})"
         + ("" if r.geweke.reliable else " [unreliable]"),
-        f"mean_A = {r.geweke.mean_a * HA_TO_EV:.6f} eV",
-        f"mean_B = {r.geweke.mean_b * HA_TO_EV:.6f} eV",
+        f"mean_A = {r.geweke.mean_a:.6f} a.u.",
+        f"mean_B = {r.geweke.mean_b:.6f} a.u.",
     ]
 
     lines = sec1 + [""] + sec2 + [""] + sec3 + [""] + sec4
@@ -255,10 +250,10 @@ def plot_free_energy_profile(
     fig, ax1 = plt.subplots(figsize=(8, 5), dpi=180)
 
     xi = ti_report.xi_values
-    forces = ti_report.forces * HA_TO_EV
-    errors = ti_report.force_errors * HA_TO_EV
+    forces = ti_report.forces  # a.u. (Hartree / ξ_unit)
+    errors = ti_report.force_errors
 
-    # Left axis: dA/dxi with error bars
+    # Left axis: dA/dxi with error bars (a.u.)
     colors = [
         "C2" if r.passed else "C3"
         for r in ti_report.point_reports
@@ -267,13 +262,13 @@ def plot_free_energy_profile(
     for i, (x, y) in enumerate(zip(xi, forces)):
         ax1.plot(x, y, "o", markersize=5, color=colors[i], zorder=5)
     ax1.set_xlabel("ξ (a.u.)")
-    ax1.set_ylabel("dA/dξ (eV/a.u.)", color="C0")
+    ax1.set_ylabel("dA/dξ (a.u.)", color="C0")
     ax1.tick_params(axis="y", labelcolor="C0")
 
-    # Right axis: integrated A(xi)
+    # Right axis: integrated A(xi) in eV
     ax2 = ax1.twinx()
-    cumul_A = np.cumsum(ti_report.weights * forces)
-    cumul_sigma = np.sqrt(np.cumsum(ti_report.weights**2 * errors**2))
+    cumul_A = np.cumsum(ti_report.weights * forces) * HA_TO_EV
+    cumul_sigma = np.sqrt(np.cumsum(ti_report.weights**2 * errors**2)) * HA_TO_EV
     ax2.plot(xi, cumul_A, "-s", color="C1", markersize=3, linewidth=1.2, label="A(ξ)")
     ax2.fill_between(
         xi,

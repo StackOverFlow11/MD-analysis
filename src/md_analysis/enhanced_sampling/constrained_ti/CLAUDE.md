@@ -49,13 +49,14 @@ passed: bool | None
 
 ## CSV 输出列
 
-能量相关量单位为 eV（内部计算用 Hartree，输出时乘 `HA_TO_EV`）。
+λ = dA/dξ 不是纯能量（量纲为 Hartree/ξ_unit），保持 a.u. 输出。
+仅积分后的自由能 ΔA 转换为 eV。
 
 ```
-xi, lambda_mean_eV, sigma_lambda_eV, tau_corr, n_eff, sem_auto_eV,
-sem_block_eV, delta_sem_block_eV, plateau_B, plateau_reached,
-sem_final_eV, sem_final_method, sem_max_eV,
-geweke_z, geweke_reliable, drift_D_eV,
+xi, lambda_mean, sigma_lambda, tau_corr, n_eff, sem_auto,
+sem_block, delta_sem_block, plateau_B, plateau_reached,
+sem_final, sem_final_method, sem_max,
+geweke_z, geweke_reliable, drift_D,
 passed, failure_reasons
 ```
 
