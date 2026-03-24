@@ -58,37 +58,24 @@ class AutocorrResult:
 
 
 @dataclass(frozen=True)
-class ArctanFitResult:
-    """Result of arctan extrapolation on the SEM(B) curve.
+class BlockAverageResult:
+    """Output of Step 3: Flyvbjerg-Petersen block averaging.
 
-    The model SEM(B) = A · arctan(B · x) is an empirical fit (not exact
-    theory).  The asymptotic SEM estimate is A · π/2.
+    Block sizes are powers of 2.  Plateau is detected when the SEM
+    increase between consecutive levels falls below δSEM for
+    *n_consecutive* levels.  δSEM(B) = SEM(B) / √(2(n_b − 1)).
     """
 
-    sem_asymptote: float  # A · π/2 — extrapolated asymptotic SEM
-    A: float  # amplitude parameter
-    B: float  # rate parameter
-    r2: float  # goodness-of-fit R²
-    reliable: bool  # R² ≥ threshold AND A>0, B>0 AND pcov non-singular
-    tau_corr_implied: float  # back-calculated τ = N·SEM²/(2·σ²)
-    fit_curve: np.ndarray | None  # fitted values at input block_sizes (for plotting)
-
-
-@dataclass(frozen=True)
-class BlockAverageResult:
-    """Output of Step 3: block-averaging (Flyvbjerg-Petersen)."""
-
-    block_sizes: np.ndarray  # B values tested
-    sem_curve: np.ndarray  # SEM(B) for each B
-    sem_plateau: float  # s_bar from plateau detection
-    sem_at_max_B: float  # SEM at largest B (for fallback transparency)
-    plateau_rtol: float  # delta_s / s_bar
-    plateau_reached: bool  # plateau_rtol < PLATEAU_RTOL_MAX
-    cross_valid_ok: bool  # |SEM_block - SEM_auto| / SEM_block < threshold
+    block_sizes: np.ndarray  # pow2 block sizes tested
+    sem_curve: np.ndarray  # SEM(B) at each level
+    delta_sem: np.ndarray  # δSEM(B) = SEM(B) / √(2(n_b − 1))
+    n_total: int  # series length (n_b = n_total // B)
+    plateau_index: int | None  # index where plateau first detected; None if not
+    plateau_sem: float  # SEM at plateau (or SEM at max B if no plateau)
+    plateau_delta: float  # δSEM at plateau point
+    plateau_block_size: int | None  # B at plateau; None if not detected
+    plateau_reached: bool  # True if plateau was detected
     passed: bool | None  # plateau_reached AND SEM <= SEM_max; None if no target
-
-    # Arctan extrapolation result (None = not attempted / scipy unavailable)
-    arctan: ArctanFitResult | None = None
 
 
 @dataclass(frozen=True)

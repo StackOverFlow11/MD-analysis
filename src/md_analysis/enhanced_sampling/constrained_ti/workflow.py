@@ -21,6 +21,7 @@ from .analysis.block_average import analyze_block_average
 from .analysis.geweke import analyze_geweke
 from .analysis.running_average import analyze_running_average
 from .config import (
+    DEFAULT_CROSS_CHECK_RTOL,
     DEFAULT_EPSILON_TOL_KCAL,
     DEFAULT_N_MIN,
     DEFAULT_N_WARN_SHORT,
@@ -129,10 +130,7 @@ def _validate_and_trim(
 # ---------------------------------------------------------------------------
 
 _ACF_KEYS = {"alpha", "neff_min"}
-_BLOCK_KEYS = {
-    "min_blocks", "plateau_window", "plateau_rtol", "cross_valid_rtol",
-    "dense_sampling", "arctan_r2_min", "arctan_min_points",
-}
+_BLOCK_KEYS = {"min_blocks", "n_consecutive"}
 _RUNNING_KEYS = {"drift_factor"}
 _GEWEKE_KEYS = {"f_a", "f_b", "z_crit", "alpha", "min_neff_subseries"}
 
@@ -181,39 +179,32 @@ def analyze_single_point(
         series, sem_max=inp.sem_max, **dispatch["acf"]
     )
 
-    # Step 2 (executed as step 3): Block averaging
+    # Step 2 (executed as step 3): Block averaging (F&P)
     block_avg = analyze_block_average(
         series,
         sem_max=inp.sem_max,
-        sem_auto=autocorr.sem_auto,
         **dispatch["block"],
     )
 
-    # Determine sem_final: 3-tier hierarchy (arctan → plateau → ACF)
-    if block_avg.arctan is not None and block_avg.arctan.reliable:
-        sem_final = block_avg.arctan.sem_asymptote
-    elif block_avg.plateau_reached:
-        sem_final = block_avg.sem_plateau
-        if block_avg.arctan is not None:
-            failure_reasons.append(
-                f"Arctan fit unreliable (R²={block_avg.arctan.r2:.3f}); "
-                "using plateau SEM."
-            )
-        elif block_avg.arctan is None:
-            failure_reasons.append(
-                "Arctan fit not attempted; using plateau SEM."
-            )
+    # Determine sem_final: 2-tier hierarchy (F&P plateau → ACF fallback)
+    if block_avg.plateau_reached:
+        sem_final = block_avg.plateau_sem
     else:
         sem_final = autocorr.sem_auto
-        if block_avg.arctan is not None:
-            failure_reasons.append(
-                f"Arctan fit unreliable (R²={block_avg.arctan.r2:.3f}); "
-                "plateau not reached; falling back to SEM_auto."
-            )
-        else:
-            failure_reasons.append(
-                "Block-average plateau not reached; falling back to SEM_auto."
-            )
+        failure_reasons.append(
+            "F&P block-average plateau not reached; falling back to SEM_auto."
+        )
+
+    # Cross-check: SEM_block vs SEM_auto
+    if block_avg.plateau_reached:
+        _max_sem = max(block_avg.plateau_sem, autocorr.sem_auto)
+        if _max_sem > 0:
+            _rel_diff = abs(block_avg.plateau_sem - autocorr.sem_auto) / _max_sem
+            if _rel_diff > DEFAULT_CROSS_CHECK_RTOL:
+                failure_reasons.append(
+                    f"SEM_block ({block_avg.plateau_sem:.2e}) and SEM_auto "
+                    f"({autocorr.sem_auto:.2e}) disagree by {_rel_diff:.0%}."
+                )
 
     # Step 3 (executed as step 4): Running average
     running_avg = analyze_running_average(
@@ -248,12 +239,7 @@ def analyze_single_point(
 
     if block_avg.passed is False and block_avg.plateau_reached:
         failure_reasons.append(
-            f"SEM_block ({block_avg.sem_plateau:.6f}) > SEM_max ({inp.sem_max})."
-        )
-
-    if not block_avg.cross_valid_ok:
-        failure_reasons.append(
-            "ACF and block SEM disagree > 30% (possible truncation issue)."
+            f"SEM_block ({block_avg.plateau_sem:.6f}) > SEM_max ({inp.sem_max})."
         )
 
     if not running_avg.passed:
@@ -596,22 +582,27 @@ _POINT_CSV_COLUMNS = [
     "n_eff",
     "sem_auto",
     "sem_block",
-    "sem_at_max_B",
+    "delta_sem_block",
+    "plateau_B",
+    "plateau_reached",
+    "sem_final",
+    "sem_final_method",
     "sem_max",
     "geweke_z",
     "geweke_reliable",
     "drift_D",
     "passed",
     "failure_reasons",
-    "sem_arctan",
-    "arctan_r2",
-    "arctan_reliable",
-    "tau_corr_implied",
 ]
 
 
 def _point_to_row(r: ConstraintPointReport) -> dict:
     """Convert a ConstraintPointReport to a CSV row dict."""
+    ba = r.block_avg
+    if ba.plateau_reached:
+        method = "plateau"
+    else:
+        method = "acf"
     return {
         "xi": f"{r.xi:.6f}",
         "lambda_mean": f"{r.lambda_mean:.8f}",
@@ -619,30 +610,21 @@ def _point_to_row(r: ConstraintPointReport) -> dict:
         "tau_corr": f"{r.autocorr.tau_corr:.2f}",
         "n_eff": f"{r.autocorr.n_eff:.1f}",
         "sem_auto": f"{r.autocorr.sem_auto:.8f}",
-        "sem_block": f"{r.block_avg.sem_plateau:.8f}",
-        "sem_at_max_B": f"{r.block_avg.sem_at_max_B:.8f}",
+        "sem_block": f"{ba.plateau_sem:.8f}",
+        "delta_sem_block": f"{ba.plateau_delta:.8f}",
+        "plateau_B": (
+            str(ba.plateau_block_size) if ba.plateau_block_size is not None
+            else "N/A"
+        ),
+        "plateau_reached": str(ba.plateau_reached),
+        "sem_final": f"{r.sem_final:.8f}",
+        "sem_final_method": method,
         "sem_max": f"{r.sem_max:.8f}" if r.sem_max is not None else "N/A",
         "geweke_z": f"{r.geweke.z:.4f}",
         "geweke_reliable": str(r.geweke.reliable),
         "drift_D": f"{r.running_avg.drift_D:.8f}",
         "passed": str(r.passed) if r.passed is not None else "N/A",
         "failure_reasons": "; ".join(r.failure_reasons),
-        "sem_arctan": (
-            f"{r.block_avg.arctan.sem_asymptote:.8f}"
-            if r.block_avg.arctan else "N/A"
-        ),
-        "arctan_r2": (
-            f"{r.block_avg.arctan.r2:.4f}"
-            if r.block_avg.arctan else "N/A"
-        ),
-        "arctan_reliable": (
-            str(r.block_avg.arctan.reliable)
-            if r.block_avg.arctan else "N/A"
-        ),
-        "tau_corr_implied": (
-            f"{r.block_avg.arctan.tau_corr_implied:.2f}"
-            if r.block_avg.arctan else "N/A"
-        ),
     }
 
 

@@ -76,57 +76,67 @@ def plot_point_diagnostics(
     ax.set_title(f"ACF (τ_corr={report.autocorr.tau_corr:.1f})")
     ax.legend(fontsize=7)
 
-    # --- Bottom-left: Block average SEM(B) ---
+    # --- Bottom-left: Block average SEM(B) — Flyvbjerg-Petersen ---
     ax = axes[1, 0]
-    ax.plot(report.block_avg.block_sizes, report.block_avg.sem_curve, "o-", markersize=3, color="C0")
-    # Dynamic x-axis base: log10 for dense sampling, log2 for legacy
-    arctan = report.block_avg.arctan
-    if arctan is not None:
-        ax.set_xscale("log", base=10)
+    ba = report.block_avg
+    bs = ba.block_sizes
+    valid = ~np.isnan(ba.sem_curve)
+
+    # Split points into plateau (green squares) and non-plateau (blue circles)
+    if ba.plateau_reached and ba.plateau_index is not None:
+        pre = np.zeros(len(bs), dtype=bool)
+        pre[:ba.plateau_index] = True
+        pre &= valid
+        plat = np.zeros(len(bs), dtype=bool)
+        plat[ba.plateau_index:] = True
+        plat &= valid
+        # Non-plateau points
+        ax.errorbar(
+            bs[pre], ba.sem_curve[pre], yerr=ba.delta_sem[pre],
+            fmt="o", markersize=4, color="C0", capsize=3,
+            ecolor="C0", elinewidth=0.8,
+        )
+        # Plateau points (highlighted)
+        ax.errorbar(
+            bs[plat], ba.sem_curve[plat], yerr=ba.delta_sem[plat],
+            fmt="s", markersize=5, color="C2", capsize=3,
+            ecolor="C2", elinewidth=0.8, label="plateau",
+        )
+        # Plateau line and band
+        ax.axhline(ba.plateau_sem, color="C2", linestyle="--", linewidth=0.8,
+                    label=f"SEM_block ({ba.plateau_sem:.2e})")
+        ax.axhspan(
+            ba.plateau_sem - ba.plateau_delta,
+            ba.plateau_sem + ba.plateau_delta,
+            alpha=0.12, color="C2",
+        )
     else:
-        ax.set_xscale("log", base=2)
+        ax.errorbar(
+            bs[valid], ba.sem_curve[valid], yerr=ba.delta_sem[valid],
+            fmt="o-", markersize=4, color="C0", capsize=3,
+            ecolor="C0", elinewidth=0.8, label="SEM(B) ± δSEM",
+        )
+
+    ax.set_xscale("log", base=2)
     ax.set_xlabel("Block size B")
     ax.set_ylabel("SEM(B)")
     if report.sem_max is not None:
         ax.axhline(
-            report.sem_max,
-            color="C3",
-            linestyle="--",
-            linewidth=0.8,
+            report.sem_max, color="C3", linestyle="--", linewidth=0.8,
             label=f"SEM_max ({report.sem_max:.2e})",
         )
-    # Shade plateau region
-    if report.block_avg.plateau_reached:
-        bs = report.block_avg.block_sizes
-        pw = min(4, len(bs))
-        if pw > 0:
-            ax.axhspan(
-                report.block_avg.sem_plateau * 0.95,
-                report.block_avg.sem_plateau * 1.05,
-                alpha=0.15,
-                color="C2",
-            )
-    # Overlay arctan fit curve and asymptote
-    if arctan is not None:
-        if arctan.fit_curve is not None:
-            # Smooth curve via dense interpolation
-            bs_float = report.block_avg.block_sizes.astype(float)
-            x_dense = np.linspace(bs_float[0], bs_float[-1], 200)
-            y_dense = arctan.A * np.arctan(arctan.B * x_dense)
-            ax.plot(x_dense, y_dense, "-", color="C3", linewidth=1.2, label="arctan fit")
-        asym_color = "C2" if arctan.reliable else "0.6"
-        asym_style = "--" if arctan.reliable else ":"
-        ax.axhline(
-            arctan.sem_asymptote,
-            color=asym_color,
-            linestyle=asym_style,
-            linewidth=0.8,
-            label=f"SEM_arctan ({arctan.sem_asymptote:.2e})",
+    # Annotate n_b on each point
+    for i in range(len(bs)):
+        if not valid[i]:
+            continue
+        nb = ba.n_total // bs[i]
+        ax.annotate(
+            f"n={nb}", (bs[i], ba.sem_curve[i]),
+            textcoords="offset points", xytext=(0, 8),
+            fontsize=5, ha="center", color="0.5",
         )
-    arctan_ok = arctan is not None and arctan.reliable
     ax.set_title(
-        f"Block Average (arctan={'yes' if arctan_ok else 'no'}, "
-        f"plateau={'yes' if report.block_avg.plateau_reached else 'no'})"
+        f"Block Average (plateau={'yes' if ba.plateau_reached else 'no'})"
     )
     ax.legend(fontsize=7)
 
@@ -134,6 +144,10 @@ def plot_point_diagnostics(
     ax = axes[1, 1]
     ax.axis("off")
     r = report
+    ba = r.block_avg
+    plat_info = (
+        f"yes, B={ba.plateau_block_size}" if ba.plateau_reached else "no"
+    )
     lines = [
         f"ξ = {r.xi:.6f}",
         f"⟨λ⟩ = {r.lambda_mean:.6f} ± {r.sigma_lambda:.6f}",
@@ -141,17 +155,8 @@ def plot_point_diagnostics(
         f"τ_corr = {r.autocorr.tau_corr:.1f} frames",
         f"N_eff = {r.autocorr.n_eff:.1f}  ({'PASS' if r.autocorr.passed_neff else 'FAIL'})",
         f"SEM_auto = {r.autocorr.sem_auto:.6f}",
-        f"SEM_block = {r.block_avg.sem_plateau:.6f}  (plateau: {'yes' if r.block_avg.plateau_reached else 'no'})",
-        f"SEM_at_max_B = {r.block_avg.sem_at_max_B:.6f}",
+        f"SEM_block = {ba.plateau_sem:.6f}  (plateau: {plat_info})",
         f"SEM_final = {r.sem_final:.6f}",
-        *(
-            [
-                f"SEM_arctan = {r.block_avg.arctan.sem_asymptote:.6f}  (R²={r.block_avg.arctan.r2:.3f})",
-                f"τ_implied = {r.block_avg.arctan.tau_corr_implied:.1f}",
-            ]
-            if r.block_avg.arctan is not None and r.block_avg.arctan.reliable
-            else []
-        ),
         "",
         f"SEM target: {r.sem_max:.6f}" if r.sem_max is not None else "SEM target: N/A",
         f"Drift D = {r.running_avg.drift_D:.6f}  ({'PASS' if r.running_avg.passed else 'FAIL'})",

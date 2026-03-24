@@ -43,33 +43,18 @@ DEFAULT_ACF_M_MAX_FRACTION: float = 0.5
 DEFAULT_NEFF_MIN: int = 50
 
 # ---------------------------------------------------------------------------
-# Step 3: Block averaging
+# Step 3: Block averaging (Flyvbjerg-Petersen)
 # ---------------------------------------------------------------------------
 
-# Maximum relative spread for plateau detection (delta_s / s_bar < 0.2).
-DEFAULT_PLATEAU_RTOL: float = 0.2
+# Minimum number of blocks at largest pow2 B.
+DEFAULT_FP_MIN_BLOCKS: int = 4
 
-# Minimum number of blocks at largest B (n_b >= 4).
-DEFAULT_MIN_BLOCKS: int = 4
+# Number of consecutive pow2 levels where SEM increase < δSEM to declare
+# plateau reached.  See Flyvbjerg & Petersen, J. Chem. Phys. 91, 461 (1989).
+DEFAULT_FP_CONSECUTIVE: int = 2
 
-# Number of largest-B points used in plateau check.
-DEFAULT_PLATEAU_WINDOW: int = 4
-
-# Cross-validation tolerance between SEM_block and SEM_auto (30%).
-DEFAULT_CROSS_VALID_RTOL: float = 0.3
-
-# ---------------------------------------------------------------------------
-# Step 3b: Arctan extrapolation
-# ---------------------------------------------------------------------------
-
-# Minimum R² for arctan fit to be considered reliable.
-# Set below 0.95 because dense sampling (B=1..20 continuous) produces many
-# precise low-B points where the arctan model is weakest, lowering R²
-# without degrading the asymptotic estimate.
-DEFAULT_ARCTAN_R2_MIN: float = 0.75
-
-# Minimum number of (non-NaN) block sizes needed to attempt arctan fit.
-DEFAULT_ARCTAN_MIN_POINTS: int = 5
+# Cross-check tolerance: warn when |SEM_block - SEM_auto| / max > this.
+DEFAULT_CROSS_CHECK_RTOL: float = 0.15
 
 # ---------------------------------------------------------------------------
 # Step 1: Running average drift

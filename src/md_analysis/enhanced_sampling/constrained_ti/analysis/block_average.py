@@ -1,45 +1,18 @@
-"""Step 3: Block averaging (Flyvbjerg-Petersen) — SEM(B) plateau detection."""
+"""Step 3: Flyvbjerg-Petersen block averaging — SEM(B) plateau detection.
+
+Reference: Flyvbjerg & Petersen, J. Chem. Phys. 91, 461 (1989).
+"""
 
 from __future__ import annotations
 
 import numpy as np
 
-from ..config import (
-    DEFAULT_ARCTAN_MIN_POINTS,
-    DEFAULT_ARCTAN_R2_MIN,
-    DEFAULT_CROSS_VALID_RTOL,
-    DEFAULT_MIN_BLOCKS,
-    DEFAULT_PLATEAU_RTOL,
-    DEFAULT_PLATEAU_WINDOW,
-)
+from ..config import DEFAULT_FP_CONSECUTIVE, DEFAULT_FP_MIN_BLOCKS
 from ..models import BlockAverageResult
-from ._arctan_fit import fit_arctan_sem
 
 
-# ---------------------------------------------------------------------------
-# Block-size generation strategies
-# ---------------------------------------------------------------------------
-
-
-def _generate_block_sizes(n: int, min_blocks: int = 4) -> np.ndarray:
-    """Mixed strategy: continuous integers for small B, geometric for large B.
-
-    B = 1..20 continuous integers + 1.25x geometric series starting at 21.
-    Covers the B ≈ 2τ transition region typical of MD data (τ ≈ 5–15).
-    """
-    max_b = n // min_blocks if min_blocks > 0 else n
-    if max_b < 1:
-        return np.array([1], dtype=int)
-    sizes: set[int] = set(range(1, min(21, max_b + 1)))  # B = 1..20
-    b = 21.0
-    while int(b) <= max_b:
-        sizes.add(int(b))
-        b *= 1.25
-    return np.array(sorted(sizes), dtype=int)
-
-
-def _generate_block_sizes_pow2(n: int, min_blocks: int = 4) -> np.ndarray:
-    """Legacy powers-of-2 strategy (for backward compatibility)."""
+def _generate_block_sizes(n: int, min_blocks: int = DEFAULT_FP_MIN_BLOCKS) -> np.ndarray:
+    """Powers-of-2 block sizes up to n // min_blocks."""
     max_b = n // min_blocks if min_blocks > 0 else n
     block_sizes = []
     b = 1
@@ -49,127 +22,91 @@ def _generate_block_sizes_pow2(n: int, min_blocks: int = 4) -> np.ndarray:
     return np.array(block_sizes, dtype=int) if block_sizes else np.array([1], dtype=int)
 
 
-# ---------------------------------------------------------------------------
-# Main analysis function
-# ---------------------------------------------------------------------------
-
-
 def analyze_block_average(
     series: np.ndarray,
     *,
     sem_max: float | None = None,
-    sem_auto: float | None = None,
-    min_blocks: int = DEFAULT_MIN_BLOCKS,
-    plateau_window: int = DEFAULT_PLATEAU_WINDOW,
-    plateau_rtol: float = DEFAULT_PLATEAU_RTOL,
-    cross_valid_rtol: float = DEFAULT_CROSS_VALID_RTOL,
-    dense_sampling: bool = True,
-    arctan_r2_min: float = DEFAULT_ARCTAN_R2_MIN,
-    arctan_min_points: int = DEFAULT_ARCTAN_MIN_POINTS,
+    min_blocks: int = DEFAULT_FP_MIN_BLOCKS,
+    n_consecutive: int = DEFAULT_FP_CONSECUTIVE,
 ) -> BlockAverageResult:
-    """Run block-averaging analysis on a Lagrange multiplier time series.
+    """Run Flyvbjerg-Petersen block averaging on a time series.
 
     Parameters
     ----------
     series : np.ndarray, shape (N,)
-        Lagrange multiplier time series.
+        Time series (e.g. Lagrange multiplier).
     sem_max : float or None
-        Precision target. None skips the SEM pass/fail check.
-    sem_auto : float or None
-        SEM from autocorrelation analysis, for cross-validation.
+        Precision target.  None skips the pass/fail check.
     min_blocks : int
         Minimum number of blocks at largest B.
-    plateau_window : int
-        Number of largest-B points used in plateau check.
-    plateau_rtol : float
-        Maximum relative spread for plateau detection.
-    cross_valid_rtol : float
-        Cross-validation tolerance between SEM_block and SEM_auto.
-    dense_sampling : bool
-        True = mixed continuous+geometric strategy (~30 points).
-        False = legacy powers-of-2 (~9 points).
-    arctan_r2_min : float
-        Minimum R² for arctan fit to be considered reliable.
-    arctan_min_points : int
-        Minimum number of non-NaN block sizes to attempt arctan fit.
+    n_consecutive : int
+        Consecutive pow2 levels with increase < δSEM to declare plateau.
 
     Returns
     -------
     BlockAverageResult
     """
     n = len(series)
+    block_sizes = _generate_block_sizes(n, min_blocks)
 
-    # Generate block sizes
-    if dense_sampling:
-        block_sizes = _generate_block_sizes(n, min_blocks)
-    else:
-        block_sizes = _generate_block_sizes_pow2(n, min_blocks)
-
-    # Compute SEM(B) for each block size
     sem_curve = np.empty(len(block_sizes))
+    delta_sem = np.empty(len(block_sizes))
+
     for i, bs in enumerate(block_sizes):
-        n_blocks = n // bs
-        if n_blocks < 1:
+        nb = n // bs
+        if nb < 2:
             sem_curve[i] = np.nan
+            delta_sem[i] = np.nan
             continue
-        # Compute block means
-        trimmed = series[: n_blocks * bs].reshape(n_blocks, bs)
-        block_means = trimmed.mean(axis=1)
-        # SEM of block means
-        sem_curve[i] = np.std(block_means, ddof=1) / np.sqrt(n_blocks)
+        block_means = series[: nb * bs].reshape(nb, bs).mean(axis=1)
+        sem_curve[i] = np.std(block_means, ddof=1) / np.sqrt(nb)
+        delta_sem[i] = sem_curve[i] / np.sqrt(2.0 * (nb - 1))
 
-    # SEM at largest B (for fallback transparency)
-    sem_at_max_B = float(sem_curve[-1]) if len(sem_curve) > 0 else 0.0
+    # Plateau detection: consecutive levels where increase < δSEM
+    plateau_index: int | None = None
+    consec = 0
+    for i in range(len(block_sizes) - 1):
+        if np.isnan(sem_curve[i]) or np.isnan(sem_curve[i + 1]):
+            consec = 0
+            continue
+        increase = sem_curve[i + 1] - sem_curve[i]
+        if increase < delta_sem[i]:
+            consec += 1
+            if consec >= n_consecutive and plateau_index is None:
+                # plateau starts at the first point of the qualifying run
+                plateau_index = i - n_consecutive + 2
+        else:
+            consec = 0
 
-    # Plateau detection: last `plateau_window` valid entries
-    valid_mask = ~np.isnan(sem_curve)
-    valid_indices = np.where(valid_mask)[0]
+    plateau_reached = plateau_index is not None
 
-    if len(valid_indices) >= plateau_window:
-        plateau_indices = valid_indices[-plateau_window:]
-        plateau_values = sem_curve[plateau_indices]
-        s_bar = np.mean(plateau_values)
-        delta_s = np.max(plateau_values) - np.min(plateau_values)
-        rtol = delta_s / s_bar if s_bar > 0 else np.inf
-        plateau_reached = rtol < plateau_rtol
-        sem_plateau_val = float(s_bar)
+    if plateau_reached:
+        plateau_sem = float(sem_curve[plateau_index])
+        plateau_delta = float(delta_sem[plateau_index])
+        plateau_block_size: int | None = int(block_sizes[plateau_index])
     else:
-        # Not enough points for plateau check
-        sem_plateau_val = float(sem_at_max_B)
-        rtol = np.inf
-        plateau_reached = False
+        # Fallback: use the last valid point
+        valid = np.where(~np.isnan(sem_curve))[0]
+        last = valid[-1] if len(valid) > 0 else 0
+        plateau_sem = float(sem_curve[last])
+        plateau_delta = float(delta_sem[last])
+        plateau_block_size = None
 
-    # Cross-validation with SEM_auto
-    cross_valid_ok = True
-    if sem_auto is not None and sem_plateau_val > 0:
-        relative_diff = abs(sem_plateau_val - sem_auto) / sem_plateau_val
-        cross_valid_ok = relative_diff < cross_valid_rtol
-
-    # Pass/fail (plateau sub-step only)
+    # Pass/fail
     if sem_max is not None:
-        passed: bool | None = plateau_reached and sem_plateau_val <= sem_max
+        passed: bool | None = plateau_reached and plateau_sem <= sem_max
     else:
         passed = None
-
-    # Arctan extrapolation
-    sigma = float(np.std(series, ddof=0))
-    arctan_result = fit_arctan_sem(
-        block_sizes,
-        sem_curve,
-        n_total=n,
-        sigma_series=sigma,
-        r2_min=arctan_r2_min,
-        min_points=arctan_min_points,
-    )
 
     return BlockAverageResult(
         block_sizes=block_sizes,
         sem_curve=sem_curve,
-        sem_plateau=sem_plateau_val,
-        sem_at_max_B=sem_at_max_B,
-        plateau_rtol=float(rtol),
+        delta_sem=delta_sem,
+        n_total=n,
+        plateau_index=plateau_index,
+        plateau_sem=plateau_sem,
+        plateau_delta=plateau_delta,
+        plateau_block_size=plateau_block_size,
         plateau_reached=plateau_reached,
-        cross_valid_ok=cross_valid_ok,
         passed=passed,
-        arctan=arctan_result,
     )

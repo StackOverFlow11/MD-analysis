@@ -1,6 +1,6 @@
-"""Integration regression tests for constrained TI with arctan extrapolation.
+"""Integration regression tests for constrained TI with F&P block averaging.
 
-Uses real data from data_example/ti/ti_target_0.302356/ (1970 frames).
+Uses real data from data_example/ti/ti_target_0.302356/ (3112 frames).
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ pytestmark = pytest.mark.skipif(
 
 
 class TestRegressionTiTarget:
-    """Regression tests on known-good data (1970 frames, τ_corr ≈ 8.2)."""
+    """Regression tests on known-good data (3112 frames, τ_corr ≈ 9.0)."""
 
     def _run_diagnostics(self, output_dir=None):
         from md_analysis.enhanced_sampling.constrained_ti.workflow import (
@@ -30,34 +30,38 @@ class TestRegressionTiTarget:
             restart, log, output_dir=output_dir
         )
 
-    def test_arctan_reliable_and_matches_acf(self) -> None:
-        """#1 (P0): arctan reliable, sem_asymptote ≈ sem_auto, sem_auto ≈ 2.84e-04."""
+    def test_fp_plateau_and_matches_acf(self) -> None:
+        """F&P plateau detected, SEM_block ≈ SEM_auto."""
         result = self._run_diagnostics()
         report = result["report"]
 
         # ACF SEM should be close to known value
-        assert report.autocorr.sem_auto == pytest.approx(2.84e-04, rel=0.05)
+        assert report.autocorr.sem_auto == pytest.approx(2.42e-04, rel=0.05)
 
-        # Arctan should be reliable
-        assert report.block_avg.arctan is not None
-        assert report.block_avg.arctan.reliable == True  # noqa: E712
+        # F&P plateau should be detected
+        assert report.block_avg.plateau_reached == True  # noqa: E712
+        assert report.block_avg.plateau_block_size is not None
 
-        # Arctan asymptote should match ACF SEM (10% tolerance due to
-        # dense sampling pulling fit toward low-B region)
-        assert report.block_avg.arctan.sem_asymptote == pytest.approx(
-            report.autocorr.sem_auto, rel=0.10
+        # SEM_block should agree with SEM_auto (20% tolerance)
+        assert report.block_avg.plateau_sem == pytest.approx(
+            report.autocorr.sem_auto, rel=0.20
+        )
+
+        # sem_final should be the plateau value
+        assert report.sem_final == pytest.approx(
+            report.block_avg.plateau_sem, rel=1e-10
         )
 
     def test_diagnostics_png_generated(self, tmp_path) -> None:
-        """#2 (P1): PNG file generated without error."""
+        """PNG file generated without error."""
         result = self._run_diagnostics(output_dir=tmp_path)
         png_path = result.get("diagnostics_png")
         assert png_path is not None
         assert Path(png_path).exists()
         assert Path(png_path).stat().st_size > 0
 
-    def test_plot_with_arctan_none(self, tmp_path) -> None:
-        """#3 (P1): plot works when arctan=None (mock scipy unavailable)."""
+    def test_plot_with_no_plateau(self, tmp_path) -> None:
+        """Plot works when plateau is not reached (mock)."""
         from unittest.mock import patch
 
         from md_analysis.enhanced_sampling.constrained_ti.models import (
@@ -70,33 +74,27 @@ class TestRegressionTiTarget:
             analyze_standalone,
         )
 
-        # Get a real report first
         import numpy as np
 
         rng = np.random.default_rng(42)
         series = rng.normal(0, 1, 2000)
 
-        # Patch block_average to return arctan=None
         def patched_ba(series, **kwargs):
-            real_module = __import__(
-                "md_analysis.enhanced_sampling.constrained_ti.analysis.block_average",
-                fromlist=["analyze_block_average"],
+            from md_analysis.enhanced_sampling.constrained_ti.analysis.block_average import (
+                analyze_block_average as real_ba,
             )
-            real_result = real_module.analyze_block_average(
-                series, dense_sampling=False, **{
-                    k: v for k, v in kwargs.items() if k != "dense_sampling"
-                }
-            )
+            real = real_ba(series, **kwargs)
             return BlockAverageResult(
-                block_sizes=real_result.block_sizes,
-                sem_curve=real_result.sem_curve,
-                sem_plateau=real_result.sem_plateau,
-                sem_at_max_B=real_result.sem_at_max_B,
-                plateau_rtol=real_result.plateau_rtol,
-                plateau_reached=real_result.plateau_reached,
-                cross_valid_ok=real_result.cross_valid_ok,
-                passed=real_result.passed,
-                arctan=None,
+                block_sizes=real.block_sizes,
+                sem_curve=real.sem_curve,
+                delta_sem=real.delta_sem,
+                n_total=real.n_total,
+                plateau_index=None,
+                plateau_sem=real.plateau_sem,
+                plateau_delta=real.plateau_delta,
+                plateau_block_size=None,
+                plateau_reached=False,
+                passed=None,
             )
 
         with patch(
@@ -105,6 +103,5 @@ class TestRegressionTiTarget:
         ):
             report = analyze_standalone(series)
 
-        # Plot should not crash with arctan=None
         png_path = plot_point_diagnostics(report, output_dir=tmp_path)
         assert png_path.exists()

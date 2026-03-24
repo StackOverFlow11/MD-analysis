@@ -11,6 +11,7 @@ TIGen 工作目录生成在 `scripts/TIGen.py`（不在此包中）。
 | 目录 | 用途 |
 |---|---|
 | `slowgrowth/` | SG 数据结构、积分、绘图 → `slowgrowth/CLAUDE.md` |
+| `constrained_ti/` | 约束 TI 收敛诊断（ACF + F&P block avg + Geweke） → `constrained_ti/CLAUDE.md` |
 
 ## 慢增长 (SG) → 热力学积分 (TI) 工作流
 
@@ -57,8 +58,11 @@ TIGen 工作目录生成在 `scripts/TIGen.py`（不在此包中）。
 - `generate_ti_workdir()`：单个 TARGET 点（用于迭代补点场景）
 - `batch_generate_ti_workdirs()`：批量生成（支持时间模式和数值模式）
 
-### 未来：TI 结果分析模块（待实现）
+### TI 收敛诊断模块（constrained_ti/）
 
-- 计算自相关函数 (ACF) → 确定特征相关时间
-- 根据相关时间做分块重采样 (block resampling) → Lagrange 乘子误差分析
-- 判断 ⟨λ⟩ ≈ 0 的统计显著性 → 定位势能面极值/鞍点
+已实现，详见 `constrained_ti/CLAUDE.md`。核心流程：
+1. ACF → τ_corr, N_eff, SEM_auto
+2. Flyvbjerg-Petersen block averaging → SEM_block（pow2 + δSEM 平台检测）
+3. Running average drift check
+4. Geweke stationarity test
+5. sem_final: F&P plateau → ACF fallback

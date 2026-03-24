@@ -13,7 +13,6 @@ Public API
 from __future__ import annotations
 
 from .models import (
-    ArctanFitResult,
     AutocorrResult,
     BlockAverageResult,
     ConstraintPointInput,
@@ -28,7 +27,6 @@ from .models import (
 
 __all__ = [
     # Models
-    "ArctanFitResult",
     "AutocorrResult",
     "BlockAverageResult",
     "ConstraintPointInput",
