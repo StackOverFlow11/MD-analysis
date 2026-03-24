@@ -144,7 +144,8 @@
   - `_water.py`：水分析命令类（101-105）：`WaterDensityCmd`、`WaterOrientationCmd`、`AdWaterOrientationCmd`、`AdWaterThetaCmd`、`WaterThreePanelCmd`
   - `_potential.py`：电势分析命令类（211-216）：`CenterPotentialCmd`、`FermiEnergyCmd`、`ElectrodePotentialCmd`、`PhiZProfileCmd`、`ThicknessSensitivityCmd`、`FullPotentialCmd`
   - `_charge.py`：电荷分析命令类（221-223）：`SurfaceChargeCmd`（通过 `method` 参数区分）、`_print_ensemble_summary()`
-  - `_enhanced_sampling.py`：增强抽样命令类（301-302）：`SGQuickPlotCmd`、`SGPublicationPlotCmd`
+  - `_enhanced_sampling.py`：慢增长命令类（30=SG 301-302）：`SGQuickPlotCmd`、`SGPublicationPlotCmd`
+  - `_constrained_ti.py`：约束 TI 命令类（31=TI 311-312）：`TISingleDiagCmd`、`TIFullAnalysisCmd`
   - `_scripts.py`：脚本/工具命令类（41=Bader 411-412，42=TI 421-422）：`BaderSingleCmd`、`BaderBatchCmd`、`TISingleCmd`、`TIBatchCmd`
   - `_settings.py`：设置命令类（901-909）：`SetVaspScriptCmd`、`SetCp2kScriptCmd`、`ShowConfigCmd`、`SetAnalysisDefaultCmd`、`ResetDefaultsCmd`、`SetPotentialReferenceCmd`
 
@@ -155,8 +156,14 @@
   - `SlowGrowth.py`：数据类（`Slowgrowth`、`SlowgrowthFull`、`SlowgrowthSegment`）+ 自由能积分（midpoint rule，CP2K 约定取负号）
   - `SlowGrowthPlot.py`：双轴绘图（quick / publication）+ CSV 导出 + 统一入口 `slowgrowth_analysis`
   - `config.py`：输出文件名常量
+- `enhanced_sampling/constrained_ti/`：约束 TI 收敛诊断子包
+  - `workflow.py`：编排器（`analyze_standalone`、`analyze_ti`、`standalone_diagnostics`、CSV 导出）
+  - `io.py`：自动发现约束点目录（`discover_ti_points`、`load_ti_series`）
+  - `plot.py`：2×2 诊断图 + 自由能曲线图
+  - `integration.py`：梯形积分权重、SEM targets、自由能积分
+  - `analysis/`：四步诊断引擎（ACF、F&P block average、running average、Geweke）
 - 依赖方向：`enhanced_sampling` → `utils`（`ColvarParser`、`config`、`_io_helpers`）；无反向依赖
-- CLI 集成：301（quick plot）、302（publication plot），通过 `cli/_enhanced_sampling.py` 实现
+- CLI 集成：30=Slow-Growth（301-302，`cli/_enhanced_sampling.py`），31=Constrained TI（311-312，`cli/_constrained_ti.py`）
 
 ### 9) `md_analysis.scripts`（自动化脚本工具）
 

@@ -58,3 +58,5 @@ VASPKIT 风格交互式编号菜单。无 argparse，所有输入通过 `input()
 - `CellAbcParam.collect()` 允许一次重试（.restart 失败 → 切 md.inp），第二次失败才报错
 - `_discover_restart_file()` 排除 `_\d+.restart` 检查点文件（正则过滤）
 - SG 命令会检测 LagrangeMultLog 中的 overflow（NaN 步），并在终端打印警告
+- SG 命令 301/302 的 `output_name` 由父 `MenuGroup("30", output_name="slowgrowth")` 提供，`_SlowgrowthPlotCmd` 自身不定义 `output_name`（否则路径重复拼接为 `slowgrowth/slowgrowth`）
+- `K.TI_DIR_PATTERN` 仅接受 `"ti_target"/"xi"/"auto"`，注意区分 `K.DIR_PATTERN`（Bader 用）

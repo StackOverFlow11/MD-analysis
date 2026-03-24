@@ -21,6 +21,7 @@
   - `<outdir>/electrochemical/charge/<method>/`
   - `<outdir>/electrochemical/calibration/{fit,predict}/`
   - `<outdir>/enhanced_sampling/slowgrowth/`
+  - `<outdir>/enhanced_sampling/constrained_ti/`
 - **导入规范**：包内用相对导入（`.`/`..`/`...`），测试用绝对导入
 
 ## 陷阱与历史 Bug
