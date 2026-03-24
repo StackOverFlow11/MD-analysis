@@ -141,42 +141,77 @@ def plot_point_diagnostics(
     )
     ax.legend(fontsize=7)
 
-    # --- Bottom-right: Summary table ---
+    # --- Bottom-right: Summary table (4 sections) ---
     ax = axes[1, 1]
     ax.axis("off")
     r = report
     ba = r.block_avg
+    n = ba.n_total
+    sigma = r.sigma_lambda
+
+    # Block-average implied tau and N_eff:
+    # SEM_block = sigma * sqrt(2*tau_implied/N)  =>  tau_implied = N*(SEM/sigma)^2/2
+    if sigma > 0 and ba.plateau_sem > 0:
+        tau_block = n * (ba.plateau_sem / sigma) ** 2 / 2.0
+        neff_block = n / (2.0 * tau_block) if tau_block > 0 else float("inf")
+    else:
+        tau_block = float("nan")
+        neff_block = float("nan")
+
+    # Convert energy quantities to eV for display
+    mean_ev = r.lambda_mean * HA_TO_EV
+    sem_final_ev = r.sem_final * HA_TO_EV
+    sem_auto_ev = r.autocorr.sem_auto * HA_TO_EV
+    sem_block_ev = ba.plateau_sem * HA_TO_EV
+    dsem_block_ev = ba.plateau_delta * HA_TO_EV
+    sem_max_ev = r.sem_max * HA_TO_EV if r.sem_max is not None else None
+
+    # Section 1: Overview
+    sec1 = [
+        "── Overview ──",
+        f"ξ = {r.xi:.6f}    N = {n}",
+        f"⟨λ⟩ = {mean_ev:.6f} eV",
+        f"SEM  = {sem_final_ev:.6f} eV",
+    ]
+    if r.passed is not None:
+        sec1.append(f"OVERALL: {'PASS' if r.passed else 'FAIL'}")
+    else:
+        sec1.append("OVERALL: N/A (no target)")
+
+    # Section 2: ACF
+    sec2 = [
+        "── ACF ──",
+        f"τ_corr = {r.autocorr.tau_corr:.1f} frames",
+        f"N_eff  = {r.autocorr.n_eff:.1f}  ({'PASS' if r.autocorr.passed_neff else 'FAIL'})",
+        f"SEM    = {sem_auto_ev:.6f} eV",
+    ]
+
+    # Section 3: Block Average (F&P)
     plat_info = (
         f"yes, B={ba.plateau_block_size}" if ba.plateau_reached else "no"
     )
-    lines = [
-        f"ξ = {r.xi:.6f}",
-        f"⟨λ⟩ = {r.lambda_mean:.6f} ± {r.sigma_lambda:.6f}",
-        "",
-        f"τ_corr = {r.autocorr.tau_corr:.1f} frames",
-        f"N_eff = {r.autocorr.n_eff:.1f}  ({'PASS' if r.autocorr.passed_neff else 'FAIL'})",
-        f"SEM_auto = {r.autocorr.sem_auto:.6f}",
-        f"SEM_block = {ba.plateau_sem:.6f}  (plateau: {plat_info})",
-        f"SEM_final = {r.sem_final:.6f}",
-        "",
-        f"SEM target: {r.sem_max:.6f}" if r.sem_max is not None else "SEM target: N/A",
-        f"Drift D = {r.running_avg.drift_D:.6f}  ({'PASS' if r.running_avg.passed else 'FAIL'})",
-        f"Geweke z = {r.geweke.z:.3f}  ({'PASS' if r.geweke.passed else 'FAIL'})"
-        + ("" if r.geweke.reliable else " [unreliable]"),
-        "",
+    sec3 = [
+        "── Block Average ──",
+        f"plateau: {plat_info}",
+        f"SEM    = {sem_block_ev:.6f} ± {dsem_block_ev:.6f} eV",
+        f"τ_impl = {tau_block:.1f} frames",
+        f"N_impl = {neff_block:.1f}",
     ]
-    if r.passed is not None:
-        lines.append(f"OVERALL: {'PASS' if r.passed else 'FAIL'}")
-    else:
-        lines.append("OVERALL: N/A (no precision target)")
-    if r.failure_reasons:
-        lines.append("")
-        for reason in r.failure_reasons[:5]:
-            lines.append(f"• {reason}")
+
+    # Section 4: Geweke
+    sec4 = [
+        "── Geweke ──",
+        f"|z| = {abs(r.geweke.z):.3f}  ({'PASS' if r.geweke.passed else 'FAIL'})"
+        + ("" if r.geweke.reliable else " [unreliable]"),
+        f"mean_A = {r.geweke.mean_a * HA_TO_EV:.6f} eV",
+        f"mean_B = {r.geweke.mean_b * HA_TO_EV:.6f} eV",
+    ]
+
+    lines = sec1 + [""] + sec2 + [""] + sec3 + [""] + sec4
 
     ax.text(
         0.05,
-        0.95,
+        0.98,
         "\n".join(lines),
         transform=ax.transAxes,
         fontsize=7,
