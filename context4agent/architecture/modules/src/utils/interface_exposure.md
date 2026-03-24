@@ -174,7 +174,7 @@
   - 支持 `__len__`、`__getitem__(colvar_id)`（按 colvar_id 查找，KeyError 如未找到）、`__iter__`
   - 属性 `primary` 返回第一个约束
 - `ColvarRestart`
-  - restart 文件元数据：`project_name`、`step_start`、`time_start_fs`、`timestep_fs`、`total_steps`、`colvars: ColvarInfo`、`lagrange_filename`、`cell_abc_ang`、`fixed_atom_indices`
+  - restart 文件元数据：`project_name`、`step_start`、`time_start_fs`、`timestep_fs`、`total_steps`、`colvars: ColvarInfo`、`lagrange_filename: str | None`（可选，CP2K 不一定写出）、`cell_abc_ang`、`fixed_atom_indices`
 - `LagrangeMultLog`
   - 拉格朗日乘子时序：`shake`、`rattle`、`n_steps`、`n_constraints`；属性 `collective_shake`/`collective_rattle` 提取 CV 乘子
 - `ColvarMDInfo`

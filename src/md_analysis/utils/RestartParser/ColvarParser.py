@@ -72,7 +72,7 @@ class ColvarRestart:
     timestep_fs: float
     total_steps: int
     colvars: ColvarInfo
-    lagrange_filename: str
+    lagrange_filename: str | None
     cell_abc_ang: tuple[float, float, float]
     fixed_atom_indices: tuple[int, ...] | None
 
@@ -230,15 +230,15 @@ def _parse_all_collective_blocks(text: str) -> ColvarInfo:
     return ColvarInfo(constraints=constraints)
 
 
-def _parse_lagrange_filename(text: str) -> str:
+def _parse_lagrange_filename(text: str) -> str | None:
     constraint_match = _CONSTRAINT_BLOCK_RE.search(text)
     if not constraint_match:
-        raise ColvarParseError("No &CONSTRAINT block found")
+        return None
     lag_match = _LAGRANGE_BLOCK_RE.search(constraint_match.group(1))
     if not lag_match:
-        raise ColvarParseError("No &LAGRANGE_MULTIPLIERS block found")
-    fn = _require_scalar(lag_match.group(1), "FILENAME", "&LAGRANGE_MULTIPLIERS")
-    return fn.strip()
+        return None
+    fn = _extract_scalar(lag_match.group(1), "FILENAME")
+    return fn.strip() if fn else None
 
 
 def _parse_fixed_atoms_list(text: str) -> tuple[int, ...] | None:
