@@ -112,7 +112,7 @@ class TestAnalyzeTI:
         xi = np.array([1.0, 2.0, 3.0])
         # Use longer series and lower phi for robust convergence
         series_list = [make_ar1(10000, 0.3, seed=10 + i) for i in range(3)]
-        report = analyze_ti(xi, series_list, dt=1.0, epsilon_tol_kcal=100.0)
+        report = analyze_ti(xi, series_list, dt=1.0, epsilon_tol_ev=100.0)
         assert report.all_passed == True  # noqa: E712
         assert len(report.failing_indices) == 0
         assert len(report.point_reports) == 3
@@ -124,7 +124,7 @@ class TestAnalyzeTI:
             make_drifting(5000, slope=0.1, seed=1),  # Should fail
             make_iid(5000, seed=2),
         ]
-        report = analyze_ti(xi, series_list, dt=1.0, epsilon_tol_kcal=100.0)
+        report = analyze_ti(xi, series_list, dt=1.0, epsilon_tol_ev=100.0)
         # At least one point should have failure reasons (drift or Geweke)
         any_failures = any(
             len(r.failure_reasons) > 0 for r in report.point_reports
@@ -134,7 +134,7 @@ class TestAnalyzeTI:
     def test_unequal_lengths(self):
         xi = np.array([1.0, 2.0])
         series_list = [make_iid(3000, seed=0), make_iid(1000, seed=1)]
-        report = analyze_ti(xi, series_list, dt=1.0, epsilon_tol_kcal=100.0)
+        report = analyze_ti(xi, series_list, dt=1.0, epsilon_tol_ev=100.0)
         assert len(report.point_reports) == 2
 
     def test_k_less_than_2_raises(self):
@@ -151,9 +151,9 @@ class TestAnalyzeTI:
     def test_epsilon_tol_unit_conversion(self):
         xi = np.array([1.0, 2.0])
         series_list = [make_iid(2000, seed=i) for i in range(2)]
-        report = analyze_ti(xi, series_list, dt=1.0, epsilon_tol_kcal=1.0)
-        # epsilon_tol_au should be ~1/627.5
-        assert report.epsilon_tol_au == pytest.approx(1.0 / 627.509474, rel=1e-6)
+        report = analyze_ti(xi, series_list, dt=1.0, epsilon_tol_ev=0.05)
+        # epsilon_tol_au should be 0.05 / 27.211386245988
+        assert report.epsilon_tol_au == pytest.approx(0.05 / 27.211386245988, rel=1e-6)
 
     def test_report_fields(self):
         xi = np.array([1.0, 2.0, 3.0])
@@ -254,7 +254,7 @@ class TestSEMSelection:
         """Regression — clean AR(1) TI all-pass behavior preserved."""
         xi = np.array([1.0, 2.0, 3.0])
         series_list = [make_ar1(10000, 0.3, seed=10 + i) for i in range(3)]
-        report = analyze_ti(xi, series_list, dt=1.0, epsilon_tol_kcal=100.0)
+        report = analyze_ti(xi, series_list, dt=1.0, epsilon_tol_ev=100.0)
         assert report.all_passed is True
         for r in report.point_reports:
             assert 0 < r.sem_final < 1.0

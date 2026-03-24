@@ -22,14 +22,14 @@ from .analysis.geweke import analyze_geweke
 from .analysis.running_average import analyze_running_average
 from .config import (
     DEFAULT_CROSS_CHECK_RTOL,
-    DEFAULT_EPSILON_TOL_KCAL,
+    DEFAULT_EPSILON_TOL_EV,
     DEFAULT_N_MIN,
     DEFAULT_N_WARN_SHORT,
     DEFAULT_N_WARN_UNRELIABLE,
     DEFAULT_NAN_FRACTION_MAX,
     DEFAULT_STANDALONE_CSV_NAME,
     DEFAULT_STANDALONE_PNG_NAME,
-    KCAL_TO_HARTREE,
+    EV_TO_HARTREE,
 )
 from .integration import (
     _compute_sem_targets,
@@ -371,7 +371,7 @@ def analyze_ti(
     lambda_series_list: list[np.ndarray],
     dt: float,
     *,
-    epsilon_tol_kcal: float = DEFAULT_EPSILON_TOL_KCAL,
+    epsilon_tol_ev: float = DEFAULT_EPSILON_TOL_EV,
     equilibration: int | list[int] = 0,
     **engine_overrides: object,
 ) -> TIReport:
@@ -385,8 +385,8 @@ def analyze_ti(
         K arrays, each shape (N_k,).
     dt : float
         Frame interval in fs.
-    epsilon_tol_kcal : float
-        Free-energy tolerance in kcal/mol.
+    epsilon_tol_ev : float
+        Free-energy tolerance in eV.
     equilibration : int or list[int]
         Frames to discard per point.
     **engine_overrides
@@ -397,7 +397,7 @@ def analyze_ti(
     TIReport
     """
     k = len(xi_values)
-    epsilon_tol_au = epsilon_tol_kcal * KCAL_TO_HARTREE
+    epsilon_tol_au = epsilon_tol_ev * EV_TO_HARTREE
 
     # Compute weights and SEM targets
     weights = compute_trapezoid_weights(xi_values)

@@ -6,10 +6,10 @@ here are the recommended defaults.
 
 Unit convention for epsilon_tol
 -------------------------------
-User-facing API accepts kcal/mol (DEFAULT_EPSILON_TOL_KCAL).
+User-facing API accepts eV (DEFAULT_EPSILON_TOL_EV).
 ``workflow.analyze_ti`` converts to Hartree internally before computing
 SEM targets, so that SEM_max has the same unit as lambda_series (a.u.).
-The conversion chain: user kcal/mol → KCAL_TO_HARTREE → Hartree (a.u.).
+The conversion chain: user eV → EV_TO_HARTREE → Hartree (a.u.).
 """
 
 from __future__ import annotations
@@ -81,14 +81,11 @@ DEFAULT_GEWEKE_MIN_NEFF_SUBSERIES: int = 10
 # Global precision
 # ---------------------------------------------------------------------------
 
-# Default free-energy tolerance (1 kcal/mol ~ chemical accuracy).
-DEFAULT_EPSILON_TOL_KCAL: float = 1.0
+# Default free-energy tolerance (0.05 eV ~ 1 kcal/mol chemical accuracy).
+DEFAULT_EPSILON_TOL_EV: float = 0.05
 
-# Unit conversion: kcal/mol -> Hartree.
-KCAL_TO_HARTREE: float = 1.0 / 627.509474
-
-# Unit conversion: kcal/mol -> eV.
-KCAL_TO_EV: float = 0.0433641
+# Unit conversion: eV -> Hartree.
+EV_TO_HARTREE: float = 1.0 / 27.211386245988
 
 # ---------------------------------------------------------------------------
 # Output filenames

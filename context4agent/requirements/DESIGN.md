@@ -265,10 +265,10 @@ All are exposed as keyword arguments in the analysis functions; the values
 here are the recommended defaults.
 
 Unit convention for epsilon_tol:
-  User-facing API accepts kcal/mol (DEFAULT_EPSILON_TOL_KCAL).
+  User-facing API accepts eV (DEFAULT_EPSILON_TOL_EV).
   workflow.analyze_ti converts to Hartree internally before computing
   SEM targets, so that SEM_max has the same unit as lambda_series (a.u.).
-  The conversion chain: user kcal/mol → KCAL_TO_HARTREE → Hartree (a.u.).
+  The conversion chain: user eV → EV_TO_HARTREE → Hartree (a.u.).
 """
 
 from __future__ import annotations
@@ -350,14 +350,11 @@ DEFAULT_GEWEKE_MIN_NEFF_SUBSERIES: int = 10
 # Global precision
 # ---------------------------------------------------------------------------
 
-# Default free-energy tolerance (§7 Q1: 1 kcal/mol ≈ chemical accuracy).
-DEFAULT_EPSILON_TOL_KCAL: float = 1.0
+# Default free-energy tolerance (0.05 eV ≈ 1 kcal/mol chemical accuracy).
+DEFAULT_EPSILON_TOL_EV: float = 0.05
 
-# Unit conversion: kcal/mol → Hartree (for internal consistency with CP2K a.u.).
-KCAL_TO_HARTREE: float = 1.0 / 627.509474
-
-# Unit conversion: kcal/mol → eV.
-KCAL_TO_EV: float = 0.0433641
+# Unit conversion: eV → Hartree (for internal consistency with CP2K a.u.).
+EV_TO_HARTREE: float = 1.0 / 27.211386245988
 
 # ---------------------------------------------------------------------------
 # Output filenames
@@ -575,9 +572,9 @@ Before calling any engine, the orchestrator performs:
 
 ### 6.0.2 Unit conversion for epsilon_tol
 
-`analyze_ti` accepts `epsilon_tol_kcal` (user-facing, kcal/mol) and converts internally:
+`analyze_ti` accepts `epsilon_tol_ev` (user-facing, eV) and converts internally:
 ```python
-epsilon_tol_au = epsilon_tol_kcal * KCAL_TO_HARTREE
+epsilon_tol_au = epsilon_tol_ev * EV_TO_HARTREE
 ```
 All downstream SEM targets and comparisons use Hartree (a.u.), matching the unit of `lambda_series` from CP2K.
 
@@ -655,14 +652,14 @@ analyze_ti(
     lambda_series:  list[np.ndarray],        # K arrays, each shape (N_k,)
     dt:             float,
     *,
-    epsilon_tol_kcal: float = DEFAULT_EPSILON_TOL_KCAL,  # user-facing unit
+    epsilon_tol_ev: float = DEFAULT_EPSILON_TOL_EV,  # user-facing unit
     equilibration:  int | list[int] = 0,     # frames to discard per point
     **engine_overrides,
 ) → TIReport
 ```
 
 Logic:
-1. Convert `epsilon_tol_kcal` → `epsilon_tol_au` (Hartree)
+1. Convert `epsilon_tol_ev` → `epsilon_tol_au` (Hartree)
 2. Validate `xi_values`: must be strictly monotonic, K ≥ 2
 3. Compute trapezoid weights and SEM targets via `integration._compute_sem_targets`
 4. Apply equilibration trimming + NaN handling (§6.0) to each λ series
@@ -1072,7 +1069,7 @@ All generators accept `rng = np.random.default_rng(seed)` for reproducibility.
 | `geweke` | Stationary → \|z\| < 1.96; drifting → \|z\| > 1.96; step_change → \|z\| > 1.96; short front segment → reliable=False |
 | `integration` | K=2 exact formula; uniform-spacing weights correct; K=1 → ValueError; non-monotonic xi → ValueError; SEM_max safety floor enforced |
 | `workflow` — `analyze_standalone` | sem_max=None → passed is None; sem_target set → passed is True/False; NaN input handled; equilibration ≥ N → error; failure_reasons non-empty when passed=False, empty when passed=True |
-| `workflow` — `analyze_ti` | All-pass on clean AR(1); at least one fail on drifting; unequal-length series (N_1≠N_2) handled; epsilon_tol_kcal correctly converted to Hartree |
+| `workflow` — `analyze_ti` | All-pass on clean AR(1); at least one fail on drifting; unequal-length series (N_1≠N_2) handled; epsilon_tol_ev correctly converted to Hartree |
 | `models` | Frozen dataclass immutability; TIPointDefinition fields typed |
 
 ### 12.3 Integration tests
