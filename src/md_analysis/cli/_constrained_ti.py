@@ -8,7 +8,7 @@ import numpy as np
 
 from ._framework import MenuCommand, lazy_import
 from ._params import K
-from ._prompt import prompt_float, prompt_int, prompt_str
+from ._prompt import prompt_bool, prompt_float, prompt_int, prompt_str
 from ._enhanced_sampling import _discover_restart_file, _discover_log_file
 
 
@@ -117,7 +117,7 @@ class TIFullAnalysisCmd(MenuCommand):
         ctx[K.TI_DIR_PATTERN] = pattern
 
         ctx[K.EQUILIBRATION] = prompt_int(
-            "Equilibration frames to discard (all points)", default=0,
+            "Default equilibration frames to discard", default=0,
         ) or 0
         ctx[K.EPSILON_TOL_EV] = prompt_float(
             "Free-energy tolerance ε (eV)", default=0.05,
@@ -164,6 +164,22 @@ class TIFullAnalysisCmd(MenuCommand):
         for p in point_defs:
             print(f"    ξ = {p.xi:.6f}")
 
+        # Per-point equilibration
+        default_equil = ctx[K.EQUILIBRATION]
+        if len(point_defs) > 1 and prompt_bool(
+            "Set per-point equilibration frames?", default=False,
+        ):
+            equil_list = []
+            for p in point_defs:
+                val = prompt_int(
+                    f"  ξ={p.xi:.6f} equilibration frames",
+                    default=default_equil,
+                )
+                equil_list.append(val if val is not None else default_equil)
+            equilibration = equil_list
+        else:
+            equilibration = default_equil
+
         # 2. Load series
         series_data = load_ti_series(point_defs)
         xi_values = np.array([x for x, _, _ in series_data])
@@ -182,7 +198,7 @@ class TIFullAnalysisCmd(MenuCommand):
         ti_report = analyze_ti(
             xi_values, lambda_list, dt,
             epsilon_tol_ev=ctx[K.EPSILON_TOL_EV],
-            equilibration=ctx[K.EQUILIBRATION],
+            equilibration=equilibration,
         )
 
         # 5. Console summary table

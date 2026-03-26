@@ -234,11 +234,11 @@ Input: 312
 |---|---|---|---|---|
 | root_dir | `K.TI_ROOT_DIR` | str | "." | 包含 ti_target_* 子目录的根路径 |
 | pattern | `K.TI_DIR_PATTERN` | str | "auto" | 目录发现模式，仅 `"ti_target"/"xi"/"auto"` 有效 |
-| equilibration | `K.EQUILIBRATION` | int | 0 | 统一丢弃帧数（所有点） |
+| equilibration | `K.EQUILIBRATION` | int | 0 | 默认丢弃帧数（作为逐点的默认值） |
 | epsilon_tol_ev | `K.EPSILON_TOL_EV` | float | 0.05 | 自由能精度容差（eV） |
 | output_dir | `K.OUTDIR` | str | "analysis" | |
 
-> **equilibration 按点设置**：底层 `analyze_ti()` 支持 `list[int]`（每点独立值），但 CLI 仅暴露统一 int。这是合理的简化——需要按点设置的高级用户可使用编程 API。
+> **equilibration 按点设置**：发现约束点后，CLI 会询问 `"Set per-point equilibration frames? (y/N)"`。选 Yes 则逐点提示输入（回车使用默认值）；选 No 则所有点使用统一默认值。底层 `analyze_ti()` 接收 `int | list[int]`。
 
 ### execute 内部流程
 
@@ -256,6 +256,13 @@ point_defs = discover_ti_points(Path(root_dir), pattern=pattern)
 print(f"  Found {len(point_defs)} constraint points")
 for p in point_defs:
     print(f"    ξ = {p.xi:.6f}")
+
+# 1.5 逐点 equilibration（可选）
+default_equil = ctx[K.EQUILIBRATION]
+if len(point_defs) > 1 and prompt_bool("Set per-point equilibration frames?", default=False):
+    equilibration = [prompt_int(f"  ξ={p.xi:.6f} ...", default=default_equil) for p in point_defs]
+else:
+    equilibration = default_equil
 
 # 2. 加载序列
 series_data = load_ti_series(point_defs)
