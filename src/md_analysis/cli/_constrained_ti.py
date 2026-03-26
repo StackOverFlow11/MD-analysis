@@ -186,7 +186,7 @@ class TIFullAnalysisCmd(MenuCommand):
         )
 
         # 5. Console summary table
-        from ...utils.config import HA_TO_EV
+        from ..utils.config import HA_TO_EV
         print(f"\n  {'Point':<6} {'ξ':<12} {'⟨λ⟩':<14} {'SEM':<14} {'Status'}")
         print(f"  {'─' * 58}")
         for i, r in enumerate(ti_report.point_reports):
