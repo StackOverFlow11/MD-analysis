@@ -13,7 +13,7 @@ from ..config import (
     KEY_Z_BIN_WIDTH_A,
 )
 from ._calibration import CalibrateFromCSVCmd, CalibrateManualCmd, PredictPotentialCmd
-from ._charge import CounterionChargeCmd, SurfaceChargeCmd, TrackedChargeCmd
+from ._charge import CounterionChargeCmd, SingleSideChargeCmd, SurfaceChargeCmd, TrackedChargeCmd
 from ._constrained_ti import TIFullAnalysisCmd, TISingleDiagCmd
 from ._enhanced_sampling import SGPublicationPlotCmd, SGQuickPlotCmd
 from ._framework import MenuGroup
@@ -82,8 +82,9 @@ def build_menu_tree() -> MenuGroup:
         SurfaceChargeCmd("221", "Surface Charge (Counterion)", method="counterion"),
         SurfaceChargeCmd("222", "Surface Charge (Layer)", method="layer"),
         SurfaceChargeCmd("223", "Full Charge Analysis with Plots", method=None),
-        TrackedChargeCmd("224", "Tracked Atom Charges (XYZ indices)"),
-        CounterionChargeCmd("225", "Counterion Charge Tracking"),
+        SingleSideChargeCmd("224", "Single-Side Charge + Potential"),
+        TrackedChargeCmd("225", "Tracked Atom Charges (XYZ indices)"),
+        CounterionChargeCmd("226", "Counterion Charge Tracking"),
     )
 
     calibration = MenuGroup("23", "Charge-Potential Calibration",

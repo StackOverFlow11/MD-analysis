@@ -409,6 +409,67 @@ def _plot_surface_charge(
     plt.close(fig)
 
 
+def _plot_single_side_charge(
+    png_path: Path,
+    steps: np.ndarray,
+    sigma: np.ndarray,
+    sigma_cum: np.ndarray,
+    *,
+    side_label: str = "aligned",
+    phi: np.ndarray | None = None,
+    phi_cum: np.ndarray | None = None,
+    fit_rmse: float | None = None,
+    potential_reference: str = "SHE",
+) -> None:
+    """Plot single-side surface charge density (± extrapolated potential)."""
+    png_path.parent.mkdir(parents=True, exist_ok=True)
+
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    has_phi = phi is not None
+
+    fig, ax = plt.subplots(figsize=(9, 4.8), dpi=160)
+    ax.plot(steps, sigma, lw=1.0, alpha=0.65, color="tab:blue",
+            label=f"{side_label} σ (inst.)")
+    ax.plot(steps, sigma_cum, lw=2.0, color="tab:blue", ls="--",
+            label=f"{side_label} σ (cum. avg)")
+    ax.set_xlabel("MD step")
+    ax.set_ylabel(r"$\sigma$ ($\mu$C/cm$^2$)")
+    ax.set_title(
+        f"Surface charge density ({side_label})"
+        + (" + extrapolated potential" if has_phi else "")
+    )
+    ax.grid(True, alpha=0.25)
+
+    if has_phi:
+        ax2 = ax.twinx()
+        ax2.plot(steps, phi, lw=1.0, alpha=0.45, color="tab:green",
+                 label=f"{side_label} φ (inst.)")
+        ax2.plot(steps, phi_cum, lw=2.0, color="tab:green", ls="--",
+                 label=f"{side_label} φ (cum. avg)")
+        ax2.set_ylabel(f"φ (V vs {potential_reference})")
+
+        h1, l1 = ax.get_legend_handles_labels()
+        h2, l2 = ax2.get_legend_handles_labels()
+        ax.legend(h1 + h2, l1 + l2, loc="upper left", fontsize=8)
+
+        if fit_rmse is not None:
+            ax2.annotate(
+                f"fit RMSE = {fit_rmse:.4e} V",
+                xy=(0.98, 0.02), xycoords="axes fraction",
+                ha="right", va="bottom", fontsize=8, fontfamily="monospace",
+                bbox=dict(boxstyle="round,pad=0.2", fc="wheat", alpha=0.5),
+            )
+    else:
+        ax.legend()
+
+    fig.tight_layout()
+    fig.savefig(png_path)
+    plt.close(fig)
+
+
 # ---------------------------------------------------------------------------
 # End-to-end surface charge analysis
 # ---------------------------------------------------------------------------
@@ -434,6 +495,7 @@ def surface_charge_analysis(
     potential_pH: float = 0.0,
     potential_temperature_K: float = 298.15,
     potential_phi_pzc: float | None = None,
+    target_side: str | None = None,
 ) -> Path:
     """End-to-end surface charge density analysis with CSV + PNG output.
 
@@ -463,12 +525,19 @@ def surface_charge_analysis(
         Temperature in K for RHE conversion.
     potential_phi_pzc
         Potential of zero charge in V vs SHE for PZC conversion.
+    target_side
+        ``None`` — output both sides (default).
+        ``"aligned"`` or ``"opposed"`` — output only that side.
 
     Returns
     -------
     Path
         Path to the written CSV file.
     """
+    if target_side is not None and target_side not in ("aligned", "opposed"):
+        raise ValueError(
+            f"target_side must be 'aligned', 'opposed', or None, got {target_side!r}"
+        )
     if normal not in AREA_VECTOR_INDICES:
         raise ValueError(
             f"normal must be one of {set(AREA_VECTOR_INDICES)}, got {normal!r}"
@@ -578,7 +647,56 @@ def surface_charge_analysis(
     except Exception as exc:
         logger.warning("Failed to load calibration: %s", exc)
 
-    # CSV
+    # --- Select side(s) for output ---
+    if target_side is not None:
+        side_idx = 0 if target_side == "aligned" else 1
+        sigma_side = np.array([sigma_aligned, sigma_opposed][side_idx])
+        sigma_side_cum = _cumulative_average(sigma_side)
+        phi_side = [phi_aligned, phi_opposed][side_idx] if phi_aligned is not None else None
+        phi_side_cum = _cumulative_average(phi_side) if phi_side is not None else None
+
+        # CSV (single-side)
+        fieldnames = ["step", "sigma_uC_cm2", "sigma_cumavg_uC_cm2"]
+        if phi_side is not None:
+            fieldnames.extend([f"phi_V_vs_{ref_tag}", f"phi_cumavg_V_vs_{ref_tag}"])
+
+        csv_rows: list[dict] = []
+        for i in range(len(steps)):
+            row: dict = {
+                "step": int(steps[i]),
+                "sigma_uC_cm2": float(sigma_side[i]),
+                "sigma_cumavg_uC_cm2": float(sigma_side_cum[i]),
+            }
+            if phi_side is not None:
+                row[f"phi_V_vs_{ref_tag}"] = float(phi_side[i])
+                row[f"phi_cumavg_V_vs_{ref_tag}"] = float(phi_side_cum[i])
+            csv_rows.append(row)
+        csv_path = output_dir / DEFAULT_SURFACE_CHARGE_CSV_NAME
+        _write_csv(csv_path, csv_rows, fieldnames)
+
+        # PNG (single-side)
+        png_path = output_dir / DEFAULT_SURFACE_CHARGE_PNG_NAME
+        _plot_single_side_charge(
+            png_path, steps, sigma_side, sigma_side_cum,
+            side_label=target_side,
+            phi=phi_side, phi_cum=phi_side_cum,
+            fit_rmse=fit_rmse, potential_reference=ref_tag,
+        )
+
+        # Summary
+        if phi_side is not None:
+            logger.info(
+                "Extrapolated potential — %s side (cum. avg over %d frames):\n"
+                "  %.6f ± %.6f V vs %s\n"
+                "  fit RMSE: %.4e V",
+                target_side, len(phi_side),
+                phi_side_cum[-1], float(np.std(phi_side)), ref_tag,
+                fit_rmse or 0.0,
+            )
+
+        return csv_path
+
+    # CSV (both sides)
     fieldnames = [
         "step",
         "sigma_aligned_uC_cm2",
@@ -612,7 +730,7 @@ def surface_charge_analysis(
     csv_path = output_dir / DEFAULT_SURFACE_CHARGE_CSV_NAME
     _write_csv(csv_path, csv_rows, fieldnames)
 
-    # PNG
+    # PNG (both sides)
     png_path = output_dir / DEFAULT_SURFACE_CHARGE_PNG_NAME
     _plot_surface_charge(
         png_path, steps, sigma_aligned, sigma_opposed,

@@ -19,6 +19,7 @@ from ._params import (
     normal_axis,
     outdir,
     root_dir,
+    target_side,
 )
 
 
@@ -102,6 +103,71 @@ class SurfaceChargeCmd(MenuCommand):
         )
         print(f"\n Analysis complete. Output:\n   charge_csv: {csv_path}")
         _print_ensemble_summary(csv_path)
+
+
+class SingleSideChargeCmd(MenuCommand):
+    """Single-side surface charge density with potential extrapolation."""
+
+    params = (charge_method, target_side)
+    advanced_params = (root_dir, dir_pattern, normal_axis, metal_elements,
+                       layer_tol, n_surface_layers, outdir, frame_slice)
+
+    def execute(self, ctx: dict) -> None:
+        analyze = lazy_import(
+            "md_analysis.electrochemical.charge",
+            "surface_charge_analysis",
+        )
+        from ..config import (
+            KEY_POTENTIAL_PH,
+            KEY_POTENTIAL_PHI_PZC,
+            KEY_POTENTIAL_REFERENCE,
+            KEY_POTENTIAL_TEMPERATURE_K,
+            get_config,
+        )
+
+        method = ctx[K.METHOD]
+        side = ctx[K.TARGET_SIDE]
+        out = Path(ctx.get(K.OUTDIR, "analysis")) / self.output_subdir / f"{method}_{side}"
+        if K.OUTDIR_RESOLVED in ctx:
+            out = Path(ctx[K.OUTDIR_RESOLVED]) / f"{method}_{side}"
+        out.mkdir(parents=True, exist_ok=True)
+
+        csv_path = analyze(
+            ctx[K.ROOT_DIR],
+            metal_symbols=ctx[K.METAL_ELEMENTS],
+            normal=ctx[K.NORMAL],
+            method=method,
+            layer_tol_A=ctx[K.LAYER_TOL],
+            n_surface_layers=ctx[K.N_SURFACE_LAYERS],
+            dir_pattern=ctx[K.DIR_PATTERN],
+            output_dir=out,
+            frame_start=ctx[K.FRAME_START],
+            frame_end=ctx[K.FRAME_END],
+            frame_step=ctx[K.FRAME_STEP],
+            verbose=True,
+            potential_reference=get_config(KEY_POTENTIAL_REFERENCE, "SHE"),
+            potential_pH=get_config(KEY_POTENTIAL_PH, 0.0),
+            potential_temperature_K=get_config(KEY_POTENTIAL_TEMPERATURE_K, 298.15),
+            potential_phi_pzc=get_config(KEY_POTENTIAL_PHI_PZC),
+            target_side=side,
+        )
+        print(f"\n Analysis complete ({side} side). Output:\n   charge_csv: {csv_path}")
+
+        # Ensemble summary for single side
+        if csv_path.exists():
+            import numpy as np
+            with csv_path.open(encoding="utf-8") as f:
+                reader = _csv.DictReader(f)
+                rows = list(reader)
+            if rows:
+                sigma = np.array([float(r["sigma_uC_cm2"]) for r in rows])
+                print(f"\n Ensemble average ({len(rows)} frames, {side} side):")
+                print(f"   sigma: {sigma.mean():8.4f} +/- {sigma.std():.4f} uC/cm^2")
+                phi_col = [c for c in rows[0] if c.startswith("phi_cumavg")]
+                if phi_col:
+                    phi = np.array([float(r[phi_col[0]]) for r in rows])
+                    ref = phi_col[0].split("_vs_")[-1]
+                    print(f"   phi:   {phi[-1]:8.4f} V vs {ref} (cum. avg)")
 
 
 class TrackedChargeCmd(MenuCommand):

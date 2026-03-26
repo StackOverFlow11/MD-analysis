@@ -34,6 +34,7 @@ class K:
     DIR_PATTERN = "dir_pattern"
     NORMAL = "normal"
     N_SURFACE_LAYERS = "n_surface_layers"
+    TARGET_SIDE = "target_side"
     # scripts-specific
     FRAME = "frame"
     WORKDIR_NAME = "workdir_name"
@@ -302,6 +303,8 @@ charge_method = ChoiceParam(K.METHOD, "Charge method",
                             ["counterion", "layer"], default="counterion")
 n_surface_layers = IntParam(K.N_SURFACE_LAYERS,
                             "Number of surface layers per interface", default=1)
+target_side = ChoiceParam(K.TARGET_SIDE, "Target surface side",
+                          ["aligned", "opposed"], default="aligned")
 
 # Config-backed params
 dz_bin = ConfigDefaultParam(K.DZ_A, "Z-axis bin width (A)",
