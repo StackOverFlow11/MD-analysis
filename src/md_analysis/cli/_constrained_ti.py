@@ -187,10 +187,18 @@ class TIFullAnalysisCmd(MenuCommand):
         else:
             equilibration = default_equil
 
-        # 2. Load series
+        # 2. Load series + parse time_start for each point
+        parse_colvar_restart = lazy_import(
+            "md_analysis.utils.RestartParser.ColvarParser",
+            "parse_colvar_restart",
+        )
         series_data = load_ti_series(point_defs)
         xi_values = np.array([x for x, _, _ in series_data])
         lambda_list = [s for _, s, _ in series_data]
+        time_starts = [
+            parse_colvar_restart(str(p.restart_path)).time_start_fs
+            for p in point_defs
+        ]
 
         # 3. dt consistency check
         dts = [d for _, _, d in series_data]
@@ -210,11 +218,26 @@ class TIFullAnalysisCmd(MenuCommand):
 
         # 5. Console summary table
         from ..utils.config import HA_TO_EV
+        equil_list = equilibration if isinstance(equilibration, list) else [equilibration] * len(xi_values)
         print(f"\n  {'Point':<6} {'ξ':<12} {'⟨λ⟩':<14} {'SEM':<14} {'Status'}")
         print(f"  {'─' * 58}")
         for i, r in enumerate(ti_report.point_reports):
             status = "PASS" if r.passed else "FAIL"
             print(f"  {i:<6} {r.xi:<12.6f} {r.lambda_mean:<14.6f} {r.sem_final:<14.6f} {status}")
+
+        # Per-point sampling details
+        print(f"\n  Sampling details:")
+        for i in range(len(xi_values)):
+            n_total_i = len(lambda_list[i])
+            eq_i = equil_list[i]
+            n_used_i = n_total_i - eq_i
+            t_start_i = time_starts[i] + eq_i * dt
+            t_end_i = time_starts[i] + (n_total_i - 1) * dt
+            print(
+                f"    {i}  ξ={xi_values[i]:.6f}  "
+                f"{n_total_i} total, {eq_i} discarded, {n_used_i} analyzed "
+                f"({t_start_i:.1f} – {t_end_i:.1f} fs)"
+            )
 
         delta_A_ev = ti_report.delta_A * HA_TO_EV
         sigma_A_ev = ti_report.sigma_A * HA_TO_EV
