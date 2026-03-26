@@ -536,7 +536,17 @@ def standalone_diagnostics(
         equilibration=equilibration,
     )
 
-    result: dict[str, Path | ConstraintPointReport] = {"report": report}
+    n_total = len(lambda_series)
+    t0 = float(md_info.restart.time_start_fs)
+    result: dict = {
+        "report": report,
+        "n_total": n_total,
+        "n_analyzed": n_total - equilibration,
+        "equilibration": equilibration,
+        "dt_fs": dt,
+        "time_start_fs": t0 + equilibration * dt,
+        "time_end_fs": t0 + (n_total - 1) * dt,
+    }
 
     if output_dir is not None:
         out = Path(output_dir)

@@ -77,6 +77,13 @@ class TISingleDiagCmd(MenuCommand):
         status = "N/A" if r.passed is None else ("PASS" if r.passed else "FAIL")
         method = "plateau" if r.block_avg.plateau_reached else "acf"
         print(f"\n  ξ = {r.xi:.6f} a.u.")
+        n_total = result["n_total"]
+        n_analyzed = result["n_analyzed"]
+        equil = result["equilibration"]
+        t_start = result["time_start_fs"]
+        t_end = result["time_end_fs"]
+        print(f"  Frames: {n_total} total, {equil} discarded, {n_analyzed} analyzed")
+        print(f"  Time range: {t_start:.1f} – {t_end:.1f} fs")
         print(f"  ⟨λ⟩ = {r.lambda_mean:.6f} a.u.")
         print(f"  τ_corr = {r.autocorr.tau_corr:.1f} frames, N_eff = {r.autocorr.n_eff:.1f}")
         print(f"  SEM_final = {r.sem_final:.6f} a.u. (method: {method})")
