@@ -54,6 +54,8 @@ Interactive CLI package providing a VASPKIT-style numbered menu interface. Repla
 
 `_charge.py` 中 `_print_ensemble_summary()` 作为独立辅助函数保留，在 `SurfaceChargeCmd.execute()` 结束时调用。
 
+221/222（固定 method）通过 `output_name` 由框架自动解析输出子目录（`charge/counterion/`、`charge/layer/`）。223（动态 method）`output_name` 为空，`execute()` 中手动追加 `ctx[K.METHOD]` 到输出路径以避免不同方法输出覆盖同一文件。
+
 ## Cell parameter acquisition
 
 All sub-menus requiring cell parameters (water 101-105, scripts 411-412) use the shared `_prompt_cell_abc()` helper from `_prompt.py`:

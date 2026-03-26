@@ -70,13 +70,17 @@ class SurfaceChargeCmd(MenuCommand):
         )
 
         # Static method (221/222): framework resolved via output_name
-        # Dynamic method (223): resolve manually
+        # Dynamic method (223): append method to avoid overwriting
         if K.OUTDIR_RESOLVED in ctx:
-            out = ctx[K.OUTDIR_RESOLVED]
+            out = Path(ctx[K.OUTDIR_RESOLVED])
         else:
             out = (Path(ctx.get(K.OUTDIR, "analysis"))
-                   / self.output_subdir / ctx[K.METHOD])
-            out.mkdir(parents=True, exist_ok=True)
+                   / self.output_subdir)
+
+        if not self.output_name:
+            out = out / ctx[K.METHOD]
+
+        out.mkdir(parents=True, exist_ok=True)
 
         csv_path = analyze(
             ctx[K.ROOT_DIR],
