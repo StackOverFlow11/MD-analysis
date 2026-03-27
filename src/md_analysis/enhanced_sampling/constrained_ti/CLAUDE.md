@@ -24,12 +24,13 @@ otherwise           → SEM_auto  (ACF fallback)
 
 | 文件 | 用途 |
 |---|---|
-| `config.py` | 阈值常量（`DEFAULT_FP_MIN_BLOCKS=4`, `DEFAULT_FP_CONSECUTIVE=2`, `DEFAULT_CROSS_CHECK_RTOL=0.15` 等） |
+| `config.py` | 阈值常量（`DEFAULT_FP_MIN_BLOCKS=4`, `DEFAULT_FP_CONSECUTIVE=2`, `DEFAULT_CROSS_CHECK_RTOL=0.15` 等）+ 输出文件名 |
 | `models.py` | frozen dataclass: `BlockAverageResult`, `AutocorrResult`, `RunningAverageResult`, `GewekeResult`, `ConstraintPointReport`, `TIReport` |
 | `workflow.py` | 编排器：`analyze_single_point`, `analyze_standalone`, `analyze_ti`, `standalone_diagnostics`, CSV 导出 |
-| `plot.py` | 2×2 诊断图（running avg / ACF / block avg / summary） |
+| `plot.py` | 2×2 诊断图（running avg / ACF / block avg / summary）+ 自由能曲线图 |
 | `integration.py` | 梯形积分权重、SEM targets、自由能积分 |
-| `io.py` | 自动发现约束点目录 |
+| `io.py` | 自动发现约束点目录（`discover_ti_points(reverse=False)` 支持升序/降序） |
+| `correction.py` | 恒电势自由能修正（Nørskov）：`ConstantPotentialCorrection`, `ConstantPotentialResult`, `compute_constant_potential_correction` |
 | `analysis/` | 四步诊断引擎 → `analysis/CLAUDE.md` |
 
 ## BlockAverageResult 字段
@@ -66,3 +67,15 @@ passed, failure_reasons
 - `_BLOCK_KEYS` 仅含 `{"min_blocks", "n_consecutive"}`，通过 `engine_overrides` 传递
 - `ArctanFitResult` 和 `analysis/_arctan_fit.py` 已删除
 - **符号约定**：`ConstraintPointReport.lambda_mean` 存储 CP2K 输出的原始 Shake 乘子 ⟨λ⟩；积分时由 `workflow.analyze_ti` 取反（`dA/dξ = −⟨λ⟩`）后存入 `TIReport.forces`，CSV 列 `dA_dxi` 和自由能图均使用取反后的值
+
+## 恒电势修正（correction.py）
+
+Nørskov 修正公式：`ΔF_Φ(ξ) = ΔF_q(ξ) + Δσ[e/Å²] × ΔΦ[V] × A[Å²] / 2`
+
+- σ 从各 `ti_target_*/bader/` 的 Bader 帧系综平均得到（`trajectory_surface_charge`）
+- Φ 由 calibration mapper 从 σ 外推（`mapper.predict(σ)`）
+- A 为电极表面积（从 POSCAR 晶胞计算，`AREA_VECTOR_INDICES`）
+- 初态 = 排序后第一个约束点（`sigma[0]`, `phi[0]`）
+- 不做误差分析（修正项视为精确），保留 TIReport 的 λ 误差
+- 缺少 bader/ 目录时 WARN 并跳过修正
+- 依赖：`electrochemical.charge`（σ 计算）、`electrochemical.calibration`（σ→Φ）
