@@ -46,6 +46,7 @@ def _make_ti_report(
         reports.append(ConstraintPointReport(
             xi=float(xi[i]),
             point_index=i,
+            n_analyzed=1000,
             lambda_mean=-float(forces[i]),
             sigma_lambda=0.01,
             autocorr=AutocorrResult(

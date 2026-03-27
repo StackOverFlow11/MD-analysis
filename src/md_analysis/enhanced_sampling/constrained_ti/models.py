@@ -121,6 +121,7 @@ class ConstraintPointReport:
 
     xi: float
     point_index: int | None
+    n_analyzed: int  # number of frames used in analysis (post-equilibration)
     lambda_mean: float  # mean constraint force at this point
     sigma_lambda: float  # sample standard deviation of lambda
 

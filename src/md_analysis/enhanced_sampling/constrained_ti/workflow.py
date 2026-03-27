@@ -283,6 +283,7 @@ def analyze_single_point(
     return ConstraintPointReport(
         xi=inp.xi,
         point_index=inp.point_index,
+        n_analyzed=len(inp.lambda_series),
         lambda_mean=lambda_mean,
         sigma_lambda=sigma_lambda,
         autocorr=autocorr,
@@ -348,6 +349,7 @@ def analyze_standalone(
         report = ConstraintPointReport(
             xi=report.xi,
             point_index=report.point_index,
+            n_analyzed=report.n_analyzed,
             lambda_mean=report.lambda_mean,
             sigma_lambda=report.sigma_lambda,
             autocorr=report.autocorr,
@@ -435,6 +437,7 @@ def analyze_ti(
             report = ConstraintPointReport(
                 xi=report.xi,
                 point_index=report.point_index,
+                n_analyzed=report.n_analyzed,
                 lambda_mean=report.lambda_mean,
                 sigma_lambda=report.sigma_lambda,
                 autocorr=report.autocorr,
@@ -588,6 +591,7 @@ def standalone_diagnostics(
 
 _POINT_CSV_COLUMNS = [
     "xi",
+    "n_analyzed",
     "lambda_mean",
     "sigma_lambda",
     "tau_corr",
@@ -621,6 +625,7 @@ def _point_to_row(r: ConstraintPointReport) -> dict:
         method = "acf"
     return {
         "xi": f"{r.xi:.6f}",
+        "n_analyzed": str(r.n_analyzed),
         "lambda_mean": f"{r.lambda_mean:.8f}",
         "sigma_lambda": f"{r.sigma_lambda:.8f}",
         "tau_corr": f"{r.autocorr.tau_corr:.2f}",
