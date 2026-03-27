@@ -449,7 +449,8 @@ def analyze_ti(
         reports.append(report)
 
     # Integrate
-    forces = np.array([r.lambda_mean for r in reports])
+    # dA/dξ = -⟨λ_shake⟩  (standard constrained-MD / Blue Moon formula)
+    forces = -np.array([r.lambda_mean for r in reports])
     force_errors = np.array([r.sem_final for r in reports])
     delta_A, sigma_A = _integrate_free_energy(forces, weights, force_errors)
 

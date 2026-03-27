@@ -92,7 +92,7 @@ def _integrate_free_energy(
     Parameters
     ----------
     forces : np.ndarray, shape (K,)
-        Mean constraint force (lambda_mean) at each point.
+        dA/dξ estimates at each point (= −⟨λ_shake⟩, already negated by caller).
     weights : np.ndarray, shape (K,)
         Trapezoid quadrature weights.
     sems : np.ndarray, shape (K,)

@@ -189,7 +189,7 @@ class ConstraintPointReport:
     """Complete diagnostic output for one constraint point."""
     xi: float
     point_index: int
-    lambda_mean: float           # λ̄ = dA/dξ estimate at this point
+    lambda_mean: float           # λ̄ = raw Shake multiplier ⟨λ⟩; dA/dξ = −λ̄ (negated by workflow)
     sigma_lambda: float          # sample standard deviation of λ
 
     # Engine results (carried verbatim for downstream inspection)
@@ -522,7 +522,7 @@ _compute_sem_targets(
     to prevent degenerate tolerance when w_k → 0 on non-uniform grids.
 
 _integrate_free_energy(
-    forces: np.ndarray,           # λ̄ at each point (dA/dξ estimates)
+    forces: np.ndarray,           # dA/dξ = −λ̄ at each point (already negated by caller)
     weights: np.ndarray,
     sems:   np.ndarray,           # SEM_final at each point
 ) → tuple[float, float]

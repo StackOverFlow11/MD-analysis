@@ -65,3 +65,4 @@ passed, failure_reasons
 - `analyze_block_average` 不再接受 `sem_auto`, `dense_sampling`, `arctan_*` 参数（2026-03-24 F&P 重构已删除 arctan）
 - `_BLOCK_KEYS` 仅含 `{"min_blocks", "n_consecutive"}`，通过 `engine_overrides` 传递
 - `ArctanFitResult` 和 `analysis/_arctan_fit.py` 已删除
+- **符号约定**：`ConstraintPointReport.lambda_mean` 存储 CP2K 输出的原始 Shake 乘子 ⟨λ⟩；积分时由 `workflow.analyze_ti` 取反（`dA/dξ = −⟨λ⟩`）后存入 `TIReport.forces`，CSV 列 `dA_dxi` 和自由能图均使用取反后的值
