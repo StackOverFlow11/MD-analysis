@@ -22,6 +22,7 @@
 - **标定文件**：独立 JSON（默认 `~/.config/md_analysis/calibration.json`），同时存储原始数据点和拟合参数
 - **scipy 依赖**：仅 `SplineMapper` 需要 scipy（lazy import）
 - **图表风格**：与 `PhiZProfile.py` 一致（11×4.8, 160 dpi, grid, tight_layout）
+- **`DifferentialCapacitanceMapper`**：按 φ 排序 → 一阶差分得各区间微分电容 C_i = Δσ/Δφ → 分段线性 σ→φ 映射；要求 σ 随 φ 单调递增；图中自动标注各段 C 值和区间分界线
 
 ## CLI 命令
 

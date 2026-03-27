@@ -11,7 +11,7 @@
 ### Mapper
 - `ChargePotentialMapper` — ABC（fit, predict, to_dict, from_dict）
 - `FittingInfo` — 拟合信息数据类（r_squared, rmse, residuals, equation_str, params）
-- `LinearMapper`, `PolynomialMapper`, `SplineMapper` — 具体实现
+- `LinearMapper`, `PolynomialMapper`, `SplineMapper`, `DifferentialCapacitanceMapper` — 具体实现
 - `create_mapper(method, **kwargs)` — 工厂函数
 - `mapper_from_dict(d)` — 从序列化字典恢复 mapper
 

@@ -33,6 +33,7 @@ LN10: float = 2.302585092994046           # ln(10)
 FITTING_LINEAR: str = "linear"
 FITTING_POLYNOMIAL: str = "polynomial"
 FITTING_SPLINE: str = "spline"
+FITTING_DIFFERENTIAL_CAPACITANCE: str = "differential_capacitance"
 DEFAULT_FITTING_METHOD: str = FITTING_LINEAR
 DEFAULT_POLY_DEGREE: int = 2
 

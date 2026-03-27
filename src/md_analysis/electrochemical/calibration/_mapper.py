@@ -323,6 +323,136 @@ class SplineMapper(ChargePotentialMapper):
 
 
 # ---------------------------------------------------------------------------
+# Differential capacitance mapper
+# ---------------------------------------------------------------------------
+
+class DifferentialCapacitanceMapper(ChargePotentialMapper):
+    """Piecewise linear σ→φ mapper using per-interval differential capacitance.
+
+    Algorithm
+    ---------
+    1. Sort calibration points by potential φ (ascending).
+    2. Compute differential capacitance for each adjacent pair:
+       C_i = Δσ_i / Δφ_i  (μF/cm²).
+    3. Predict φ from σ via piecewise linear interpolation within the data
+       range; extrapolate beyond either end using the nearest boundary-
+       interval capacitance.
+
+    Requirements
+    ------------
+    σ must be monotonically increasing with φ across all calibration points
+    (positive differential capacitance everywhere).
+    """
+
+    def __init__(self) -> None:
+        self._phi_nodes: np.ndarray | None = None    # shape (n,), sorted ascending
+        self._sigma_nodes: np.ndarray | None = None  # shape (n,), monotone ascending
+        self._capacitances: np.ndarray | None = None # shape (n-1,), μF/cm²
+        self._fitted: bool = False
+
+    def fit(self, sigma: np.ndarray, phi: np.ndarray) -> FittingInfo:
+        order = np.argsort(phi)
+        phi_s = phi[order].astype(float)
+        sigma_s = sigma[order].astype(float)
+
+        delta_phi = np.diff(phi_s)
+        delta_sigma = np.diff(sigma_s)
+
+        if np.any(delta_phi == 0.0):
+            dup = np.where(delta_phi == 0.0)[0]
+            raise ValueError(
+                f"Duplicate potential values at sorted indices {dup.tolist()}; "
+                "DifferentialCapacitanceMapper requires unique φ values."
+            )
+
+        caps = delta_sigma / delta_phi  # μF/cm²
+
+        if not np.all(np.diff(sigma_s) > 0):
+            bad = np.where(np.diff(sigma_s) <= 0)[0]
+            raise ValueError(
+                f"σ is not monotonically increasing with φ at sorted intervals "
+                f"{bad.tolist()} (C ≤ 0). DifferentialCapacitanceMapper requires "
+                "positive differential capacitance throughout."
+            )
+
+        self._phi_nodes = phi_s
+        self._sigma_nodes = sigma_s
+        self._capacitances = caps
+        self._fitted = True
+
+        phi_pred = self.predict(sigma)
+        residuals = phi_pred - phi
+        r2 = _compute_r_squared(phi, phi_pred)
+        rmse = _compute_rmse(residuals)
+
+        if len(caps) <= 5:
+            cap_str = ", ".join(f"{c:.2f}" for c in caps)
+            eq = (
+                f"piecewise linear ({len(caps)} interval"
+                f"{'s' if len(caps) > 1 else ''}, "
+                f"C = [{cap_str}] μF/cm²)"
+            )
+        else:
+            eq = (
+                f"piecewise linear ({len(caps)} intervals, "
+                f"C ∈ [{caps.min():.2f}, {caps.max():.2f}] μF/cm²)"
+            )
+
+        return FittingInfo(
+            method="differential_capacitance",
+            r_squared=r2,
+            residuals=residuals,
+            rmse=rmse,
+            equation_str=eq,
+            params={
+                "phi_nodes": phi_s.tolist(),
+                "sigma_nodes": sigma_s.tolist(),
+                "capacitances": caps.tolist(),
+            },
+        )
+
+    def predict(self, sigma: np.ndarray | float) -> np.ndarray:
+        self._check_fitted()
+        s = np.asarray(sigma, dtype=float)
+        s_flat = np.atleast_1d(s).ravel()
+
+        sigma_nodes = self._sigma_nodes
+        phi_nodes = self._phi_nodes
+        caps = self._capacitances
+        n = len(sigma_nodes)
+
+        # searchsorted gives insertion point i such that sigma_nodes[i-1] <= sv < sigma_nodes[i].
+        # j = i - 1 is the left boundary of the interval; clip to [0, n-2].
+        # Left extrapolation (sv < sigma_nodes[0]):  j = -1 → clipped to 0  → uses caps[0].
+        # Right extrapolation (sv >= sigma_nodes[-1]): j = n-1 → clipped to n-2 → uses caps[-1].
+        # Both are algebraically equivalent to anchoring at the respective end node.
+        j = np.searchsorted(sigma_nodes, s_flat, side="right") - 1
+        j = np.clip(j, 0, n - 2)
+
+        return phi_nodes[j] + (s_flat - sigma_nodes[j]) / caps[j]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "method": "differential_capacitance",
+            "phi_nodes": (self._phi_nodes.tolist()
+                          if self._phi_nodes is not None else []),
+            "sigma_nodes": (self._sigma_nodes.tolist()
+                            if self._sigma_nodes is not None else []),
+            "capacitances": (self._capacitances.tolist()
+                             if self._capacitances is not None else []),
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> DifferentialCapacitanceMapper:
+        m = cls()
+        m._phi_nodes = np.array(d["phi_nodes"])
+        m._sigma_nodes = np.array(d["sigma_nodes"])
+        m._capacitances = np.array(d["capacitances"])
+        m._fitted = True
+        return m
+
+
+# ---------------------------------------------------------------------------
 # Factory
 # ---------------------------------------------------------------------------
 
@@ -330,6 +460,7 @@ _MAPPER_REGISTRY: dict[str, type[ChargePotentialMapper]] = {
     "linear": LinearMapper,
     "polynomial": PolynomialMapper,
     "spline": SplineMapper,
+    "differential_capacitance": DifferentialCapacitanceMapper,
 }
 
 

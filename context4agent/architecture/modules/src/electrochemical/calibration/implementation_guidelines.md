@@ -30,6 +30,13 @@ calibration/
 | linear | `LinearMapper` | numpy |
 | polynomial | `PolynomialMapper` | numpy |
 | spline | `SplineMapper` | scipy（lazy import） |
+| differential_capacitance | `DifferentialCapacitanceMapper` | numpy |
+
+### DifferentialCapacitanceMapper 算法
+1. 按 φ 排序标定点
+2. 一阶差分计算各区间微分电容：C_i = Δσ_i / Δφ_i（μF/cm²）
+3. 分段线性外推（σ→φ）：区间内插值，边界外用最近区间电容延伸
+4. 要求 σ 随 φ 单调递增（所有 C_i > 0），否则抛出 ValueError
 
 ## CLI 命令
 

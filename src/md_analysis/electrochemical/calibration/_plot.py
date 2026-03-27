@@ -81,6 +81,27 @@ def plot_calibration(
         bbox=dict(boxstyle="round,pad=0.3", fc="wheat", alpha=0.5),
     )
 
+    # Extra annotations for differential_capacitance: draw interval boundaries
+    # and label each segment with its capacitance value.
+    if (
+        fitting_info.method == "differential_capacitance"
+        and getattr(mapper, "_sigma_nodes", None) is not None
+    ):
+        sigma_nodes = mapper._sigma_nodes
+        phi_nodes = mapper._phi_nodes
+        caps = mapper._capacitances
+        for j in range(len(caps)):
+            sigma_mid = 0.5 * (sigma_nodes[j] + sigma_nodes[j + 1])
+            phi_mid = 0.5 * (phi_nodes[j] + phi_nodes[j + 1])
+            ax.annotate(
+                f"C={caps[j]:.1f} μF/cm²",
+                xy=(sigma_mid, phi_mid),
+                fontsize=8, ha="center", va="center", color="#2ca02c",
+                bbox=dict(boxstyle="round,pad=0.15", fc="white", alpha=0.7, ec="none"),
+            )
+        for s_node in sigma_nodes[1:-1]:
+            ax.axvline(s_node, color="gray", ls="--", lw=0.8, alpha=0.5)
+
     ax.set_xlabel("σ (μC/cm²)")
     ax.set_ylabel(f"φ (V vs {reference})")
     ax.grid(True, alpha=0.25)

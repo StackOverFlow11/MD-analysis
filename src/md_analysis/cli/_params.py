@@ -324,7 +324,8 @@ atom_indices_xyz = AtomIndicesParam()
 # Calibration params
 calibration_csv_path = StrParam(K.CALIBRATION_CSV, "Calibration CSV file path")
 fitting_method = ChoiceParam(K.FITTING_METHOD, "Fitting method",
-                             ["linear", "polynomial", "spline"], default="linear")
+                             ["linear", "polynomial", "spline",
+                              "differential_capacitance"], default="linear")
 poly_degree = IntParam(K.POLY_DEGREE, "Polynomial degree", default=2)
 sigma_value = FloatParam(K.SIGMA_VALUE,
                          "Surface charge density sigma (uC/cm^2)", default=0.0)

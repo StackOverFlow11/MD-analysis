@@ -14,6 +14,7 @@ from ._data import (
 )
 from ._mapper import (
     ChargePotentialMapper,
+    DifferentialCapacitanceMapper,
     FittingInfo,
     LinearMapper,
     PolynomialMapper,
@@ -30,6 +31,7 @@ __all__ = [
     "load_calibration_json",
     "save_calibration_json",
     "ChargePotentialMapper",
+    "DifferentialCapacitanceMapper",
     "FittingInfo",
     "LinearMapper",
     "PolynomialMapper",
