@@ -10,7 +10,7 @@
 |---|---|
 | `config.py` | 默认文件名、Nernst 常量、拟合方法常量 |
 | `_data.py` | `CalibrationData` 数据类、CSV/JSON I/O |
-| `_mapper.py` | `ChargePotentialMapper` ABC + Linear/Polynomial/Spline 实现 |
+| `_mapper.py` | `ChargePotentialMapper` ABC + Linear/Polynomial/Spline/DifferentialCapacitance 实现 |
 | `_plot.py` | 标定拟合可视化 |
 | `CalibrationWorkflow.py` | 公开 API：`calibrate()`、`predict_potential()`、`convert_reference()` |
 

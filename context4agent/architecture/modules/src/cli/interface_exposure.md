@@ -8,7 +8,8 @@
 
 ## Internal modules (non-public)
 
-- `_prompt.py` -- reusable input-prompt helpers (`_get_effective_default`, `_prompt_str`, `_prompt_int`, `_prompt_float`, `_prompt_choice`, `_prompt_bool`, `_parse_metal_elements`, `_prompt_global_params`)
+- `_prompt.py` -- low-level prompt helpers (`prompt_str`, `prompt_str_required`, `prompt_int`, `prompt_float`, `prompt_choice`, `prompt_bool`, `set_input_source`)
+- `_params.py` -- parameter collection layer (`K` key constants, `ParamCollector` ABC, generic param classes: `StrParam`, `FloatParam`, `IntParam`, `ChoiceParam`, `FixedParam`, `ConfigDefaultParam`; special: `CellAbcParam`, `MetalElementsParam`, `FrameSliceParam`)
 - `_water.py` -- water analysis sub-menu (codes 101-105) + parameter collection + dispatch
 - `_potential.py` -- potential analysis sub-menu (codes 211-216) + parameter collection + dispatch
 - `_charge.py` -- charge analysis sub-menu (codes 221-226) + parameter collection + dispatch

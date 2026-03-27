@@ -36,13 +36,18 @@ from md_analysis.enhanced_sampling.constrained_ti import (
     AutocorrResult,
     BlockAverageResult,
     GewekeResult,
+    # 恒电位校正
+    ConstantPotentialCorrection,
+    ConstantPotentialResult,
 )
 from md_analysis.enhanced_sampling.constrained_ti.workflow import (
     analyze_standalone,
+    analyze_single_point,
     analyze_ti,
     standalone_diagnostics,
     write_convergence_csv,
     write_free_energy_csv,
+    write_single_point_csv,
 )
 from md_analysis.enhanced_sampling.constrained_ti.io import (
     discover_ti_points,
@@ -51,6 +56,11 @@ from md_analysis.enhanced_sampling.constrained_ti.io import (
 from md_analysis.enhanced_sampling.constrained_ti.plot import (
     plot_point_diagnostics,
     plot_free_energy_profile,
+)
+from md_analysis.enhanced_sampling.constrained_ti.correction import (
+    compute_constant_potential_correction,
+    write_corrected_free_energy_csv,
+    plot_corrected_free_energy_profile,
 )
 ```
 

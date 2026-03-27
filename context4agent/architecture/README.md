@@ -113,7 +113,7 @@
 
 - `calibration/config.py`：Nernst 常量、默认文件名、拟合方法常量
 - `calibration/_data.py`：`CalibrationData` 数据类、CSV/JSON I/O（自动检测表头）
-- `calibration/_mapper.py`：`ChargePotentialMapper` ABC + `LinearMapper`/`PolynomialMapper`/`SplineMapper`
+- `calibration/_mapper.py`：`ChargePotentialMapper` ABC + `LinearMapper`/`PolynomialMapper`/`SplineMapper`/`DifferentialCapacitanceMapper`
 - `calibration/_plot.py`：标定拟合可视化（散点 + 拟合曲线 + R²/RMSE 标注）
 - `calibration/CalibrationWorkflow.py`：
   - `calibrate()`：完整标定流程（加载数据→拟合→保存 JSON→出图）

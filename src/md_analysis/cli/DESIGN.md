@@ -1,8 +1,9 @@
 # CLI Composite + Command Refactoring Design
 
-> **NOTE (2026-03-18)**: 本文档中的 `output_subdir` 硬编码模式已被 `output_name` 树推导机制取代。
-> 菜单编号已更新：Charge 221-225、Calibration 231-233、Bader 411-412、TI 421-422。
-> 最新约定参见 `cli/CLAUDE.md`。
+> **NOTE (2026-03-27)**: 本文档是初始设计文档，部分细节已过时。当前实现以源码和 `cli/CLAUDE.md` 为准。
+> 主要变化：`output_subdir` 硬编码已被 `output_name` 树推导机制取代；
+> Charge 已扩展为 221-226（6 个命令类）；Bader 411-412、TI 421-422；
+> `_charge.py` 现含 `SurfaceChargeCmd`、`SingleSideChargeCmd`、`TrackedChargeCmd`、`CounterionChargeCmd`。
 
 ## Design Goals
 
