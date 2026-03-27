@@ -262,6 +262,8 @@ def plot_free_energy_profile(
     for i, (x, y) in enumerate(zip(xi, forces)):
         ax1.plot(x, y, "o", markersize=5, color=colors[i], zorder=5)
     ax1.set_xlabel("ξ (a.u.)")
+    if len(xi) >= 2 and xi[0] > xi[-1]:
+        ax1.invert_xaxis()
     ax1.set_ylabel("dA/dξ (a.u.)", color="C0")
     ax1.tick_params(axis="y", labelcolor="C0")
 
