@@ -353,6 +353,28 @@ $$
 - CSV：`calibration_data.csv`（列 `potential_V`, `sigma_uC_cm2`）
 - PNG：`calibration_fit.png`（散点 + 拟合曲线 + R²/RMSE 标注，11×4.8 inch, 160 DPI）
 
+### Mapper 算法
+
+- **LinearMapper**：`φ = slope · σ + intercept`，最小二乘拟合
+- **PolynomialMapper**：`φ = Σ c_i · σ^i`，可配置阶数（默认 2）
+- **SplineMapper**：按 σ 排序后构造三次样条插值（需 scipy）
+- **DifferentialCapacitanceMapper**：
+  1. 按 φ 升序排列标定点
+  2. 计算相邻点间微分电容 `C_i = Δσ_i / Δφ_i` (μF/cm²)
+  3. 分段线性插值；超出数据范围时使用最近端点的电容外推
+  - 约束：σ 必须随 φ 单调递增（正微分电容），否则抛出 `ValueError`
+  - 重复 φ 值同样抛出 `ValueError`
+
+### 错误条件
+
+- `ValueError`：`csv_path` 与 `data_points` 同时或均未提供
+- `ValueError`：未知拟合方法或参考标度
+- `ValueError`：PZC 转换缺少 `phi_pzc`
+- `ValueError`：`DifferentialCapacitanceMapper` 重复 φ 值或 σ 非单调
+- `RuntimeError`：mapper 未拟合即调用 `predict()`
+- `ImportError`：`SplineMapper` 缺少 scipy
+- `FileNotFoundError`：标定 JSON 不存在
+
 ### 电势参考转换
 
 - SHE ↔ RHE：`φ_RHE = φ_SHE + (RT/F)·ln(10)·pH`
