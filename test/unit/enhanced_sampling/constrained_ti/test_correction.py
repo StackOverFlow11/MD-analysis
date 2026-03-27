@@ -47,6 +47,8 @@ def _make_ti_report(
             xi=float(xi[i]),
             point_index=i,
             n_analyzed=1000,
+            time_start_fs=0.0,
+            time_end_fs=999.0,
             lambda_mean=-float(forces[i]),
             sigma_lambda=0.01,
             autocorr=AutocorrResult(

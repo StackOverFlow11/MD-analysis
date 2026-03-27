@@ -280,10 +280,13 @@ def analyze_single_point(
         # Standalone without SEM target: can still fail on non-SEM criteria
         passed = None
 
+    n = len(inp.lambda_series)
     return ConstraintPointReport(
         xi=inp.xi,
         point_index=inp.point_index,
-        n_analyzed=len(inp.lambda_series),
+        n_analyzed=n,
+        time_start_fs=inp.time_start_fs,
+        time_end_fs=inp.time_start_fs + (n - 1) * inp.dt,
         lambda_mean=lambda_mean,
         sigma_lambda=sigma_lambda,
         autocorr=autocorr,
@@ -309,6 +312,7 @@ def analyze_standalone(
     xi: float = 0.0,
     sem_target: float | None = None,
     equilibration: int = 0,
+    time_start_fs: float = 0.0,
     **engine_overrides: object,
 ) -> ConstraintPointReport:
     """Diagnose one constraint point independently (no TI context).
@@ -338,6 +342,7 @@ def analyze_standalone(
         xi=xi,
         lambda_series=series,
         dt=dt,
+        time_start_fs=time_start_fs + equilibration * dt,
         weight=None,
         sem_max=sem_target,
         point_index=None,
@@ -350,6 +355,8 @@ def analyze_standalone(
             xi=report.xi,
             point_index=report.point_index,
             n_analyzed=report.n_analyzed,
+            time_start_fs=report.time_start_fs,
+            time_end_fs=report.time_end_fs,
             lambda_mean=report.lambda_mean,
             sigma_lambda=report.sigma_lambda,
             autocorr=report.autocorr,
@@ -376,6 +383,7 @@ def analyze_ti(
     *,
     epsilon_tol_ev: float = DEFAULT_EPSILON_TOL_EV,
     equilibration: int | list[int] = 0,
+    time_starts: list[float] | None = None,
     **engine_overrides: object,
 ) -> TIReport:
     """Run full constrained-TI convergence analysis.
@@ -392,6 +400,9 @@ def analyze_ti(
         Free-energy tolerance in eV.
     equilibration : int or list[int]
         Frames to discard per point.
+    time_starts : list[float] or None
+        Absolute start time (fs) per point from restart files.
+        If None, defaults to 0.0 for all points.
     **engine_overrides
         Forwarded to analysis engines.
 
@@ -416,6 +427,12 @@ def analyze_ti(
                 f"equilibration list length ({len(equil_list)}) != K ({k})."
             )
 
+    # Normalize time_starts
+    if time_starts is None:
+        ts_list = [0.0] * k
+    else:
+        ts_list = list(time_starts)
+
     # Analyze each point
     reports: list[ConstraintPointReport] = []
     for i in range(k):
@@ -424,10 +441,14 @@ def analyze_ti(
             series, equilibration=equil_list[i]
         )
 
+        # Analyzed window starts after equilibration
+        t_start_analyzed = ts_list[i] + equil_list[i] * dt
+
         inp = ConstraintPointInput(
             xi=float(xi_values[i]),
             lambda_series=series,
             dt=dt,
+            time_start_fs=t_start_analyzed,
             weight=float(weights[i]),
             sem_max=float(sem_targets[i]),
             point_index=i,
@@ -532,16 +553,17 @@ def standalone_diagnostics(
     xi = float(constraint.target_au)
     dt = float(md_info.restart.timestep_fs)
 
+    t0 = float(md_info.restart.time_start_fs)
     report = analyze_standalone(
         lambda_series,
         dt=dt,
         xi=xi,
         sem_target=sem_target,
         equilibration=equilibration,
+        time_start_fs=t0,
     )
 
     n_total = len(lambda_series)
-    t0 = float(md_info.restart.time_start_fs)
     result: dict = {
         "report": report,
         "n_total": n_total,
@@ -592,6 +614,8 @@ def standalone_diagnostics(
 _POINT_CSV_COLUMNS = [
     "xi",
     "n_analyzed",
+    "time_start_fs",
+    "time_end_fs",
     "lambda_mean",
     "sigma_lambda",
     "tau_corr",
@@ -626,6 +650,8 @@ def _point_to_row(r: ConstraintPointReport) -> dict:
     return {
         "xi": f"{r.xi:.6f}",
         "n_analyzed": str(r.n_analyzed),
+        "time_start_fs": f"{r.time_start_fs:.1f}",
+        "time_end_fs": f"{r.time_end_fs:.1f}",
         "lambda_mean": f"{r.lambda_mean:.8f}",
         "sigma_lambda": f"{r.sigma_lambda:.8f}",
         "tau_corr": f"{r.autocorr.tau_corr:.2f}",

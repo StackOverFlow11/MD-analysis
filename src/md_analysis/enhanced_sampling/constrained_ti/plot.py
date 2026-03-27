@@ -164,7 +164,8 @@ def plot_point_diagnostics(
     # Section 1: Overview
     sec1 = [
         "── Overview ──",
-        f"ξ = {r.xi:.6f}    N = {n}",
+        f"ξ = {r.xi:.6f}    N = {r.n_analyzed}",
+        f"t = {r.time_start_fs:.1f} – {r.time_end_fs:.1f} fs",
         f"⟨λ⟩ = {r.lambda_mean:.6f} a.u.",
         f"SEM  = {r.sem_final:.6f} a.u.",
     ]

@@ -110,6 +110,7 @@ class ConstraintPointInput:
     xi: float  # CV constraint value (or user label)
     lambda_series: np.ndarray  # shape (N,) — post-equilibration
     dt: float  # frame interval (fs)
+    time_start_fs: float  # absolute start time of analyzed window (fs)
     weight: float | None  # trapezoid weight w_k (None in standalone)
     sem_max: float | None  # precision target (None in standalone)
     point_index: int | None  # 0-based index; None in standalone
@@ -122,6 +123,8 @@ class ConstraintPointReport:
     xi: float
     point_index: int | None
     n_analyzed: int  # number of frames used in analysis (post-equilibration)
+    time_start_fs: float  # start time of analyzed window (fs)
+    time_end_fs: float  # end time of analyzed window (fs)
     lambda_mean: float  # mean constraint force at this point
     sigma_lambda: float  # sample standard deviation of lambda
 

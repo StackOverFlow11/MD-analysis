@@ -222,29 +222,19 @@ class TIFullAnalysisCmd(MenuCommand):
             xi_values, lambda_list, dt,
             epsilon_tol_ev=ctx[K.EPSILON_TOL_EV],
             equilibration=equilibration,
+            time_starts=time_starts,
         )
 
         # 5. Console summary table
         from ..utils.config import HA_TO_EV
-        equil_list = equilibration if isinstance(equilibration, list) else [equilibration] * len(xi_values)
-        print(f"\n  {'Point':<6} {'ξ':<12} {'⟨λ⟩':<14} {'SEM':<14} {'Status'}")
-        print(f"  {'─' * 58}")
+        print(f"\n  {'Point':<6} {'ξ':<12} {'⟨λ⟩':<14} {'SEM':<14} {'N':<8} {'Time range (fs)':<24} {'Status'}")
+        print(f"  {'─' * 82}")
         for i, r in enumerate(ti_report.point_reports):
             status = "PASS" if r.passed else "FAIL"
-            print(f"  {i:<6} {r.xi:<12.6f} {r.lambda_mean:<14.6f} {r.sem_final:<14.6f} {status}")
-
-        # Per-point sampling details
-        print(f"\n  Sampling details:")
-        for i in range(len(xi_values)):
-            n_total_i = len(lambda_list[i])
-            eq_i = equil_list[i]
-            n_used_i = n_total_i - eq_i
-            t_start_i = time_starts[i] + eq_i * dt
-            t_end_i = time_starts[i] + (n_total_i - 1) * dt
             print(
-                f"    {i}  ξ={xi_values[i]:.6f}  "
-                f"{n_total_i} total, {eq_i} discarded, {n_used_i} analyzed "
-                f"({t_start_i:.1f} – {t_end_i:.1f} fs)"
+                f"  {i:<6} {r.xi:<12.6f} {r.lambda_mean:<14.6f} {r.sem_final:<14.6f} "
+                f"{r.n_analyzed:<8} {r.time_start_fs:.1f} – {r.time_end_fs:.1f}"
+                f"{'':>4}{status}"
             )
 
         delta_A_ev = ti_report.delta_A * HA_TO_EV
@@ -442,28 +432,19 @@ class TIConstPotCorrectionCmd(MenuCommand):
             xi_values, lambda_list, dt,
             epsilon_tol_ev=ctx[K.EPSILON_TOL_EV],
             equilibration=equilibration,
+            time_starts=time_starts,
         )
 
         # 5. Console summary (same as 312)
         from ..utils.config import HA_TO_EV
-        equil_list = equilibration if isinstance(equilibration, list) else [equilibration] * len(xi_values)
-        print(f"\n  {'Point':<6} {'ξ':<12} {'⟨λ⟩':<14} {'SEM':<14} {'Status'}")
-        print(f"  {'─' * 58}")
+        print(f"\n  {'Point':<6} {'ξ':<12} {'⟨λ⟩':<14} {'SEM':<14} {'N':<8} {'Time range (fs)':<24} {'Status'}")
+        print(f"  {'─' * 82}")
         for i, r in enumerate(ti_report.point_reports):
             status = "PASS" if r.passed else "FAIL"
-            print(f"  {i:<6} {r.xi:<12.6f} {r.lambda_mean:<14.6f} {r.sem_final:<14.6f} {status}")
-
-        print(f"\n  Sampling details:")
-        for i in range(len(xi_values)):
-            n_total_i = len(lambda_list[i])
-            eq_i = equil_list[i]
-            n_used_i = n_total_i - eq_i
-            t_start_i = time_starts[i] + eq_i * dt
-            t_end_i = time_starts[i] + (n_total_i - 1) * dt
             print(
-                f"    {i}  ξ={xi_values[i]:.6f}  "
-                f"{n_total_i} total, {eq_i} discarded, {n_used_i} analyzed "
-                f"({t_start_i:.1f} – {t_end_i:.1f} fs)"
+                f"  {i:<6} {r.xi:<12.6f} {r.lambda_mean:<14.6f} {r.sem_final:<14.6f} "
+                f"{r.n_analyzed:<8} {r.time_start_fs:.1f} – {r.time_end_fs:.1f}"
+                f"{'':>4}{status}"
             )
 
         delta_A_ev = ti_report.delta_A * HA_TO_EV
