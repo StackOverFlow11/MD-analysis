@@ -714,8 +714,10 @@ discover_ti_points(
     root_dir: Path,
     *,
     pattern: str = "auto",        # "ti_target" | "xi" | "auto"
+    reverse: bool = False,        # True → sort descending (initial state = max ξ)
 ) → list[TIPointDefinition]
-    Returns list of TIPointDefinition sorted by xi.
+    Returns list of TIPointDefinition sorted by xi (ascending by default,
+    descending if reverse=True).
     Auto-detection: tries ti_target_* first (TIGen convention), then xi_*.
     Extracts xi by parsing the numeric suffix from the directory name.
     Raises FileNotFoundError if no matching directories found.

@@ -129,6 +129,10 @@ class TIFullAnalysisCmd(MenuCommand):
         ctx[K.EPSILON_TOL_EV] = prompt_float(
             "Free-energy tolerance ε (eV)", default=0.05,
         )
+        ctx[K.TI_REVERSE] = prompt_bool(
+            "Reverse integration direction (initial state = max ξ)?",
+            default=False,
+        )
         ctx[K.OUTDIR] = prompt_str("Output directory", default="analysis") or "analysis"
         return ctx
 
@@ -166,7 +170,11 @@ class TIFullAnalysisCmd(MenuCommand):
         root_dir = Path(ctx[K.TI_ROOT_DIR])
 
         # 1. Discover constraint points
-        point_defs = discover_ti_points(root_dir, pattern=ctx[K.TI_DIR_PATTERN])
+        point_defs = discover_ti_points(
+            root_dir,
+            pattern=ctx[K.TI_DIR_PATTERN],
+            reverse=ctx[K.TI_REVERSE],
+        )
         print(f"\n  Found {len(point_defs)} constraint points:")
         for p in point_defs:
             print(f"    ξ = {p.xi:.6f}")

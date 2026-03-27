@@ -48,6 +48,7 @@ def discover_ti_points(
     root_dir: Path,
     *,
     pattern: str = "auto",
+    reverse: bool = False,
 ) -> list[TIPointDefinition]:
     """Discover constraint-point directories and their files.
 
@@ -57,11 +58,13 @@ def discover_ti_points(
         Root directory containing constraint-point subdirectories.
     pattern : str
         Discovery pattern: "ti_target", "xi", or "auto".
+    reverse : bool
+        If True, sort by xi descending (initial state = max ξ).
 
     Returns
     -------
     list[TIPointDefinition]
-        Sorted by xi value.
+        Sorted by xi value (ascending by default, descending if reverse).
 
     Raises
     ------
@@ -109,7 +112,7 @@ def discover_ti_points(
         )
 
     # Sort by xi
-    points.sort(key=lambda p: p.xi)
+    points.sort(key=lambda p: p.xi, reverse=reverse)
     return points
 
 
