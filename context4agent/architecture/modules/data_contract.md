@@ -231,6 +231,44 @@ $$
 
 ## Enhanced Sampling 层输出契约
 
+### Constrained TI 输出契约
+
+#### `write_convergence_csv(ti_report)` — 多点收敛报告
+
+- 默认文件名：`ti_convergence_report.csv`
+- 每约束点一行，按 ξ 排列
+- λ 相关量单位为 a.u.
+- CSV 列：`xi, lambda_mean, sigma_lambda, tau_corr, n_eff, sem_auto, sem_block, delta_sem_block, plateau_B, plateau_reached, sem_final, sem_final_method, sem_max, geweke_z, geweke_reliable, drift_D, passed, failure_reasons`
+
+#### `write_free_energy_csv(ti_report)` — 自由能曲线
+
+- 默认文件名：`ti_free_energy.csv`
+- dA/dξ 单位 a.u.；积分后 A 单位 eV
+- CSV 列：`xi, weight, dA_dxi, sem, A_integrated_eV, sigma_A_cumulative_eV`
+
+#### `write_single_point_csv(report)` — 单点诊断报告
+
+- 默认文件名：`ti_single_point.csv`
+- 单行 CSV，列同 `write_convergence_csv`
+
+#### 诊断图（PNG）
+
+- **单点诊断图**（`ti_diag_xi{value}.png`）：2×2 子图
+  - 左上：累积均值 λ̄(n) + ±SEM 带
+  - 右上：ACF C(j) + 截断点标记
+  - 左下：SEM(B) vs B + 平台区域高亮 + δSEM 误差棒
+  - 右下：文字摘要表（τ_corr, N_eff, SEM, Geweke z, pass/fail）
+- DPI: 180
+
+#### 自由能曲线图（PNG）
+
+- **自由能图**（`ti_free_energy.png`）：双轴图
+  - 左轴：dA/dξ with error bars (a.u.)，点按 PASS/FAIL 着色（绿/红）
+  - 右轴：积分 A(ξ) (eV) + ±σ_A 不确定度带
+  - ξ 降序时自动翻转 x 轴（`invert_xaxis`）
+  - 标题：`ΔA = ... ± ... eV (ALL PASS / N FAILED)`
+- DPI: 180
+
 ### `slowgrowth_analysis(...)` 输出
 
 - 统一入口：解析 restart + log 文件，切片/反转，输出 CSV + PNG
