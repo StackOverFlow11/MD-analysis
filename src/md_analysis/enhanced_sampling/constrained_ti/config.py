@@ -100,3 +100,7 @@ DEFAULT_SUMMARY_TXT_NAME: str = "ti_summary.txt"
 # Standalone single-point output filenames.
 DEFAULT_STANDALONE_PNG_NAME: str = "ti_single_point_diag.png"
 DEFAULT_STANDALONE_CSV_NAME: str = "ti_single_point.csv"
+
+# Constant-potential correction output filenames.
+DEFAULT_CORRECTED_FE_CSV_NAME: str = "ti_corrected_free_energy.csv"
+DEFAULT_CORRECTED_FE_PNG_NAME: str = "ti_corrected_free_energy.png"

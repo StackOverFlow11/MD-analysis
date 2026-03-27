@@ -117,3 +117,4 @@ Config keys: `KEY_POTENTIAL_REFERENCE`, `KEY_POTENTIAL_PH`, `KEY_POTENTIAL_TEMPE
 
 - **311 `TISingleDiagCmd`**：单点收敛诊断。复用 SG 的 `_discover_restart_file` / `_discover_log_file`。覆写 `_collect_all_params()`（SEM target 为可空 float，用 `prompt_str` + 手动转换）。调用 `standalone_diagnostics()`。
 - **312 `TIFullAnalysisCmd`**：多点 TI 分析。调用 `discover_ti_points()` → `load_ti_series()` → `analyze_ti()`，含 dt 一致性校验。TI_DIR_PATTERN 限制为 `"ti_target"/"xi"/"auto"`。支持 `K.TI_REVERSE`（反向积分，ξ 降序，初态 = max ξ）。对所有约束点生成诊断图。
+- **313 `TIConstPotCorrectionCmd`**：恒电势自由能修正（Nørskov）。先运行完整 312 分析，再从各 `ti_target_*/bader/` 提取系综平均 σ，通过 calibration mapper 外推 Φ，计算修正项并输出修正后自由能曲线。需要 calibration.json（硬错误）；缺 bader/ 时 WARN 并跳过修正。新增参数：`K.TARGET_SIDE`（aligned/opposed）、`K.CALIBRATION_JSON`。

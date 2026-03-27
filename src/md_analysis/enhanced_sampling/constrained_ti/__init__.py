@@ -12,6 +12,7 @@ Public API
 
 from __future__ import annotations
 
+from .correction import ConstantPotentialCorrection, ConstantPotentialResult
 from .models import (
     AutocorrResult,
     BlockAverageResult,
@@ -29,6 +30,8 @@ __all__ = [
     # Models
     "AutocorrResult",
     "BlockAverageResult",
+    "ConstantPotentialCorrection",
+    "ConstantPotentialResult",
     "ConstraintPointInput",
     "ConstraintPointReport",
     "GewekeResult",

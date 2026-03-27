@@ -85,6 +85,28 @@ otherwise           → SEM_auto  (ACF fallback)
 - SEM 目标与 λ 同单位（a.u.）
 - 仅最终 ΔA 输出为 eV
 
+## 恒电势自由能修正（correction.py）
+
+Nørskov 修正将恒电荷 TI 自由能转换为恒电势自由能：
+
+```
+ΔF_Φ(ξ) = ΔF_q(ξ) + Δσ[e/Å²] × ΔΦ[V] × A[Å²] / 2
+```
+
+- σ 从各 `ti_target_*/bader/` 的 Bader 帧系综平均得到
+- Φ 由 calibration mapper 从 σ 外推（`mapper.predict(σ)`）
+- A 为电极表面积（从 POSCAR 晶胞计算）
+- 初态 = 排序后第一个约束点
+- 不做误差分析（修正项视为精确）
+- 缺少 bader/ 目录时 WARN 并跳过修正
+
+### 依赖方向
+
+`correction.py` → `electrochemical.charge.Bader.SurfaceCharge`（σ 计算）
+`correction.py` → `electrochemical.calibration`（σ→Φ 映射）
+`correction.py` → `utils.config`（HA_TO_EV, AREA_VECTOR_INDICES）
+`correction.py` → `electrochemical.charge.config`（E_PER_A2_TO_UC_PER_CM2）
+
 ## 扩展性
 
 未来可在 `enhanced_sampling/` 下新增同级子包（如 `metadynamics/`），结构与 `slowgrowth/` 平行。顶层 `__init__.py` 可在需要时添加 re-export。

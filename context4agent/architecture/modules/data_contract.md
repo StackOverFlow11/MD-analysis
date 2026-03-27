@@ -269,6 +269,21 @@ $$
   - 标题：`ΔA = ... ± ... eV (ALL PASS / N FAILED)`
 - DPI: 180
 
+#### Constant-Potential Correction 输出契约
+
+##### `write_corrected_free_energy_csv(result)` — 修正后自由能曲线
+
+- 默认文件名：`ti_corrected_free_energy.csv`
+- CSV 列：`xi, weight, dA_dxi, sem, A_const_q_eV, sigma_A_cumulative_eV, sigma_uC_cm2, phi_V_SHE, correction_eV, A_const_phi_eV`
+
+##### 修正后自由能图（PNG）
+
+- **自由能图**（`ti_corrected_free_energy.png`）：双轴图
+  - 左轴：dA/dξ with error bars (a.u.)
+  - 右轴：A_const_q (C1 橙, 虚线 + 误差带) + A_const_phi (C3 红, 实线)
+  - 标题：`ΔA(const-q) = ... ± ... eV | ΔA(const-Φ) = ... eV`
+- DPI: 180
+
 ### `slowgrowth_analysis(...)` 输出
 
 - 统一入口：解析 restart + log 文件，切片/反转，输出 CSV + PNG

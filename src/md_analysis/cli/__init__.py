@@ -14,7 +14,7 @@ from ..config import (
 )
 from ._calibration import CalibrateFromCSVCmd, CalibrateManualCmd, PredictPotentialCmd
 from ._charge import CounterionChargeCmd, SingleSideChargeCmd, SurfaceChargeCmd, TrackedChargeCmd
-from ._constrained_ti import TIFullAnalysisCmd, TISingleDiagCmd
+from ._constrained_ti import TIConstPotCorrectionCmd, TIFullAnalysisCmd, TISingleDiagCmd
 from ._enhanced_sampling import SGPublicationPlotCmd, SGQuickPlotCmd
 from ._framework import MenuGroup
 from ._potential import (
@@ -112,6 +112,7 @@ def build_menu_tree() -> MenuGroup:
     constrained_ti.add(
         TISingleDiagCmd("311", "Single-Point Diagnostics"),
         TIFullAnalysisCmd("312", "Full TI Analysis"),
+        TIConstPotCorrectionCmd("313", "Constant-Potential Correction"),
     )
 
     enhanced.add(slowgrowth, constrained_ti)
