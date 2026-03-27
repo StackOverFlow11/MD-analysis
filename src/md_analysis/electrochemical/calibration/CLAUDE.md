@@ -35,4 +35,4 @@
 `surface_charge_analysis()`（charge/Bader/SurfaceCharge.py）在分析完成后自动尝试加载 `~/.config/md_analysis/calibration.json`：
 - **有标定**：通过 `mapper_from_dict()` + `predict(σ)` 得到 V vs SHE 电势，再根据 `potential_reference` 参数通过 `convert_reference()` 转换参考标度（SHE/RHE/PZC），追加 φ 列到 CSV（列名含参考标度标签），PNG 添加右轴
 - **无标定**：log info 提示用户可通过菜单 23 标定，不影响 σ 输出
-- **参考配置**：CLI 221-223 从用户配置（菜单 909 `SetPotentialReferenceCmd` 设置）读取 `potential_reference`/`pH`/`temperature_K`/`phi_pzc` 传递给分析函数
+- **参考配置**：CLI 221-224 从用户配置（菜单 909 `SetPotentialReferenceCmd` 设置）读取 `potential_reference`/`pH`/`temperature_K`/`phi_pzc` 传递给分析函数

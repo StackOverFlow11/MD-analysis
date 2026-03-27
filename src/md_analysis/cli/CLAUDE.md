@@ -8,7 +8,7 @@ VASPKIT 风格交互式编号菜单。无 argparse，所有输入通过 `input()
 
 ### 菜单编号方案
 - `1xx`：Water (101-105)
-- `21x`：Potential (211-216), `22x`：Charge (221-225), `23x`：Calibration (231-233)
+- `21x`：Potential (211-216), `22x`：Charge (221-226), `23x`：Calibration (231-233)
 - `30x`：Slow-Growth (301-302), `31x`：Constrained TI (311-313)
 - `41x`：Bader (411-412), `42x`：TI (421-422)
 - `9xx`：Settings (901-909)
@@ -39,7 +39,7 @@ VASPKIT 风格交互式编号菜单。无 argparse，所有输入通过 `input()
 - `ConfigDefaultParam`：从 `~/.config/md_analysis/config.json` 读取用户覆盖值，fallback 到硬编码默认
 
 ### 错误处理
-- `_handle_cmd_error` 装饰器捕获 `MDAnalysisError`/`FileNotFoundError`/`ValueError`/`RuntimeError` → 打印简洁消息
+- `MenuCommand.run()` 的 inline try-except 捕获 `MDAnalysisError`/`FileNotFoundError`/`ValueError`/`RuntimeError` → 打印简洁消息
 - 未知异常 → `logger.error(..., exc_info=True)` 记录完整 traceback + 打印简洁消息到 stdout
 
 ### 测试钩子

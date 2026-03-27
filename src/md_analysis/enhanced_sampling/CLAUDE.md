@@ -4,7 +4,7 @@
 
 增强采样工作流包。包含 slowgrowth 和 constrained_ti 两个子包。不从 `md_analysis.__init__` re-export — 需直接 `from md_analysis.enhanced_sampling.slowgrowth import ...`。
 
-CLI 入口在菜单 3 下分两个子组：`30)` Slow-Growth (301-302)、`31)` Constrained TI Analysis (311-312)。
+CLI 入口在菜单 3 下分两个子组：`30)` Slow-Growth (301-302)、`31)` Constrained TI Analysis (311-313)。
 
 TIGen 工作目录生成在 `scripts/TIGen.py`（不在此包中）。
 

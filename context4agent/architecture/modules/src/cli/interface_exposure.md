@@ -11,10 +11,10 @@
 - `_prompt.py` -- reusable input-prompt helpers (`_get_effective_default`, `_prompt_str`, `_prompt_int`, `_prompt_float`, `_prompt_choice`, `_prompt_bool`, `_parse_metal_elements`, `_prompt_global_params`)
 - `_water.py` -- water analysis sub-menu (codes 101-105) + parameter collection + dispatch
 - `_potential.py` -- potential analysis sub-menu (codes 211-216) + parameter collection + dispatch
-- `_charge.py` -- charge analysis sub-menu (codes 221-225) + parameter collection + dispatch
+- `_charge.py` -- charge analysis sub-menu (codes 221-226) + parameter collection + dispatch
 - `_calibration.py` -- calibration sub-menu (codes 231-233): CSV/manual calibrate + predict
 - `_enhanced_sampling.py` -- slow-growth sub-group 30 (codes 301-302) + file discovery helpers
-- `_constrained_ti.py` -- constrained TI sub-group 31 (codes 311-312): single-point diagnostics + full TI analysis (lazy import of `enhanced_sampling.constrained_ti`)
+- `_constrained_ti.py` -- constrained TI sub-group 31 (codes 311-313): single-point diagnostics + full TI analysis + constant-potential correction (lazy import of `enhanced_sampling.constrained_ti`)
 - `_scripts.py` -- scripts/tools sub-menu; Bader sub-group 41 (codes 411-412), TI sub-group 42 (codes 421-422)
 - `_settings.py` -- settings sub-menu (codes 901-909) + persistent config management (903-906: configurable analysis defaults, 907: reset all defaults, 909: potential output reference)
 
@@ -26,7 +26,7 @@
 - Scripts sub-groups: 41=Bader Charge Preparation, 42=Thermodynamic Integration Preparation
 - Leaf codes use numbered codes: 1xx=Water, 21x=Potential, 22x=Charge, 23x=Calibration, 30x=Slow-Growth, 31x=Constrained TI, 41x=Bader, 42x=TI, 9xx=Settings
 - Flat index allows direct jump to any leaf code from the root menu
-- After one analysis completes, the program exits (no loop)
+- After one analysis completes, control returns to the parent menu (MenuGroup uses a while-True loop)
 
 ## Entry point registration
 

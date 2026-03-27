@@ -14,7 +14,7 @@ Interactive CLI package providing a VASPKIT-style numbered menu interface. Repla
 - 每个子菜单模块通过 `MenuCommand` 子类实现，定义 `params`、`advanced_params`、`output_name` 和 `execute(self, ctx)` 方法
 - `output_subdir` 由 `@property` 自动遍历父链（`parent.output_name`）拼接，无需硬编码
 - `_prompt.py` 的共享 helper（`prompt_str`、`prompt_float` 等）由 `_params.py` 的参数类内部调用
-- 错误处理由 `MenuCommand` 框架统一应用 `_handle_cmd_error` 装饰器
+- 错误处理由 `MenuCommand.run()` 的 inline try-except 统一处理
 - `KeyboardInterrupt` / `EOFError` 在顶层 `main()` 中捕获以实现干净退出
 
 ## Dependencies
@@ -35,7 +35,7 @@ Interactive CLI package providing a VASPKIT-style numbered menu interface. Repla
 - `main()` configures a `StreamHandler` on the `"md_analysis"` logger at `INFO` level, outputting to stderr with format `"%(levelname)s: %(message)s"`
 - Configuration is idempotent: only adds the handler if no non-NullHandler handlers exist
 - The library itself uses `NullHandler` (set in `md_analysis/__init__.py`), so logging is silent unless the CLI (or an application) explicitly configures a handler
-- `_handle_cmd_error` logs unexpected exceptions at `ERROR` level with `exc_info=True` for full traceback in logs, while printing a concise message to stdout for the user
+- `MenuCommand.run()` 的 except 分支对未知异常以 `ERROR` level 加 `exc_info=True` 记录完整 traceback，同时在 stdout 打印简洁消息给用户
 
 ## 命令类架构
 
@@ -45,10 +45,10 @@ Interactive CLI package providing a VASPKIT-style numbered menu interface. Repla
 |------|--------|--------|
 | `_water.py` | `WaterDensityCmd`, `WaterOrientationCmd`, `AdWaterOrientationCmd`, `AdWaterThetaCmd`, `WaterThreePanelCmd` | 101-105 |
 | `_potential.py` | `CenterPotentialCmd`, `FermiEnergyCmd`, `ElectrodePotentialCmd`, `PhiZProfileCmd`, `ThicknessSensitivityCmd`, `FullPotentialCmd` | 211-216 |
-| `_charge.py` | `SurfaceChargeCmd`（通过 `method` 参数区分 counterion/layer/prompted）, `TrackedChargeCmd`, `CounterionChargeCmd` | 221-225 |
+| `_charge.py` | `SurfaceChargeCmd`（通过 `method` 参数区分 counterion/layer/prompted）, `SingleSideChargeCmd`, `TrackedChargeCmd`, `CounterionChargeCmd` | 221-226 |
 | `_calibration.py` | `CalibrateFromCSVCmd`, `CalibrateManualCmd`, `PredictPotentialCmd` | 231-233 |
 | `_enhanced_sampling.py` | `SGQuickPlotCmd`, `SGPublicationPlotCmd`（共享基类 `_SlowgrowthPlotCmd`） | 301-302 (sub-group 30) |
-| `_constrained_ti.py` | `TISingleDiagCmd`, `TIFullAnalysisCmd` | 311-312 (sub-group 31) |
+| `_constrained_ti.py` | `TISingleDiagCmd`, `TIFullAnalysisCmd`, `TIConstPotCorrectionCmd` | 311-313 (sub-group 31) |
 | `_scripts.py` | `BaderSingleCmd`, `BaderBatchCmd`, `TISingleCmd`, `TIBatchCmd` | 411-412 (sub-group 41), 421-422 (sub-group 42) |
 | `_settings.py` | `SetVaspScriptCmd`, `SetCp2kScriptCmd`, `ShowConfigCmd`, `SetAnalysisDefaultCmd`（通过 `config_key` 参数复用）, `ResetDefaultsCmd`, `SetPotentialReferenceCmd` | 901-909 |
 
@@ -63,7 +63,7 @@ All sub-menus requiring cell parameters (water 101-105, scripts 411-412) use the
 1. Prompt cell source: `.restart` (default) or `md.inp`
 2. Parse the chosen file (`parse_abc_from_restart` or `parse_abc_from_md_inp`)
 3. On failure, offer one retry with a different file
-4. On second failure, raise `CellParseError` (caught by `@_handle_cmd_error`)
+4. On second failure, raise `CellParseError` (caught by `MenuCommand.run()` 的 try-except)
 5. Return `(a, b, c)` tuple, passed as `cell_abc` keyword argument to analysis functions
 
 ## Parameter flow
@@ -72,7 +72,7 @@ All sub-menus requiring cell parameters (water 101-105, scripts 411-412) use the
 2. Required parameters prompted (if any)
 3. "Modify advanced parameters? (y/N)" gate for optional parameters
 4. Handler calls the appropriate analysis function
-5. Results printed, program exits
+5. Results printed, control returns to parent menu
 
 ## Configurable analysis defaults
 
@@ -85,7 +85,7 @@ Settings menu 903-907 allow users to persistently override algorithm defaults fr
 - 907: reset all analysis defaults
 - 909: potential output reference (SHE/RHE/PZC) — `SetPotentialReferenceCmd`
 
-The `_get_effective_default(key)` helper in `_prompt.py` reads the user config first, falling back to the hardcoded default from `CONFIGURABLE_DEFAULTS` registry. Analysis sub-menus (`_potential.py`, `_water.py`, `_charge.py`) use this helper to populate prompt defaults. Library function signatures remain unchanged — persistence only affects CLI prompt defaults.
+`ConfigDefaultParam` 类（在 `_params.py` 中定义）通过 `apply_default()` 方法读取用户持久化配置，fallback 到 `CONFIGURABLE_DEFAULTS` 注册表中的硬编码默认值。Analysis sub-menus (`_potential.py`, `_water.py`, `_charge.py`) 使用此参数类来填充提示默认值。Library function signatures remain unchanged — persistence only affects CLI prompt defaults.
 
 ### Potential output reference (909)
 

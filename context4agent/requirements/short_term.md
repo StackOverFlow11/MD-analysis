@@ -28,19 +28,22 @@
 
 ## 当前已实现能力（按"可跑通的入口"）
 
-- **CLI 入口**：
-  - `md-analysis water --xyz md-pos-1.xyz --md-inp md.inp`
-  - `md-analysis potential --cube-pattern "md-POTENTIAL-*.cube"`
-  - `md-analysis charge --root-dir . --charge-method counterion|layer` （Bader 表面电荷密度时序分析，CSV + PNG 输出）
-  - `md-analysis all --xyz ... --md-inp ... --cube-pattern ...`
-  - CLI 301: Slow-Growth Quick Plot
-  - CLI 302: Slow-Growth Publication Plot
-  - CLI 311: Constrained TI Single-Point Diagnostics
-  - CLI 312: Constrained TI Full Analysis
+- **CLI 入口**（`md-analysis` 启动 VASPKIT 风格交互式编号菜单，无 argparse 参数）：
+  - 1xx：Water（密度/取向/吸附层/三联图）
+  - 21x：Potential（center potential / Fermi / electrode potential / φ(z) / thickness sensitivity / full）
+  - 22x：Charge（221 counterion σ / 222 layer σ / 223 full σ / 224 single-side σ+φ / 225 tracked atoms / 226 counterion tracking）
+  - 23x：Calibration（CSV/手动标定 + 预测）
+  - 30x：Slow-Growth（301 quick plot / 302 publication plot）
+  - 31x：Constrained TI（311 single-point diagnostics / 312 full analysis / 313 constant-potential correction）
+  - 41x：Bader 工作目录生成（411 单帧 / 412 批量）
+  - 42x：TI 工作目录生成（421 单帧 / 422 批量）
+  - 9xx：Settings（配置管理）
 - **编程入口**：
   - `md_analysis.main.run_water_analysis(xyz_path, md_inp_path, ...)`
   - `md_analysis.main.run_potential_analysis(cube_pattern=..., md_out_path=..., ...)`
   - `md_analysis.main.run_charge_analysis(output_dir=..., root_dir=..., ...)`
+  - `md_analysis.main.run_tracked_charge_analysis(root_dir=..., atom_indices_xyz=..., ...)`
+  - `md_analysis.main.run_counterion_charge_analysis(root_dir=..., ...)`
   - `md_analysis.main.run_all(...)`
   - `md_analysis.enhanced_sampling.slowgrowth.slowgrowth_analysis(restart_path, log_path, ...)`
   - `md_analysis.enhanced_sampling.constrained_ti.workflow.standalone_diagnostics(restart_path, log_path, ...)`
@@ -68,7 +71,7 @@
     - ✅ 表面电荷密度（双方法）：
       - `method="counterion"`：排除水分子和金属原子，仅反离子/溶质物种净电荷贡献 σ
       - `method="layer"`：界面层金属原子净电荷求和 / 面积（`n_surface_layers` 参数控制每侧取几层，默认 1）
-      - CLI 通过 `--charge-method counterion|layer` 选择；输出目录按方法分离 `<outdir>/electrochemical/charge/<method>/`
+      - CLI 通过交互式菜单选择（221=counterion / 222=layer / 223=prompted）；输出目录按方法分离 `<outdir>/electrochemical/charge/<method>/`
     - ✅ 单帧原子净电荷提取：`frame_indexed_atom_charges` 传入 `(N,)` 索引，返回 `(N, 2)` 的索引+净电荷数组
     - ✅ 轨迹原子净电荷提取：`trajectory_indexed_atom_charges` 按帧传入 `(t, N)` 索引矩阵，返回 `(t, N, 2)` 的索引+净电荷数组（内部调用 `frame_indexed_atom_charges`）
     - ✅ 轨迹表面电荷密度时序：`trajectory_surface_charge` 逐帧计算表面电荷密度，返回 `(t, 2)` 的 μC/cm² 数组
@@ -81,7 +84,7 @@
     - ✅ POTCAR 通过 vaspkit 103 自动生成（可选）
     - ✅ 提交脚本路径支持持久化配置（`~/.config/md_analysis/config.json`）
     - ✅ 多帧批量生成：`batch_generate_bader_workdirs(xyz_path, cell_abc, output_dir, *, frame_start/end/step, ...)`
-    - ✅ CLI 支持：401（单帧）+ 402（批量），cell 来源支持 `.restart` 和 `md.inp`
+    - ✅ CLI 支持：411（单帧）+ 412（批量），cell 来源支持 `.restart` 和 `md.inp`
     - ✅ RestartParser：`parse_abc_from_restart()` 从 CP2K `.restart` 文件解析正交 cell 参数
     - ✅ ColvarParser：解析 CP2K COLVAR restart 元数据（COLLECTIVE、CONSTRAINT、FIXED_ATOMS）和 LagrangeMultLog（单约束/多约束自动检测），重建 ξ(t) 目标序列；溢出值 `***` 自动处理为 `np.nan`
   - 持久化用户配置（`config.py`）：

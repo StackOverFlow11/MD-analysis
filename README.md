@@ -24,15 +24,29 @@ Lightweight analysis utilities for periodic metal-water interfaces from CP2K MD 
 - Two surface charge methods:
   - `counterion` — only non-water, non-metal species (counterions, adsorbates) contribute to σ
   - `layer` — sum of interface-layer metal atom net charges / area
+- Single-side surface charge + potential extrapolation via calibration
 - Time-series CSV with cumulative average + PNG visualization
-- Per-atom indexed charge extraction across trajectory
+- Per-atom indexed charge extraction and counterion charge tracking across trajectory
 
-**Scripts & Tools** — automation for VASP Bader charge workflow:
+**Charge-potential calibration** — σ→φ mapping for constant-charge simulations:
 
-- Generate VASP Bader single-point work directory from a single MD frame (POSCAR + INCAR + KPOINTS + POTCAR + submission script)
-- Batch generate work directories across trajectory frames with configurable frame slicing
-- Bijective CP2K XYZ ↔ VASP POSCAR index mapping (encoded in POSCAR comment line for lossless round-trip)
-- Persistent configuration for VASP submission script path
+- Fit calibration from CSV or manual (φ, σ) data points (linear, polynomial, spline, differential capacitance)
+- Predict electrode potential from surface charge density
+- Reference scale conversion (SHE / RHE / PZC)
+
+**Enhanced sampling** — slow-growth and constrained thermodynamic integration:
+
+- Slow-growth TI: quick and publication-quality free energy plots
+- Constrained TI: 4-step convergence diagnostics (ACF, Flyvbjerg-Petersen block average, running average drift, Geweke stationarity)
+- Free-energy integration with error propagation
+- Constant-potential correction (Norskov) for constant-charge TI
+
+**Scripts & Tools** — automation for simulation workflows:
+
+- VASP Bader work directory generation (single frame + batch from trajectory)
+- Bijective CP2K XYZ ↔ VASP POSCAR index mapping (encoded in POSCAR comment line)
+- CP2K constrained-MD work directory generation for TI (single target + batch)
+- Persistent configuration for VASP/CP2K submission script paths
 
 ## Quick Start
 
@@ -53,15 +67,20 @@ md-analysis
 
 The VASPKIT-style numbered menu guides you through:
 
-- **1) Water Analysis** — density (101), orientation (102), adsorbed-layer (103/104), full three-panel (105)
+- **1) Water Analysis** — density (101), orientation (102), adsorbed-layer (103/104), three-panel (105)
 - **2) Electrochemical Analysis**
-  - **21) Potential** — center slab (211), Fermi (212), electrode U vs SHE (213), φ(z) (214), thickness sweep (215), full (216)
-  - **22) Charge** — counterion method (221), layer method (222), full with plots (223)
-- **3) Enhanced Sampling** — slow-growth quick plot (301), publication plot (302)
-- **4) Scripts / Tools** — single-frame Bader workdir (401), batch Bader workdirs (402)
-- **9) Settings** — set VASP submission script path (901), show config (902), set analysis defaults (903-906), reset defaults (907)
+  - **21) Potential** — center slab (211), Fermi (212), U vs SHE (213), phi(z) (214), thickness sweep (215), full (216)
+  - **22) Charge** — counterion (221), layer (222), full (223), single-side + potential (224), tracked atoms (225), counterion tracking (226)
+  - **23) Calibration** — calibrate from CSV (231), manual input (232), predict potential (233)
+- **3) Enhanced Sampling**
+  - **30) Slow-Growth** — quick plot (301), publication plot (302)
+  - **31) Constrained TI** — single-point diagnostics (311), full TI analysis (312), constant-potential correction (313)
+- **4) Scripts / Tools**
+  - **41) Bader** — single frame (411), batch (412)
+  - **42) TI** — single target (421), batch (422)
+- **9) Settings** — VASP script (901), CP2K script (908), show config (902), analysis defaults (903-906), reset (907), potential reference (909)
 
-Each option prompts for required inputs, then offers an optional "Modify advanced parameters?" gate for output directory and frame slicing.
+Each option prompts for required inputs, then offers an optional "Modify advanced parameters?" gate.
 
 ### Python API
 
@@ -78,7 +97,10 @@ plot_water_three_panel_analysis(
 Or use the programmatic entry points:
 
 ```python
-from md_analysis.main import run_water_analysis, run_potential_analysis, run_charge_analysis, run_all
+from md_analysis.main import (
+    run_water_analysis, run_potential_analysis, run_charge_analysis,
+    run_tracked_charge_analysis, run_counterion_charge_analysis, run_all,
+)
 ```
 
 Generate VASP Bader work directories from an MD trajectory:
@@ -121,14 +143,18 @@ src/md_analysis/
 ├── config.py               # persistent user configuration (~/.config/md_analysis/)
 ├── main.py                 # programmatic entry points
 ├── cli/                    # VASPKIT-style interactive CLI (md-analysis console script)
-│   ├── __init__.py         #   main() entry point, banner, top menu
-│   ├── _prompt.py          #   reusable input prompt helpers + _handle_cmd_error decorator
+│   ├── __init__.py         #   main() entry point, banner, top menu, build_menu_tree()
+│   ├── _framework.py       #   MenuNode, MenuGroup, MenuCommand, lazy_import()
+│   ├── _params.py          #   K key constants, ParamCollector ABC, generic param classes
+│   ├── _prompt.py          #   reusable input prompt helpers
 │   ├── _water.py           #   water sub-menu (101-105)
 │   ├── _potential.py       #   potential sub-menu (211-216)
-│   ├── _charge.py          #   charge sub-menu (221-223)
-│   ├── _enhanced_sampling.py #   enhanced sampling sub-menu (301-302)
-│   ├── _scripts.py         #   scripts/tools sub-menu (401-402)
-│   └── _settings.py        #   settings sub-menu (901-907)
+│   ├── _charge.py          #   charge sub-menu (221-226)
+│   ├── _calibration.py     #   calibration sub-menu (231-233)
+│   ├── _enhanced_sampling.py #   slow-growth sub-menu (301-302)
+│   ├── _constrained_ti.py  #   constrained TI sub-menu (311-313)
+│   ├── _scripts.py         #   scripts/tools sub-menu (411-412, 421-422)
+│   └── _settings.py        #   settings sub-menu (901-909)
 ├── utils/                  # single-frame low-level tools
 │   ├── config.py           #   constants, unit conversions, cSHE parameters
 │   ├── _io_helpers.py      #   private shared I/O helpers (_cumulative_average, _write_csv)
@@ -149,28 +175,35 @@ src/md_analysis/
 │       ├── WaterDensity.py
 │       ├── WaterOrientation.py
 │       └── AdWaterOrientation.py
-├── potential/              # multi-frame potential analysis workflows
-│   ├── config.py           #   output filename constants
-│   ├── CenterPotential.py  #   center-slab, Fermi, electrode potential, thickness sweep
-│   └── PhiZProfile.py      #   φ(z) overlay visualization
-├── charge/                 # Bader charge analysis workflows
-│   ├── config.py           #   unit conversion constants, default filenames
-│   └── BaderAnalysis.py    #   surface charge (counterion/layer), indexed charges, trajectory analysis
-└── scripts/                # automation scripts & VASP Bader workdir generation
-    ├── BaderGen.py         #   generate_bader_workdir(), batch_generate_bader_workdirs()
+├── electrochemical/        # electrochemical analysis grouping package
+│   ├── potential/          #   Hartree potential + electrode potential workflows
+│   │   ├── CenterPotential.py  # center-slab, Fermi, electrode potential, thickness sweep
+│   │   └── PhiZProfile.py      # phi(z) overlay visualization
+│   ├── charge/             #   Bader charge analysis workflows
+│   │   └── Bader/          #     BaderData, SurfaceCharge, AtomCharges, _frame_utils
+│   └── calibration/        #   sigma->phi calibration mapping
+│       └── CalibrationWorkflow.py  # calibrate(), predict_potential(), convert_reference()
+├── enhanced_sampling/      # enhanced sampling workflows
+│   ├── slowgrowth/         #   slow-growth TI (data classes + plots + CSV)
+│   └── constrained_ti/     #   constrained TI diagnostics + free energy integration + correction
+└── scripts/                # automation scripts
+    ├── BaderGen.py         #   VASP Bader work directory generation
+    ├── TIGen.py            #   CP2K constrained-MD work directory generation
     ├── template/           #   bundled VASP templates (INCAR, KPOINTS)
     └── utils/
-        └── IndexMapper.py  #   CP2K XYZ ↔ VASP POSCAR bijective index mapping
+        └── IndexMapper.py  #   CP2K XYZ <-> VASP POSCAR bijective index mapping
 
 test/
 ├── conftest.py             # shared fixtures
 ├── unit/
 │   ├── utils/              # ClusterUtils, LayerParser, WaterParser, BaderParser, CellParser,
-│   │                       #   CubeParser, ColvarParser
-│   ├── cli/                # _handle_cmd_error decorator
-│   ├── charge/             # BaderAnalysis (5 public functions + internal helpers)
+│   │                       #   CubeParser, ColvarParser (SlowGrowth parser)
+│   ├── cli/                # MenuCommand error handling, settings defaults
+│   ├── calibration/        # CalibrationData, Mapper, reference conversion, workflow
+│   ├── charge/             # surface charge, atom charges, tracked charges
 │   ├── potential/          # single-frame electrode potential pipeline
-│   ├── scripts/            # BaderGen + IndexMapper
+│   ├── scripts/            # BaderGen, TIGen, IndexMapper
+│   ├── enhanced_sampling/  # constrained_ti: ACF, block avg, correction, integration, I/O, workflow
 │   ├── test_config.py      # persistent user config
 │   └── test_logging_setup.py  # NullHandler / StreamHandler setup
 └── integration/
@@ -178,12 +211,14 @@ test/
     ├── water/              # density, orientation, theta, three-panel end-to-end
     ├── potential/          # center slab potential, phi(z) profile with real cube files
     ├── charge/             # trajectory surface charge, surface_charge_analysis end-to-end
-    └── test_main.py        # programmatic entry points (run_water/potential/charge_analysis)
+    ├── enhanced_sampling/  # constrained TI regression, slow-growth plot
+    └── test_main.py        # programmatic entry points (run_* functions)
 
 data_example/               # minimal reproducible input data
 ├── potential/              #   cube files, md.out, md-pos-1.xyz, md.inp, .restart files
-├── bader/                  #   bader_work_dir/ with POSCAR, ACF.dat, POTCAR (274 atoms: 62 Cu + 2 Ag + 70 O + 140 H)
-└── sg/                     #   COLVAR restart + LagrangeMultLog test data (4 scenarios)
+├── bader/                  #   bader_work_dir/ with POSCAR, ACF.dat, POTCAR
+├── sg/                     #   COLVAR restart + LagrangeMultLog test data (4 scenarios)
+└── ti/                     #   8 ti_target_* constraint-point directories for TI regression tests
 context4agent/              # architecture contracts, decisions, requirements
 ```
 
@@ -204,7 +239,7 @@ pytest test/integration/                             # all integration tests
 
 ## Architecture Notes
 
-- **Three-layer design**: `utils` (single-frame primitives) → `water` / `potential` / `charge` (multi-frame workflows) → `main` / `cli` (integration entry points)
+- **Three-layer design**: `utils` (single-frame primitives) → `water` / `electrochemical` / `enhanced_sampling` (multi-frame workflows) → `main` / `cli` (integration entry points)
 - **Interface detection**: 1D periodic clustering on metal z-coordinates, largest gap = water region, two bounding layers = interfaces
 - **Water profiles**: computed from selected interface toward the cell midpoint, normalized to [0, 1], then ensemble-averaged across frames
 - **Electrode potential**: U = -E_Fermi + φ_center + ΔΨ_a(H₃O⁺/w) - μ(H⁺,g⁰) - ΔE_ZP (computational SHE)

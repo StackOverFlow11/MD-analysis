@@ -135,17 +135,17 @@
 
 ### 7) `md_analysis.main` / `md_analysis.cli`（集成入口）
 
-- `main.py`：编程入口 `run_water_analysis()`、`run_potential_analysis()`、`run_charge_analysis()`、`run_all()`
+- `main.py`：编程入口 `run_water_analysis()`、`run_potential_analysis()`、`run_charge_analysis()`、`run_tracked_charge_analysis()`、`run_counterion_charge_analysis()`、`run_all()`
 - `cli/`：VASPKIT 风格交互式 CLI 包，注册为 `md-analysis` console script
   - `__init__.py`：`main()` 入口 + banner + 顶层菜单分发
-  - `_prompt.py`：可复用的输入提示辅助函数（含 `_get_effective_default` 用于读取用户配置或硬编码默认值）
+  - `_prompt.py`：可复用的输入提示辅助函数
   - `_framework.py`：核心框架（`MenuNode`、`MenuGroup`、`MenuCommand`、`lazy_import()`）
   - `_params.py`：参数采集层次（`K` 键常量、`ParamCollector` ABC、泛型参数类）
   - `_water.py`：水分析命令类（101-105）：`WaterDensityCmd`、`WaterOrientationCmd`、`AdWaterOrientationCmd`、`AdWaterThetaCmd`、`WaterThreePanelCmd`
   - `_potential.py`：电势分析命令类（211-216）：`CenterPotentialCmd`、`FermiEnergyCmd`、`ElectrodePotentialCmd`、`PhiZProfileCmd`、`ThicknessSensitivityCmd`、`FullPotentialCmd`
-  - `_charge.py`：电荷分析命令类（221-223）：`SurfaceChargeCmd`（通过 `method` 参数区分）、`_print_ensemble_summary()`
+  - `_charge.py`：电荷分析命令类（221-226）：`SurfaceChargeCmd`（通过 `method` 参数区分）、`SingleSideChargeCmd`、`TrackedChargeCmd`、`CounterionChargeCmd`、`_print_ensemble_summary()`
   - `_enhanced_sampling.py`：慢增长命令类（30=SG 301-302）：`SGQuickPlotCmd`、`SGPublicationPlotCmd`
-  - `_constrained_ti.py`：约束 TI 命令类（31=TI 311-312）：`TISingleDiagCmd`、`TIFullAnalysisCmd`
+  - `_constrained_ti.py`：约束 TI 命令类（31=TI 311-313）：`TISingleDiagCmd`、`TIFullAnalysisCmd`、`TIConstPotCorrectionCmd`
   - `_scripts.py`：脚本/工具命令类（41=Bader 411-412，42=TI 421-422）：`BaderSingleCmd`、`BaderBatchCmd`、`TISingleCmd`、`TIBatchCmd`
   - `_settings.py`：设置命令类（901-909）：`SetVaspScriptCmd`、`SetCp2kScriptCmd`、`ShowConfigCmd`、`SetAnalysisDefaultCmd`、`ResetDefaultsCmd`、`SetPotentialReferenceCmd`
 
@@ -163,11 +163,11 @@
   - `integration.py`：梯形积分权重、SEM targets、自由能积分
   - `analysis/`：四步诊断引擎（ACF、F&P block average、running average、Geweke）
 - 依赖方向：`enhanced_sampling` → `utils`（`ColvarParser`、`config`、`_io_helpers`）；无反向依赖
-- CLI 集成：30=Slow-Growth（301-302，`cli/_enhanced_sampling.py`），31=Constrained TI（311-312，`cli/_constrained_ti.py`）
+- CLI 集成：30=Slow-Growth（301-302，`cli/_enhanced_sampling.py`），31=Constrained TI（311-313，`cli/_constrained_ti.py`）
 
 ### 9) `md_analysis.scripts`（自动化脚本工具）
 
-- `scripts/__init__.py`：re-exports `BaderGenError`, `generate_bader_workdir`, `batch_generate_bader_workdirs`
+- `scripts/__init__.py`：re-exports `BaderGenError`, `generate_bader_workdir`, `batch_generate_bader_workdirs`, `TIGenError`, `generate_ti_workdir`, `batch_generate_ti_workdirs`
 - `scripts/BaderGen.py`：从单帧 MD 结构生成 VASP Bader 工作目录（POSCAR + INCAR + KPOINTS + POTCAR + script.sh）
 - `scripts/template/`：VASP 模板文件（INCAR、KPOINTS），通过 `importlib.resources` 访问
 - `scripts/utils/IndexMapper.py`

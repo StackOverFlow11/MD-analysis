@@ -37,7 +37,7 @@ Explore `src/md_analysis/water/` in depth:
 
 ## Agent 4: Potential & Charge Modules
 
-Explore `src/md_analysis/potential/` and `src/md_analysis/charge/` in depth:
+Explore `src/md_analysis/electrochemical/potential/` and `src/md_analysis/electrochemical/charge/` in depth:
 - Read all files in both modules
 - Identify public APIs, configuration constants, and output formats
 - Understand the cSHE formula implementation and Bader charge methods
