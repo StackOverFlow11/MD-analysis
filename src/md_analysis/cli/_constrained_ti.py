@@ -245,7 +245,6 @@ class TIFullAnalysisCmd(MenuCommand):
 
         if ti_report.all_passed:
             print("  Status: ALL PASS")
-            print("  All points converged. Use 311 for per-point diagnostics.")
         else:
             failing = ti_report.failing_indices
             print(f"  Status: {len(failing)} FAILED (indices: {', '.join(str(i) for i in failing)})")
@@ -260,15 +259,14 @@ class TIFullAnalysisCmd(MenuCommand):
         write_free_energy_csv(ti_report, output_dir=outdir)
         plot_free_energy_profile(ti_report, output_dir=outdir)
 
-        # 7. Diagnostics plots for failing points only
-        for i in ti_report.failing_indices:
-            plot_point_diagnostics(ti_report.point_reports[i], output_dir=outdir)
+        # 7. Diagnostics plots for all points
+        for r in ti_report.point_reports:
+            plot_point_diagnostics(r, output_dir=outdir)
 
         # 8. List output files
         print(f"\n  Output files:")
         print(f"    {outdir / 'ti_free_energy.png'}")
         print(f"    {outdir / 'ti_free_energy.csv'}")
         print(f"    {outdir / 'ti_convergence_report.csv'}")
-        for i in ti_report.failing_indices:
-            xi = ti_report.point_reports[i].xi
-            print(f"    {outdir / f'ti_diag_xi{xi:.4f}.png'}")
+        for r in ti_report.point_reports:
+            print(f"    {outdir / f'ti_diag_xi{r.xi:.4f}.png'}")

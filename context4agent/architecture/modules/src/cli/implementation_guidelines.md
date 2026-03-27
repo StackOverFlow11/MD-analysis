@@ -116,4 +116,4 @@ Config keys: `KEY_POTENTIAL_REFERENCE`, `KEY_POTENTIAL_PH`, `KEY_POTENTIAL_TEMPE
 ### Constrained TI（`_constrained_ti.py`，sub-group 31）
 
 - **311 `TISingleDiagCmd`**：单点收敛诊断。复用 SG 的 `_discover_restart_file` / `_discover_log_file`。覆写 `_collect_all_params()`（SEM target 为可空 float，用 `prompt_str` + 手动转换）。调用 `standalone_diagnostics()`。
-- **312 `TIFullAnalysisCmd`**：多点 TI 分析。调用 `discover_ti_points()` → `load_ti_series()` → `analyze_ti()`，含 dt 一致性校验。TI_DIR_PATTERN 限制为 `"ti_target"/"xi"/"auto"`。仅对失败点生成诊断图。
+- **312 `TIFullAnalysisCmd`**：多点 TI 分析。调用 `discover_ti_points()` → `load_ti_series()` → `analyze_ti()`，含 dt 一致性校验。TI_DIR_PATTERN 限制为 `"ti_target"/"xi"/"auto"`。对所有约束点生成诊断图。

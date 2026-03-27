@@ -288,12 +288,12 @@ write_convergence_csv(ti_report, output_dir=outdir)
 write_free_energy_csv(ti_report, output_dir=outdir)
 plot_free_energy_profile(ti_report, output_dir=outdir)
 
-# 6. 每个失败点输出诊断图
-for i in ti_report.failing_indices:
-    plot_point_diagnostics(ti_report.point_reports[i], output_dir=outdir)
+# 6. 所有点均输出诊断图
+for r in ti_report.point_reports:
+    plot_point_diagnostics(r, output_dir=outdir)
 ```
 
-> **诊断图策略**：默认仅对失败点生成 `ti_diag_xi*.png`。若全部通过，不生成诊断图（节省时间），但终端提示用户可用 311 单独查看某个点。如果想改为全部生成也可以，作为高级参数预留。
+> **诊断图策略**：默认对所有点生成 `ti_diag_xi*.png`，方便直接对比各点收敛质量，无需再单独调用 311。
 
 ### 输出文件
 
@@ -302,7 +302,7 @@ for i in ti_report.failing_indices:
 | `ti_free_energy.png` | 双轴图：左=dA/dξ 误差棒，右=A(ξ) 累积曲线 |
 | `ti_free_energy.csv` | ξ, weight, dA/dξ, SEM, A(eV), σ_A(eV) |
 | `ti_convergence_report.csv` | 每点一行的诊断汇总 |
-| `ti_diag_xi{value}.png` | 仅失败点的 2×2 诊断图（0 至 K 张） |
+| `ti_diag_xi{value}.png` | 所有点的 2×2 诊断图（K 张） |
 
 ### 终端摘要
 
