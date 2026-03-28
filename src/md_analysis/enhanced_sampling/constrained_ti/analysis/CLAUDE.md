@@ -21,7 +21,7 @@
 - Block sizes: 2 的幂次，`1, 2, 4, ..., B_max`，其中 `B_max = N // min_blocks`
 - `SEM(B) = std(block_means, ddof=1) / √n_b`
 - `δSEM(B) = SEM(B) / √(2(n_b − 1))`（来自 χ² 分布）
-- 平台检测：连续 `n_consecutive` 个 pow2 level 的 SEM 增量 < δSEM
+- 平台检测：连续 `n_consecutive` 个 pow2 level 的 SEM 增量 < √(δSEM_i² + δSEM_{i+1}²)（合成不确定度）
 - `n_b < 2` 时 SEM 和 δSEM 均为 NaN（跳过）
 
 ### 公开函数

@@ -62,7 +62,7 @@ def analyze_block_average(
         sem_curve[i] = np.std(block_means, ddof=1) / np.sqrt(nb)
         delta_sem[i] = sem_curve[i] / np.sqrt(2.0 * (nb - 1))
 
-    # Plateau detection: consecutive levels where increase < δSEM
+    # Plateau detection: consecutive levels where increase < combined δSEM
     plateau_index: int | None = None
     consec = 0
     for i in range(len(block_sizes) - 1):
@@ -70,7 +70,8 @@ def analyze_block_average(
             consec = 0
             continue
         increase = sem_curve[i + 1] - sem_curve[i]
-        if increase < delta_sem[i]:
+        threshold = np.sqrt(delta_sem[i] ** 2 + delta_sem[i + 1] ** 2)
+        if increase < threshold:
             consec += 1
             if consec >= n_consecutive and plateau_index is None:
                 # plateau starts at the first point of the qualifying run
