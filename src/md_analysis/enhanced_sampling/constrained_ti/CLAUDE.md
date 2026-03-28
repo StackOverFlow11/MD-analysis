@@ -11,14 +11,16 @@
 3. **Running average**（`analysis/running_average.py`）→ drift D < factor × SEM
 4. **Geweke**（`analysis/geweke.py`）→ stationarity z-test
 
-## sem_final 选择（2-tier）
+## sem_final 选择
+
+始终使用 block-average SEM：
 
 ```
-F&P plateau reached → SEM_block (primary)
-otherwise           → SEM_auto  (ACF fallback)
+F&P plateau reached → SEM at plateau start
+otherwise           → SEM at largest valid block size
 ```
 
-交叉验证：|SEM_block − SEM_auto| / max > 15% 时发出 warning。
+交叉验证：|SEM_block − SEM_auto| / max > 15% 时发出 warning（无论平台是否达到）。
 
 ## 模块结构
 

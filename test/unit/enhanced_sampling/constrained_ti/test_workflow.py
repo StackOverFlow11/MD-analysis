@@ -184,8 +184,8 @@ class TestSEMSelection:
                 report.block_avg.plateau_sem, rel=1e-10
             )
 
-    def test_no_plateau_fallback_to_acf(self):
-        """No plateau → sem_final == sem_auto."""
+    def test_no_plateau_uses_largest_block(self):
+        """No plateau → sem_final == block_avg.plateau_sem (largest-block fallback)."""
         from unittest.mock import patch
 
         def patched_ba(series, **kwargs):
@@ -214,7 +214,7 @@ class TestSEMSelection:
             report = analyze_standalone(series)
 
         assert report.sem_final == pytest.approx(
-            report.autocorr.sem_auto, rel=1e-10
+            report.block_avg.plateau_sem, rel=1e-10
         )
         assert any("plateau not reached" in r for r in report.failure_reasons)
 

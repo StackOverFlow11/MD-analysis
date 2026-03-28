@@ -187,25 +187,25 @@ def analyze_single_point(
         **dispatch["block"],
     )
 
-    # Determine sem_final: 2-tier hierarchy (F&P plateau → ACF fallback)
-    if block_avg.plateau_reached:
-        sem_final = block_avg.plateau_sem
-    else:
-        sem_final = autocorr.sem_auto
+    # Determine sem_final: always prefer block-average SEM.
+    # When plateau is detected, plateau_sem is from the plateau start;
+    # otherwise block_average.py falls back to the largest valid block size.
+    sem_final = block_avg.plateau_sem
+
+    if not block_avg.plateau_reached:
         failure_reasons.append(
-            "F&P block-average plateau not reached; falling back to SEM_auto."
+            "F&P block-average plateau not reached; using largest-block SEM."
         )
 
     # Cross-check: SEM_block vs SEM_auto
-    if block_avg.plateau_reached:
-        _max_sem = max(block_avg.plateau_sem, autocorr.sem_auto)
-        if _max_sem > 0:
-            _rel_diff = abs(block_avg.plateau_sem - autocorr.sem_auto) / _max_sem
-            if _rel_diff > DEFAULT_CROSS_CHECK_RTOL:
-                failure_reasons.append(
-                    f"SEM_block ({block_avg.plateau_sem:.2e}) and SEM_auto "
-                    f"({autocorr.sem_auto:.2e}) disagree by {_rel_diff:.0%}."
-                )
+    _max_sem = max(block_avg.plateau_sem, autocorr.sem_auto)
+    if _max_sem > 0:
+        _rel_diff = abs(block_avg.plateau_sem - autocorr.sem_auto) / _max_sem
+        if _rel_diff > DEFAULT_CROSS_CHECK_RTOL:
+            failure_reasons.append(
+                f"SEM_block ({block_avg.plateau_sem:.2e}) and SEM_auto "
+                f"({autocorr.sem_auto:.2e}) disagree by {_rel_diff:.0%}."
+            )
 
     # Step 3 (executed as step 4): Running average
     running_avg = analyze_running_average(
@@ -646,7 +646,7 @@ def _point_to_row(r: ConstraintPointReport) -> dict:
     if ba.plateau_reached:
         method = "plateau"
     else:
-        method = "acf"
+        method = "largest_block"
     return {
         "xi": f"{r.xi:.6f}",
         "n_analyzed": str(r.n_analyzed),
