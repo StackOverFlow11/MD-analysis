@@ -7,7 +7,11 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..config import DEFAULT_FP_CONSECUTIVE, DEFAULT_FP_MIN_BLOCKS
+from ..config import (
+    DEFAULT_FP_CONSECUTIVE,
+    DEFAULT_FP_FALLBACK_MIN_BLOCKS,
+    DEFAULT_FP_MIN_BLOCKS,
+)
 from ..models import BlockAverageResult
 
 
@@ -86,9 +90,17 @@ def analyze_block_average(
         plateau_delta = float(delta_sem[plateau_index])
         plateau_block_size: int | None = int(block_sizes[plateau_index])
     else:
-        # Fallback: use the last valid point
-        valid = np.where(~np.isnan(sem_curve))[0]
-        last = valid[-1] if len(valid) > 0 else 0
+        # Fallback: largest block size with n_b >= fallback_min_blocks
+        n_blocks = np.array([n // bs for bs in block_sizes])
+        candidates = np.where(
+            (~np.isnan(sem_curve)) & (n_blocks >= DEFAULT_FP_FALLBACK_MIN_BLOCKS)
+        )[0]
+        if len(candidates) > 0:
+            last = candidates[-1]
+        else:
+            # Not enough data even for fallback; use last valid point
+            valid = np.where(~np.isnan(sem_curve))[0]
+            last = valid[-1] if len(valid) > 0 else 0
         plateau_sem = float(sem_curve[last])
         plateau_delta = float(delta_sem[last])
         plateau_block_size = None

@@ -53,6 +53,10 @@ DEFAULT_FP_MIN_BLOCKS: int = 4
 # plateau reached.  See Flyvbjerg & Petersen, J. Chem. Phys. 91, 461 (1989).
 DEFAULT_FP_CONSECUTIVE: int = 2
 
+# Minimum number of blocks required for the no-plateau fallback level.
+# Ensures enough independent samples for a reliable SEM estimate.
+DEFAULT_FP_FALLBACK_MIN_BLOCKS: int = 35
+
 # Cross-check tolerance: warn when |SEM_block - SEM_auto| / max > this.
 DEFAULT_CROSS_CHECK_RTOL: float = 0.15
 
