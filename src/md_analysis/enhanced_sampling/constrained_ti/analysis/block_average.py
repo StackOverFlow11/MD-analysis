@@ -74,7 +74,7 @@ def analyze_block_average(
             consec += 1
             if consec >= n_consecutive and plateau_index is None:
                 # plateau starts at the first point of the qualifying run
-                plateau_index = i - n_consecutive + 2
+                plateau_index = i - n_consecutive + 1
         else:
             consec = 0
 
