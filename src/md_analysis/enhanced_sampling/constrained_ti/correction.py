@@ -65,8 +65,9 @@ def _get_electrode_area(bader_dir: Path, normal: str) -> float:
         DEFAULT_STRUCTURE_FILENAME,
     )
     from ...electrochemical.charge.Bader._frame_utils import _sorted_frame_dirs
+    from ...electrochemical.charge.config import DEFAULT_DIR_PATTERN
 
-    frame_dirs = _sorted_frame_dirs(bader_dir)
+    frame_dirs = _sorted_frame_dirs(bader_dir, DEFAULT_DIR_PATTERN)
     if not frame_dirs:
         raise FileNotFoundError(f"No bader frame directories in {bader_dir}")
 
