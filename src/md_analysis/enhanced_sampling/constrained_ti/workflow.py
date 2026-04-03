@@ -459,6 +459,8 @@ def analyze_ti(
                 xi=report.xi,
                 point_index=report.point_index,
                 n_analyzed=report.n_analyzed,
+                time_start_fs=report.time_start_fs,
+                time_end_fs=report.time_end_fs,
                 lambda_mean=report.lambda_mean,
                 sigma_lambda=report.sigma_lambda,
                 autocorr=report.autocorr,

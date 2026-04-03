@@ -69,6 +69,7 @@ passed, failure_reasons
 - `_BLOCK_KEYS` 仅含 `{"min_blocks", "n_consecutive"}`，通过 `engine_overrides` 传递
 - `ArctanFitResult` 和 `analysis/_arctan_fit.py` 已删除
 - **符号约定**：`ConstraintPointReport.lambda_mean` 存储 CP2K 输出的原始 Shake 乘子 ⟨λ⟩；积分时由 `workflow.analyze_ti` 取反（`dA/dξ = −⟨λ⟩`）后存入 `TIReport.forces`，CSV 列 `dA_dxi` 和自由能图均使用取反后的值
+- **Bug 9028656**：`correction.py` 的 `_get_electrode_area` 调用 `_sorted_frame_dirs(bader_dir)` 时缺少必需的 `dir_pattern` 参数，导致恒电位修正（菜单 313）运行时 TypeError。修复：补上 `DEFAULT_DIR_PATTERN`。跨包调用 `_frame_utils` 的私有函数时务必检查签名是否同步
 
 ## 恒电势修正（correction.py）
 
