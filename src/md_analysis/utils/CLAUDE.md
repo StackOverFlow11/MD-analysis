@@ -16,6 +16,7 @@
 ## 陷阱与历史 Bug
 
 - **CubeParser**：CP2K 输出的 cube 文件使用 Fortran `D` 指数格式（如 `1.23D-04`），`_float()` 辅助函数将 `D` 替换为 `E`
+- **CubeParser**：`read_cube_atoms(path, header)` 为公开函数，从 cube 文件头解析原子坐标 + cell → `ase.Atoms`。被分布式电势分析（`_frame_source.py`）和 `PhiZProfile.py` 使用
 - **BaderParser**：POTCAR 中元素符号可能带 `_pv`/`_sv` 后缀，解析时需去除
 - **常量精度**：`AU_TIME_TO_FS = 0.02418884326585`（CODATA 值），不要随意修改
 

@@ -100,6 +100,12 @@ def run_potential_analysis(
     frame_step: int | None = None,
     verbose: bool = False,
     _nest: bool = True,
+    # --- distributed mode params ---
+    input_mode: str = "continuous",
+    sp_root_dir: Path | str | None = None,
+    sp_dir_pattern: str = "potential_t*_i*",
+    sp_cube_filename: str = "sp_potential-v_hartree-1_0.cube",
+    sp_out_filename: str = "sp.out",
 ) -> dict[str, Path]:
     """Run all potential analysis workflows.
 
@@ -123,7 +129,20 @@ def run_potential_analysis(
                if _nest else Path(output_dir))
     results: dict[str, Path] = {}
 
-    if compute_u and md_out_path is not None:
+    # Shared distributed-mode kwargs
+    _dist = {
+        "input_mode": input_mode,
+        "sp_root_dir": sp_root_dir,
+        "sp_dir_pattern": sp_dir_pattern,
+        "sp_cube_filename": sp_cube_filename,
+        "sp_out_filename": sp_out_filename,
+    }
+    is_distributed = input_mode == "distributed"
+
+    # In distributed mode, Fermi data comes from sp.out in each subdir
+    has_fermi = is_distributed or md_out_path is not None
+
+    if compute_u and has_fermi:
         # Full electrode potential analysis (includes center + fermi)
         electrode_dir = pot_dir / "electrode"
         electrode_dir.mkdir(parents=True, exist_ok=True)
@@ -141,6 +160,7 @@ def run_potential_analysis(
             frame_end=frame_end,
             frame_step=frame_step,
             verbose=verbose,
+            **_dist,
         )
         results["electrode_csv"] = u_csv
     else:
@@ -159,6 +179,7 @@ def run_potential_analysis(
             frame_end=frame_end,
             frame_step=frame_step,
             verbose=verbose,
+            **_dist,
         )
         results["center_csv"] = center_csv
 
@@ -172,6 +193,7 @@ def run_potential_analysis(
                 frame_start=frame_start,
                 frame_end=frame_end,
                 frame_step=frame_step,
+                **_dist,
             )
             results["fermi_csv"] = fermi_csv
 
@@ -186,11 +208,12 @@ def run_potential_analysis(
             frame_end=frame_end,
             frame_step=frame_step,
             verbose=verbose,
+            **_dist,
         )
         results["phi_z_png"] = phi_z_png
 
-    # Thickness sensitivity sweep (requires Fermi energies from md.out)
-    if md_out_path is not None:
+    # Thickness sensitivity sweep
+    if has_fermi:
         ts_dir = pot_dir / "thickness_sensitivity"
         ts_dir.mkdir(parents=True, exist_ok=True)
         ts_csv = thickness_sensitivity_analysis(
@@ -207,6 +230,7 @@ def run_potential_analysis(
             frame_end=frame_end,
             frame_step=frame_step,
             verbose=verbose,
+            **_dist,
         )
         results["thickness_sensitivity_csv"] = ts_csv
 

@@ -230,6 +230,47 @@ def discover_cube_files(
 _CUBE_STEP_RE = re.compile(r"_(\d+)\.cube$")
 
 
+def read_cube_atoms(path: Path, header: CubeHeader):
+    """Parse atomic positions from a cube file header and return ``ase.Atoms``.
+
+    Reuses the already-parsed *header* for cell vectors; only re-reads the
+    atom lines from *path*.
+
+    Parameters
+    ----------
+    path
+        Path to the cube file.
+    header
+        Previously parsed ``CubeHeader`` from ``read_cube_header_and_values``.
+
+    Returns
+    -------
+    ase.Atoms
+        Atoms object with positions (Å) and cell set from cube header.
+    """
+    from ase import Atoms as _Atoms
+    from ase.data import chemical_symbols
+
+    with path.open("r", encoding="utf-8", errors="replace") as f:
+        for _ in range(6):  # 2 comments + natoms/origin + 3 voxel lines
+            f.readline()
+        symbols: list[str] = []
+        positions_ang: list[list[float]] = []
+        for _ in range(header.natoms):
+            parts = f.readline().split()
+            z_num = int(parts[0])
+            x, y, z = _float(parts[2]), _float(parts[3]), _float(parts[4])
+            symbols.append(chemical_symbols[z_num])
+            positions_ang.append([x * BOHR_TO_ANG, y * BOHR_TO_ANG, z * BOHR_TO_ANG])
+
+    cell_ang = np.array([
+        header.vx_bohr * header.nx * BOHR_TO_ANG,
+        header.vy_bohr * header.ny * BOHR_TO_ANG,
+        header.vz_bohr * header.nz * BOHR_TO_ANG,
+    ])
+    return _Atoms(symbols=symbols, positions=positions_ang, cell=cell_ang, pbc=True)
+
+
 def extract_step_from_cube_filename(path: Path) -> Optional[int]:
     """Extract the MD step number from a cube filename.
 

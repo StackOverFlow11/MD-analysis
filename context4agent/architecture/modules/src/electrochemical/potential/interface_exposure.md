@@ -10,6 +10,26 @@
 | `thickness_sensitivity_analysis`   | CenterPotential.py   | Thickness sweep → U vs SHE mean + spatial std φ(z) |
 | `phi_z_planeavg_analysis`          | PhiZProfile.py       | Full-frame φ(z) profiles → CSV + PNG              |
 
+## Frame Discovery API (new)
+
+| Symbol                           | Module               | Description                                      |
+|------------------------------------|----------------------|--------------------------------------------------|
+| `PotentialFrame`                 | _frame_source.py     | Frozen dataclass: step, time_fs, cube_path, header, values, fermi_raw, atoms |
+| `discover_continuous_frames`     | _frame_source.py     | Discover frames from single directory (mode A)   |
+| `discover_distributed_frames`    | _frame_source.py     | Discover frames from `potential_t*_i*/` subdirs (mode B) |
+
+## Input Mode Parameters (all 5 analysis functions)
+
+All public analysis functions now accept these optional keyword arguments (default = continuous mode behavior):
+
+| Parameter          | Type           | Default                              |
+|--------------------|----------------|--------------------------------------|
+| `input_mode`       | `str`          | `"continuous"`                       |
+| `sp_root_dir`      | `Path \| str`  | `None`                               |
+| `sp_dir_pattern`   | `str`          | `"potential_t*_i*"`                  |
+| `sp_cube_filename` | `str`          | `"sp_potential-v_hartree-1_0.cube"`  |
+| `sp_out_filename`  | `str`          | `"sp.out"`                           |
+
 ## Config Constants
 
 All default output filenames are defined in `config.py`:
@@ -28,3 +48,6 @@ All default output filenames are defined in `config.py`:
 | `DEFAULT_THICKNESS_SENSITIVITY_CSV_NAME`  | `thickness_sensitivity.csv`           |
 | `DEFAULT_THICKNESS_SENSITIVITY_PNG_NAME`  | `thickness_sensitivity.png`           |
 | `DEFAULT_THICKNESS_ANG`                  | `7.5`                                 |
+| `DEFAULT_SP_DIR_PATTERN`                 | `"potential_t*_i*"`                   |
+| `DEFAULT_SP_CUBE_FILENAME`               | `"sp_potential-v_hartree-1_0.cube"`   |
+| `DEFAULT_SP_OUT_FILENAME`                | `"sp.out"`                            |

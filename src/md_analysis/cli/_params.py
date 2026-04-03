@@ -73,6 +73,12 @@ class K:
     TI_DIR_PATTERN = "ti_dir_pattern"  # distinct from DIR_PATTERN (Bader)
     EPSILON_TOL_EV = "epsilon_tol_ev"
     TI_REVERSE = "ti_reverse"
+    # Potential input mode (continuous MD vs distributed SP)
+    INPUT_MODE = "input_mode"
+    SP_ROOT_DIR = "sp_root_dir"
+    SP_DIR_PATTERN = "sp_dir_pattern"
+    SP_CUBE_FILENAME = "sp_cube_filename"
+    SP_OUT_FILENAME = "sp_out_filename"
 
 
 # ---------------------------------------------------------------------------
@@ -331,6 +337,18 @@ poly_degree = IntParam(K.POLY_DEGREE, "Polynomial degree", default=2)
 sigma_value = FloatParam(K.SIGMA_VALUE,
                          "Surface charge density sigma (uC/cm^2)", default=0.0)
 calibration_json = StrParam(K.CALIBRATION_JSON, "Calibration JSON file path")
+
+# Potential input mode params
+input_mode = ChoiceParam(K.INPUT_MODE, "Input mode",
+                         ["continuous", "distributed"], default="continuous")
+sp_root_dir = StrParam(K.SP_ROOT_DIR,
+                       "Root directory of SP calculations", default=".")
+sp_dir_pattern = StrParam(K.SP_DIR_PATTERN, "SP directory pattern",
+                          default="potential_t*_i*")
+sp_cube_filename = StrParam(K.SP_CUBE_FILENAME, "Cube filename in SP dirs",
+                            default="sp_potential-v_hartree-1_0.cube")
+sp_out_filename = StrParam(K.SP_OUT_FILENAME, "Output filename in SP dirs",
+                           default="sp.out")
 potential_reference = ChoiceParam(K.POTENTIAL_REFERENCE,
                                   "Output potential reference",
                                   ["SHE", "RHE", "PZC"], default="SHE")

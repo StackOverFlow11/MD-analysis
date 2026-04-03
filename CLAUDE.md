@@ -32,7 +32,7 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 - **Interface labels:** `"normal_aligned"` (+axis facing) / `"normal_opposed"` (-axis facing)
 - **Layer ordering:** `[normal_aligned, slab_interior..., normal_opposed]`
 - **Surface normal:** only `"a"/"b"/"c"` cell axes supported (no custom vectors)
-- **Frame dirs:** `bader_t*_i*` pattern, numerically sorted by `_t(\d+)` regex
+- **Frame dirs:** `bader_t*_i*` (Bader) / `potential_t*_i*` (distributed SP) patterns, numerically sorted by `_t(\d+)` regex
 - **Output dir structure:** mirrors CLI menu tree via `output_name` on each `MenuNode`:
   - `<outdir>/water/`
   - `<outdir>/electrochemical/potential/<sub>/`

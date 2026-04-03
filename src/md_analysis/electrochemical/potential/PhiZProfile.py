@@ -23,6 +23,7 @@ from ...utils.CubeParser import (
     discover_cube_files,
     extract_step_from_cube_filename,
     plane_avg_phi_z_ev,
+    read_cube_atoms,
     read_cube_header_and_values,
     z_coords_ang,
 )
@@ -51,35 +52,6 @@ def _write_phi_z_csv(
 # Private helpers — slab centering
 # ---------------------------------------------------------------------------
 
-def _read_cube_atoms(path: Path, header: CubeHeader):
-    """Parse atomic positions from a cube file header and return ``ase.Atoms``.
-
-    Reuses the already-parsed *header* for cell vectors; only re-reads the
-    atom lines from *path*.
-    """
-    from ase import Atoms
-    from ase.data import chemical_symbols
-
-    with path.open("r", encoding="utf-8", errors="replace") as f:
-        for _ in range(6):          # 2 comments + natoms/origin + 3 voxel lines
-            f.readline()
-        symbols: list[str] = []
-        positions_ang: list[list[float]] = []
-        for _ in range(header.natoms):
-            parts = f.readline().split()
-            z_num = int(parts[0])
-            x, y, z = _float(parts[2]), _float(parts[3]), _float(parts[4])
-            symbols.append(chemical_symbols[z_num])
-            positions_ang.append([x * BOHR_TO_ANG, y * BOHR_TO_ANG, z * BOHR_TO_ANG])
-
-    cell_ang = np.array([
-        header.vx_bohr * header.nx * BOHR_TO_ANG,
-        header.vy_bohr * header.ny * BOHR_TO_ANG,
-        header.vz_bohr * header.nz * BOHR_TO_ANG,
-    ])
-    return Atoms(symbols=symbols, positions=positions_ang, cell=cell_ang, pbc=True)
-
-
 def _slab_center_roll(
     atoms,
     nz: int,
@@ -107,7 +79,7 @@ def _slab_center_roll(
 # ---------------------------------------------------------------------------
 
 def phi_z_planeavg_analysis(
-    cube_pattern: str,
+    cube_pattern: str = "",
     *,
     output_dir: Path | None = None,
     max_curves: int = 0,
@@ -117,11 +89,18 @@ def phi_z_planeavg_analysis(
     frame_end: int | None = None,
     frame_step: int | None = None,
     verbose: bool = False,
+    # --- distributed mode params ---
+    input_mode: str = "continuous",
+    sp_root_dir: Path | str | None = None,
+    sp_dir_pattern: str = "potential_t*_i*",
+    sp_cube_filename: str = "sp_potential-v_hartree-1_0.cube",
+    sp_out_filename: str = "sp.out",
 ) -> Path:
     """Full-frame φ(z) plane-averaged potential profile analysis.
 
-    Reads all cube files matching *cube_pattern*, computes the
-    xy plane-average at each z-slice, and produces:
+    Reads all cube files matching *cube_pattern* (continuous mode) or
+    all subdirectories matching *sp_dir_pattern* (distributed mode),
+    computes the xy plane-average at each z-slice, and produces:
 
     - ``phi_z_planeavg_stats.csv`` (mean/std/min/max over frames)
     - ``phi_z_planeavg_all_frames.png`` (overlay plot, slab centred at cell_c/2)
@@ -135,11 +114,31 @@ def phi_z_planeavg_analysis(
     outdir = (output_dir or workdir).resolve()
     outdir.mkdir(parents=True, exist_ok=True)
 
-    cube_paths = discover_cube_files(
-        cube_pattern, workdir=workdir,
-        frame_start=frame_start, frame_end=frame_end, frame_step=frame_step,
-    )
-    logger.info("phi(z) analysis: %d cube files", len(cube_paths))
+    # --- Resolve cube paths based on input mode ---
+    if input_mode == "distributed":
+        from ._frame_source import discover_distributed_frames
+
+        dist_frames = discover_distributed_frames(
+            sp_root_dir or workdir,
+            dir_pattern=sp_dir_pattern,
+            cube_filename=sp_cube_filename,
+            sp_out_filename=sp_out_filename,
+            center_mode="cell",  # atoms loaded separately below
+            frame_start=frame_start,
+            frame_end=frame_end,
+            frame_step=frame_step,
+            verbose=verbose,
+        )
+        cube_paths = [f.cube_path for f in dist_frames]
+        dist_steps = {f.cube_path: f.step for f in dist_frames}
+    else:
+        cube_paths = discover_cube_files(
+            cube_pattern, workdir=workdir,
+            frame_start=frame_start, frame_end=frame_end, frame_step=frame_step,
+        )
+        dist_steps = None
+
+    logger.info("phi(z) analysis: %d cube files (mode=%s)", len(cube_paths), input_mode)
 
     steps: list[int] = []
     phi_list: list[np.ndarray] = []
@@ -169,7 +168,7 @@ def phi_z_planeavg_analysis(
         # --- slab centering: roll φ(z) so slab midpoint → cell_c/2 ---
         # Use the first frame's shift for all frames to keep profiles aligned.
         if shift_n is None:
-            atoms = _read_cube_atoms(cp, header)
+            atoms = read_cube_atoms(cp, header)
             if metal_symbols is None:
                 metal_symbols = set(atoms.get_chemical_symbols()) & set(TRANSITION_METAL_SYMBOLS)
                 if metal_symbols:
@@ -184,8 +183,13 @@ def phi_z_planeavg_analysis(
         if shift_n:
             phi_z_ev = np.roll(phi_z_ev, shift_n)
 
-        s = extract_step_from_cube_filename(cp)
-        steps.append(int(s) if s is not None else 0)
+        # Step extraction: from distributed frame map or filename
+        if dist_steps is not None:
+            s = dist_steps.get(cp, 0)
+        else:
+            s_opt = extract_step_from_cube_filename(cp)
+            s = int(s_opt) if s_opt is not None else 0
+        steps.append(s)
         phi_list.append(phi_z_ev)
 
     assert z_ang_ref is not None

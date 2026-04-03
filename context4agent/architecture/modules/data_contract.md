@@ -194,6 +194,25 @@ $$
 - 默认文件名：`surface_charge.csv`、`surface_charge.png`
 - 返回 CSV 路径
 
+## Potential 帧数据抽象
+
+### `PotentialFrame` dataclass (`_frame_source.py`)
+
+- `step: int` — MD 步数
+- `time_fs: float | None` — 模拟时间（fs，分布式模式从目录名提取；连续模式为 None）
+- `cube_path: Path` — cube 文件路径
+- `header: CubeHeader` — 已解析的 cube 文件头
+- `values: np.ndarray` — flat cube 数据，length `nx * ny * nz`
+- `fermi_raw: float | None` — Fermi 能（Hartree），None 表示无数据
+- `atoms: Atoms | None` — 用于 interface detection（含 cell）
+
+### 输入模式发现契约
+
+- **Continuous**：所有 cube 文件在单个目录，glob 匹配；Fermi 能从单个 md.out
+- **Distributed**：多个 `potential_t{time}_i{step}/` 子目录，每个含一个 cube + sp.out
+- 两种模式均支持 `frame_start/frame_end/frame_step` 切片
+- 分布式模式下未完成计算的子目录（无 cube 文件）自动跳过
+
 ## Potential 层输出契约
 
 ### `center_slab_potential_analysis(...)` 输出
@@ -227,7 +246,7 @@ $$
 - PNG 双轴图：
   - 左轴：`mean U vs SHE (V)` — 系综平均电极电势
   - 右轴：`spatial std of φ(z) in slab (eV)` — slab 区间内 Hartree 势沿 z 的空间标准差（帧系综平均）
-- 需要 `md.out`（Fermi 能级）；无 `md.out` 时跳过
+- 连续模式需要 `md.out`（Fermi 能级）；分布式模式从各子目录 `sp.out` 获取；均无时跳过
 
 ## Enhanced Sampling 层输出契约
 

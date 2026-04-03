@@ -37,6 +37,7 @@ VASPKIT 风格交互式编号菜单。无 argparse，所有输入通过 `input()
 - `ParamCollector` ABC：`collect(ctx)` 提示用户 + `apply_default(ctx)` 静默填充
 - `params` 元组：总是提示；`advanced_params` 元组：用户选择"修改高级参数"时才提示
 - `ConfigDefaultParam`：从 `~/.config/md_analysis/config.json` 读取用户覆盖值，fallback 到硬编码默认
+- 所有 Potential 命令（211-216）的 `params` 元组首位为 `input_mode`（`ChoiceParam`："continuous"/"distributed"），后接模式相关参数（`sp_root_dir`、`sp_dir_pattern`、`sp_cube_filename`、`sp_out_filename`）。`execute()` 通过 `_is_distributed(ctx)` 分派调用
 
 ### 错误处理
 - `MenuCommand.run()` 的 inline try-except 捕获 `MDAnalysisError`/`FileNotFoundError`/`ValueError`/`RuntimeError` → 打印简洁消息

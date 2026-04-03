@@ -11,7 +11,7 @@
 - `_prompt.py` -- low-level prompt helpers (`prompt_str`, `prompt_str_required`, `prompt_int`, `prompt_float`, `prompt_choice`, `prompt_bool`, `set_input_source`)
 - `_params.py` -- parameter collection layer (`K` key constants, `ParamCollector` ABC, generic param classes: `StrParam`, `FloatParam`, `IntParam`, `ChoiceParam`, `FixedParam`, `ConfigDefaultParam`; special: `CellAbcParam`, `MetalElementsParam`, `FrameSliceParam`)
 - `_water.py` -- water analysis sub-menu (codes 101-105) + parameter collection + dispatch
-- `_potential.py` -- potential analysis sub-menu (codes 211-216) + parameter collection + dispatch
+- `_potential.py` -- potential analysis sub-menu (codes 211-216) + input_mode selection (continuous/distributed) + parameter collection + dispatch
 - `_charge.py` -- charge analysis sub-menu (codes 221-226) + parameter collection + dispatch
 - `_calibration.py` -- calibration sub-menu (codes 231-233): CSV/manual calibrate + predict
 - `_enhanced_sampling.py` -- slow-growth sub-group 30 (codes 301-302) + file discovery helpers

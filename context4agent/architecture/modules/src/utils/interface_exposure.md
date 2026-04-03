@@ -81,6 +81,10 @@
   - 无匹配时抛出 `FileNotFoundError`
 - `extract_step_from_cube_filename(...)`
   - 从 cube 文件名提取 step 编号
+- `read_cube_atoms(path, header) -> Atoms`
+  - 从 cube 文件原子列表解析原子坐标（Å）+ cell → `ase.Atoms`（含 pbc=True）
+  - 复用已解析的 `CubeHeader` 获取 cell 向量，仅重读原子行
+  - 用于分布式电势分析（`_frame_source.py`）和 `PhiZProfile.py` slab 居中
 
 ### 2.4 `StructureParser/LayerParser.py` 导出（Stable）
 

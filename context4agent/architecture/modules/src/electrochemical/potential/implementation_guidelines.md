@@ -8,9 +8,21 @@
 ## Module layout
 
 Flat structure (no sub-packages):
-- `config.py` — default output filenames
-- `CenterPotential.py` — center slab potential + Fermi + electrode potential + thickness sensitivity
-- `PhiZProfile.py` — φ(z) plane-averaged profile analysis
+- `config.py` — default output filenames + distributed mode constants
+- `_frame_source.py` — frame data abstraction: `PotentialFrame` dataclass + `discover_continuous_frames()` / `discover_distributed_frames()`
+- `CenterPotential.py` — center slab potential + Fermi + electrode potential + thickness sensitivity (delegates to frame source)
+- `PhiZProfile.py` — φ(z) plane-averaged profile analysis (delegates to frame source for distributed mode)
+
+## Input mode abstraction
+
+Two input modes, unified through `PotentialFrame`:
+
+- **Continuous (mode A)**: single directory with `*-HARTREE-*.cube` files + `md.out` → `discover_continuous_frames()`
+- **Distributed (mode B)**: `potential_t{time}_i{step}/` subdirectories, each containing one cube file + `sp.out` → `discover_distributed_frames()`
+
+All 5 analysis functions accept `input_mode` parameter (default `"continuous"`) and route to the appropriate discovery function via `_resolve_frames()`. Downstream analysis logic operates on `list[PotentialFrame]` uniformly.
+
+In distributed mode, atoms for interface detection come from the cube file itself (`read_cube_atoms()` in CubeParser), eliminating the need for a separate xyz trajectory.
 
 ## Key imports from `utils`
 
