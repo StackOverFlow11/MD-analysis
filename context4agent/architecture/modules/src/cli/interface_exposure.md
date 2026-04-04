@@ -17,7 +17,7 @@
 - `_enhanced_sampling.py` -- slow-growth sub-group 30 (codes 301-302) + file discovery helpers
 - `_constrained_ti.py` -- constrained TI sub-group 31 (codes 311-313): single-point diagnostics + full TI analysis + constant-potential correction (lazy import of `enhanced_sampling.constrained_ti`)
 - `_scripts.py` -- scripts/tools sub-menu; Bader sub-group 41 (codes 411-412), TI sub-group 42 (codes 421-422), SP Potential sub-group 43 (codes 431-432)
-- `_settings.py` -- settings sub-menu (codes 901-910) + persistent config management (903-906: configurable analysis defaults, 907: reset all defaults, 909: potential output reference, 910: SP inp template path)
+- `_settings.py` -- settings sub-menu with sub-groups: 90x show/reset (900, 909), 91x script paths (911-913), 92x analysis defaults (921-924), 93x potential output (931)
 
 ## Menu structure
 

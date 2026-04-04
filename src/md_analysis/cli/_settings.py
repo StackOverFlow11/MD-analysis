@@ -1,4 +1,4 @@
-"""Settings command classes (901-907)."""
+"""Settings command classes (90x show/reset, 91x script paths, 92x analysis defaults, 93x potential output)."""
 
 from __future__ import annotations
 

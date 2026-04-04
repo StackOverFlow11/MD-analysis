@@ -150,24 +150,38 @@ def build_menu_tree() -> MenuGroup:
 
     # --- Settings ---
     settings = MenuGroup("9", "Settings")
-    settings.add(
-        SetVaspScriptCmd("901", "Set VASP Submission Script Path"),
-        SetCp2kScriptCmd("908", "Set CP2K Submission Script Path"),
-        ShowConfigCmd("902", "Show Current Configuration"),
-        "Analysis Defaults",
-        SetAnalysisDefaultCmd("903", "Layer Clustering Tolerance (A)",
-                              config_key=KEY_LAYER_TOL_A),
-        SetAnalysisDefaultCmd("904", "Z-axis Bin Width (A)",
-                              config_key=KEY_Z_BIN_WIDTH_A),
-        SetAnalysisDefaultCmd("905", "Theta Bin Width (deg)",
-                              config_key=KEY_THETA_BIN_DEG),
-        SetAnalysisDefaultCmd("906", "Water O-H Cutoff (A)",
-                              config_key=KEY_WATER_OH_CUTOFF_A),
-        ResetDefaultsCmd("907", "Reset All Defaults"),
-        "Potential Output",
-        SetSpInpTemplateCmd("910", "Set SP Inp Template Path"),
-        SetPotentialReferenceCmd("909", "Set Potential Output Reference"),
+
+    show_reset = MenuGroup("90", "Show / Reset")
+    show_reset.add(
+        ShowConfigCmd("900", "Show Current Configuration"),
+        ResetDefaultsCmd("909", "Reset All Defaults"),
     )
+
+    script_paths = MenuGroup("91", "Script Paths")
+    script_paths.add(
+        SetVaspScriptCmd("911", "Set VASP Submission Script Path"),
+        SetCp2kScriptCmd("912", "Set CP2K Submission Script Path"),
+        SetSpInpTemplateCmd("913", "Set SP Inp Template Path"),
+    )
+
+    analysis_defaults = MenuGroup("92", "Analysis Defaults")
+    analysis_defaults.add(
+        SetAnalysisDefaultCmd("921", "Layer Clustering Tolerance (A)",
+                              config_key=KEY_LAYER_TOL_A),
+        SetAnalysisDefaultCmd("922", "Z-axis Bin Width (A)",
+                              config_key=KEY_Z_BIN_WIDTH_A),
+        SetAnalysisDefaultCmd("923", "Theta Bin Width (deg)",
+                              config_key=KEY_THETA_BIN_DEG),
+        SetAnalysisDefaultCmd("924", "Water O-H Cutoff (A)",
+                              config_key=KEY_WATER_OH_CUTOFF_A),
+    )
+
+    potential_output = MenuGroup("93", "Potential Output")
+    potential_output.add(
+        SetPotentialReferenceCmd("931", "Set Potential Output Reference"),
+    )
+
+    settings.add(show_reset, script_paths, analysis_defaults, potential_output)
 
     root.add(water, electrochemical, enhanced, scripts, "", settings)
     root.build_flat_index()

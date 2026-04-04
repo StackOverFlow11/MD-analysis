@@ -50,7 +50,7 @@ Interactive CLI package providing a VASPKIT-style numbered menu interface. Repla
 | `_enhanced_sampling.py` | `SGQuickPlotCmd`, `SGPublicationPlotCmd`（共享基类 `_SlowgrowthPlotCmd`） | 301-302 (sub-group 30) |
 | `_constrained_ti.py` | `TISingleDiagCmd`, `TIFullAnalysisCmd`, `TIConstPotCorrectionCmd` | 311-313 (sub-group 31) |
 | `_scripts.py` | `BaderSingleCmd`, `BaderBatchCmd`, `TISingleCmd`, `TIBatchCmd`, `PotentialSingleCmd`, `PotentialBatchCmd` | 411-412 (sub-group 41), 421-422 (sub-group 42), 431-432 (sub-group 43) |
-| `_settings.py` | `SetVaspScriptCmd`, `SetCp2kScriptCmd`, `ShowConfigCmd`, `SetAnalysisDefaultCmd`（通过 `config_key` 参数复用）, `ResetDefaultsCmd`, `SetPotentialReferenceCmd`, `SetSpInpTemplateCmd` | 901-910 |
+| `_settings.py` | `ShowConfigCmd`, `ResetDefaultsCmd` (sub-group 90); `SetVaspScriptCmd`, `SetCp2kScriptCmd`, `SetSpInpTemplateCmd` (sub-group 91); `SetAnalysisDefaultCmd`×4 (sub-group 92); `SetPotentialReferenceCmd` (sub-group 93) | 900-931 |
 
 `_charge.py` 中 `_print_ensemble_summary()` 作为独立辅助函数保留，在 `SurfaceChargeCmd.execute()` 结束时调用。
 
@@ -76,14 +76,14 @@ All sub-menus requiring cell parameters (water 101-105, scripts 411-412) use the
 
 ## Configurable analysis defaults
 
-Settings menu 903-907 allow users to persistently override algorithm defaults from `utils/config.py`:
+Settings sub-group 92 allows users to persistently override algorithm defaults from `utils/config.py`:
 
-- 903: `layer_tol_A` (layer clustering tolerance)
-- 904: `z_bin_width_A` (z-axis bin width)
-- 905: `theta_bin_deg` (theta bin width)
-- 906: `water_oh_cutoff_A` (water O-H cutoff)
-- 907: reset all analysis defaults
-- 909: potential output reference (SHE/RHE/PZC) — `SetPotentialReferenceCmd`
+- 921: `layer_tol_A` (layer clustering tolerance)
+- 922: `z_bin_width_A` (z-axis bin width)
+- 923: `theta_bin_deg` (theta bin width)
+- 924: `water_oh_cutoff_A` (water O-H cutoff)
+- 909: reset all analysis defaults (sub-group 90)
+- 931: potential output reference (SHE/RHE/PZC) — `SetPotentialReferenceCmd` (sub-group 93)
 
 `ConfigDefaultParam` 类（在 `_params.py` 中定义）通过 `apply_default()` 方法读取用户持久化配置，fallback 到 `CONFIGURABLE_DEFAULTS` 注册表中的硬编码默认值。Analysis sub-menus (`_potential.py`, `_water.py`, `_charge.py`) 使用此参数类来填充提示默认值。Library function signatures remain unchanged — persistence only affects CLI prompt defaults.
 
