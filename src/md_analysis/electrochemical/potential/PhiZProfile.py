@@ -7,7 +7,6 @@ Public API
 
 from __future__ import annotations
 
-import csv
 import logging
 from pathlib import Path
 from typing import Optional
@@ -15,6 +14,8 @@ from typing import Optional
 import numpy as np
 
 logger = logging.getLogger(__name__)
+
+from ...utils._io_helpers import _write_csv_from_arrays
 
 from ...utils.config import BOHR_TO_ANG, DEFAULT_LAYER_TOL_A, TRANSITION_METAL_SYMBOLS
 from ...utils.CubeParser import (
@@ -40,12 +41,13 @@ def _write_phi_z_csv(
     vmin: np.ndarray,
     vmax: np.ndarray,
 ) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", newline="", encoding="utf-8") as f:
-        w = csv.writer(f)
-        w.writerow(["z_ang", "phi_mean_ev", "phi_std_ev", "phi_min_ev", "phi_max_ev"])
-        for zz, m, s, mn, mx in zip(z_ang, mean, std, vmin, vmax, strict=True):
-            w.writerow([float(zz), float(m), float(s), float(mn), float(mx)])
+    _write_csv_from_arrays(path, {
+        "z_ang": z_ang,
+        "phi_mean_ev": mean,
+        "phi_std_ev": std,
+        "phi_min_ev": vmin,
+        "phi_max_ev": vmax,
+    })
 
 
 # ---------------------------------------------------------------------------

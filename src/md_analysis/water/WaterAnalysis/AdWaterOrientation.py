@@ -10,6 +10,7 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+from ...utils._io_helpers import _write_csv_from_arrays
 from ...utils import (
     _compute_bisector_cos_theta_vec,
     _oxygen_to_hydrogen_map,
@@ -244,13 +245,10 @@ def compute_adsorbed_water_theta_distribution(
         theta_pdf = np.zeros(n_bins, dtype=float)
 
     out_csv_path = output_dir_path / output_csv_name
-    np.savetxt(
-        out_csv_path,
-        np.column_stack([theta_centers, theta_pdf]),
-        delimiter=",",
-        header="theta_degree,pdf_degree_inv",
-        comments="",
-    )
+    _write_csv_from_arrays(out_csv_path, {
+        "theta_degree": theta_centers,
+        "pdf_degree_inv": theta_pdf,
+    })
     return theta_centers, theta_pdf, out_csv_path
 
 
@@ -312,13 +310,12 @@ def ad_water_orientation_analysis(
     in_adsorbed = (distance_A >= d_start) & (distance_A <= d_end)
 
     profile_csv_path = output_dir_path / output_profile_csv_name
-    np.savetxt(
-        profile_csv_path,
-        np.column_stack([distance_A, rho_ensemble, orient_ensemble, in_adsorbed.astype(int)]),
-        delimiter=",",
-        header="distance_A,rho_ensemble_avg_g_cm3,orientation_ensemble_avg_g_cm3,is_adsorbed_layer_bin",
-        comments="",
-    )
+    _write_csv_from_arrays(profile_csv_path, {
+        "distance_A": distance_A,
+        "rho_ensemble_avg_g_cm3": rho_ensemble,
+        "orientation_ensemble_avg_g_cm3": orient_ensemble,
+        "is_adsorbed_layer_bin": in_adsorbed.astype(float),
+    })
 
     range_txt_path = output_dir_path / output_range_txt_name
     range_txt_path.write_text(

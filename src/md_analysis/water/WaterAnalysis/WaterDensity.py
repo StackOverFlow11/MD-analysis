@@ -7,6 +7,7 @@ from typing import Iterable
 
 import numpy as np
 
+from ...utils._io_helpers import _write_csv_from_arrays
 from ...utils.config import DEFAULT_LAYER_TOL_A, DEFAULT_Z_BIN_WIDTH_A
 from ..config import DEFAULT_OUTPUT_DIR, DEFAULT_WATER_MASS_DENSITY_CSV_NAME
 from ..config import DEFAULT_START_INTERFACE
@@ -65,11 +66,9 @@ def water_mass_density_z_distribution_analysis(
     distance_A = common_centers_u * mean_path_A
 
     out_csv_path = output_dir_path / output_csv_name
-    np.savetxt(
-        out_csv_path,
-        np.column_stack([common_centers_u, distance_A, rho_ensemble]),
-        delimiter=",",
-        header="path_fraction_center,distance_A,rho_ensemble_avg_g_cm3",
-        comments="",
-    )
+    _write_csv_from_arrays(out_csv_path, {
+        "path_fraction_center": common_centers_u,
+        "distance_A": distance_A,
+        "rho_ensemble_avg_g_cm3": rho_ensemble,
+    })
     return out_csv_path

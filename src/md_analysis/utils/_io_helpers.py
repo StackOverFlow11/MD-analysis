@@ -22,3 +22,28 @@ def _write_csv(path: Path, rows: Iterable[dict], fieldnames: list[str]) -> None:
         w = csv.DictWriter(f, fieldnames=fieldnames)
         w.writeheader()
         w.writerows(rows)
+
+
+def _write_csv_from_arrays(
+    path: Path,
+    columns: dict[str, np.ndarray],
+) -> None:
+    """Write named numpy arrays as columns to a standard CSV file.
+
+    Parameters
+    ----------
+    path
+        Output file path (parent directories are created automatically).
+    columns
+        Ordered mapping of ``column_name → 1-D array``.
+        All arrays must have the same length.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fieldnames = list(columns.keys())
+    arrays = list(columns.values())
+    n = arrays[0].size
+    with path.open("w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(fieldnames)
+        for i in range(n):
+            w.writerow([float(a[i]) for a in arrays])

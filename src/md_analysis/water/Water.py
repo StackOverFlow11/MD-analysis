@@ -8,8 +8,8 @@ from pathlib import Path
 import numpy as np
 
 logger = logging.getLogger(__name__)
-from matplotlib.ticker import MultipleLocator
-from matplotlib.ticker import NullFormatter
+
+from ..utils._io_helpers import _write_csv_from_arrays
 
 from .config import DEFAULT_ADSORBED_WATER_PROFILE_CSV_NAME
 from .config import DEFAULT_ADSORBED_WATER_RANGE_TXT_NAME
@@ -88,23 +88,19 @@ def plot_water_three_panel_analysis(
 
     # Save density CSV
     density_csv_path = output_dir_path / DEFAULT_WATER_MASS_DENSITY_CSV_NAME
-    np.savetxt(
-        density_csv_path,
-        np.column_stack([common_centers_u, distance_A, rho_ensemble]),
-        delimiter=",",
-        header="path_fraction_center,distance_A,rho_ensemble_avg_g_cm3",
-        comments="",
-    )
+    _write_csv_from_arrays(density_csv_path, {
+        "path_fraction_center": common_centers_u,
+        "distance_A": distance_A,
+        "rho_ensemble_avg_g_cm3": rho_ensemble,
+    })
 
     # Save orientation CSV
     orientation_csv_path = output_dir_path / DEFAULT_WATER_ORIENTATION_WEIGHTED_DENSITY_CSV_NAME
-    np.savetxt(
-        orientation_csv_path,
-        np.column_stack([common_centers_u, distance_A, orient_ensemble]),
-        delimiter=",",
-        header="path_fraction_center,distance_A,orientation_ensemble_avg_g_cm3",
-        comments="",
-    )
+    _write_csv_from_arrays(orientation_csv_path, {
+        "path_fraction_center": common_centers_u,
+        "distance_A": distance_A,
+        "orientation_ensemble_avg_g_cm3": orient_ensemble,
+    })
 
     # Detect adsorbed layer range in-memory (no trajectory read)
     d_start_A, d_end_A, d_peak_A = detect_adsorbed_layer_range_from_density_profile(
@@ -115,13 +111,12 @@ def plot_water_three_panel_analysis(
 
     # Save adsorbed profile CSV and range TXT (side effects expected by callers)
     adsorbed_profile_path = output_dir_path / DEFAULT_ADSORBED_WATER_PROFILE_CSV_NAME
-    np.savetxt(
-        adsorbed_profile_path,
-        np.column_stack([distance_A, rho_ensemble, orient_ensemble, in_adsorbed.astype(int)]),
-        delimiter=",",
-        header="distance_A,rho_ensemble_avg_g_cm3,orientation_ensemble_avg_g_cm3,is_adsorbed_layer_bin",
-        comments="",
-    )
+    _write_csv_from_arrays(adsorbed_profile_path, {
+        "distance_A": distance_A,
+        "rho_ensemble_avg_g_cm3": rho_ensemble,
+        "orientation_ensemble_avg_g_cm3": orient_ensemble,
+        "is_adsorbed_layer_bin": in_adsorbed.astype(float),
+    })
 
     range_txt_path = output_dir_path / DEFAULT_ADSORBED_WATER_RANGE_TXT_NAME
     range_txt_path.write_text(
@@ -159,6 +154,7 @@ def plot_water_three_panel_analysis(
 
     try:
         import matplotlib.pyplot as plt
+        from matplotlib.ticker import MultipleLocator, NullFormatter
     except Exception as exc:  # pragma: no cover
         raise RuntimeError("matplotlib is required to generate plots.") from exc
 
