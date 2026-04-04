@@ -76,9 +76,21 @@ class MenuGroup(MenuNode):
 
     def build_flat_index(self) -> None:
         """Recursively index all descendant MenuCommand nodes by code.
-        Call once on root after tree is fully assembled."""
+        Call once on root after tree is fully assembled.
+
+        The flat index is shared with all descendant ``MenuGroup`` nodes
+        so that leaf-code shortcuts work from any level in the menu tree.
+        """
         self._flat_index = {}
         self._collect_commands(self._flat_index)
+        self._propagate_flat_index(self._flat_index)
+
+    def _propagate_flat_index(self, index: dict[str, MenuCommand]) -> None:
+        """Share *index* with all descendant MenuGroup nodes."""
+        for child in self.children:
+            if isinstance(child, MenuGroup):
+                child._flat_index = index
+                child._propagate_flat_index(index)
 
     def _collect_commands(self, index: dict[str, MenuCommand]) -> None:
         for child in self.children:
