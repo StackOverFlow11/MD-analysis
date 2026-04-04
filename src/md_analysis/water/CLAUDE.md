@@ -9,7 +9,9 @@
 - `DEFAULT_START_INTERFACE = "normal_aligned"` — 从 +axis 界面开始的半路径分析
 - 三面板图 (`Water.py`) 是 **two-pass**：第一遍算 density + orientation，第二遍算 theta PDF
 - 输出 CSV/PNG 文件名常量在 `config.py` 中定义
+- CSV 输出通过 `_write_csv_from_arrays()`��`utils/_io_helpers.py`），与 potential/charge 模块的 `_write_csv()` 格式一致
 - Cell 参数获取：优先 `cell_abc` 参数，其次 `md_inp_path` 文件解析；两者均无则 `ValueError`
+- matplotlib 延迟 import：`Water.py` 中 `matplotlib.ticker` 在 plot 函数体内导入，不在模块顶层
 
 ## 陷阱与历史 Bug
 

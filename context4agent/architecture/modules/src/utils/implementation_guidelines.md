@@ -21,9 +21,11 @@
 ### `_io_helpers.py`
 
 - 私有模块（`_` 前缀），不属于公开 API，不出现在 `__all__` 中。
-- 提供被 `potential/CenterPotential.py` 和 `charge/BaderAnalysis.py` 共享的 I/O 与数值 helper：
+- 提供全模块共享的 I/O 与数值 helper：
   - `_cumulative_average(values)` — 1-D 数组逐元素累积平均
-  - `_write_csv(path, rows, fieldnames)` — 将字典行列表写入 CSV 文件（自动创建父目录）
+  - `_write_csv(path, rows, fieldnames)` — 将字典行列表写入标准 CSV 文件（自动创建父目录）
+  - `_write_csv_from_arrays(path, columns)` — 将命名 numpy 数组按列写入标准 CSV 文件。`columns` 为 `dict[str, np.ndarray]`，所有数组须等长
+- 两个 CSV 写入函数输出格式完全一致（标准 CSV：首行为逗号分隔列名���无 `#` 前缀），使用方按数据形态选择：dict rows 用 `_write_csv`，numpy arrays 用 `_write_csv_from_arrays`
 - 不依赖 ASE 或其他上层模块。
 
 ### `StructureParser/ClusterUtils.py`

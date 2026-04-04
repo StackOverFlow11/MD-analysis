@@ -10,7 +10,7 @@
 - **两个 config.py**（重要！）：
   - `utils/config.py`：物理常量（`AU_TIME_TO_FS`、`HA_TO_EV`、`BOHR_TO_ANG`）、cSHE 常量、默认参数、轴映射
   - `md_analysis/config.py`（上级目录）：用户持久化配置
-- **`_io_helpers.py`**：带下划线的私有模块，提供 `_cumulative_average()` 和 `_write_csv()`，被 potential 和 charge 共享
+- **`_io_helpers.py`**：带下划线的私有模块，提供 `_cumulative_average()`、`_write_csv()`（dict rows）和 `_write_csv_from_arrays()`（numpy arrays），被全模块共享。所有 CSV 输出统一通过这两个函数
 - **单位约定**：距离 Å、能量 eV（内部 Hartree→eV 转换）、分数坐标 [0,1)、时间 fs
 
 ## 陷阱与历史 Bug
