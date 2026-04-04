@@ -52,6 +52,28 @@ class SetCp2kScriptCmd(MenuCommand):
         print(f"  Saved: {KEY_CP2K_SCRIPT_PATH} = {p}")
 
 
+class SetSpInpTemplateCmd(MenuCommand):
+    def execute(self, ctx: dict) -> None:
+        from ..config import KEY_SP_INP_TEMPLATE_PATH, get_config, set_config
+
+        current = get_config(KEY_SP_INP_TEMPLATE_PATH)
+        if current:
+            print(f"  Current: {current}")
+
+        raw = prompt_str("SP inp template path (e.g. sp.inp)", default=current)
+        if raw is None:
+            print("  No path provided, skipping.")
+            return
+
+        p = Path(raw).expanduser().resolve()
+        if not p.is_file():
+            print(f"  Warning: file does not exist: {p}")
+            return
+
+        set_config(KEY_SP_INP_TEMPLATE_PATH, str(p))
+        print(f"  Saved: {KEY_SP_INP_TEMPLATE_PATH} = {p}")
+
+
 class ShowConfigCmd(MenuCommand):
     def execute(self, ctx: dict) -> None:
         from ..config import (

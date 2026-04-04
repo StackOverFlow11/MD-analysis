@@ -137,7 +137,70 @@ def batch_generate_ti_workdirs(
 
 ---
 
+---
+
+## SP Potential Work Directory Generation (PotentialGen.py)
+
+| Symbol                                | Module            | Description                                              |
+|---------------------------------------|-------------------|----------------------------------------------------------|
+| `PotentialGenError`                   | PotentialGen.py   | Exception for potential work directory generation failures |
+| `generate_potential_workdir`          | PotentialGen.py   | Generate a CP2K SP work directory for Hartree potential analysis |
+| `batch_generate_potential_workdirs`   | PotentialGen.py   | Batch-generate SP potential work directories from XYZ trajectory |
+
+### `generate_potential_workdir` Signature
+
+```python
+def generate_potential_workdir(
+    atoms: Atoms,
+    output_dir: str | Path,
+    *,
+    inp_template_path: str | Path | None = None,
+    cell_abc: tuple[float, float, float] | None = None,
+    script_path: str | Path | None = None,
+    workdir_name: str = "potential",
+    frame: int = 0,
+    source: str = "",
+) -> Path:
+```
+
+### `batch_generate_potential_workdirs` Signature
+
+```python
+def batch_generate_potential_workdirs(
+    xyz_path: str | Path,
+    cell_abc: tuple[float, float, float],
+    output_dir: str | Path,
+    *,
+    inp_template_path: str | Path | None = None,
+    frame_start: int = 0,
+    frame_end: int | None = None,
+    frame_step: int = 1,
+    script_path: str | Path | None = None,
+    verbose: bool = False,
+) -> list[Path]:
+```
+
+### Generated Directory Contents
+
+| File        | Source                          |
+|-------------|---------------------------------|
+| `init.xyz`  | Extracted frame from MD trajectory |
+| `sp.inp`    | User-provided template with CELL ABC auto-replaced |
+| `script.sh` | Copied from `script_path` or persistent config |
+
+### Inp Template Path Resolution
+
+1. If `inp_template_path` explicitly provided → use it
+2. If `None` → read `KEY_SP_INP_TEMPLATE_PATH` from persistent config
+3. If neither → raise `PotentialGenError`
+
+### Directory Naming
+
+`potential_t{int(time_fs)}_i{step}` — matches `_frame_source._SP_DIR_RE` pattern for downstream analysis.
+
+---
+
 ## Stability
 
-- **Stable** — single-frame and batch APIs (Bader + TI).
+- **Stable** — single-frame and batch APIs (Bader + TI + Potential).
 - Not re-exported from `md_analysis` top-level `__init__.py`.

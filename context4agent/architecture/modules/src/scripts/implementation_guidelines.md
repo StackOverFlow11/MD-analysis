@@ -2,9 +2,10 @@
 
 ## Responsibilities
 
-- Provide automation scripts for MD-analysis workflows (Bader work directory generation, TI constrained-MD setup).
+- Provide automation scripts for MD-analysis workflows (Bader work directory generation, TI constrained-MD setup, SP potential preparation).
 - `BaderGen.py`: generate VASP single-point work directories for Bader charge analysis (single frame and batch from trajectory).
 - `TIGen.py`: generate CP2K constrained-MD work directories for thermodynamic integration (single target + batch).
+- `PotentialGen.py`: generate CP2K single-point work directories for Hartree potential analysis (single frame and batch from trajectory).
 
 ## Dependencies
 
@@ -27,9 +28,10 @@
 
 ```
 scripts/
-  __init__.py             # re-exports Bader + TI public symbols
+  __init__.py             # re-exports Bader + TI + Potential public symbols
   BaderGen.py             # Bader work directory generation (single + batch)
   TIGen.py                # TI constrained-MD work directory generation (single + batch)
+  PotentialGen.py         # SP potential work directory generation (single + batch)
   template/
     __init__.py           # empty (importlib.resources requirement)
     INCAR                 # VASP INCAR template (single-point, Bader settings)
@@ -53,6 +55,14 @@ scripts/
 3. **Units**: All CV values in atomic units (CP2K default). No custom unit conversion supported — avoids complex dimensionality issues with exotic CVs.
 4. **Batch efficiency**: Pre-loads trajectory and parses restart once; reuses across all target points.
 5. **Two batch modes**: Numeric (explicit a.u. values) or time-based (linspace over fs range → map to CV values).
+
+## PotentialGen Key Design Decisions
+
+1. **User-provided template**: sp.inp is body-specific (CELL, KIND blocks vary per system), so it's not bundled as package data. User provides the template path explicitly or via `KEY_SP_INP_TEMPLATE_PATH` persistent config.
+2. **CELL ABC replacement**: Regex-based substitution of `ABC [angstrom] a b c` line inside `&CELL` block. Cell values come from restart/md.inp parsing.
+3. **TOPOLOGY enforcement**: Same pattern as TIGen — ensures `COORD_FILE_NAME init.xyz` + `COORD_FILE_FORMAT XYZ`.
+4. **Batch efficiency**: Parses and modifies the inp template once; writes the same modified text to every subdirectory (cell is constant across frames).
+5. **Directory naming**: `potential_t{time}_i{step}` matches `_frame_source._SP_DIR_RE` for seamless downstream analysis with `input_mode="distributed"`.
 
 ## Sync Rules
 

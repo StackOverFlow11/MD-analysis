@@ -299,3 +299,99 @@ class TIBatchCmd(MenuCommand):
         print(f"\n Created {len(dirs)} TI work directories:")
         for d in dirs:
             print(f"  {d}")
+
+
+# ---------------------------------------------------------------------------
+# Potential SP commands (43x)
+# ---------------------------------------------------------------------------
+
+def _resolve_sp_inp_template() -> str | None:
+    """Prompt for SP inp template path with config default."""
+    from ..config import KEY_SP_INP_TEMPLATE_PATH, get_config
+
+    default_template = get_config(KEY_SP_INP_TEMPLATE_PATH)
+    return prompt_str("SP inp template path (e.g. sp.inp)", default=default_template)
+
+
+class PotentialSingleCmd(MenuCommand):
+    """Generate one SP potential work directory."""
+
+    def _collect_all_params(self) -> dict:
+        print()
+        ctx: dict = {}
+        ctx[K.XYZ] = prompt_str_required("XYZ trajectory file (e.g. md-pos-1.xyz)")
+        _print_trajectory_info(ctx[K.XYZ])
+        cell_abc.collect(ctx)
+        ctx[K.FRAME] = prompt_int("Frame number (0-based)", default=0) or 0
+        ctx["inp_template"] = _resolve_sp_inp_template()
+        ctx[K.OUTDIR] = prompt_str("Output directory", default=".") or "."
+        ctx[K.WORKDIR_NAME] = prompt_str("Work directory name", default="potential") or "potential"
+        ctx[K.SCRIPT_PATH] = _resolve_cp2k_script_path()
+        return ctx
+
+    def execute(self, ctx: dict) -> None:
+        iread = lazy_import("ase.io", "iread")
+        generate = lazy_import("md_analysis.scripts", "generate_potential_workdir")
+
+        print(f"\n Reading frame {ctx[K.FRAME]} from {ctx[K.XYZ]} ...")
+        atoms = None
+        for i, a in enumerate(iread(ctx[K.XYZ], index=":")):
+            if i == ctx[K.FRAME]:
+                atoms = a
+                break
+        if atoms is None:
+            print(f"  Error: frame {ctx[K.FRAME]} not found in {ctx[K.XYZ]}")
+            return
+
+        atoms.set_cell(ctx[K.CELL_ABC])
+        atoms.set_pbc(True)
+
+        workdir = generate(
+            atoms,
+            ctx[K.OUTDIR],
+            inp_template_path=ctx["inp_template"],
+            cell_abc=ctx[K.CELL_ABC],
+            script_path=ctx[K.SCRIPT_PATH],
+            workdir_name=ctx[K.WORKDIR_NAME],
+            frame=ctx[K.FRAME],
+            source=ctx[K.XYZ],
+        )
+
+        print(f"\n Potential work directory created: {workdir}")
+        contents = sorted(p.name for p in workdir.iterdir())
+        print(f"  Contents: {', '.join(contents)}")
+
+
+class PotentialBatchCmd(MenuCommand):
+    """Batch-generate SP potential work directories."""
+
+    def _collect_all_params(self) -> dict:
+        print()
+        ctx: dict = {}
+        ctx[K.XYZ] = prompt_str_required("XYZ trajectory file (e.g. md-pos-1.xyz)")
+        _print_trajectory_info(ctx[K.XYZ])
+        cell_abc.collect(ctx)
+        ctx[K.FRAME_START] = prompt_int("Frame start (0-based)", default=0) or 0
+        ctx[K.FRAME_END] = prompt_int("Frame end (exclusive, empty=all)", default=None)
+        ctx[K.FRAME_STEP] = prompt_int("Frame step", default=1) or 1
+        ctx["inp_template"] = _resolve_sp_inp_template()
+        ctx[K.OUTDIR] = prompt_str("Output directory", default=".") or "."
+        ctx[K.SCRIPT_PATH] = _resolve_cp2k_script_path()
+        return ctx
+
+    def execute(self, ctx: dict) -> None:
+        batch = lazy_import("md_analysis.scripts", "batch_generate_potential_workdirs")
+        dirs = batch(
+            ctx[K.XYZ],
+            ctx[K.CELL_ABC],
+            ctx[K.OUTDIR],
+            inp_template_path=ctx["inp_template"],
+            frame_start=ctx[K.FRAME_START],
+            frame_end=ctx[K.FRAME_END],
+            frame_step=ctx[K.FRAME_STEP],
+            script_path=ctx[K.SCRIPT_PATH],
+            verbose=True,
+        )
+        print(f"\n Created {len(dirs)} potential work directories:")
+        for d in dirs:
+            print(f"  {d}")

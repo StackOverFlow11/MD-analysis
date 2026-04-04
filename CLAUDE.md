@@ -24,7 +24,7 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 | `src/md_analysis/water/` | 水分析工作流 | → `water/CLAUDE.md` |
 | `src/md_analysis/electrochemical/` | 电化学分组包（potential + charge） | → `electrochemical/CLAUDE.md` |
 | `src/md_analysis/enhanced_sampling/` | 增强采样（SG + TI 准备） | → `enhanced_sampling/CLAUDE.md` |
-| `src/md_analysis/scripts/` | 自动化脚本（BaderGen, TIGen） | → `scripts/CLAUDE.md` |
+| `src/md_analysis/scripts/` | 自动化脚本（BaderGen, TIGen, PotentialGen） | → `scripts/CLAUDE.md` |
 | `context4agent/` | 详细 API 文档（单一真相源） | 见下方 Sync Rules |
 
 ## Key Conventions

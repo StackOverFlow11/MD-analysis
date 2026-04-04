@@ -10,8 +10,8 @@ VASPKIT 风格交互式编号菜单。无 argparse，所有输入通过 `input()
 - `1xx`：Water (101-105)
 - `21x`：Potential (211-216), `22x`：Charge (221-226), `23x`：Calibration (231-233)
 - `30x`：Slow-Growth (301-302), `31x`：Constrained TI (311-313)
-- `41x`：Bader (411-412), `42x`：TI (421-422)
-- `9xx`：Settings (901-909)
+- `41x`：Bader (411-412), `42x`：TI (421-422), `43x`：SP Potential (431-432)
+- `9xx`：Settings (901-910)
 - 编号前缀必须与父 MenuGroup 编号匹配
 
 ### 框架模式

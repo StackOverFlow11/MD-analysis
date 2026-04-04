@@ -49,8 +49,8 @@ Interactive CLI package providing a VASPKIT-style numbered menu interface. Repla
 | `_calibration.py` | `CalibrateFromCSVCmd`, `CalibrateManualCmd`, `PredictPotentialCmd` | 231-233 |
 | `_enhanced_sampling.py` | `SGQuickPlotCmd`, `SGPublicationPlotCmd`（共享基类 `_SlowgrowthPlotCmd`） | 301-302 (sub-group 30) |
 | `_constrained_ti.py` | `TISingleDiagCmd`, `TIFullAnalysisCmd`, `TIConstPotCorrectionCmd` | 311-313 (sub-group 31) |
-| `_scripts.py` | `BaderSingleCmd`, `BaderBatchCmd`, `TISingleCmd`, `TIBatchCmd` | 411-412 (sub-group 41), 421-422 (sub-group 42) |
-| `_settings.py` | `SetVaspScriptCmd`, `SetCp2kScriptCmd`, `ShowConfigCmd`, `SetAnalysisDefaultCmd`（通过 `config_key` 参数复用）, `ResetDefaultsCmd`, `SetPotentialReferenceCmd` | 901-909 |
+| `_scripts.py` | `BaderSingleCmd`, `BaderBatchCmd`, `TISingleCmd`, `TIBatchCmd`, `PotentialSingleCmd`, `PotentialBatchCmd` | 411-412 (sub-group 41), 421-422 (sub-group 42), 431-432 (sub-group 43) |
+| `_settings.py` | `SetVaspScriptCmd`, `SetCp2kScriptCmd`, `ShowConfigCmd`, `SetAnalysisDefaultCmd`（通过 `config_key` 参数复用）, `ResetDefaultsCmd`, `SetPotentialReferenceCmd`, `SetSpInpTemplateCmd` | 901-910 |
 
 `_charge.py` 中 `_print_ensemble_summary()` 作为独立辅助函数保留，在 `SurfaceChargeCmd.execute()` 结束时调用。
 

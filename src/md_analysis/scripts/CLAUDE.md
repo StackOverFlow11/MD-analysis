@@ -2,7 +2,7 @@
 
 ## 定位
 
-自动化工作目录生成：VASP Bader 单点（BaderGen）和 CP2K 约束 MD（TIGen）。不从 `md_analysis.__init__` re-export。
+自动化工作目录生成：VASP Bader 单点（BaderGen）、CP2K 约束 MD（TIGen）、CP2K 单点电势（PotentialGen）。不从 `md_analysis.__init__` re-export。
 
 ## 约定
 
@@ -30,6 +30,14 @@
 - **续算场景**：用户可能已删除 `&TOPOLOGY` 中的 `COORD_FILE_NAME`/`COORD_FILE_FORMAT` — TIGen 会自动补回
 - TARGET regex 必须用负向前瞻 `(?!_GROWTH)` 避免误匹配 `TARGET_GROWTH`
 - `_modify_inp_for_ti` 中 STEPS 替换仅限 `&MD` 块内（避免误改 `MAX_SCF` 等其他 STEPS）
+
+### PotentialGen
+- 从 MD 轨迹抽帧生成 CP2K 单点电势计算目录：init.xyz + sp.inp + script.sh（可选）
+- sp.inp 由用户提供模板（体系相关，不内嵌到包中），通过 `KEY_SP_INP_TEMPLATE_PATH` 持久化或运行时指定
+- CELL ABC 自动替换：从 restart/md.inp 读取 cell 后替换模板中的 `&CELL ABC` 行
+- `&TOPOLOGY` 确保 `COORD_FILE_NAME init.xyz` + `COORD_FILE_FORMAT XYZ`
+- 批量目录命名：`potential_t{time}_i{step}`，与分析模块 `_frame_source.py` 的 `_SP_DIR_RE` 匹配
+- 批量模式下 inp 只解析一次（cell 替换 + topology 检查），复用 modified text 写入每个目录
 
 ## 子目录
 

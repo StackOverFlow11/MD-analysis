@@ -25,12 +25,20 @@ from ._potential import (
     PhiZProfileCmd,
     ThicknessSensitivityCmd,
 )
-from ._scripts import BaderBatchCmd, BaderSingleCmd, TIBatchCmd, TISingleCmd
+from ._scripts import (
+    BaderBatchCmd,
+    BaderSingleCmd,
+    PotentialBatchCmd,
+    PotentialSingleCmd,
+    TIBatchCmd,
+    TISingleCmd,
+)
 from ._settings import (
     ResetDefaultsCmd,
     SetAnalysisDefaultCmd,
     SetCp2kScriptCmd,
     SetPotentialReferenceCmd,
+    SetSpInpTemplateCmd,
     SetVaspScriptCmd,
     ShowConfigCmd,
 )
@@ -132,7 +140,13 @@ def build_menu_tree() -> MenuGroup:
         TIBatchCmd("422", "Batch Generate TI Work Directories"),
     )
 
-    scripts.add(bader, ti)
+    potential_prep = MenuGroup("43", "SP Potential Preparation")
+    potential_prep.add(
+        PotentialSingleCmd("431", "Generate SP Potential Work Directory (single frame)"),
+        PotentialBatchCmd("432", "Batch Generate SP Potential Work Directories"),
+    )
+
+    scripts.add(bader, ti, potential_prep)
 
     # --- Settings ---
     settings = MenuGroup("9", "Settings")
@@ -151,6 +165,7 @@ def build_menu_tree() -> MenuGroup:
                               config_key=KEY_WATER_OH_CUTOFF_A),
         ResetDefaultsCmd("907", "Reset All Defaults"),
         "Potential Output",
+        SetSpInpTemplateCmd("910", "Set SP Inp Template Path"),
         SetPotentialReferenceCmd("909", "Set Potential Output Reference"),
     )
 
