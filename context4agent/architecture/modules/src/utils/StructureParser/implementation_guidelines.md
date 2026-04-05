@@ -13,7 +13,7 @@
 ## 2. 导入约定
 
 - 子包内模块间使用同级相对导入（`from .ClusterUtils import ...`）
-- 引用 `utils/config.py` 使用上跳一级（`from ..config import ...`）
+- 引用 `utils/constants.py` 使用上跳一级（`from ..constants import ...`）
 - 子包不得直接导入 `water/`、`potential/`、`charge/` 等上层模块
 
 ## 3. 实现准则

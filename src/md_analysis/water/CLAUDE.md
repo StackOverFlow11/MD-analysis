@@ -11,7 +11,7 @@
 - 输出 CSV/PNG 文件名常量在 `config.py` 中定义
 - CSV 输出通过 `_write_csv_from_arrays()`��`utils/_io_helpers.py`），与 potential/charge 模块的 `_write_csv()` 格式一致
 - Cell 参数获取：优先 `cell_abc` 参数，其次 `md_inp_path` 文件解析；两者均无则 `ValueError`
-- matplotlib 延迟 import：`Water.py` 中 `matplotlib.ticker` 在 plot 函数体内导入，不在模块顶层
+- matplotlib 逻辑集中在 `_plot.py`（`plot_three_panel`、`_savgol_smooth_window5`）；`Water.py` 本身不再直接 import matplotlib，调用 `_plot_three_panel(...)` 委托出图
 
 ## 陷阱与历史 Bug
 

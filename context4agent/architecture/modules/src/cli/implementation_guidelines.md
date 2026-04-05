@@ -10,7 +10,7 @@ Interactive CLI package providing a VASPKIT-style numbered menu interface. Repla
 
 - Pure interactive: no command-line arguments, all input via `input()` prompts
 - `_framework.py` 提供核心基础设施：`MenuNode`、`MenuGroup`、`MenuCommand`、`lazy_import()`
-- `_params.py` 提供声明式参数采集：`ParamCollector` ABC + 泛型参数类（`StrParam`、`FloatParam`、`IntParam`、`ChoiceParam` 等）
+- `_params.py` 提供声明式参数采集：`ParamCollector` ABC + 泛型参数类（`StrParam`、`FloatParam`、`IntParam`、`ChoiceParam`、`ConditionalParam` 等）
 - 每个子菜单模块通过 `MenuCommand` 子类实现，定义 `params`、`advanced_params`、`output_name` 和 `execute(self, ctx)` 方法
 - `output_subdir` 由 `@property` 自动遍历父链（`parent.output_name`）拼接，无需硬编码
 - `_prompt.py` 的共享 helper（`prompt_str`、`prompt_float` 等）由 `_params.py` 的参数类内部调用
@@ -76,7 +76,7 @@ All sub-menus requiring cell parameters (water 101-105, scripts 411-412) use the
 
 ## Configurable analysis defaults
 
-Settings sub-group 92 allows users to persistently override algorithm defaults from `utils/config.py`:
+Settings sub-group 92 allows users to persistently override algorithm defaults from `utils/constants.py`:
 
 - 921: `layer_tol_A` (layer clustering tolerance)
 - 922: `z_bin_width_A` (z-axis bin width)
@@ -86,6 +86,10 @@ Settings sub-group 92 allows users to persistently override algorithm defaults f
 - 931: potential output reference (SHE/RHE/PZC) — `SetPotentialReferenceCmd` (sub-group 93)
 
 `ConfigDefaultParam` 类（在 `_params.py` 中定义）通过 `apply_default()` 方法读取用户持久化配置，fallback 到 `CONFIGURABLE_DEFAULTS` 注册表中的硬编码默认值。Analysis sub-menus (`_potential.py`, `_water.py`, `_charge.py`) 使用此参数类来填充提示默认值。Library function signatures remain unchanged — persistence only affects CLI prompt defaults.
+
+## Conditional parameter collection (`ConditionalParam`)
+
+`ConditionalParam(inner, predicate)` wraps another `ParamCollector` and prompts only when `predicate(ctx)` returns true. Otherwise `inner.apply_default(ctx)` is called silently. Used by Potential commands (211-216) to skip distributed-mode parameters (`sp_root_dir`, `sp_dir_pattern`, `sp_cube_filename`, `sp_out_filename`) when the user selects `input_mode = "continuous"`. The predicate is evaluated against the live ctx, so any keys it reads must be collected earlier in the `params` tuple.
 
 ### Potential output reference (909)
 

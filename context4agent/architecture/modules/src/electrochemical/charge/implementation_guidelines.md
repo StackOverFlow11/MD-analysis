@@ -16,8 +16,8 @@
 
 ## Key imports from `utils` (4-dot relative from Bader/)
 
-- `....utils.config`: `AXIS_MAP`, `AREA_VECTOR_INDICES` — 轴索引和面积计算向量索引
-- `....utils.config`: `CHARGE_METHOD_COUNTERION`, `CHARGE_METHOD_LAYER` — 电荷方法名称常量
+- `....utils.constants`: `AXIS_MAP`, `AREA_VECTOR_INDICES` — 轴索引和面积计算向量索引
+- `....utils.constants`: `CHARGE_METHOD_COUNTERION`, `CHARGE_METHOD_LAYER` — 电荷方法名称常量
 - `....utils._io_helpers`: `_cumulative_average`, `_write_csv` — 私有共享 helper
 - `....utils.BaderParser`: `load_bader_atoms` — 加载 Bader 数据到 ASE Atoms
 - `....scripts.utils.IndexMapper`: `read_index_map_from_poscar`, `remap_array` — XYZ↔POSCAR 索引映射（BaderData.py 和 AtomCharges.py 使用）
@@ -102,7 +102,7 @@ Both methods output `[σ_aligned, σ_opposed]` — ordered by stable `interface_
    - 若 `potential_reference` 非 SHE，通过 `convert_reference()` 转换参考标度后再计算累积平均
    - 追加 4 列（`phi_{surface}_V_vs_{REF}` + cumavg）到 CSV，PNG 添加右轴（轴标签随 reference 变化）
    - 失败（FileNotFoundError）：log info 提示用户可通过菜单 23 标定，继续输出仅含 σ 的结果
-7. Write CSV (`_write_csv`) + PNG (`_plot_surface_charge`)
+7. Write CSV (`_write_csv`) + PNG (`_plot.plot_surface_charge` from `Bader/_plot.py`)
 8. Return CSV path
 
 ## CLI

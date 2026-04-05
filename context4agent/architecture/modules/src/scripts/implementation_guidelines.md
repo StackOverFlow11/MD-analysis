@@ -20,7 +20,7 @@
 
 ### TIGen
 - `md_analysis.utils.RestartParser.ColvarParser`: `parse_colvar_restart`, `ColvarRestart`
-- `md_analysis.utils.config`: `AU_TIME_TO_FS`
+- `md_analysis.utils.constants`: `AU_TIME_TO_FS`
 - `ase.io`: `iread` (trajectory reading), `write` (init.xyz output)
 - `tqdm`: optional progress bar for batch generation
 

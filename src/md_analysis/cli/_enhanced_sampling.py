@@ -11,7 +11,7 @@ from ._framework import MenuCommand, lazy_import
 from ._params import K
 from ._prompt import prompt_int, prompt_str
 
-_AU_TIME_TO_FS = 0.02418884326585  # avoid heavy import of utils.config at CLI load
+_AU_TIME_TO_FS = 0.02418884326585  # avoid heavy import of utils.constants at CLI load
 
 
 # ---------------------------------------------------------------------------

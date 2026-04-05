@@ -11,7 +11,7 @@ import numpy as np
 
 from .CellParser import parse_abc_from_restart
 
-from ..config import AU_TIME_TO_FS
+from ..constants import AU_TIME_TO_FS
 from ...exceptions import MDAnalysisError
 
 

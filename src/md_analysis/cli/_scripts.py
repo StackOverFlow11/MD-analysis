@@ -169,7 +169,7 @@ def _print_sg_cv_info(restart_path: str, xyz_path: str) -> None:
         return
 
     cv = restart.colvars.primary
-    au_time_to_fs = lazy_import("md_analysis.utils.config", "AU_TIME_TO_FS")
+    au_time_to_fs = lazy_import("md_analysis.utils.constants", "AU_TIME_TO_FS")
     dt_au = restart.timestep_fs / au_time_to_fs
     growth_per_step = cv.target_growth_au * dt_au
 

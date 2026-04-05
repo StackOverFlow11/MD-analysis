@@ -18,9 +18,9 @@ from pathlib import Path
 
 import numpy as np
 
-from .config import DEFAULT_CORRECTED_FE_CSV_NAME, DEFAULT_CORRECTED_FE_PNG_NAME
+from .config import DEFAULT_CORRECTED_FE_CSV_NAME
 from .models import TIPointDefinition, TIReport
-from ...utils.config import AREA_VECTOR_INDICES, HA_TO_EV
+from ...utils.constants import AREA_VECTOR_INDICES, HA_TO_EV
 
 logger = logging.getLogger(__name__)
 
@@ -305,79 +305,5 @@ def write_corrected_free_energy_csv(
 # ---------------------------------------------------------------------------
 
 
-def plot_corrected_free_energy_profile(
-    result: ConstantPotentialResult,
-    *,
-    output_dir: Path | None = None,
-) -> Path:
-    """Plot free-energy profile with constant-potential correction overlay."""
-    import matplotlib
-
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
-    out = Path(output_dir) if output_dir else Path(".")
-    out.mkdir(parents=True, exist_ok=True)
-    out_path = out / DEFAULT_CORRECTED_FE_PNG_NAME
-
-    tr = result.ti_report
-    corr = result.correction
-    xi = tr.xi_values
-    forces = tr.forces
-    errors = tr.force_errors
-
-    fig, ax1 = plt.subplots(figsize=(8, 5), dpi=180)
-
-    # Left axis: dA/dxi with error bars (same as 312)
-    colors = ["C2" if r.passed else "C3" for r in tr.point_reports]
-    ax1.errorbar(
-        xi, forces, yerr=errors, fmt="o", markersize=4,
-        color="C0", ecolor="C0", capsize=3,
-    )
-    for i, (x, y) in enumerate(zip(xi, forces)):
-        ax1.plot(x, y, "o", markersize=5, color=colors[i], zorder=5)
-    ax1.set_xlabel("ξ (a.u.)")
-    if len(xi) >= 2 and xi[0] > xi[-1]:
-        ax1.invert_xaxis()
-    ax1.set_ylabel("dA/dξ (a.u.)", color="C0")
-    ax1.tick_params(axis="y", labelcolor="C0")
-
-    # Right axis: cumulative free energy (eV)
-    ax2 = ax1.twinx()
-    cumul_sigma = np.sqrt(
-        np.cumsum(tr.weights**2 * errors**2)
-    ) * HA_TO_EV
-
-    # Const-q (dashed orange with error band)
-    ax2.plot(
-        xi, result.A_const_q_eV, "--s", color="C1",
-        markersize=3, linewidth=1.0, label="A(ξ) const-q", alpha=0.7,
-    )
-    ax2.fill_between(
-        xi,
-        result.A_const_q_eV - cumul_sigma,
-        result.A_const_q_eV + cumul_sigma,
-        alpha=0.15, color="C1",
-    )
-
-    # Const-phi (solid red)
-    ax2.plot(
-        xi, result.A_const_phi_eV, "-o", color="C3",
-        markersize=3, linewidth=1.2, label="A(ξ) const-Φ",
-    )
-
-    ax2.set_ylabel("A(ξ) (eV)")
-    ax2.legend(loc="best", fontsize=8)
-
-    delta_q = float(result.A_const_q_eV[-1])
-    sigma_q = cumul_sigma[-1]
-    delta_phi = result.delta_A_const_phi_eV
-    title = (
-        f"ΔA(const-q) = {delta_q:.6f} ± {sigma_q:.6f} eV"
-        f"  |  ΔA(const-Φ) = {delta_phi:.6f} eV"
-    )
-    ax1.set_title(title, fontsize=9)
-    fig.tight_layout()
-    fig.savefig(out_path)
-    plt.close(fig)
-    return out_path
+# Plotting moved to .plot — kept as a re-export for CLI compatibility.
+from .plot import plot_corrected_free_energy_profile  # noqa: E402, F401

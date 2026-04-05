@@ -13,7 +13,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from ...utils.config import AU_TIME_TO_FS
+from ...utils.constants import AU_TIME_TO_FS
 from ...utils.RestartParser.ColvarParser import ColvarMDInfo
 
 

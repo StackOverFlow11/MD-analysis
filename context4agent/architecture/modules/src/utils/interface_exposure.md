@@ -6,9 +6,10 @@
 
 ## 1. 接口角色定义
 
-- `md_analysis.utils` 是"底层实现能力的公开导出层"。
-- 本层暴露的符号允许被上层（`md_analysis.water`、`md_analysis.potential`）和外部调用方直接导入。
-- 本层不自动暴露模块内私有 helper；公开范围由 `__all__` 严格定义。
+- `md_analysis.utils` 是"底层实现能力的直接导入层"。
+- 本层暴露的符号允许被上层（`md_analysis.water`、`md_analysis.electrochemical`、`md_analysis.enhanced_sampling`）和外部调用方通过 **子模块路径** 直接导入。
+- 本层 `__init__.py` 不 re-export 任何符号（`__all__ = []`）；每个子模块各自声明公开接口。
+- 公开边界：子模块中非下划线前缀的符号均视为公开；下划线前缀的符号属于 cross-layer 内部依赖（不稳定）。
 
 ## 2. 当前公开接口清单（按模块）
 
@@ -37,7 +38,7 @@
 说明：
 
 - 以上常量为默认行为来源；默认值变化属于接口行为变化。
-- 当前默认值（与 `src/md_analysis/utils/config.py` 对齐）：
+- 当前默认值（与 `src/md_analysis/utils/constants.py` 对齐）：
   - `DEFAULT_Z_BIN_WIDTH_A = 0.1` Angstrom
   - `DEFAULT_THETA_BIN_DEG = 5.0` degree
   - `DEFAULT_WATER_OH_CUTOFF_A = 1.25` Angstrom
@@ -203,22 +204,26 @@
 
 ## 3. 推荐导入方式
 
-- `from md_analysis.utils import detect_interface_layers`
-- `from md_analysis.utils import detect_water_molecule_indices`
-- `from md_analysis.utils import get_water_oxygen_indices_array`
-- `from md_analysis.utils import DEFAULT_Z_BIN_WIDTH_A, DEFAULT_THETA_BIN_DEG`
-- `from md_analysis.utils import read_cube_header_and_values, slab_average_potential_ev`
-- `from md_analysis.utils import discover_cube_files`
-- `from md_analysis.utils import HA_TO_EV, BOHR_TO_ANG`
-- `from md_analysis.utils import AXIS_MAP, AREA_VECTOR_INDICES`
-- `from md_analysis.utils import INTERFACE_NORMAL_ALIGNED, INTERFACE_NORMAL_OPPOSED`
-- `from md_analysis.utils import CHARGE_METHOD_COUNTERION, CHARGE_METHOD_LAYER`
+**约定**：`utils/__init__.py` 不 re-export 任何符号，所有调用方必须直接从子模块导入。
+详细规则见 `implementation_guidelines.md` 的"子模块直接导入"约定。
+
+- `from md_analysis.utils.StructureParser.LayerParser import detect_interface_layers, Layer, SurfaceDetectionResult`
+- `from md_analysis.utils.StructureParser.WaterParser import detect_water_molecule_indices, get_water_oxygen_indices_array`
+- `from md_analysis.utils.CubeParser import read_cube_header_and_values, slab_average_potential_ev, discover_cube_files`
+- `from md_analysis.utils.constants import DEFAULT_Z_BIN_WIDTH_A, DEFAULT_THETA_BIN_DEG`
+- `from md_analysis.utils.constants import HA_TO_EV, BOHR_TO_ANG, AU_TIME_TO_FS`
+- `from md_analysis.utils.constants import AXIS_MAP, AREA_VECTOR_INDICES`
+- `from md_analysis.utils.constants import INTERFACE_NORMAL_ALIGNED, INTERFACE_NORMAL_OPPOSED`
+- `from md_analysis.utils.constants import CHARGE_METHOD_COUNTERION, CHARGE_METHOD_LAYER`
+- `from md_analysis.utils.BaderParser import load_bader_atoms, BaderParseError`
+- `from md_analysis.utils.RestartParser.CellParser import parse_abc_from_md_inp, parse_abc_from_restart`
+- `from md_analysis.utils.RestartParser import parse_colvar_restart, parse_lagrange_mult_log, ColvarMDInfo`
 
 ## 4. 非公开边界（必须遵守）
 
-- 未出现在 `src/md_analysis/utils/__init__.py` 的 `__all__` 中的符号，不属于公开接口。
+- 符号的公开性通过"非下划线前缀 + 出现在子模块 `__all__`"判定（若子模块未声明 `__all__` 则以非下划线符号为公开）。
 - 以下类别默认非公开：
-  - `_` 前缀 helper
+  - `_` 前缀 helper（例外：`_compute_bisector_cos_theta_vec` 等被 water 层 cross-layer 使用，但仍视为非稳定边界）
   - 模块内部中间计算函数
   - 仅用于局部复用的工具函数
 
@@ -228,12 +233,12 @@
 
 ### 5.1 稳定性等级
 
-- 当前 `__all__` 内符号按 Stable 管理。
+- 子模块直接路径（`md_analysis.utils.<sub>.<Member>`）按 Stable 管理。
 
 ### 5.2 兼容策略
 
-- 默认不破坏现有导入路径：
-  - `from md_analysis.utils import <symbol>`
+- 默认稳定的导入路径：直接子模块路径
+  - `from md_analysis.utils.<submodule> import <symbol>`
 - 若需要替换接口：
   - 先新增新符号并保留旧符号兼容期
   - 再进行分阶段迁移
@@ -250,8 +255,8 @@
 
 ## 7. 接口变更流程（必须执行）
 
-1. 更新 `src/md_analysis/utils/__init__.py` 的导出与 `__all__`
-2. 更新本文档公开接口清单
+1. 更新子模块内的 `__all__`（若存在）及符号签名
+2. 更新本文档公开接口清单（按子模块分组）
 3. 若涉及契约变化，同步更新：
    - `context4agent/architecture/modules/data_contract.md`
    - `context4agent/architecture/modules/glossary_units.md`（若涉及术语/单位）
@@ -259,7 +264,7 @@
 
 ## 8. 反模式（禁止）
 
-- 将模块私有 helper 暴露到 `__all__`
+- 在 `utils/__init__.py` 中添加新的 re-export（`__all__` 应保持为空）
 - 公开函数改签名但不更新文档
 - 更改默认常量而不声明行为变化
 - 直接在外部依赖内部 helper 路径

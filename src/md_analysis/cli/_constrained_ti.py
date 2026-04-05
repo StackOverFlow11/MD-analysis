@@ -226,7 +226,7 @@ class TIFullAnalysisCmd(MenuCommand):
         )
 
         # 5. Console summary table
-        from ..utils.config import HA_TO_EV
+        from ..utils.constants import HA_TO_EV
         print(f"\n  {'Point':<6} {'ξ':<12} {'⟨λ⟩':<14} {'SEM':<14} {'N':<8} {'Time range (fs)':<24} {'Status'}")
         print(f"  {'─' * 82}")
         for i, r in enumerate(ti_report.point_reports):
@@ -436,7 +436,7 @@ class TIConstPotCorrectionCmd(MenuCommand):
         )
 
         # 5. Console summary (same as 312)
-        from ..utils.config import HA_TO_EV
+        from ..utils.constants import HA_TO_EV
         print(f"\n  {'Point':<6} {'ξ':<12} {'⟨λ⟩':<14} {'SEM':<14} {'N':<8} {'Time range (fs)':<24} {'Status'}")
         print(f"  {'─' * 82}")
         for i, r in enumerate(ti_report.point_reports):

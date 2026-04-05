@@ -1,12 +1,12 @@
 # `md_analysis.utils` 内部实现准则（当前实现口径）
 
-> 适用范围：`src/md_analysis/utils/`（`config.py`、`_io_helpers.py`、`CubeParser.py`、`BaderParser.py`、`StructureParser/`（`ClusterUtils.py`、`LayerParser.py`、`WaterParser.py`）、`RestartParser/`（`CellParser.py`、`ColvarParser.py`））。
+> 适用范围：`src/md_analysis/utils/`（`constants.py`、`_io_helpers.py`、`CubeParser.py`、`BaderParser.py`、`StructureParser/`（`ClusterUtils.py`、`LayerParser.py`、`WaterParser.py`）、`RestartParser/`（`CellParser.py`、`ColvarParser.py`））。
 >
 > 目标：在明确物理口径与输入输出契约的前提下，提供可复用、可测试、可维护的底层实现。
 
 ## 1. 职责分层与边界
 
-### `config.py`
+### `constants.py`
 
 - 只承载默认参数与常量：
   - 元素集合
@@ -18,6 +18,15 @@
   - 电荷方法常量（`CHARGE_METHOD_COUNTERION`、`CHARGE_METHOD_LAYER`）
 - 禁止写任何业务计算逻辑。
 
+### `__init__.py` — 子模块直接导入约定
+
+- `utils/__init__.py` 仅包含包定位说明和 `__all__ = []`，不 re-export 任何符号。
+- 原则：任何调用方（包内/测试/外部用户）必须按 **子模块直接路径** 导入，例如：
+  - `from md_analysis.utils.constants import HA_TO_EV`
+  - `from md_analysis.utils.StructureParser.LayerParser import detect_interface_layers`
+- 理由：集中 re-export hub 要为每次子模块变更同步维护，且相对子模块直接路径无额外信息。子模块直接路径使调用站点自文档化，并消除 `__init__.py` 作为单点故障源。
+- 子模块内部仍应声明 `__all__`（见各 `interface_exposure.md`）以表达公开意图。
+
 ### `_io_helpers.py`
 
 - 私有模块（`_` 前缀），不属于公开 API，不出现在 `__all__` 中。
@@ -25,8 +34,19 @@
   - `_cumulative_average(values)` — 1-D 数组逐元素累积平均
   - `_write_csv(path, rows, fieldnames)` — 将字典行列表写入标准 CSV 文件（自动创建父目录）
   - `_write_csv_from_arrays(path, columns)` — 将命名 numpy 数组按列写入标准 CSV 文件。`columns` 为 `dict[str, np.ndarray]`，所有数组须等长
-- 两个 CSV 写入函数输出格式完全一致（标准 CSV：首行为逗号分隔列名���无 `#` 前缀），使用方按数据形态选择：dict rows 用 `_write_csv`，numpy arrays 用 `_write_csv_from_arrays`
+- 两个 CSV 写入函数输出格式完全一致（标准 CSV：首行为逗号分隔列名，无 `#` 前缀），使用方按数据形态选择：dict rows 用 `_write_csv`，numpy arrays 用 `_write_csv_from_arrays`
 - 不依赖 ASE 或其他上层模块。
+
+### `_frame_discovery.py`
+
+- 私有模块（`_` 前缀），不属于公开 API。
+- 统一了 Bader (`bader_t{time}_i{step}`) 与 SP Potential (`potential_t{time}_i{step}`) 帧目录的发现与排序逻辑。
+- 公开符号：
+  - `FRAME_DIR_STEP_TIME_RE` — 编译正则 `_t(\d+)_i(\d+)`
+  - `extract_step_time_from_dirname(dirname)` → `(step, time_fs)` 或 `None`
+  - `discover_frame_dirs(root, glob_pattern, *, required=True)` → 按 `(time_fs, step)` 升序排列的 `list[Path]`
+- 两种 frame 目录约定下，`time_fs` 和 `step` 对真实轨迹均单调，元组排序保证稳定。
+- 被 `electrochemical/charge/Bader/_frame_utils.py`（Bader 目录）和 `electrochemical/potential/_frame_source.py`（SP 目录）共同调用，取代原本三处各自的正则与排序实现。
 
 ### `StructureParser/ClusterUtils.py`
 
@@ -50,8 +70,8 @@
 - 负责金属层识别、界面层标记、法向符号判定。
 - 负责层级数据结构与摘要输出。
 - 不负责水分子拓扑识别、角度 PDF 统计。
-- 使用 `config.py` 中的 `AXIS_MAP` 常量（取代原有的模块局部 `_AXIS_MAP` 字典）。
-- 使用 `config.py` 中的 `INTERFACE_NORMAL_ALIGNED`/`INTERFACE_NORMAL_OPPOSED` 常量作为界面标签。
+- 使用 `constants.py` 中的 `AXIS_MAP` 常量（取代原有的模块局部 `_AXIS_MAP` 字典）。
+- 使用 `constants.py` 中的 `INTERFACE_NORMAL_ALIGNED`/`INTERFACE_NORMAL_OPPOSED` 常量作为界面标签。
 - `circular_mean_fractional()` 委托给 `ClusterUtils._circular_mean(values, period=1.0)`。
 
 ### `RestartParser/CellParser.py`
@@ -155,9 +175,9 @@
 
 ## 5. 参数管理准则
 
-- 默认参数只能从 `config.py` 读取，不得在函数内部重复硬编码
+- 默认参数只能从 `constants.py` 读取，不得在函数内部重复硬编码
 - 新增默认参数时必须：
-  1. 写入 `config.py`
+  1. 写入 `constants.py`
   2. 在调用链中显式接入
   3. 更新 `data_contract.md` 对应条目
 
@@ -206,7 +226,7 @@
 
 - [ ] 模块职责是否越界（facade/实现/config 是否混杂）
 - [ ] c 方向口径是否全链路一致
-- [ ] 默认参数是否全部来自 `config.py`
+- [ ] 默认参数是否全部来自 `constants.py`
 - [ ] 异常类型与报错信息是否清晰
 - [ ] 单元与集成测试是否通过
 - [ ] 契约文档是否同步更新

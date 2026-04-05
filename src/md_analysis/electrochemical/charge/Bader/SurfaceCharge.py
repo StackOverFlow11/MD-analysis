@@ -11,7 +11,7 @@ from ase import Atoms
 
 from ....utils._io_helpers import _cumulative_average, _write_csv
 from ....utils.BaderParser import load_bader_atoms
-from ....utils.config import (
+from ....utils.constants import (
     AREA_VECTOR_INDICES,
     AXIS_MAP,
     CHARGE_METHOD_COUNTERION,
@@ -35,6 +35,10 @@ from ..config import (
     E_PER_A2_TO_UC_PER_CM2,
 )
 from ._frame_utils import _extract_t_value, _sorted_frame_dirs
+from ._plot import (
+    plot_single_side_charge as _plot_single_side_charge,
+    plot_surface_charge as _plot_surface_charge,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -332,142 +336,6 @@ def trajectory_surface_charge(
         rows.append(sigma)
 
     return np.array(rows, dtype=float)
-
-
-# ---------------------------------------------------------------------------
-# Private helpers for analysis output
-# ---------------------------------------------------------------------------
-
-def _plot_surface_charge(
-    png_path: Path,
-    steps: np.ndarray,
-    sigma_aligned: np.ndarray,
-    sigma_opposed: np.ndarray,
-    sigma_aligned_cum: np.ndarray,
-    sigma_opposed_cum: np.ndarray,
-    *,
-    phi_aligned: np.ndarray | None = None,
-    phi_opposed: np.ndarray | None = None,
-    phi_aligned_cum: np.ndarray | None = None,
-    phi_opposed_cum: np.ndarray | None = None,
-    fit_rmse: float | None = None,
-    potential_reference: str = "SHE",
-) -> None:
-    """Plot surface charge density with instantaneous and cumulative average.
-
-    If *phi_aligned* / *phi_opposed* are provided, a secondary y-axis shows
-    the extrapolated electrode potential.
-    """
-    png_path.parent.mkdir(parents=True, exist_ok=True)
-
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
-    has_phi = phi_aligned is not None
-
-    fig, ax = plt.subplots(figsize=(9, 4.8), dpi=160)
-    ax.plot(steps, sigma_aligned, lw=1.0, alpha=0.65, color="tab:blue", label="aligned σ (inst.)")
-    ax.plot(steps, sigma_aligned_cum, lw=2.0, color="tab:blue", ls="--", label="aligned σ (cum. avg)")
-    ax.plot(steps, sigma_opposed, lw=1.0, alpha=0.65, color="tab:orange", label="opposed σ (inst.)")
-    ax.plot(steps, sigma_opposed_cum, lw=2.0, color="tab:orange", ls="--", label="opposed σ (cum. avg)")
-    ax.set_xlabel("MD step")
-    ax.set_ylabel(r"$\sigma$ ($\mu$C/cm$^2$)")
-    ax.set_title("Surface charge density" + (" + extrapolated potential" if has_phi else ""))
-    ax.grid(True, alpha=0.25)
-
-    if has_phi:
-        ax2 = ax.twinx()
-        ax2.plot(steps, phi_aligned, lw=1.0, alpha=0.45, color="tab:green",
-                 label="aligned φ (inst.)")
-        ax2.plot(steps, phi_aligned_cum, lw=2.0, color="tab:green", ls="--",
-                 label="aligned φ (cum. avg)")
-        ax2.plot(steps, phi_opposed, lw=1.0, alpha=0.45, color="tab:red",
-                 label="opposed φ (inst.)")
-        ax2.plot(steps, phi_opposed_cum, lw=2.0, color="tab:red", ls="--",
-                 label="opposed φ (cum. avg)")
-        ax2.set_ylabel(f"φ (V vs {potential_reference})")
-
-        # Combine legends from both axes
-        h1, l1 = ax.get_legend_handles_labels()
-        h2, l2 = ax2.get_legend_handles_labels()
-        ax.legend(h1 + h2, l1 + l2, loc="upper left", fontsize=8)
-
-        # Annotate fit RMSE
-        if fit_rmse is not None:
-            ax2.annotate(
-                f"fit RMSE = {fit_rmse:.4e} V",
-                xy=(0.98, 0.02), xycoords="axes fraction",
-                ha="right", va="bottom", fontsize=8, fontfamily="monospace",
-                bbox=dict(boxstyle="round,pad=0.2", fc="wheat", alpha=0.5),
-            )
-    else:
-        ax.legend()
-
-    fig.tight_layout()
-    fig.savefig(png_path)
-    plt.close(fig)
-
-
-def _plot_single_side_charge(
-    png_path: Path,
-    steps: np.ndarray,
-    sigma: np.ndarray,
-    sigma_cum: np.ndarray,
-    *,
-    side_label: str = "aligned",
-    phi: np.ndarray | None = None,
-    phi_cum: np.ndarray | None = None,
-    fit_rmse: float | None = None,
-    potential_reference: str = "SHE",
-) -> None:
-    """Plot single-side surface charge density (± extrapolated potential)."""
-    png_path.parent.mkdir(parents=True, exist_ok=True)
-
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
-    has_phi = phi is not None
-
-    fig, ax = plt.subplots(figsize=(9, 4.8), dpi=160)
-    ax.plot(steps, sigma, lw=1.0, alpha=0.65, color="tab:blue",
-            label=f"{side_label} σ (inst.)")
-    ax.plot(steps, sigma_cum, lw=2.0, color="tab:blue", ls="--",
-            label=f"{side_label} σ (cum. avg)")
-    ax.set_xlabel("MD step")
-    ax.set_ylabel(r"$\sigma$ ($\mu$C/cm$^2$)")
-    ax.set_title(
-        f"Surface charge density ({side_label})"
-        + (" + extrapolated potential" if has_phi else "")
-    )
-    ax.grid(True, alpha=0.25)
-
-    if has_phi:
-        ax2 = ax.twinx()
-        ax2.plot(steps, phi, lw=1.0, alpha=0.45, color="tab:green",
-                 label=f"{side_label} φ (inst.)")
-        ax2.plot(steps, phi_cum, lw=2.0, color="tab:green", ls="--",
-                 label=f"{side_label} φ (cum. avg)")
-        ax2.set_ylabel(f"φ (V vs {potential_reference})")
-
-        h1, l1 = ax.get_legend_handles_labels()
-        h2, l2 = ax2.get_legend_handles_labels()
-        ax.legend(h1 + h2, l1 + l2, loc="upper left", fontsize=8)
-
-        if fit_rmse is not None:
-            ax2.annotate(
-                f"fit RMSE = {fit_rmse:.4e} V",
-                xy=(0.98, 0.02), xycoords="axes fraction",
-                ha="right", va="bottom", fontsize=8, fontfamily="monospace",
-                bbox=dict(boxstyle="round,pad=0.2", fc="wheat", alpha=0.5),
-            )
-    else:
-        ax.legend()
-
-    fig.tight_layout()
-    fig.savefig(png_path)
-    plt.close(fig)
 
 
 # ---------------------------------------------------------------------------

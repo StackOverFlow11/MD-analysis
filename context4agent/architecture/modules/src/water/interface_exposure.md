@@ -28,7 +28,7 @@
 - `DEFAULT_WATER_ORIENTATION_WEIGHTED_DENSITY_CSV_NAME`
 - `DEFAULT_WATER_THREE_PANEL_PLOT_PNG_NAME`
 
-注：各分析函数的 `dz_A` 参数默认值取自 `md_analysis.utils.config.DEFAULT_Z_BIN_WIDTH_A`（当前为 `0.1` Angstrom），`layer_tol_A` 默认值取自 `md_analysis.utils.config.DEFAULT_LAYER_TOL_A`（当前为 `0.6` Angstrom），它们均为函数参数而非模块级常量。
+注：各分析函数的 `dz_A` 参数默认值取自 `md_analysis.utils.constants.DEFAULT_Z_BIN_WIDTH_A`（当前为 `0.1` Angstrom），`layer_tol_A` 默认值取自 `md_analysis.utils.constants.DEFAULT_LAYER_TOL_A`（当前为 `0.6` Angstrom），它们均为函数参数而非模块级常量。
 
 ### 2.2 Re-exported Utility Types（Stable）
 
@@ -50,11 +50,11 @@
 
 常量：
 
-- `DEFAULT_METAL_SYMBOLS`（来自 `utils.config`）
-- `DEFAULT_Z_BIN_WIDTH_A`（来自 `utils.config`）
-- `DEFAULT_THETA_BIN_DEG`（来自 `utils.config`）
-- `DEFAULT_WATER_OH_CUTOFF_A`（来自 `utils.config`）
-- `WATER_MOLAR_MASS_G_PER_MOL`（来自 `utils.config`）
+- `DEFAULT_METAL_SYMBOLS`（来自 `utils.constants`）
+- `DEFAULT_Z_BIN_WIDTH_A`（来自 `utils.constants`）
+- `DEFAULT_THETA_BIN_DEG`（来自 `utils.constants`）
+- `DEFAULT_WATER_OH_CUTOFF_A`（来自 `utils.constants`）
+- `WATER_MOLAR_MASS_G_PER_MOL`（来自 `utils.constants`）
 
 ### 2.3 分析函数（Stable）
 

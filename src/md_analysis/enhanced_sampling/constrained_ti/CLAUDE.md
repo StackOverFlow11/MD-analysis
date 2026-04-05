@@ -32,7 +32,7 @@ otherwise           → SEM at largest valid block size
 | `plot.py` | 2×2 诊断图（running avg / ACF / block avg / summary）+ 自由能曲线图 |
 | `integration.py` | 梯形积分权重、SEM targets、自由能积分 |
 | `io.py` | 自动发现约束点目录（`discover_ti_points(reverse=False)` 支持升序/降序） |
-| `correction.py` | 恒电势自由能修正（Nørskov）：`ConstantPotentialCorrection`, `ConstantPotentialResult`, `compute_constant_potential_correction` |
+| `correction.py` | 恒电势自由能修正（Nørskov）：`ConstantPotentialCorrection`, `ConstantPotentialResult`, `compute_constant_potential_correction`。`plot_corrected_free_energy_profile` 已迁至 `plot.py`，`correction.py` 仅 re-export 以保持旧导入路径 |
 | `analysis/` | 四步诊断引擎 → `analysis/CLAUDE.md` |
 
 ## BlockAverageResult 字段

@@ -6,11 +6,19 @@
 
 ## 约定
 
-- **`__init__.py` 是集中 re-export hub**：54 项在 `__all__` 中（均为公开符号）。下划线前缀函数（如 `_compute_bisector_cos_theta_vec`）在 `__init__.py` 中导入但不在 `__all__` 中，供 water 层内部 cross-layer 使用
+- **`__init__.py` 不 re-export 任何符号**（`__all__ = []`）。所有调用方（包内/测试/外部）必须按 **子模块直接路径** 导入，例如：
+  - `from md_analysis.utils.constants import HA_TO_EV, DEFAULT_LAYER_TOL_A`
+  - `from md_analysis.utils.StructureParser.LayerParser import detect_interface_layers`
+  - `from md_analysis.utils.StructureParser.WaterParser import detect_water_molecule_indices`
+  - `from md_analysis.utils.CubeParser import slab_average_potential_ev`
+  - `from md_analysis.utils.BaderParser import load_bader_atoms`
+  - `from md_analysis.utils.RestartParser.CellParser import parse_abc_from_md_inp`
+- 下划线前缀函数（如 `_compute_bisector_cos_theta_vec`）被 water 层 cross-layer 使用，路径仍为子模块直接路径，视为不稳定的内部依赖
 - **两个 config.py**（重要！）：
-  - `utils/config.py`：物理常量（`AU_TIME_TO_FS`、`HA_TO_EV`、`BOHR_TO_ANG`）、cSHE 常量、默认参数、轴映射
-  - `md_analysis/config.py`（上级目录）：用户持久化配置
+  - `utils/constants.py`：物理常量（`AU_TIME_TO_FS`、`HA_TO_EV`、`BOHR_TO_ANG`）、cSHE 常量、默认参数、轴映射
+  - `md_analysis/config.py`（上级目录）：用户持久化配置（独立命名，与 `utils/constants.py` 完全不再冲突）
 - **`_io_helpers.py`**：带下划线的私有模块，提供 `_cumulative_average()`、`_write_csv()`（dict rows）和 `_write_csv_from_arrays()`（numpy arrays），被全模块共享。所有 CSV 输出统一通过这两个函数
+- **`_frame_discovery.py`**：带下划线的私有模块，提供 `_t(\d+)_i(\d+)` 帧目录正则 + `extract_step_time_from_dirname()` + `discover_frame_dirs()`。Bader (`bader_t*_i*`) 与 SP Potential (`potential_t*_i*`) 目录共用此模块排序帧
 - **单位约定**：距离 Å、能量 eV（内部 Hartree→eV 转换）、分数坐标 [0,1)、时间 fs
 
 ## 陷阱与历史 Bug

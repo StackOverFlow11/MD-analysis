@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 from ...utils._io_helpers import _write_csv_from_arrays
 
-from ...utils.config import BOHR_TO_ANG, DEFAULT_LAYER_TOL_A, TRANSITION_METAL_SYMBOLS
+from ...utils.constants import BOHR_TO_ANG, DEFAULT_LAYER_TOL_A, TRANSITION_METAL_SYMBOLS
 from ...utils.CubeParser import (
     CubeHeader,
     _float,
@@ -30,6 +30,7 @@ from ...utils.CubeParser import (
 )
 from ...utils.StructureParser.ClusterUtils import gap_midpoint_periodic
 from ...utils.StructureParser.LayerParser import detect_interface_layers
+from ._plot import plot_phi_z_profile
 from .config import DEFAULT_PHI_Z_PNG_NAME, DEFAULT_PHI_Z_STATS_CSV_NAME
 
 
@@ -211,37 +212,10 @@ def phi_z_planeavg_analysis(
     _write_phi_z_csv(outdir / DEFAULT_PHI_Z_STATS_CSV_NAME, z_ang_ref, phi_mean, phi_std, phi_min, phi_max)
 
     # --- Plotting ---
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
-    fig, ax1 = plt.subplots(figsize=(11, 4.8), dpi=160)
-
-    if max_curves > 0 and phi_mat.shape[0] > max_curves:
-        rng = np.random.default_rng(0)
-        idx = np.sort(rng.choice(phi_mat.shape[0], size=max_curves, replace=False))
-        curves = phi_mat[idx]
-        label_suffix = f"(random {max_curves}/{phi_mat.shape[0]})"
-    else:
-        curves = phi_mat
-        label_suffix = f"({phi_mat.shape[0]} frames)"
-
-    for row in curves:
-        ax1.plot(z_ang_ref, row, color="#1f77b4", alpha=0.05, lw=0.8)
-
-    ax1.fill_between(z_ang_ref, phi_mean - phi_std, phi_mean + phi_std, color="k", alpha=0.15, label="mean ± 1σ")
-    ax1.plot(z_ang_ref, phi_mean, color="k", lw=2.0, label=f"mean {label_suffix}")
-    ax1.plot(z_ang_ref, phi_min, color="k", lw=1.0, ls="--", alpha=0.45, label="min/max envelope")
-    ax1.plot(z_ang_ref, phi_max, color="k", lw=1.0, ls="--", alpha=0.45)
-
-    ax1.set_xlabel("z (Å)")
-    ax1.set_ylabel("φ(z) (eV)")
-    ax1.grid(True, alpha=0.25)
-    ax1.legend(loc="best", frameon=True)
-
-    fig.tight_layout()
     out_png = outdir / DEFAULT_PHI_Z_PNG_NAME
-    fig.savefig(out_png)
-    plt.close(fig)
+    plot_phi_z_profile(
+        out_png, z_ang_ref, phi_mat, phi_mean, phi_std, phi_min, phi_max,
+        max_curves=max_curves,
+    )
 
     return out_png

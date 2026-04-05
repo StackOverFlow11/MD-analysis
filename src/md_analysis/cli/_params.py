@@ -178,6 +178,28 @@ class FixedParam(ParamCollector):
         ctx[self.key] = self.value
 
 
+class ConditionalParam(ParamCollector):
+    """Wraps another ParamCollector; prompts only when ``predicate(ctx)`` is true.
+
+    When the predicate is false, the inner collector's default value is applied
+    silently. Requires any ctx keys the predicate reads to be collected earlier
+    in the same ``params`` tuple (predicate runs at ``collect`` time).
+    """
+
+    def __init__(self, inner: ParamCollector, predicate):
+        self.inner = inner
+        self.predicate = predicate
+
+    def collect(self, ctx: dict) -> None:
+        if self.predicate(ctx):
+            self.inner.collect(ctx)
+        else:
+            self.inner.apply_default(ctx)
+
+    def apply_default(self, ctx: dict) -> None:
+        self.inner.apply_default(ctx)
+
+
 class ConfigDefaultParam(ParamCollector):
     """Reads default from persistent user config (~/.config/md_analysis/)."""
 
@@ -341,14 +363,26 @@ calibration_json = StrParam(K.CALIBRATION_JSON, "Calibration JSON file path")
 # Potential input mode params
 input_mode = ChoiceParam(K.INPUT_MODE, "Input mode",
                          ["continuous", "distributed"], default="continuous")
-sp_root_dir = StrParam(K.SP_ROOT_DIR,
-                       "Root directory of SP calculations", default=".")
-sp_dir_pattern = StrParam(K.SP_DIR_PATTERN, "SP directory pattern",
-                          default="potential_t*_i*")
-sp_cube_filename = StrParam(K.SP_CUBE_FILENAME, "Cube filename in SP dirs",
-                            default="sp_potential-v_hartree-1_0.cube")
-sp_out_filename = StrParam(K.SP_OUT_FILENAME, "Output filename in SP dirs",
-                           default="sp.out")
+_sp_root_dir_base = StrParam(K.SP_ROOT_DIR,
+                             "Root directory of SP calculations", default=".")
+_sp_dir_pattern_base = StrParam(K.SP_DIR_PATTERN, "SP directory pattern",
+                                default="potential_t*_i*")
+_sp_cube_filename_base = StrParam(K.SP_CUBE_FILENAME, "Cube filename in SP dirs",
+                                  default="sp_potential-v_hartree-1_0.cube")
+_sp_out_filename_base = StrParam(K.SP_OUT_FILENAME, "Output filename in SP dirs",
+                                 default="sp.out")
+
+
+def _is_distributed_mode(ctx: dict) -> bool:
+    return ctx.get(K.INPUT_MODE) == "distributed"
+
+
+# Only prompt sp_* params when input_mode == "distributed".
+# Requires ``input_mode`` to appear earlier in the params tuple.
+sp_root_dir = ConditionalParam(_sp_root_dir_base, _is_distributed_mode)
+sp_dir_pattern = ConditionalParam(_sp_dir_pattern_base, _is_distributed_mode)
+sp_cube_filename = ConditionalParam(_sp_cube_filename_base, _is_distributed_mode)
+sp_out_filename = ConditionalParam(_sp_out_filename_base, _is_distributed_mode)
 potential_reference = ChoiceParam(K.POTENTIAL_REFERENCE,
                                   "Output potential reference",
                                   ["SHE", "RHE", "PZC"], default="SHE")

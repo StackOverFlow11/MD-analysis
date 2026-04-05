@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from md_analysis.utils.config import DP_A_H3O_W_EV, MU_HPLUS_G0_EV, DELTA_E_ZP_EV
+from md_analysis.utils.constants import DP_A_H3O_W_EV, MU_HPLUS_G0_EV, DELTA_E_ZP_EV
 
 
 def _merge_csvs(center_csv_path, fermi_csv_path):

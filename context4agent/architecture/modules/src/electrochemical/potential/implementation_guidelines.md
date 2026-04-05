@@ -34,7 +34,7 @@ In distributed mode, atoms for interface detection come from the cube file itsel
 
 - CP2K V_HARTREE_CUBE: z is the fastest-running index → reshape as `(nx, ny, nz)`
 - Units in cube files: Bohr (positions) and Hartree (values)
-- Conversion constants are in `md_analysis.utils.config`
+- Conversion constants are in `md_analysis.utils.constants`
 
 ## Interface detection for slab centering
 
@@ -49,7 +49,7 @@ $$
 U_{\mathrm{SHE}} = -E_{\mathrm{Fermi}} + \varphi_{\mathrm{center}} + \Delta\Psi_{a}(\mathrm{H_3O^+/w}) - \mu(\mathrm{H^+, g^0}) - \Delta E_{\mathrm{ZP}}
 $$
 
-Constants from `md_analysis.utils.config`:
+Constants from `md_analysis.utils.constants`:
 - `DP_A_H3O_W_EV = 15.35`
 - `MU_HPLUS_G0_EV = 15.81`
 - `DELTA_E_ZP_EV = 0.35`

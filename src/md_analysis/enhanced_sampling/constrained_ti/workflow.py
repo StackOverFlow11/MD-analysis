@@ -31,7 +31,7 @@ from .config import (
     DEFAULT_STANDALONE_PNG_NAME,
     EV_TO_HARTREE,
 )
-from ...utils.config import HA_TO_EV
+from ...utils.constants import HA_TO_EV
 from .integration import (
     _compute_sem_targets,
     _integrate_free_energy,

@@ -37,7 +37,8 @@ VASPKIT 风格交互式编号菜单。无 argparse，所有输入通过 `input()
 - `ParamCollector` ABC：`collect(ctx)` 提示用户 + `apply_default(ctx)` 静默填充
 - `params` 元组：总是提示；`advanced_params` 元组：用户选择"修改高级参数"时才提示
 - `ConfigDefaultParam`：从 `~/.config/md_analysis/config.json` 读取用户覆盖值，fallback 到硬编码默认
-- 所有 Potential 命令（211-216）的 `params` 元组首位为 `input_mode`（`ChoiceParam`："continuous"/"distributed"），后接模式相关参数（`sp_root_dir`、`sp_dir_pattern`、`sp_cube_filename`、`sp_out_filename`）。`execute()` 通过 `_is_distributed(ctx)` 分派调用
+- 所有 Potential 命令（211-216）的 `params` 元组首位为 `input_mode`（`ChoiceParam`："continuous"/"distributed"），后接模式相关参数（`sp_root_dir`、`sp_dir_pattern`、`sp_cube_filename`、`sp_out_filename`）。这 4 个 sp_* 参数通过 `ConditionalParam` 包装，仅当 `ctx[K.INPUT_MODE] == "distributed"` 时提示用户，否则静默应用默认值。`execute()` 通过 `_is_distributed(ctx)` 分派调用
+- **`ConditionalParam(inner, predicate)`**：通用包装器，仅当 `predicate(ctx)` 为真时调用 `inner.collect(ctx)`，否则调用 `inner.apply_default(ctx)`。要求 predicate 依赖的 ctx 键在 params 元组中先于此参数出现
 
 ### 错误处理
 - `MenuCommand.run()` 的 inline try-except 捕获 `MDAnalysisError`/`FileNotFoundError`/`ValueError`/`RuntimeError` → 打印简洁消息

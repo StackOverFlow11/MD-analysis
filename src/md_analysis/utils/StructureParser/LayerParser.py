@@ -32,7 +32,7 @@ try:
 except ImportError:  # pragma: no cover
     Atoms = object  # type: ignore[misc]
 
-from ..config import (
+from ..constants import (
     AXIS_MAP,
     DEFAULT_LAYER_TOL_A,
     DEFAULT_METAL_SYMBOLS,

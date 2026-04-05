@@ -19,7 +19,7 @@ Bader 电荷分析：计算金属-水界面的表面电荷密度（μC/cm²）�
 
 ### Frame 目录
 - 模式：`bader_t*_i*`（`DEFAULT_DIR_PATTERN`）
-- 排序：按 `_t(\d+)` 正则提取的数值升序
+- 排序：按 `(time_fs, step)` 升序（通过 `utils/_frame_discovery.py` 的共享 helper）
 - 每个目录需含 `POSCAR`、`ACF.dat`、`POTCAR`
 
 ### 单位换算

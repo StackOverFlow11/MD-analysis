@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from .electrochemical.potential.config import DEFAULT_THICKNESS_ANG
-from .utils.config import CHARGE_METHOD_COUNTERION, DEFAULT_LAYER_TOL_A
+from .utils.constants import CHARGE_METHOD_COUNTERION, DEFAULT_LAYER_TOL_A
 
 logger = logging.getLogger(__name__)
 
@@ -31,14 +31,13 @@ def run_water_analysis(
     frame_end: int | None = None,
     frame_step: int | None = None,
     verbose: bool = False,
-    _nest_water: bool = True,
     **kwargs: Any,
 ) -> dict[str, Path]:
     """Run water analysis (three-panel plot + CSVs).
 
-    Outputs are written under ``output_dir/water/`` (when *_nest_water* is
-    True) or directly into *output_dir* (when False — used by the CLI which
-    already resolved the subdirectory).
+    All outputs are written directly into *output_dir*. Callers that want
+    the canonical ``<root>/water/`` layout should pass
+    ``output_dir=<root> / "water"`` (``run_all`` does this automatically).
 
     Returns a dict mapping output names to file paths.
     """
@@ -54,7 +53,7 @@ def run_water_analysis(
         DEFAULT_WATER_THREE_PANEL_PLOT_PNG_NAME,
     )
 
-    water_dir = Path(output_dir) / "water" if _nest_water else Path(output_dir)
+    water_dir = Path(output_dir)
     water_dir.mkdir(parents=True, exist_ok=True)
 
     png_path = plot_water_three_panel_analysis(
@@ -99,7 +98,6 @@ def run_potential_analysis(
     frame_end: int | None = None,
     frame_step: int | None = None,
     verbose: bool = False,
-    _nest: bool = True,
     # --- distributed mode params ---
     input_mode: str = "continuous",
     sp_root_dir: Path | str | None = None,
@@ -109,9 +107,11 @@ def run_potential_analysis(
 ) -> dict[str, Path]:
     """Run all potential analysis workflows.
 
-    Outputs are written under ``output_dir/electrochemical/potential/``
-    (when *_nest* is True) or directly under *output_dir* (when False —
-    used by the CLI which already resolved the subdirectory).
+    Per-sub-analysis outputs are written into ``output_dir/<sub>/`` where
+    ``<sub>`` is ``center``/``fermi``/``electrode``/``phi_z``/``thickness_sensitivity``.
+    Callers that want the canonical ``<root>/electrochemical/potential/``
+    layout should pass ``output_dir=<root> / "electrochemical" / "potential"``
+    (``run_all`` does this automatically).
 
     Returns a dict mapping output names to file paths.
     """
@@ -125,8 +125,7 @@ def run_potential_analysis(
         thickness_sensitivity_analysis,
     )
 
-    pot_dir = (Path(output_dir) / "electrochemical" / "potential"
-               if _nest else Path(output_dir))
+    pot_dir = Path(output_dir)
     results: dict[str, Path] = {}
 
     # Shared distributed-mode kwargs
@@ -251,13 +250,14 @@ def run_charge_analysis(
     frame_end: int | None = None,
     frame_step: int | None = None,
     verbose: bool = False,
-    _nest: bool = True,
 ) -> dict[str, Path]:
     """Run surface charge density analysis (CSV + PNG).
 
-    Outputs are written under
-    ``output_dir/electrochemical/charge/<method>/`` (when *_nest* is True)
-    or ``output_dir/<method>/`` (when False).
+    Outputs are written into ``output_dir/<method>/`` (the method sub-dir
+    is mandatory so aligned/counterion/layer runs don't collide). Callers
+    that want the canonical ``<root>/electrochemical/charge/<method>/``
+    layout should pass ``output_dir=<root> / "electrochemical" / "charge"``
+    (``run_all`` does this automatically).
 
     Returns a dict mapping output names to file paths.
     """
@@ -269,9 +269,7 @@ def run_charge_analysis(
         DEFAULT_SURFACE_CHARGE_PNG_NAME,
     )
 
-    base = (Path(output_dir) / "electrochemical" / "charge"
-            if _nest else Path(output_dir))
-    charge_dir = base / method
+    charge_dir = Path(output_dir) / method
     charge_dir.mkdir(parents=True, exist_ok=True)
 
     csv_path = surface_charge_analysis(
@@ -305,13 +303,13 @@ def run_tracked_charge_analysis(
     frame_end: int | None = None,
     frame_step: int | None = None,
     verbose: bool = False,
-    _nest: bool = True,
 ) -> dict[str, Path]:
     """Track Bader net charges for specified XYZ atoms (CSV + PNG).
 
-    Outputs are written under
-    ``output_dir/electrochemical/charge/tracked/`` (when *_nest* is True)
-    or directly into *output_dir* (when False).
+    Outputs are written into ``output_dir/tracked/``. Callers that want
+    the canonical ``<root>/electrochemical/charge/tracked/`` layout should
+    pass ``output_dir=<root> / "electrochemical" / "charge"`` (``run_all``
+    does this automatically).
 
     Returns a dict mapping output names to file paths.
     """
@@ -323,9 +321,7 @@ def run_tracked_charge_analysis(
         DEFAULT_TRACKED_CHARGE_PNG,
     )
 
-    base = (Path(output_dir) / "electrochemical" / "charge"
-            if _nest else Path(output_dir))
-    tracked_dir = base / "tracked"
+    tracked_dir = Path(output_dir) / "tracked"
     tracked_dir.mkdir(parents=True, exist_ok=True)
 
     csv_path = tracked_atom_charge_analysis(
@@ -357,13 +353,13 @@ def run_counterion_charge_analysis(
     frame_end: int | None = None,
     frame_step: int | None = None,
     verbose: bool = False,
-    _nest: bool = True,
 ) -> dict[str, Path]:
     """Detect counterions per-frame and track their Bader charges (CSV + PNG).
 
-    Outputs are written under
-    ``output_dir/electrochemical/charge/counterion_tracking/`` (when *_nest*
-    is True) or directly into *output_dir* (when False).
+    Outputs are written into ``output_dir/counterion_tracking/``. Callers
+    that want the canonical ``<root>/electrochemical/charge/counterion_tracking/``
+    layout should pass ``output_dir=<root> / "electrochemical" / "charge"``
+    (``run_all`` does this automatically).
 
     Returns a dict mapping output names to file paths.
     """
@@ -376,9 +372,7 @@ def run_counterion_charge_analysis(
         DEFAULT_COUNTERION_SUMMARY_CSV,
     )
 
-    base = (Path(output_dir) / "electrochemical" / "charge"
-            if _nest else Path(output_dir))
-    ci_dir = base / "counterion_tracking"
+    ci_dir = Path(output_dir) / "counterion_tracking"
     ci_dir.mkdir(parents=True, exist_ok=True)
 
     csv_path = counterion_charge_analysis(
@@ -421,10 +415,12 @@ def run_all(
     """
     logger.info("Starting full analysis: output_dir=%s", output_dir)
 
+    root = Path(output_dir)
     results: dict[str, Path] = {}
 
     results.update(run_water_analysis(
-        xyz_path, md_inp_path, cell_abc=cell_abc, output_dir=output_dir,
+        xyz_path, md_inp_path, cell_abc=cell_abc,
+        output_dir=root / "water",
         frame_start=frame_start, frame_end=frame_end, frame_step=frame_step,
         verbose=verbose,
     ))
@@ -438,7 +434,7 @@ def run_all(
         }
     }
     results.update(run_potential_analysis(
-        output_dir=output_dir,
+        output_dir=root / "electrochemical" / "potential",
         cube_pattern=cube_pattern,
         md_out_path=md_out_path,
         xyz_path=xyz_path,

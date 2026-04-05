@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-from ..utils.config import INTERFACE_NORMAL_ALIGNED
+from ..utils.constants import INTERFACE_NORMAL_ALIGNED
 
 # Default output directory sentinel.
 # None means "resolve to Path.cwd() at call time", avoiding import-time evaluation.

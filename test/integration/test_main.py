@@ -53,10 +53,14 @@ def _build_fake_trajectory(tmp_path: Path, n_frames: int = 2) -> Path:
 class TestRunWaterAnalysis:
 
     def test_happy_path(self, tmp_path: Path):
+        # run_water_analysis writes directly into output_dir — caller provides
+        # the final directory (mirroring the canonical <root>/water/ layout
+        # produced by run_all).
+        water_dir = tmp_path / "water"
         results = run_water_analysis(
             xyz_path=_DATA_DIR / "md-pos-1.xyz",
             md_inp_path=_DATA_DIR / "md.inp",
-            output_dir=tmp_path,
+            output_dir=water_dir,
         )
 
         assert len(results) == 6
@@ -70,8 +74,8 @@ class TestRunWaterAnalysis:
         }
         assert set(results.keys()) == expected_keys
 
-        # All files exist and water/ subdirectory was created
-        assert (tmp_path / "water").is_dir()
+        # All files exist and water_dir was created
+        assert water_dir.is_dir()
         for key, path in results.items():
             assert path.exists(), f"{key} not found: {path}"
 
@@ -189,7 +193,9 @@ class TestRunChargeAnalysis:
     )
     def test_happy_path(self, tmp_path: Path):
         root = _build_fake_trajectory(tmp_path / "traj", n_frames=2)
-        out = tmp_path / "output"
+        # run_charge_analysis writes into output_dir/<method>/ — caller
+        # supplies the electrochemical/charge prefix (mirroring run_all).
+        out = tmp_path / "output" / "electrochemical" / "charge"
 
         results = run_charge_analysis(
             output_dir=out,
@@ -200,8 +206,8 @@ class TestRunChargeAnalysis:
         assert "charge_csv" in results
         assert "charge_png" in results
         assert results["charge_csv"].exists()
-        # electrochemical/charge/counterion/ subdirectory was created
-        assert (out / "electrochemical" / "charge" / "counterion").is_dir()
+        # method subdirectory was created inside output_dir
+        assert (out / "counterion").is_dir()
 
 
 # ===========================================================================

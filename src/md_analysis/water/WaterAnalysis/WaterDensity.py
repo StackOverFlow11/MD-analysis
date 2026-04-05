@@ -8,7 +8,7 @@ from typing import Iterable
 import numpy as np
 
 from ...utils._io_helpers import _write_csv_from_arrays
-from ...utils.config import DEFAULT_LAYER_TOL_A, DEFAULT_Z_BIN_WIDTH_A
+from ...utils.constants import DEFAULT_LAYER_TOL_A, DEFAULT_Z_BIN_WIDTH_A
 from ..config import DEFAULT_OUTPUT_DIR, DEFAULT_WATER_MASS_DENSITY_CSV_NAME
 from ..config import DEFAULT_START_INTERFACE
 from ._common import (

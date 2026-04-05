@@ -34,13 +34,13 @@ enhanced_sampling/
 
 ### slowgrowth
 - `slowgrowth` → `utils.RestartParser.ColvarParser`（`ColvarMDInfo`）
-- `slowgrowth` → `utils.config`（`HA_TO_EV`）
+- `slowgrowth` → `utils.constants`（`HA_TO_EV`）
 - `slowgrowth` → `utils._io_helpers`（`_write_csv`）
 
 ### constrained_ti
 - `constrained_ti.io` → `utils.RestartParser.ColvarParser`（仅 I/O）
 - `constrained_ti.workflow` → `constrained_ti.analysis.*`、`integration`、`plot`、`io`
-- `constrained_ti.workflow` → `utils.config`（`HA_TO_EV`）
+- `constrained_ti.workflow` → `utils.constants`（`HA_TO_EV`）
 - `constrained_ti.workflow` → `utils._io_helpers`（`_write_csv`）
 
 ### 模块内单向约束
@@ -104,7 +104,7 @@ Nørskov 修正将恒电荷 TI 自由能转换为恒电势自由能：
 
 `correction.py` → `electrochemical.charge.Bader.SurfaceCharge`（σ 计算）
 `correction.py` → `electrochemical.calibration`（σ→Φ 映射）
-`correction.py` → `utils.config`（HA_TO_EV, AREA_VECTOR_INDICES）
+`correction.py` → `utils.constants`（HA_TO_EV, AREA_VECTOR_INDICES）
 `correction.py` → `electrochemical.charge.config`（E_PER_A2_TO_UC_PER_CM2）
 
 ## 扩展性

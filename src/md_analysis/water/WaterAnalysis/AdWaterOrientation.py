@@ -11,14 +11,14 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 from ...utils._io_helpers import _write_csv_from_arrays
-from ...utils import (
+from ...utils.StructureParser.WaterParser import (
     _compute_bisector_cos_theta_vec,
     _oxygen_to_hydrogen_map,
     _theta_bin_count_from_ndeg,
     detect_water_molecule_indices,
     get_water_oxygen_indices_array,
 )
-from ...utils.config import DEFAULT_LAYER_TOL_A, DEFAULT_THETA_BIN_DEG, DEFAULT_Z_BIN_WIDTH_A, INTERFACE_NORMAL_ALIGNED
+from ...utils.constants import DEFAULT_LAYER_TOL_A, DEFAULT_THETA_BIN_DEG, DEFAULT_Z_BIN_WIDTH_A, INTERFACE_NORMAL_ALIGNED
 from ..config import (
     DEFAULT_ADSORBED_WATER_PROFILE_CSV_NAME,
     DEFAULT_ADSORBED_WATER_RANGE_TXT_NAME,

@@ -32,7 +32,8 @@ from ...utils.CubeParser import (
     read_cube_atoms,
     read_cube_header_and_values,
 )
-from ...utils.config import (
+from ...utils._frame_discovery import extract_step_time_from_dirname
+from ...utils.constants import (
     BOHR_TO_ANG,
     HA_TO_EV,
     TRANSITION_METAL_SYMBOLS,
@@ -50,9 +51,6 @@ FERMI_RE = re.compile(r"Fermi energy:\s*([+-]?\d+(?:\.\d*)?(?:[EeDd][+-]?\d+)?)"
 STEP_RE = re.compile(r"STEP NUMBER\s*=\s*(\d+)")
 TIME_RE = re.compile(r"TIME\s*\[fs\]\s*=\s*([+-]?\d+(?:\.\d*)?(?:[EeDd][+-]?\d+)?)")
 XYZ_STEP_RE = re.compile(r"\bi\s*=\s*(\d+)\b")
-
-# Directory name pattern: potential_t{time}_i{step}
-_SP_DIR_RE = re.compile(r"_t(\d+)_i(\d+)")
 
 
 @dataclass(frozen=True)
@@ -358,12 +356,11 @@ def discover_distributed_frames(
     for d in sorted(root.glob(dir_pattern)):
         if not d.is_dir():
             continue
-        m = _SP_DIR_RE.search(d.name)
-        if m is None:
+        parsed = extract_step_time_from_dirname(d.name)
+        if parsed is None:
             logger.warning("Cannot parse step/time from directory name: %s", d.name)
             continue
-        time_fs = int(m.group(1))
-        step = int(m.group(2))
+        step, time_fs = parsed
         cube_path = d / cube_filename
         if not cube_path.exists():
             logger.debug("Cube file missing in %s, skipping", d.name)

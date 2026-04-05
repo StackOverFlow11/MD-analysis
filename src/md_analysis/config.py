@@ -26,7 +26,7 @@ KEY_POTENTIAL_TEMPERATURE_K = "potential_temperature_K"
 KEY_POTENTIAL_PHI_PZC = "potential_phi_pzc"
 
 # Registry of configurable defaults: maps config key → metadata.
-# The "default" values mirror the hardcoded constants in utils/config.py.
+# The "default" values mirror the hardcoded constants in utils/constants.py.
 CONFIGURABLE_DEFAULTS: dict[str, dict] = {
     KEY_LAYER_TOL_A: {"default": 0.6, "label": "Layer clustering tolerance (A)"},
     KEY_Z_BIN_WIDTH_A: {"default": 0.1, "label": "Z-axis bin width (A)"},

@@ -6,9 +6,12 @@
 
 ## 1. 接口角色
 
-- `StructureParser` 是 `utils` 的内部子包，其公开符号通过 `utils/__init__.py` 门面层 re-export。
-- 外部消费者应通过 `from md_analysis.utils import xxx` 导入，不应直接依赖子包路径。
-- 内部消费者（如 `charge.BaderAnalysis`、`water.WaterAnalysis._common`）可直接导入子包路径。
+- `StructureParser` 是 `utils` 的结构解析子包。
+- 所有消费者（外部与内部）均通过 **模块直接路径** 导入：
+  - `from md_analysis.utils.StructureParser.LayerParser import detect_interface_layers`
+  - `from md_analysis.utils.StructureParser.WaterParser import detect_water_molecule_indices`
+  - `from md_analysis.utils.StructureParser.ClusterUtils import cluster_1d_periodic`
+- `utils/__init__.py` 不再 re-export；`StructureParser/__init__.py` 也不再集中 re-export。
 
 ## 2. 模块组成
 
@@ -18,15 +21,13 @@
 | `LayerParser.py` | 金属层识别、界面层标记、法向符号判定 |
 | `WaterParser.py` | 水分子拓扑标记、z 轴密度/取向分布统计 |
 
-## 3. `__all__` 导出清单
+## 3. 公开符号（按模块）
 
-```python
-"cluster_1d_periodic", "find_largest_gap_periodic", "gap_midpoint_periodic",
-"Layer", "SurfaceDetectionResult", "SurfaceGeometryError",
-"circular_mean_fractional", "detect_interface_layers",
-"format_detection_summary", "mic_delta_fractional",
-"WaterTopologyError", "detect_water_molecule_indices", "get_water_oxygen_indices_array",
-```
+**ClusterUtils.py**：`cluster_1d_periodic`、`find_largest_gap_periodic`、`gap_midpoint_periodic`
+
+**LayerParser.py**：`Layer`、`SurfaceDetectionResult`、`SurfaceGeometryError`、`circular_mean_fractional`、`detect_interface_layers`、`format_detection_summary`、`mic_delta_fractional`
+
+**WaterParser.py**：`WaterTopologyError`、`detect_water_molecule_indices`、`get_water_oxygen_indices_array`（`_compute_bisector_cos_theta_vec`、`_oxygen_to_hydrogen_map`、`_theta_bin_count_from_ndeg` 为 cross-layer 内部 helper，不稳定）
 
 ## 4. 内部依赖
 

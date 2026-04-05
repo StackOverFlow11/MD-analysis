@@ -16,7 +16,7 @@ from md_analysis.utils.CubeParser import (
     slab_average_potential_ev,
     z_coords_ang,
 )
-from md_analysis.utils.config import BOHR_TO_ANG, HA_TO_EV
+from md_analysis.utils.constants import BOHR_TO_ANG, HA_TO_EV
 
 
 # ---------------------------------------------------------------------------

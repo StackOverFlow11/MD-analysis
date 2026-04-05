@@ -75,7 +75,7 @@ $$
 
 ## 默认参数来源
 
-- 默认值统一来自：`src/md_analysis/utils/config.py`
+- 默认值统一来自：`src/md_analysis/utils/constants.py`
 - 常用项包括：`DEFAULT_Z_BIN_WIDTH_A`、`DEFAULT_THETA_BIN_DEG`、`DEFAULT_WATER_OH_CUTOFF_A`
 - 当前默认值（与代码同步）：
   - `DEFAULT_Z_BIN_WIDTH_A = 0.1` Angstrom

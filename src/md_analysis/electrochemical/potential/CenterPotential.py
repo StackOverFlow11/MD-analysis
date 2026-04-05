@@ -21,7 +21,7 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-from ...utils.config import (
+from ...utils.constants import (
     BOHR_TO_ANG,
     DEFAULT_LAYER_TOL_A,
     DP_A_H3O_W_EV,
@@ -89,33 +89,8 @@ def _extract_interface_geometry(detection, axis_length_ang: float) -> dict:
     }
 
 
-def _plot_series_with_cumavg(
-    png_path: Path,
-    x: np.ndarray,
-    y: np.ndarray,
-    y_cum: np.ndarray,
-    xlabel: str,
-    ylabel: str,
-    title: str,
-) -> None:
-    """Plot instantaneous values with cumulative average overlay."""
-    png_path.parent.mkdir(parents=True, exist_ok=True)
-
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
-    fig, ax = plt.subplots(figsize=(9, 4.8), dpi=160)
-    ax.plot(x, y, lw=1.0, alpha=0.65, label="instantaneous")
-    ax.plot(x, y_cum, lw=2.0, label="cumulative average")
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel(ylabel)
-    ax.set_title(title)
-    ax.grid(True, alpha=0.25)
-    ax.legend()
-    fig.tight_layout()
-    fig.savefig(png_path)
-    plt.close(fig)
+from ._plot import plot_series_with_cumavg as _plot_series_with_cumavg  # noqa: E402
+from ._plot import plot_thickness_sensitivity as _plot_thickness_sensitivity  # noqa: E402
 
 
 def _parse_csv_symbols(s: Optional[str]) -> Optional[set[str]]:
@@ -852,30 +827,11 @@ def thickness_sensitivity_analysis(
 
     # Dual-axis plot
     png_path = outdir / DEFAULT_THICKNESS_SENSITIVITY_PNG_NAME
-    png_path.parent.mkdir(parents=True, exist_ok=True)
-
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
-    fig, ax1 = plt.subplots(figsize=(9, 4.8), dpi=160)
-    color_mean = "tab:blue"
-    ax1.plot(thicknesses, means, "o-", color=color_mean, lw=1.5, markersize=4)
-    ax1.set_xlabel("Slab thickness (Å)")
-    ax1.set_ylabel("Mean U vs SHE (V)", color=color_mean)
-    ax1.tick_params(axis="y", labelcolor=color_mean)
-
-    ax2 = ax1.twinx()
-    color_std = "tab:red"
-    ax2.plot(thicknesses, spatial_stds, "s--", color=color_std, lw=1.5, markersize=4)
-    ax2.set_ylabel("Spatial std of φ(z) in slab (eV)", color=color_std)
-    ax2.tick_params(axis="y", labelcolor=color_std)
-
-    ax1.set_title("Electrode potential U vs SHE — thickness sensitivity")
-    ax1.grid(True, alpha=0.25)
-
-    fig.tight_layout()
-    fig.savefig(png_path)
-    plt.close(fig)
+    _plot_thickness_sensitivity(
+        png_path,
+        np.asarray(thicknesses),
+        np.asarray(means),
+        np.asarray(spatial_stds),
+    )
 
     return csv_path

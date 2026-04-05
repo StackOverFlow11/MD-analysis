@@ -47,7 +47,7 @@ def compute_frame_surface_charge(
 ) -> Atoms
 ```
 
-`method` options (validated against `CHARGE_METHOD_COUNTERION` / `CHARGE_METHOD_LAYER` constants from `utils.config`):
+`method` options (validated against `CHARGE_METHOD_COUNTERION` / `CHARGE_METHOD_LAYER` constants from `utils.constants`):
 - `"counterion"` — excludes water and metal; only counterion/solute species contribute to σ. `n_surface_layers` is ignored.
 - `"layer"` — sums net charges of the N outermost metal layers per interface / area. `n_surface_layers` controls how many layers inward from each interface are included (default 1 = outermost layer only).
 

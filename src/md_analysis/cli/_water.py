@@ -119,7 +119,6 @@ class WaterThreePanelCmd(MenuCommand):
             xyz_path=Path(ctx[K.XYZ]),
             cell_abc=ctx[K.CELL_ABC],
             output_dir=ctx[K.OUTDIR_RESOLVED],
-            _nest_water=False,
             dz_A=ctx[K.DZ_A],
             layer_tol_A=ctx[K.LAYER_TOL],
             frame_start=ctx[K.FRAME_START],

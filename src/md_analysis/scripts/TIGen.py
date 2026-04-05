@@ -13,7 +13,7 @@ from ase.io import iread, write
 
 from ..config import KEY_CP2K_SCRIPT_PATH, get_config
 from ..exceptions import MDAnalysisError
-from ..utils.config import AU_TIME_TO_FS
+from ..utils.constants import AU_TIME_TO_FS
 from ..utils.RestartParser.ColvarParser import (
     ColvarRestart,
     parse_colvar_restart,

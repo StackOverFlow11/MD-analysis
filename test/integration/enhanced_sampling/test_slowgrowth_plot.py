@@ -15,7 +15,7 @@ from md_analysis.enhanced_sampling.slowgrowth import (
     slowgrowth_analysis,
     write_slowgrowth_csv,
 )
-from md_analysis.utils.config import HA_TO_EV
+from md_analysis.utils.constants import HA_TO_EV
 
 # ---------------------------------------------------------------------------
 # Test data paths

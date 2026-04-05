@@ -12,6 +12,7 @@ Bader 电荷分析子包：表面电荷密度计算、指定原子电荷追踪�
 | `BaderData.py` | `BaderTrajectoryData` frozen dataclass + `load_bader_trajectory()` — 加载轨迹并 remap 回 XYZ 序 |
 | `SurfaceCharge.py` | 表面电荷密度：单帧 `compute_frame_surface_charge`、多帧 `trajectory_surface_charge`、端到端 `surface_charge_analysis`（自动加载标定外推电势，支持 SHE/RHE/PZC 输出参考） |
 | `AtomCharges.py` | 原子电荷：单帧/多帧索引查询（POSCAR 序）、指定原子追踪（XYZ 序）、counterion 逐帧检测追踪（XYZ 序） |
+| `_plot.py` | matplotlib 绘图函数（`plot_surface_charge`/`plot_single_side_charge`/`plot_tracked_charges`/`plot_counterion_charges`），与分析逻辑解耦以便独立测试 |
 
 ## 约定
 
@@ -21,7 +22,7 @@ Bader 电荷分析子包：表面电荷密度计算、指定原子电荷追踪�
 - XYZ 序还原通过 `remap_array(data, imap, "poscar_to_xyz")` 实现，依赖 POSCAR 注释行中的 IndexMap 编码
 
 ### 相对导入
-从本包内文件到 `md_analysis.utils` 需要 4 个点：`from ....utils.config import ...`
+从本包内文件到 `md_analysis.utils` 需要 4 个点：`from ....utils.constants import ...`
 
 路径层级：`Bader` → `charge` → `electrochemical` → `md_analysis`
 

@@ -194,7 +194,6 @@ class FullPotentialCmd(MenuCommand):
 
         kwargs: dict = {
             "output_dir": ctx[K.OUTDIR_RESOLVED],
-            "_nest": False,
             "thickness_ang": ctx[K.THICKNESS],
             "center_mode": ctx[K.CENTER_MODE],
             "metal_elements": ctx[K.METAL_ELEMENTS],

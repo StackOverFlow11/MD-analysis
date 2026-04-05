@@ -6,11 +6,15 @@ Hartree 势分析工作流：中心势、费米能、电极电位 U vs SHE、φ(
 
 ## 约定
 
+### 绘图模块
+- matplotlib 绑定集中在 `_plot.py`（`plot_series_with_cumavg`/`plot_thickness_sensitivity`/`plot_phi_z_profile`），与分析模块完全解耦
+- `CenterPotential.py`、`PhiZProfile.py` 本身不直接 import matplotlib，通过 `_plot.*` 委托出图
+
 ### cSHE 公式
 ```
 U = -E_Fermi + φ_center + ΔΨ_a(H₃O⁺/w) - μ(H⁺,g⁰) - ΔE_ZP
 ```
-常量定义在 `utils/config.py`：`DP_A_H3O_W_EV=15.35`, `MU_HPLUS_G0_EV=15.81`, `DELTA_E_ZP_EV=0.35`
+常量定义在 `utils/constants.py`：`DP_A_H3O_W_EV=15.35`, `MU_HPLUS_G0_EV=15.81`, `DELTA_E_ZP_EV=0.35`
 
 ### 输入模式（input_mode）
 - `input_mode="continuous"`（默认，模式 A）：单一目录下 cube 文件 + md.out
@@ -21,7 +25,7 @@ U = -E_Fermi + φ_center + ΔΨ_a(H₃O⁺/w) - μ(H⁺,g⁰) - ΔE_ZP
   - cube 发现：遍历子目录，每个含一个 cube 文件（默认 `sp_potential-v_hartree-1_0.cube`）
   - Fermi 能：从每个子目录的 `sp.out` 提取（仅取最后一条 `Fermi energy:` 行）
   - 原子坐标：从 cube 文件自身读取（`read_cube_atoms()`），天然包含 cell 信息
-  - step/time 从目录名正则提取：`_t(\d+)_i(\d+)`
+  - step/time 从目录名正则提取：`_t(\d+)_i(\d+)`（共享自 `utils/_frame_discovery.py`）
 
 ### 帧数据抽象（_frame_source.py）
 - `PotentialFrame` frozen dataclass：统一两种模式的帧数据

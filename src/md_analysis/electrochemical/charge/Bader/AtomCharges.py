@@ -12,7 +12,7 @@ from ase import Atoms
 from ....scripts.utils.IndexMapper import read_index_map_from_poscar, remap_array
 from ....utils._io_helpers import _cumulative_average, _write_csv
 from ....utils.BaderParser import load_bader_atoms
-from ....utils.config import (
+from ....utils.constants import (
     AREA_VECTOR_INDICES,
     AXIS_MAP,
     DEFAULT_LAYER_TOL_A,
@@ -30,6 +30,8 @@ from ..config import (
     DEFAULT_STRUCTURE_FILENAME,
 )
 from ._frame_utils import _extract_step_and_time, _sorted_frame_dirs
+from ._plot import plot_counterion_charges as _plot_counterion_charges
+from ._plot import plot_tracked_charges as _plot_tracked_charges
 from .BaderData import BaderTrajectoryData, load_bader_trajectory
 
 logger = logging.getLogger(__name__)
@@ -308,40 +310,6 @@ def tracked_atom_charge_analysis(
     return csv_path
 
 
-def _plot_tracked_charges(
-    png_path: Path,
-    steps: np.ndarray,
-    indices: np.ndarray,
-    charges: np.ndarray,
-    cum_avgs: np.ndarray,
-) -> None:
-    """Plot per-atom charge time evolution with cumulative averages."""
-    png_path.parent.mkdir(parents=True, exist_ok=True)
-
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
-    fig, ax = plt.subplots(figsize=(9, 4.8), dpi=160)
-    colors = plt.cm.tab10(np.linspace(0, 1, min(len(indices), 10)))
-
-    for j, idx in enumerate(indices):
-        c = colors[j % len(colors)]
-        ax.plot(steps, charges[:, j], lw=0.8, alpha=0.5, color=c,
-                label=f"atom {int(idx)} (inst.)")
-        ax.plot(steps, cum_avgs[:, j], lw=2.0, ls="--", color=c,
-                label=f"atom {int(idx)} (cum. avg)")
-
-    ax.set_xlabel("MD step")
-    ax.set_ylabel("Bader net charge (e)")
-    ax.set_title("Tracked atom charges")
-    ax.grid(True, alpha=0.25)
-    ax.legend(fontsize="small", ncol=2)
-    fig.tight_layout()
-    fig.savefig(png_path)
-    plt.close(fig)
-
-
 # ---------------------------------------------------------------------------
 # Counterion charge analysis (NEW — per-frame detection, XYZ order)
 # ---------------------------------------------------------------------------
@@ -522,50 +490,3 @@ def counterion_charge_analysis(
     return csv_path
 
 
-def _plot_counterion_charges(
-    png_path: Path,
-    frame_records: list[tuple[int, int, dict[int, float]]],
-    sorted_xyz_indices: list[int],
-) -> None:
-    """Plot per-atom counterion charge time evolution."""
-    png_path.parent.mkdir(parents=True, exist_ok=True)
-
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
-    if not sorted_xyz_indices:
-        # Nothing to plot
-        return
-
-    steps = np.array([rec[0] for rec in frame_records])
-    n_frames = len(steps)
-    n_atoms = len(sorted_xyz_indices)
-
-    # Build charge matrix (n_frames, n_atoms), NaN where not detected
-    charge_matrix = np.full((n_frames, n_atoms), np.nan)
-    for i, (_, _, record) in enumerate(frame_records):
-        for j, xi in enumerate(sorted_xyz_indices):
-            if xi in record:
-                charge_matrix[i, j] = record[xi]
-
-    fig, ax = plt.subplots(figsize=(9, 4.8), dpi=160)
-    colors = plt.cm.tab10(np.linspace(0, 1, min(n_atoms, 10)))
-
-    for j, xi in enumerate(sorted_xyz_indices):
-        c = colors[j % len(colors)]
-        series = charge_matrix[:, j]
-        mask = ~np.isnan(series)
-        if mask.any():
-            ax.plot(steps[mask], series[mask], lw=0.8, alpha=0.6, color=c,
-                    label=f"atom {xi}", marker=".", markersize=2)
-
-    ax.set_xlabel("MD step")
-    ax.set_ylabel("Bader net charge (e)")
-    ax.set_title("Counterion charges (per-frame detection)")
-    ax.grid(True, alpha=0.25)
-    if n_atoms <= 20:
-        ax.legend(fontsize="small", ncol=2)
-    fig.tight_layout()
-    fig.savefig(png_path)
-    plt.close(fig)

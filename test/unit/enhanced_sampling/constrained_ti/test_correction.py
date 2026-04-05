@@ -148,7 +148,7 @@ class TestCorrectionFormula:
         mapper = _make_linear_mapper(slope=-0.01, intercept=0.0)
 
         from md_analysis.electrochemical.charge.config import E_PER_A2_TO_UC_PER_CM2
-        from md_analysis.utils.config import HA_TO_EV
+        from md_analysis.utils.constants import HA_TO_EV
 
         # Manually compute expected: all deltas are zero
         phi = mapper.predict(sigma_const)
@@ -161,7 +161,7 @@ class TestCorrectionFormula:
     def test_correction_formula_2_points(self) -> None:
         """Hand-calculated 2-point correction."""
         from md_analysis.electrochemical.charge.config import E_PER_A2_TO_UC_PER_CM2
-        from md_analysis.utils.config import HA_TO_EV
+        from md_analysis.utils.constants import HA_TO_EV
 
         xi = np.array([0.0, 1.0])
         weights = np.array([0.5, 0.5])
@@ -226,7 +226,7 @@ class TestCSVOutput:
     """Test CSV export."""
 
     def test_csv_columns(self, tmp_path: Path) -> None:
-        from md_analysis.utils.config import HA_TO_EV
+        from md_analysis.utils.constants import HA_TO_EV
 
         xi = np.array([0.0, 1.0])
         weights = np.array([0.5, 0.5])
@@ -265,7 +265,7 @@ class TestPlotSmoke:
     """Smoke test for plot generation."""
 
     def test_plot_creates_png(self, tmp_path: Path) -> None:
-        from md_analysis.utils.config import HA_TO_EV
+        from md_analysis.utils.constants import HA_TO_EV
 
         xi = np.array([0.0, 0.5, 1.0])
         weights = np.array([0.25, 0.5, 0.25])

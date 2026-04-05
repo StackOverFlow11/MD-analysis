@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from md_analysis.utils.config import AU_TIME_TO_FS
+from md_analysis.utils.constants import AU_TIME_TO_FS
 from md_analysis.utils.RestartParser import (
     ColvarInfo,
     ColvarMDInfo,
