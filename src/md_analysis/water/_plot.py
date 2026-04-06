@@ -42,6 +42,8 @@ def plot_three_panel(
     CSVs in the caller.
     """
     try:
+        import matplotlib
+        matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         from matplotlib.ticker import MultipleLocator, NullFormatter
     except Exception as exc:  # pragma: no cover
