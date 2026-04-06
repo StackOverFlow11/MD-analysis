@@ -10,7 +10,7 @@
   - 水分析（`water/`）：从选定界面到两界面中点的系综平均（A 口径）、吸附层自动识别、吸附层角度分布、三联图输出
   - 电势分析（`electrochemical/potential/`）：center slab potential、Fermi energy、electrode potential U vs SHE、φ(z) overlay、thickness sensitivity
   - 增强抽样（`enhanced_sampling/`）：慢增长自由能绘图（quick / publication）+ CSV 导出 + 约束 TI 收敛诊断与自由能积分 + CLI 集成
-  - 集成入口：CLI（`md-analysis` 命令）、编程入口（`main.py`）
+  - 集成入口：CLI（`md-analysis` 命令）、编程入口（`main.py`）、Agent 入口（`agent/`：dispatch + JSON Schema + TaskResult，Phase 1 覆盖 10 个高频任务）
 - Bader 电荷解析（`utils/BaderParser.py`）：从 VASP Bader 输出（ACF.dat + POTCAR）读取原始电子数与净电荷，附加到 ASE Atoms
   - Bader 电荷下游分析（`electrochemical/charge/Bader/`）：
     - 核心数据结构 `BaderTrajectoryData` + `load_bader_trajectory()` — 加载轨迹并通过 IndexMap remap 回 XYZ 原子序
@@ -48,6 +48,11 @@
   - `md_analysis.enhanced_sampling.slowgrowth.slowgrowth_analysis(restart_path, log_path, ...)`
   - `md_analysis.enhanced_sampling.constrained_ti.workflow.standalone_diagnostics(restart_path, log_path, ...)`
   - `md_analysis.enhanced_sampling.constrained_ti.workflow.analyze_ti(xi_values, lambda_series_list, dt, ...)`
+- **Agent 入口**（`md_analysis.agent`，非交互式，面向 AI agent / MCP Server）：
+  - `dispatch(task, params)` → 统一任务执行，返回 `TaskResult`
+  - `list_tasks()` → 枚举已注册任务
+  - `get_task_schema(task)` → 从函数签名自动生成 JSON Schema
+  - Phase 1 任务：water_three_panel, potential_full, charge_surface, charge_tracked, charge_counterion, run_all, calibration_fit_csv, calibration_predict, slowgrowth_quick, config_show
 - **水分析**：
   - `plot_water_three_panel_analysis(xyz_path, md_inp_path, ...)`
     - 输出：密度/取向 CSV、吸附层 profile CSV、吸附层 range TXT、吸附层角度分布 CSV、三联图 PNG

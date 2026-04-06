@@ -133,9 +133,14 @@
   - 电势输出配置键：`KEY_POTENTIAL_REFERENCE`、`KEY_POTENTIAL_PH`、`KEY_POTENTIAL_TEMPERATURE_K`、`KEY_POTENTIAL_PHI_PZC`
   - `CONFIGURABLE_DEFAULTS`：可配置分析参数注册表（键 → 硬编码默认值 + 标签）
 
-### 7) `md_analysis.main` / `md_analysis.cli`（集成入口）
+### 7) `md_analysis.main` / `md_analysis.cli` / `md_analysis.agent`（集成入口）
 
 - `main.py`：编程入口 `run_water_analysis()`、`run_potential_analysis()`、`run_charge_analysis()`、`run_tracked_charge_analysis()`、`run_counterion_charge_analysis()`、`run_all()`
+- `agent/`：Agent-friendly 非交互式编程入口（dispatch + JSON Schema + TaskResult）
+  - `_core.py`：`TaskResult`、`TaskHandler` Protocol、`TaskDef`、注册表
+  - `_dispatch.py`：`dispatch()` 任务执行、`get_task_schema()` 从函数签名自动生成 JSON Schema、参数类型转换
+  - `_handlers.py`：`_make_handler()` 工厂 + Phase 1 任务注册（10 个高频任务）
+  - 设计：薄适配层，不含分析逻辑；schema 从目标函数签名自动推导（无手写 ParamDef）；异常在 dispatch 层分 4 级捕获
 - `cli/`：VASPKIT 风格交互式 CLI 包，注册为 `md-analysis` console script
   - `__init__.py`：`main()` 入口 + banner + 顶层菜单分发
   - `_prompt.py`：可复用的输入提示辅助函数
