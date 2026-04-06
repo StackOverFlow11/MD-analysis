@@ -156,8 +156,9 @@ src/md_analysis/
 │   ├── _scripts.py         #   scripts/tools sub-menu (411-412, 421-422)
 │   └── _settings.py        #   settings sub-menu (901-909)
 ├── utils/                  # single-frame low-level tools
-│   ├── config.py           #   constants, unit conversions, cSHE parameters
+│   ├── constants.py        #   physical constants, unit conversions, cSHE parameters, defaults
 │   ├── _io_helpers.py      #   private shared I/O helpers (_cumulative_average, _write_csv)
+│   ├── _frame_discovery.py #   private: frame directory discovery (bader_t*_i* / potential_t*_i*)
 │   ├── CubeParser.py       #   cube file I/O, plane-averaged φ(z), slab-averaged potential
 │   ├── BaderParser.py      #   VASP Bader charge parsing (ACF.dat + POTCAR)
 │   ├── StructureParser/    #   structure analysis sub-package
@@ -170,6 +171,7 @@ src/md_analysis/
 ├── water/                  # multi-frame water analysis workflows
 │   ├── config.py           #   water analysis defaults + output filename constants
 │   ├── Water.py            #   plot_water_three_panel_analysis() — primary entry point
+│   ├── _plot.py            #   matplotlib three-panel plotting
 │   └── WaterAnalysis/      #   density, orientation, adsorbed-layer sub-workflows
 │       ├── _common.py      #     trajectory I/O, per-frame computation, ensemble averaging
 │       ├── WaterDensity.py
@@ -178,9 +180,10 @@ src/md_analysis/
 ├── electrochemical/        # electrochemical analysis grouping package
 │   ├── potential/          #   Hartree potential + electrode potential workflows
 │   │   ├── CenterPotential.py  # center-slab, Fermi, electrode potential, thickness sweep
-│   │   └── PhiZProfile.py      # phi(z) overlay visualization
+│   │   ├── PhiZProfile.py      # phi(z) overlay visualization
+│   │   └── _plot.py            # matplotlib plotting helpers
 │   ├── charge/             #   Bader charge analysis workflows
-│   │   └── Bader/          #     BaderData, SurfaceCharge, AtomCharges, _frame_utils
+│   │   └── Bader/          #     BaderData, SurfaceCharge, AtomCharges, _frame_utils, _plot
 │   └── calibration/        #   sigma->phi calibration mapping
 │       └── CalibrationWorkflow.py  # calibrate(), predict_potential(), convert_reference()
 ├── enhanced_sampling/      # enhanced sampling workflows

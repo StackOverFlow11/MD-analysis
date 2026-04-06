@@ -9,7 +9,8 @@
 
 `Bader/` sub-package with modular split:
 - `config.py` — unit conversion constant + default filenames + output file name constants
-- `Bader/_frame_utils.py` — frame directory discovery, numeric sorting, step/time extraction from dir names
+- `Bader/_frame_utils.py` — delegates to `utils/_frame_discovery.py` for frame directory discovery, numeric sorting, step/time extraction
+- `Bader/_plot.py` — matplotlib plotting helpers for charge visualisation
 - `Bader/BaderData.py` — `BaderTrajectoryData` frozen dataclass + `load_bader_trajectory()` (loads all frames, remaps to XYZ order via IndexMap)
 - `Bader/SurfaceCharge.py` — single-frame surface charge (two methods), trajectory surface charge, end-to-end analysis (CSV+PNG)
 - `Bader/AtomCharges.py` — single-frame/trajectory indexed atom charges (POSCAR order), tracked atom charge analysis (XYZ order), counterion charge analysis (XYZ order, per-frame detection)

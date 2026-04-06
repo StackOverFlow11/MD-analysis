@@ -23,7 +23,7 @@
 
 输入：单帧 `ase.Atoms`、cube 文件、或原始数组
 
-- `config.py`
+- `constants.py`
   - 全局常量：`TRANSITION_METAL_SYMBOLS`、`DEFAULT_METAL_SYMBOLS`、默认分箱宽度/阈值
   - 单位换算：`HA_TO_EV`、`BOHR_TO_ANG`
   - cSHE 常量：`DP_A_H3O_W_EV`、`MU_HPLUS_G0_EV`、`DELTA_E_ZP_EV`

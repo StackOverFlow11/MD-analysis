@@ -13,7 +13,7 @@
 
 ## 2. 当前公开接口清单（按模块）
 
-### 2.1 `config.py` 常量（Stable）
+### 2.1 `constants.py` 常量（Stable）
 
 - `TRANSITION_METAL_SYMBOLS`
 - `DEFAULT_METAL_SYMBOLS`
