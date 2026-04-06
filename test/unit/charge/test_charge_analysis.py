@@ -454,8 +454,8 @@ class TestSurfaceChargeAnalysis:
     def test_csv_and_png_created(self, tmp_path):
         root = _build_fake_trajectory(tmp_path, n_frames=2)
         out = tmp_path / "output"
-        csv_path = surface_charge_analysis(root, output_dir=out)
-        assert csv_path.exists()
+        result = surface_charge_analysis(root, output_dir=out)
+        assert result.csv_path.exists()
         png_path = out / "surface_charge.png"
         assert png_path.exists()
 
@@ -463,8 +463,8 @@ class TestSurfaceChargeAnalysis:
         import csv
         root = _build_fake_trajectory(tmp_path, n_frames=2)
         out = tmp_path / "output"
-        csv_path = surface_charge_analysis(root, output_dir=out)
-        with csv_path.open(encoding="utf-8") as f:
+        result = surface_charge_analysis(root, output_dir=out)
+        with result.csv_path.open(encoding="utf-8") as f:
             reader = csv.DictReader(f)
             rows = list(reader)
         assert len(rows) == 2
@@ -478,10 +478,10 @@ class TestSurfaceChargeAnalysis:
         import csv
         root = _build_fake_trajectory(tmp_path, n_frames=4)
         out = tmp_path / "output"
-        csv_path = surface_charge_analysis(
+        result = surface_charge_analysis(
             root, output_dir=out, frame_start=1, frame_end=3,
         )
-        with csv_path.open(encoding="utf-8") as f:
+        with result.csv_path.open(encoding="utf-8") as f:
             rows = list(csv.DictReader(f))
         assert len(rows) == 2
 

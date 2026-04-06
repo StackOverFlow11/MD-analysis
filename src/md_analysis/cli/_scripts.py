@@ -5,9 +5,19 @@ from __future__ import annotations
 from pathlib import Path
 
 from ._framework import MenuCommand, lazy_import
-from ._params import K, cell_abc
+from ._params import (
+    BoolParam,
+    DisplayAction,
+    IntParam,
+    K,
+    StrParam,
+    cell_abc,
+    cp2k_script,
+    gen_potcar,
+    sp_inp_template,
+    vasp_script,
+)
 from ._prompt import (
-    prompt_bool,
     prompt_choice,
     prompt_float,
     prompt_int,
@@ -54,14 +64,6 @@ def _print_trajectory_info(xyz_path: str) -> None:
     print()
 
 
-def _resolve_script_path() -> str | None:
-    """Prompt for VASP submission script path with config default."""
-    from ..config import KEY_VASP_SCRIPT_PATH, get_config
-
-    default_script = get_config(KEY_VASP_SCRIPT_PATH)
-    return prompt_str("Submission script path", default=default_script)
-
-
 def _resolve_cp2k_script_path() -> str | None:
     """Prompt for CP2K submission script path with config default."""
     from ..config import KEY_CP2K_SCRIPT_PATH, get_config
@@ -72,19 +74,16 @@ def _resolve_cp2k_script_path() -> str | None:
 
 class BaderSingleCmd(MenuCommand):
 
-    def _collect_all_params(self) -> dict:
-        """Custom flow: show trajectory info between prompts."""
-        print()
-        ctx: dict = {}
-        ctx[K.XYZ] = prompt_str_required("XYZ trajectory file (e.g. md-pos-1.xyz)")
-        _print_trajectory_info(ctx[K.XYZ])
-        cell_abc.collect(ctx)
-        ctx[K.FRAME] = prompt_int("Frame number (0-based)", default=0) or 0
-        ctx[K.OUTDIR] = prompt_str("Output directory", default=".") or "."
-        ctx[K.WORKDIR_NAME] = prompt_str("Work directory name", default="bader") or "bader"
-        ctx[K.SCRIPT_PATH] = _resolve_script_path()
-        ctx[K.GEN_POTCAR] = prompt_bool("Generate POTCAR via vaspkit?", default=True)
-        return ctx
+    params = (
+        StrParam(K.XYZ, "XYZ trajectory file (e.g. md-pos-1.xyz)", required=True),
+        DisplayAction(lambda ctx: _print_trajectory_info(ctx[K.XYZ])),
+        cell_abc,
+        IntParam(K.FRAME, "Frame number (0-based)", default=0),
+        StrParam(K.OUTDIR, "Output directory", default="."),
+        StrParam(K.WORKDIR_NAME, "Work directory name", default="bader"),
+        vasp_script,
+        gen_potcar,
+    )
 
     def execute(self, ctx: dict) -> None:
         iread = lazy_import("ase.io", "iread")
@@ -120,20 +119,17 @@ class BaderSingleCmd(MenuCommand):
 
 class BaderBatchCmd(MenuCommand):
 
-    def _collect_all_params(self) -> dict:
-        """Custom flow: show trajectory info between prompts."""
-        print()
-        ctx: dict = {}
-        ctx[K.XYZ] = prompt_str_required("XYZ trajectory file (e.g. md-pos-1.xyz)")
-        _print_trajectory_info(ctx[K.XYZ])
-        cell_abc.collect(ctx)
-        ctx[K.FRAME_START] = prompt_int("Frame start (0-based)", default=0) or 0
-        ctx[K.FRAME_END] = prompt_int("Frame end (exclusive, empty=all)", default=None)
-        ctx[K.FRAME_STEP] = prompt_int("Frame step", default=1) or 1
-        ctx[K.OUTDIR] = prompt_str("Output directory", default=".") or "."
-        ctx[K.SCRIPT_PATH] = _resolve_script_path()
-        ctx[K.GEN_POTCAR] = prompt_bool("Generate POTCAR via vaspkit?", default=True)
-        return ctx
+    params = (
+        StrParam(K.XYZ, "XYZ trajectory file (e.g. md-pos-1.xyz)", required=True),
+        DisplayAction(lambda ctx: _print_trajectory_info(ctx[K.XYZ])),
+        cell_abc,
+        IntParam(K.FRAME_START, "Frame start (0-based)", default=0),
+        IntParam(K.FRAME_END, "Frame end (exclusive, empty=all)", default=None),
+        IntParam(K.FRAME_STEP, "Frame step", default=1),
+        StrParam(K.OUTDIR, "Output directory", default="."),
+        vasp_script,
+        gen_potcar,
+    )
 
     def execute(self, ctx: dict) -> None:
         batch = lazy_import("md_analysis.scripts", "batch_generate_bader_workdirs")
@@ -305,29 +301,19 @@ class TIBatchCmd(MenuCommand):
 # Potential SP commands (43x)
 # ---------------------------------------------------------------------------
 
-def _resolve_sp_inp_template() -> str | None:
-    """Prompt for SP inp template path with config default."""
-    from ..config import KEY_SP_INP_TEMPLATE_PATH, get_config
-
-    default_template = get_config(KEY_SP_INP_TEMPLATE_PATH)
-    return prompt_str("SP inp template path (e.g. sp.inp)", default=default_template)
-
-
 class PotentialSingleCmd(MenuCommand):
     """Generate one SP potential work directory."""
 
-    def _collect_all_params(self) -> dict:
-        print()
-        ctx: dict = {}
-        ctx[K.XYZ] = prompt_str_required("XYZ trajectory file (e.g. md-pos-1.xyz)")
-        _print_trajectory_info(ctx[K.XYZ])
-        cell_abc.collect(ctx)
-        ctx[K.FRAME] = prompt_int("Frame number (0-based)", default=0) or 0
-        ctx["inp_template"] = _resolve_sp_inp_template()
-        ctx[K.OUTDIR] = prompt_str("Output directory", default=".") or "."
-        ctx[K.WORKDIR_NAME] = prompt_str("Work directory name", default="potential") or "potential"
-        ctx[K.SCRIPT_PATH] = _resolve_cp2k_script_path()
-        return ctx
+    params = (
+        StrParam(K.XYZ, "XYZ trajectory file (e.g. md-pos-1.xyz)", required=True),
+        DisplayAction(lambda ctx: _print_trajectory_info(ctx[K.XYZ])),
+        cell_abc,
+        IntParam(K.FRAME, "Frame number (0-based)", default=0),
+        sp_inp_template,
+        StrParam(K.OUTDIR, "Output directory", default="."),
+        StrParam(K.WORKDIR_NAME, "Work directory name", default="potential"),
+        cp2k_script,
+    )
 
     def execute(self, ctx: dict) -> None:
         iread = lazy_import("ase.io", "iread")
@@ -349,7 +335,7 @@ class PotentialSingleCmd(MenuCommand):
         workdir = generate(
             atoms,
             ctx[K.OUTDIR],
-            inp_template_path=ctx["inp_template"],
+            inp_template_path=ctx[K.INP_TEMPLATE],
             cell_abc=ctx[K.CELL_ABC],
             script_path=ctx[K.SCRIPT_PATH],
             workdir_name=ctx[K.WORKDIR_NAME],
@@ -365,19 +351,17 @@ class PotentialSingleCmd(MenuCommand):
 class PotentialBatchCmd(MenuCommand):
     """Batch-generate SP potential work directories."""
 
-    def _collect_all_params(self) -> dict:
-        print()
-        ctx: dict = {}
-        ctx[K.XYZ] = prompt_str_required("XYZ trajectory file (e.g. md-pos-1.xyz)")
-        _print_trajectory_info(ctx[K.XYZ])
-        cell_abc.collect(ctx)
-        ctx[K.FRAME_START] = prompt_int("Frame start (0-based)", default=0) or 0
-        ctx[K.FRAME_END] = prompt_int("Frame end (exclusive, empty=all)", default=None)
-        ctx[K.FRAME_STEP] = prompt_int("Frame step", default=1) or 1
-        ctx["inp_template"] = _resolve_sp_inp_template()
-        ctx[K.OUTDIR] = prompt_str("Output directory", default=".") or "."
-        ctx[K.SCRIPT_PATH] = _resolve_cp2k_script_path()
-        return ctx
+    params = (
+        StrParam(K.XYZ, "XYZ trajectory file (e.g. md-pos-1.xyz)", required=True),
+        DisplayAction(lambda ctx: _print_trajectory_info(ctx[K.XYZ])),
+        cell_abc,
+        IntParam(K.FRAME_START, "Frame start (0-based)", default=0),
+        IntParam(K.FRAME_END, "Frame end (exclusive, empty=all)", default=None),
+        IntParam(K.FRAME_STEP, "Frame step", default=1),
+        sp_inp_template,
+        StrParam(K.OUTDIR, "Output directory", default="."),
+        cp2k_script,
+    )
 
     def execute(self, ctx: dict) -> None:
         batch = lazy_import("md_analysis.scripts", "batch_generate_potential_workdirs")
@@ -385,7 +369,7 @@ class PotentialBatchCmd(MenuCommand):
             ctx[K.XYZ],
             ctx[K.CELL_ABC],
             ctx[K.OUTDIR],
-            inp_template_path=ctx["inp_template"],
+            inp_template_path=ctx[K.INP_TEMPLATE],
             frame_start=ctx[K.FRAME_START],
             frame_end=ctx[K.FRAME_END],
             frame_step=ctx[K.FRAME_STEP],

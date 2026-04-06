@@ -127,12 +127,12 @@ class TestSurfaceChargeAnalysis:
     def test_end_to_end(self, tmp_path):
         root = _build_fake_trajectory(tmp_path, n_frames=3)
         out = tmp_path / "output"
-        csv_path = surface_charge_analysis(root, output_dir=out)
+        result = surface_charge_analysis(root, output_dir=out)
 
-        assert csv_path.exists()
+        assert result.csv_path.exists()
         assert (out / "surface_charge.png").exists()
 
-        with csv_path.open(encoding="utf-8") as f:
+        with result.csv_path.open(encoding="utf-8") as f:
             rows = list(csv.DictReader(f))
         assert len(rows) == 3
 
@@ -149,10 +149,10 @@ class TestSurfaceChargeAnalysis:
             for fname in _FRAME_FILES:
                 shutil.copy2(DATA_DIR / fname, frame_dir / fname)
         out = tmp_path / "output"
-        csv_path = surface_charge_analysis(
+        result = surface_charge_analysis(
             tmp_path, output_dir=out, dir_pattern="bader_t*_i*",
         )
-        with csv_path.open(encoding="utf-8") as f:
+        with result.csv_path.open(encoding="utf-8") as f:
             rows = list(csv.DictReader(f))
         # First row should be t=50, second t=1000
         assert int(rows[0]["step"]) == 50

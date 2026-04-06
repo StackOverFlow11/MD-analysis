@@ -10,7 +10,7 @@ Interactive CLI package providing a VASPKIT-style numbered menu interface. Repla
 
 - Pure interactive: no command-line arguments, all input via `input()` prompts
 - `_framework.py` 提供核心基础设施：`MenuNode`、`MenuGroup`、`MenuCommand`、`lazy_import()`
-- `_params.py` 提供声明式参数采集：`ParamCollector` ABC + 泛型参数类（`StrParam`、`FloatParam`、`IntParam`、`ChoiceParam`、`ConditionalParam` 等）
+- `_params.py` 提供声明式参数采集：`ParamCollector` ABC + 泛型参数类（`StrParam`、`FloatParam`、`IntParam`、`ChoiceParam`、`ConditionalParam`、`BoolParam`、`DisplayAction`、`ConfigStrParam` 等）
 - 每个子菜单模块通过 `MenuCommand` 子类实现，定义 `params`、`advanced_params`、`output_name` 和 `execute(self, ctx)` 方法
 - `output_subdir` 由 `@property` 自动遍历父链（`parent.output_name`）拼接，无需硬编码
 - `_prompt.py` 的共享 helper（`prompt_str`、`prompt_float` 等）由 `_params.py` 的参数类内部调用
@@ -52,7 +52,7 @@ Interactive CLI package providing a VASPKIT-style numbered menu interface. Repla
 | `_scripts.py` | `BaderSingleCmd`, `BaderBatchCmd`, `TISingleCmd`, `TIBatchCmd`, `PotentialSingleCmd`, `PotentialBatchCmd` | 411-412 (sub-group 41), 421-422 (sub-group 42), 431-432 (sub-group 43) |
 | `_settings.py` | `ShowConfigCmd`, `ResetDefaultsCmd` (sub-group 90); `SetVaspScriptCmd`, `SetCp2kScriptCmd`, `SetSpInpTemplateCmd` (sub-group 91); `SetAnalysisDefaultCmd`×4 (sub-group 92); `SetPotentialReferenceCmd` (sub-group 93) | 900-931 |
 
-`_charge.py` 中 `_print_ensemble_summary()` 作为独立辅助函数保留，在 `SurfaceChargeCmd.execute()` 结束时调用。
+`SurfaceChargeCmd.execute()` 使用 `surface_charge_analysis()` 返回的 `SurfaceChargeResult` 数据类直接打印系综统计摘要（不再依赖独立的 `_print_ensemble_summary()` 函数，已删除）。
 
 221/222（固定 method）通过 `output_name` 由框架自动解析输出子目录（`charge/counterion/`、`charge/layer/`）。223（动态 method）`output_name` 为空，`execute()` 中手动追加 `ctx[K.METHOD]` 到输出路径以避免不同方法输出覆盖同一文件。
 
@@ -85,7 +85,15 @@ Settings sub-group 92 allows users to persistently override algorithm defaults f
 - 909: reset all analysis defaults (sub-group 90)
 - 931: potential output reference (SHE/RHE/PZC) — `SetPotentialReferenceCmd` (sub-group 93)
 
-`ConfigDefaultParam` 类（在 `_params.py` 中定义）通过 `apply_default()` 方法读取用户持久化配置，fallback 到 `CONFIGURABLE_DEFAULTS` 注册表中的硬编码默认值。Analysis sub-menus (`_potential.py`, `_water.py`, `_charge.py`) 使用此参数类来填充提示默认值。Library function signatures remain unchanged — persistence only affects CLI prompt defaults.
+`_ConfigBackedParam` 内部基类（在 `_params.py` 中定义）提供 `_get_config_value()` 和基础 `apply_default()` 实现。两个子类：
+- `ConfigDefaultParam`：通过 `CONFIGURABLE_DEFAULTS` 注册表 fallback 到硬编码默认值。Analysis sub-menus (`_potential.py`, `_water.py`, `_charge.py`) 使用此参数类来填充提示默认值。
+- `ConfigStrParam`：直接通过 `get_config(key)` 读取字符串配置值（不经过 `CONFIGURABLE_DEFAULTS` 注册表）。预定义实例 `vasp_script`、`cp2k_script`、`sp_inp_template` 供 Scripts 命令使用。
+
+`BoolParam`：yes/no 布尔提示参数（字段：`key`、`label`、`default`）。预定义实例 `gen_potcar` 供 Bader Scripts 命令使用。
+
+`DisplayAction`：在参数采集过程中执行副作用（如打印轨迹信息），不在 ctx 中存储值。`apply_default` 为 no-op。Scripts 命令（411-412、431-432）使用 `DisplayAction(lambda ctx: _print_trajectory_info(ctx[K.XYZ]))` 在采集完 XYZ 路径后立即显示轨迹元信息。
+
+Library function signatures remain unchanged — persistence only affects CLI prompt defaults.
 
 ## Conditional parameter collection (`ConditionalParam`)
 
@@ -105,6 +113,8 @@ Config keys: `KEY_POTENTIAL_REFERENCE`, `KEY_POTENTIAL_PH`, `KEY_POTENTIAL_TEMPE
 
 菜单 3 下分两个子组：`30)` Slow-Growth、`31)` Constrained TI Analysis。
 
+两个模块均遵循延迟导入约定：顶层无 `import numpy` 或 `from ..utils.constants import ...`，numpy 和常量均在使用它们的函数体内导入。
+
 ### Slow-Growth（`_enhanced_sampling.py`，sub-group 30）
 
 301/302 共享基类 `_SlowgrowthPlotCmd`（注意：`output_name` 由父 `MenuGroup("30", output_name="slowgrowth")` 提供，命令自身无 `output_name`）：
@@ -113,12 +123,18 @@ Config keys: `KEY_POTENTIAL_REFERENCE`, `KEY_POTENTIAL_PH`, `KEY_POTENTIAL_TEMPE
   - `_discover_restart_file(workdir)`：glob `*.restart`，排除 `_\d+\.restart` 检查点文件
   - `_discover_log_file(workdir)`：glob `*.LagrangeMultLog`
   - 两者均要求恰好 1 个匹配；否则回退到用户手动输入
-- **轨迹信息预览**：`_print_sg_info()` 通过 `lazy_import` 获取 `ColvarMDInfo`，显示步数、时间步、CV 范围，并检测 NaN（溢出）步
+- **轨迹信息预览**：`_print_sg_info()` 通过 `lazy_import` 获取 `ColvarMDInfo`，显示步数、时间步、CV 范围，并检测 NaN（溢出）步。numpy 和 `AU_TIME_TO_FS` 常量在此函数体内导入
 - **参数采集**：restart path、log path、initial/final step、colvar ID、output dir
 - **执行**：通过 `lazy_import` 调用 `slowgrowth_analysis`，`_plot_style` 由子类决定（`"quick"` 或 `"publication"`）
 
 ### Constrained TI（`_constrained_ti.py`，sub-group 31）
 
+模块级共享辅助函数（312/313 去重）：
+- **`_collect_ti_base_params(ctx)`**：采集 TI_ROOT_DIR、TI_DIR_PATTERN（含 `_VALID_PATTERNS` 校验循环）、EQUILIBRATION、EPSILON_TOL_EV、TI_REVERSE。不采集 OUTDIR
+- **`_run_ti_core(ctx)`**：共享 TI 分析流水线：discover → 交互式逐点 equilibration → load → dt 一致性校验 → analyze → 终端摘要 → 写出文件。返回 `(ti_report, point_defs, xi_values, outdir)`。numpy 在此函数体内导入
+- **`_VALID_PATTERNS`**、**`_VALID_SIDES`**、**`_VALID_METHODS`** 为模块级常量
+
+命令类：
 - **311 `TISingleDiagCmd`**：单点收敛诊断。复用 SG 的 `_discover_restart_file` / `_discover_log_file`。覆写 `_collect_all_params()`（SEM target 为可空 float，用 `prompt_str` + 手动转换）。调用 `standalone_diagnostics()`。
-- **312 `TIFullAnalysisCmd`**：多点 TI 分析。调用 `discover_ti_points()` → `load_ti_series()` → `analyze_ti()`，含 dt 一致性校验。TI_DIR_PATTERN 限制为 `"ti_target"/"xi"/"auto"`。支持 `K.TI_REVERSE`（反向积分，ξ 降序，初态 = max ξ）。对所有约束点生成诊断图。
-- **313 `TIConstPotCorrectionCmd`**：恒电势自由能修正（Nørskov）。先运行完整 312 分析，再从各 `ti_target_*/bader/` 提取系综平均 σ，通过 calibration mapper 外推 Φ，计算修正项并输出修正后自由能曲线。需要 calibration.json（硬错误）；缺 bader/ 时 WARN 并跳过修正。新增参数：`K.TARGET_SIDE`（aligned/opposed）、`K.CALIBRATION_JSON`。
+- **312 `TIFullAnalysisCmd`**：调用 `_collect_ti_base_params()` + `_run_ti_core()`，打印 ΔA + 文件列表
+- **313 `TIConstPotCorrectionCmd`**：调用 `_collect_ti_base_params()` + `_run_ti_core()`（Phase 1），再执行 Phase 2 恒电势修正（Nørskov）。从各 `ti_target_*/bader/` 提取系综平均 σ，通过 calibration mapper 外推 Φ，计算修正项并输出修正后自由能曲线。需要 calibration.json（硬错误）；缺 bader/ 时 WARN 并跳过修正。额外参数：`K.TARGET_SIDE`（aligned/opposed）、`K.CALIBRATION_JSON`。

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from .Bader import (
     BaderTrajectoryData,
+    SurfaceChargeResult,
     compute_frame_surface_charge,
     counterion_charge_analysis,
     frame_indexed_atom_charges,
@@ -22,6 +23,7 @@ from .config import (
 
 __all__ = [
     "BaderTrajectoryData",
+    "SurfaceChargeResult",
     "compute_frame_surface_charge",
     "counterion_charge_analysis",
     "frame_indexed_atom_charges",

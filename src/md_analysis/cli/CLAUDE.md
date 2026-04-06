@@ -31,14 +31,21 @@ VASPKIT 风格交互式编号菜单。无 argparse，所有输入通过 `input()
 ### lazy_import
 - 所有 `execute()` 方法通过 `lazy_import()` 延迟加载分析模块（36+ 处使用）
 - 目的：CLI 启动只加载框架代码，不触发 numpy/matplotlib/ase
+- **numpy 也必须延迟导入**：CLI 模块顶层不得出现 `import numpy`，需要时在函数体内导入
+- 常量（如 `AU_TIME_TO_FS`）同理：从 `utils.constants` 导入时放在使用它的函数体内
 
 ### 参数采集
-- `K` 类：字符串键常量，防止拼写错误
+- `K` 类：字符串键常量，防止拼写错误（含 `INP_TEMPLATE`、`GEN_POTCAR` 等）
 - `ParamCollector` ABC：`collect(ctx)` 提示用户 + `apply_default(ctx)` 静默填充
 - `params` 元组：总是提示；`advanced_params` 元组：用户选择"修改高级参数"时才提示
-- `ConfigDefaultParam`：从 `~/.config/md_analysis/config.json` 读取用户覆盖值，fallback 到硬编码默认
+- **`_ConfigBackedParam(ParamCollector)`**：内部基类，提供 `_get_config_value()` 方法和基础 `apply_default()` 实现，统一配置读取逻辑
+- **`ConfigDefaultParam(_ConfigBackedParam)`**：从 `~/.config/md_analysis/config.json` 读取用户覆盖值，fallback 到 `CONFIGURABLE_DEFAULTS` 注册表中的硬编码默认值
+- **`ConfigStrParam(_ConfigBackedParam)`**：字符串提示参数，带 config-backed 默认值。直接通过 `get_config(key)` 读取（不经过 `CONFIGURABLE_DEFAULTS` 注册表）。预定义实例：`vasp_script`、`cp2k_script`、`sp_inp_template`
+- **`BoolParam(ParamCollector)`**：yes/no 提示。字段：`key`、`label`、`default`。预定义实例：`gen_potcar`
+- **`DisplayAction(ParamCollector)`**：在参数采集过程中执行副作用（如打印轨迹信息），不在 ctx 中存储值。`apply_default` 为 no-op
 - 所有 Potential 命令（211-216）的 `params` 元组首位为 `input_mode`（`ChoiceParam`："continuous"/"distributed"），后接模式相关参数（`sp_root_dir`、`sp_dir_pattern`、`sp_cube_filename`、`sp_out_filename`）。这 4 个 sp_* 参数通过 `ConditionalParam` 包装，仅当 `ctx[K.INPUT_MODE] == "distributed"` 时提示用户，否则静默应用默认值。`execute()` 通过 `_is_distributed(ctx)` 分派调用
 - **`ConditionalParam(inner, predicate)`**：通用包装器，仅当 `predicate(ctx)` 为真时调用 `inner.collect(ctx)`，否则调用 `inner.apply_default(ctx)`。要求 predicate 依赖的 ctx 键在 params 元组中先于此参数出现
+- Scripts 命令（411-412、431-432）已转换为声明式 `params` 元组（使用 `ConfigStrParam`、`BoolParam`、`DisplayAction`），不再覆写 `_collect_all_params`。TI 命令（421-422）仍使用 `_resolve_cp2k_script_path()` + `_collect_all_params` 覆写模式
 
 ### 错误处理
 - `MenuCommand.run()` 的 inline try-except 捕获 `MDAnalysisError`/`FileNotFoundError`/`ValueError`/`RuntimeError` → 打印简洁消息

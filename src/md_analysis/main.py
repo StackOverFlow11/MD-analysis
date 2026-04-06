@@ -272,7 +272,7 @@ def run_charge_analysis(
     charge_dir = Path(output_dir) / method
     charge_dir.mkdir(parents=True, exist_ok=True)
 
-    csv_path = surface_charge_analysis(
+    result = surface_charge_analysis(
         root_dir,
         metal_symbols=metal_symbols,
         normal=normal,
@@ -288,8 +288,8 @@ def run_charge_analysis(
     )
 
     return {
-        "charge_csv": csv_path,
-        "charge_png": csv_path.parent / DEFAULT_SURFACE_CHARGE_PNG_NAME,
+        "charge_csv": result.csv_path,
+        "charge_png": result.csv_path.parent / DEFAULT_SURFACE_CHARGE_PNG_NAME,
     }
 
 

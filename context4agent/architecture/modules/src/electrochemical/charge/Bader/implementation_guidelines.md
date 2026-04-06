@@ -7,7 +7,7 @@ Core Bader charge analysis sub-package. Handles surface charge density (two meth
 ## File Organization
 
 - `BaderData.py` — `BaderTrajectoryData` frozen dataclass + `load_bader_trajectory()` (remap via IndexMap to XYZ order)
-- `SurfaceCharge.py` — `compute_frame_surface_charge()` (counterion/layer methods), `trajectory_surface_charge()`, `surface_charge_analysis()` (end-to-end CSV+PNG with optional calibration)
+- `SurfaceCharge.py` — `SurfaceChargeResult` frozen dataclass (return type of `surface_charge_analysis`), `compute_frame_surface_charge()` (counterion/layer methods), `trajectory_surface_charge()`, `surface_charge_analysis()` (end-to-end CSV+PNG with optional calibration, returns `SurfaceChargeResult`)
 - `AtomCharges.py` — `frame_indexed_atom_charges()`, `trajectory_indexed_atom_charges()`, `tracked_atom_charge_analysis()`, `counterion_charge_analysis()`
 - `_frame_utils.py` — delegates to `utils/_frame_discovery.py` for frame directory discovery and step/time extraction
 - `_plot.py` — matplotlib plotting helpers (`plot_surface_charge`, `plot_single_side_charge`, `plot_tracked_charges`, `plot_counterion_charges`)
@@ -23,6 +23,7 @@ Core Bader charge analysis sub-package. Handles surface charge density (two meth
 - MIC-based directional assignment for counterion method
 - `_sorted_frame_dirs()` sorts by numeric `_t(\d+)` value (not lexicographic)
 - Calibration integration: `surface_charge_analysis()` auto-loads `calibration.json` for sigma->phi extrapolation
+- `surface_charge_analysis()` returns `SurfaceChargeResult` (frozen dataclass with `csv_path`, `n_frames`, `sigma_aligned_mean/std`, `sigma_opposed_mean/std`, `phi_cumavg_last` (optional), `phi_reference` (optional))
 
 ## Dependencies
 

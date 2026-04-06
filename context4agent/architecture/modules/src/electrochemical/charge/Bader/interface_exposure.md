@@ -4,11 +4,12 @@
 
 ### SurfaceCharge.py
 
-| Function | Description |
-|----------|-------------|
+| Symbol | Description |
+|--------|-------------|
+| `SurfaceChargeResult` | Frozen dataclass: csv_path, n_frames, sigma_aligned_mean/std, sigma_opposed_mean/std, phi_cumavg_last (optional), phi_reference (optional) |
 | `compute_frame_surface_charge(atoms, *, method, normal, ...)` | Single-frame surface charge -> atoms.info |
 | `trajectory_surface_charge(root_dir, *, method, normal, ...)` | Multi-frame -> (t, 2) uC/cm2 |
-| `surface_charge_analysis(root_dir, *, method, ...)` | End-to-end CSV+PNG (with optional calibration phi) |
+| `surface_charge_analysis(root_dir, *, method, ...)` | End-to-end CSV+PNG (with optional calibration phi) -> SurfaceChargeResult |
 
 ### AtomCharges.py
 

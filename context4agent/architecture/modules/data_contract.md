@@ -192,7 +192,7 @@ $$
 - CSV 可选列（当 `~/.config/md_analysis/calibration.json` 存在时自动追加）：`phi_aligned_V_vs_{REF},phi_opposed_V_vs_{REF},phi_aligned_cumavg_V_vs_{REF},phi_opposed_cumavg_V_vs_{REF}`（REF 由 `potential_reference` 参数决定，默认 SHE；可选 RHE/PZC）
 - PNG：9×4.8 inch, 160 DPI，左轴 σ（aligned 蓝/opposed 橙，inst. + cum. avg）；右轴 φ（aligned 绿/opposed 红，仅有标定时显示，轴标签 `φ (V vs {REF})`）+ fit RMSE 标注
 - 默认文件名：`surface_charge.csv`、`surface_charge.png`
-- 返回 CSV 路径
+- 返回 `SurfaceChargeResult` frozen dataclass（字段：`csv_path`、`n_frames`、`sigma_aligned_mean/std`、`sigma_opposed_mean/std`、`phi_cumavg_last`（可选）、`phi_reference`（可选））
 
 ## Potential 帧数据抽象
 

@@ -3,9 +3,16 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from typing import Any
 
-from ..config import KEY_LAYER_TOL_A, KEY_Z_BIN_WIDTH_A
+from ..config import (
+    KEY_CP2K_SCRIPT_PATH,
+    KEY_LAYER_TOL_A,
+    KEY_SP_INP_TEMPLATE_PATH,
+    KEY_VASP_SCRIPT_PATH,
+    KEY_Z_BIN_WIDTH_A,
+)
 from ._prompt import prompt_bool, prompt_choice, prompt_float, prompt_int, prompt_str, prompt_str_required
 
 
@@ -40,6 +47,7 @@ class K:
     WORKDIR_NAME = "workdir_name"
     SCRIPT_PATH = "script_path"
     GEN_POTCAR = "gen_potcar"
+    INP_TEMPLATE = "inp_template"
     # enhanced-sampling-specific
     RESTART_PATH = "restart_path"
     LOG_PATH = "log_path"
@@ -200,13 +208,70 @@ class ConditionalParam(ParamCollector):
         self.inner.apply_default(ctx)
 
 
-class ConfigDefaultParam(ParamCollector):
-    """Reads default from persistent user config (~/.config/md_analysis/)."""
+class BoolParam(ParamCollector):
+    """Yes/no prompt stored as bool."""
 
-    def __init__(self, key: str, label: str, *, config_key: str):
+    def __init__(self, key: str, label: str, *, default: bool = True) -> None:
+        self.key = key
+        self.label = label
+        self.default = default
+
+    def collect(self, ctx: dict) -> None:
+        ctx[self.key] = prompt_bool(self.label, default=self.default)
+
+    def apply_default(self, ctx: dict) -> None:
+        ctx[self.key] = self.default
+
+
+class DisplayAction(ParamCollector):
+    """Execute a side-effect (e.g. print info) during parameter collection.
+
+    Stores no value in ``ctx``.  Skipped silently when advanced params are
+    not prompted (``apply_default`` is a no-op).
+
+    The *action* callable receives the current ``ctx`` dict and must not
+    rely on keys that have not yet been collected (ordering matters).
+    """
+
+    def __init__(self, action: Callable[[dict], None]) -> None:
+        self.action = action
+
+    def collect(self, ctx: dict) -> None:
+        self.action(ctx)
+
+    def apply_default(self, ctx: dict) -> None:
+        pass  # intentional no-op: display actions are skipped in non-interactive mode
+
+
+class _ConfigBackedParam(ParamCollector):
+    """Internal base for params whose default comes from persistent user config.
+
+    Subclasses must implement ``collect()`` with the appropriate prompt function.
+    Note: ``apply_default`` may return ``None`` when no config value is set;
+    subclasses may override to provide a registry-backed fallback.
+    """
+
+    def __init__(self, key: str, label: str, *, config_key: str) -> None:
         self.key = key
         self.label = label
         self.config_key = config_key
+
+    def _get_config_value(self) -> Any:
+        """Read current value from user config; returns None if unset."""
+        from ..config import get_config
+
+        return get_config(self.config_key)
+
+    def apply_default(self, ctx: dict) -> None:
+        ctx[self.key] = self._get_config_value()
+
+
+class ConfigDefaultParam(_ConfigBackedParam):
+    """Float prompt with default from persistent config registry.
+
+    Uses ``CONFIGURABLE_DEFAULTS[config_key]["default"]`` as fallback
+    when the user has not set a custom value.
+    """
 
     def _get_effective_default(self) -> float:
         from ..config import CONFIGURABLE_DEFAULTS, get_config
@@ -219,6 +284,17 @@ class ConfigDefaultParam(ParamCollector):
 
     def apply_default(self, ctx: dict) -> None:
         ctx[self.key] = self._get_effective_default()
+
+
+class ConfigStrParam(_ConfigBackedParam):
+    """String prompt with default from persistent user config.
+
+    Unlike ``ConfigDefaultParam``, does not require a ``CONFIGURABLE_DEFAULTS``
+    registry entry.  Returns ``None`` when no config value is set.
+    """
+
+    def collect(self, ctx: dict) -> None:
+        ctx[self.key] = prompt_str(self.label, default=self._get_config_value())
 
 
 # ---------------------------------------------------------------------------
@@ -389,3 +465,13 @@ potential_reference = ChoiceParam(K.POTENTIAL_REFERENCE,
 temperature_k = FloatParam(K.TEMPERATURE_K, "Temperature (K)", default=298.15)
 ph_value = FloatParam(K.PH, "pH", default=0.0)
 phi_pzc = FloatParam(K.PHI_PZC, "Potential of zero charge (V vs SHE)", default=0.0)
+
+# Config-backed script / template params (used by _scripts.py declarative commands)
+vasp_script = ConfigStrParam(K.SCRIPT_PATH, "Submission script path",
+                             config_key=KEY_VASP_SCRIPT_PATH)
+cp2k_script = ConfigStrParam(K.SCRIPT_PATH, "Submission script path",
+                             config_key=KEY_CP2K_SCRIPT_PATH)
+sp_inp_template = ConfigStrParam(K.INP_TEMPLATE,
+                                 "SP inp template path (e.g. sp.inp)",
+                                 config_key=KEY_SP_INP_TEMPLATE_PATH)
+gen_potcar = BoolParam(K.GEN_POTCAR, "Generate POTCAR via vaspkit?", default=True)

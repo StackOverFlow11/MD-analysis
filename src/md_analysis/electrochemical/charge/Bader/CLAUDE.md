@@ -10,7 +10,7 @@ Bader 电荷分析子包：表面电荷密度计算、指定原子电荷追踪�
 |------|------|
 | `_frame_utils.py` | 帧目录发现、排序、step/time 提取（私有） |
 | `BaderData.py` | `BaderTrajectoryData` frozen dataclass + `load_bader_trajectory()` — 加载轨迹并 remap 回 XYZ 序 |
-| `SurfaceCharge.py` | 表面电荷密度：单帧 `compute_frame_surface_charge`、多帧 `trajectory_surface_charge`、端到端 `surface_charge_analysis`（自动加载标定外推电势，支持 SHE/RHE/PZC 输出参考） |
+| `SurfaceCharge.py` | 表面电荷密度：`SurfaceChargeResult` frozen dataclass、单帧 `compute_frame_surface_charge`、多帧 `trajectory_surface_charge`、端到端 `surface_charge_analysis`（返回 `SurfaceChargeResult`，自动加载标定外推电势，支持 SHE/RHE/PZC 输出参考） |
 | `AtomCharges.py` | 原子电荷：单帧/多帧索引查询（POSCAR 序）、指定原子追踪（XYZ 序）、counterion 逐帧检测追踪（XYZ 序） |
 | `_plot.py` | matplotlib 绘图函数（`plot_surface_charge`/`plot_single_side_charge`/`plot_tracked_charges`/`plot_counterion_charges`），与分析逻辑解耦以便独立测试 |
 

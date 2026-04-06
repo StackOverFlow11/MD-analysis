@@ -5,13 +5,9 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-import numpy as np
-
 from ._framework import MenuCommand, lazy_import
 from ._params import K
 from ._prompt import prompt_int, prompt_str
-
-_AU_TIME_TO_FS = 0.02418884326585  # avoid heavy import of utils.constants at CLI load
 
 
 # ---------------------------------------------------------------------------
@@ -40,6 +36,10 @@ def _discover_log_file(workdir: Path) -> str | None:
 
 def _print_sg_info(restart_path: str, log_path: str) -> None:
     """Parse and display trajectory metadata."""
+    import numpy as np
+
+    from ..utils.constants import AU_TIME_TO_FS
+
     ColvarMDInfo = lazy_import(
         "md_analysis.utils.RestartParser.ColvarParser", "ColvarMDInfo",
     )
@@ -50,7 +50,7 @@ def _print_sg_info(restart_path: str, log_path: str) -> None:
         return
 
     cv = info.restart.colvars.primary
-    dt_au = info.restart.timestep_fs / _AU_TIME_TO_FS
+    dt_au = info.restart.timestep_fs / AU_TIME_TO_FS
     growth_per_step = cv.target_growth_au * dt_au
     print(f"\n  Trajectory info:")
     print(f"    Steps:        {info.n_steps}")

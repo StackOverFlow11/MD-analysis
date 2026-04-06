@@ -10,6 +10,7 @@ from .AtomCharges import (
 )
 from .BaderData import BaderTrajectoryData, load_bader_trajectory
 from .SurfaceCharge import (
+    SurfaceChargeResult,
     compute_frame_surface_charge,
     surface_charge_analysis,
     trajectory_surface_charge,
@@ -17,6 +18,7 @@ from .SurfaceCharge import (
 
 __all__ = [
     "BaderTrajectoryData",
+    "SurfaceChargeResult",
     "compute_frame_surface_charge",
     "counterion_charge_analysis",
     "frame_indexed_atom_charges",

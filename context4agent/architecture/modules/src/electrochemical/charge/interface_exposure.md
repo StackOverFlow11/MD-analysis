@@ -6,7 +6,8 @@
 |-------------------------------------|-------------------------|-----------------------------------------------------------------|
 | `compute_frame_surface_charge`      | Bader/SurfaceCharge.py  | Single-frame surface charge density → `atoms.info` (`method` selects algorithm) |
 | `trajectory_surface_charge`         | Bader/SurfaceCharge.py  | Multi-frame surface charge density time series → `(t, 2)` μC/cm² |
-| `surface_charge_analysis`           | Bader/SurfaceCharge.py  | End-to-end surface charge analysis → CSV + PNG output           |
+| `SurfaceChargeResult`               | Bader/SurfaceCharge.py  | Frozen dataclass: csv_path, n_frames, sigma stats, optional phi fields |
+| `surface_charge_analysis`           | Bader/SurfaceCharge.py  | End-to-end surface charge analysis → `SurfaceChargeResult`      |
 | `frame_indexed_atom_charges`        | Bader/AtomCharges.py    | Single-frame net charges for caller-specified atom indices → `(N, 2)` (POSCAR order) |
 | `trajectory_indexed_atom_charges`   | Bader/AtomCharges.py    | Per-frame net charges for caller-specified atom indices → `(t, N, 2)` (POSCAR order) |
 | `tracked_atom_charge_analysis`      | Bader/AtomCharges.py    | Track XYZ-indexed atoms across trajectory → CSV + PNG (XYZ order) |
@@ -118,7 +119,22 @@ def surface_charge_analysis(
     frame_end: int | None = None,
     frame_step: int | None = None,
     verbose: bool = False,
-) -> Path   # path to written CSV
+) -> SurfaceChargeResult
+```
+
+### `SurfaceChargeResult` Dataclass
+
+```python
+@dataclass(frozen=True)
+class SurfaceChargeResult:
+    csv_path: Path
+    n_frames: int
+    sigma_aligned_mean: float
+    sigma_aligned_std: float
+    sigma_opposed_mean: float
+    sigma_opposed_std: float
+    phi_cumavg_last: float | None = None
+    phi_reference: str | None = None
 ```
 
 > **Calibration integration**: 函数末尾自动尝试加载 `~/.config/md_analysis/calibration.json`。

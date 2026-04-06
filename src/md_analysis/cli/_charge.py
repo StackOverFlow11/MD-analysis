@@ -1,8 +1,7 @@
-"""Charge analysis command classes (221-225)."""
+"""Charge analysis command classes (221-226)."""
 
 from __future__ import annotations
 
-import csv as _csv
 from pathlib import Path
 
 from ._framework import MenuCommand, lazy_import
@@ -21,27 +20,6 @@ from ._params import (
     root_dir,
     target_side,
 )
-
-
-def _print_ensemble_summary(csv_path: Path) -> None:
-    """Print ensemble average summary from the charge CSV."""
-    if not csv_path.exists():
-        return
-
-    with csv_path.open(encoding="utf-8") as f:
-        reader = _csv.DictReader(f)
-        rows = list(reader)
-
-    if not rows:
-        return
-
-    import numpy as np
-
-    aligned = np.array([float(r["sigma_aligned_uC_cm2"]) for r in rows])
-    opposed = np.array([float(r["sigma_opposed_uC_cm2"]) for r in rows])
-    print(f"\n Ensemble average ({len(rows)} frames):")
-    print(f"   sigma_aligned: {aligned.mean():8.4f} +/- {aligned.std():.4f} uC/cm^2")
-    print(f"   sigma_opposed: {opposed.mean():8.4f} +/- {opposed.std():.4f} uC/cm^2")
 
 
 class SurfaceChargeCmd(MenuCommand):
@@ -83,7 +61,7 @@ class SurfaceChargeCmd(MenuCommand):
 
         out.mkdir(parents=True, exist_ok=True)
 
-        csv_path = analyze(
+        result = analyze(
             ctx[K.ROOT_DIR],
             metal_symbols=ctx[K.METAL_ELEMENTS],
             normal=ctx[K.NORMAL],
@@ -101,8 +79,12 @@ class SurfaceChargeCmd(MenuCommand):
             potential_temperature_K=get_config(KEY_POTENTIAL_TEMPERATURE_K, 298.15),
             potential_phi_pzc=get_config(KEY_POTENTIAL_PHI_PZC),
         )
-        print(f"\n Analysis complete. Output:\n   charge_csv: {csv_path}")
-        _print_ensemble_summary(csv_path)
+        print(f"\n Analysis complete. Output:\n   charge_csv: {result.csv_path}")
+        print(f"\n Ensemble average ({result.n_frames} frames):")
+        print(f"   sigma_aligned: {result.sigma_aligned_mean:8.4f} "
+              f"+/- {result.sigma_aligned_std:.4f} uC/cm^2")
+        print(f"   sigma_opposed: {result.sigma_opposed_mean:8.4f} "
+              f"+/- {result.sigma_opposed_std:.4f} uC/cm^2")
 
 
 class SingleSideChargeCmd(MenuCommand):
@@ -132,7 +114,7 @@ class SingleSideChargeCmd(MenuCommand):
             out = Path(ctx[K.OUTDIR_RESOLVED]) / f"{method}_{side}"
         out.mkdir(parents=True, exist_ok=True)
 
-        csv_path = analyze(
+        result = analyze(
             ctx[K.ROOT_DIR],
             metal_symbols=ctx[K.METAL_ELEMENTS],
             normal=ctx[K.NORMAL],
@@ -151,23 +133,17 @@ class SingleSideChargeCmd(MenuCommand):
             potential_phi_pzc=get_config(KEY_POTENTIAL_PHI_PZC),
             target_side=side,
         )
-        print(f"\n Analysis complete ({side} side). Output:\n   charge_csv: {csv_path}")
+        print(f"\n Analysis complete ({side} side). Output:\n   charge_csv: {result.csv_path}")
 
-        # Ensemble summary for single side
-        if csv_path.exists():
-            import numpy as np
-            with csv_path.open(encoding="utf-8") as f:
-                reader = _csv.DictReader(f)
-                rows = list(reader)
-            if rows:
-                sigma = np.array([float(r["sigma_uC_cm2"]) for r in rows])
-                print(f"\n Ensemble average ({len(rows)} frames, {side} side):")
-                print(f"   sigma: {sigma.mean():8.4f} +/- {sigma.std():.4f} uC/cm^2")
-                phi_col = [c for c in rows[0] if c.startswith("phi_cumavg")]
-                if phi_col:
-                    phi = np.array([float(r[phi_col[0]]) for r in rows])
-                    ref = phi_col[0].split("_vs_")[-1]
-                    print(f"   phi:   {phi[-1]:8.4f} V vs {ref} (cum. avg)")
+        if side == "aligned":
+            s_mean, s_std = result.sigma_aligned_mean, result.sigma_aligned_std
+        else:
+            s_mean, s_std = result.sigma_opposed_mean, result.sigma_opposed_std
+        print(f"\n Ensemble average ({result.n_frames} frames, {side} side):")
+        print(f"   sigma: {s_mean:8.4f} +/- {s_std:.4f} uC/cm^2")
+        if result.phi_cumavg_last is not None:
+            print(f"   phi:   {result.phi_cumavg_last:8.4f} V vs "
+                  f"{result.phi_reference} (cum. avg)")
 
 
 class TrackedChargeCmd(MenuCommand):

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
@@ -41,6 +42,20 @@ from ._plot import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class SurfaceChargeResult:
+    """Return value of :func:`surface_charge_analysis`."""
+
+    csv_path: Path
+    n_frames: int
+    sigma_aligned_mean: float
+    sigma_aligned_std: float
+    sigma_opposed_mean: float
+    sigma_opposed_std: float
+    phi_cumavg_last: float | None = None
+    phi_reference: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -364,7 +379,7 @@ def surface_charge_analysis(
     potential_temperature_K: float = 298.15,
     potential_phi_pzc: float | None = None,
     target_side: str | None = None,
-) -> Path:
+) -> SurfaceChargeResult:
     """End-to-end surface charge density analysis with CSV + PNG output.
 
     Parameters
@@ -399,8 +414,8 @@ def surface_charge_analysis(
 
     Returns
     -------
-    Path
-        Path to the written CSV file.
+    SurfaceChargeResult
+        Result containing CSV path and ensemble statistics.
     """
     if target_side is not None and target_side not in ("aligned", "opposed"):
         raise ValueError(
@@ -562,7 +577,18 @@ def surface_charge_analysis(
                 fit_rmse or 0.0,
             )
 
-        return csv_path
+        _s_mean = float(sigma_side.mean())
+        _s_std = float(sigma_side.std())
+        return SurfaceChargeResult(
+            csv_path=csv_path,
+            n_frames=len(steps),
+            sigma_aligned_mean=_s_mean if target_side == "aligned" else 0.0,
+            sigma_aligned_std=_s_std if target_side == "aligned" else 0.0,
+            sigma_opposed_mean=_s_mean if target_side == "opposed" else 0.0,
+            sigma_opposed_std=_s_std if target_side == "opposed" else 0.0,
+            phi_cumavg_last=float(phi_side_cum[-1]) if phi_side_cum is not None else None,
+            phi_reference=ref_tag if phi_side is not None else None,
+        )
 
     # CSV (both sides)
     fieldnames = [
@@ -625,4 +651,11 @@ def surface_charge_analysis(
             fit_rmse or 0.0,
         )
 
-    return csv_path
+    return SurfaceChargeResult(
+        csv_path=csv_path,
+        n_frames=len(steps),
+        sigma_aligned_mean=float(sigma_aligned.mean()),
+        sigma_aligned_std=float(sigma_aligned.std()),
+        sigma_opposed_mean=float(sigma_opposed.mean()),
+        sigma_opposed_std=float(sigma_opposed.std()),
+    )
