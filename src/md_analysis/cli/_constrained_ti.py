@@ -111,8 +111,21 @@ def _run_ti_core(ctx: dict):
         reverse=ctx[K.TI_REVERSE],
     )
     print(f"\n  Found {len(point_defs)} constraint points:")
-    for p in point_defs:
-        print(f"    ξ = {p.xi:.6f}")
+    for i, p in enumerate(point_defs):
+        print(f"    [{i}] ξ = {p.xi:.6f}")
+
+    # 1b. Optional point selection via Python slice syntax
+    slice_str = prompt_str(
+        "Select points (Python slice, e.g. 3:8, :8, 3::2, empty=all)",
+        default="",
+    )
+    if slice_str:
+        parts = slice_str.split(":")
+        args = [int(x) if x.strip() else None for x in parts]
+        point_defs = point_defs[slice(*args)]
+        print(f"  Selected {len(point_defs)} points:")
+        for i, p in enumerate(point_defs):
+            print(f"    [{i}] ξ = {p.xi:.6f}")
 
     # 2. Per-point equilibration (interactive)
     default_equil = ctx[K.EQUILIBRATION]
