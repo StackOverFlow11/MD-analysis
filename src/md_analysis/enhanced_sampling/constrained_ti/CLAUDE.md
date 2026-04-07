@@ -73,12 +73,12 @@ passed, failure_reasons
 
 ## 恒电势修正（correction.py）
 
-Nørskov 修正公式：`ΔF_Φ(ξ) = ΔF_q(ξ) + Δσ[e/Å²] × ΔΦ[V] × A[Å²] / 2`
+Nørskov 修正公式：`ΔF_Φ(ξ) = ΔF_q(ξ) + [σ(ξ) − σ_ref] × [Φ(ξ) − Φ_ref] × A / 2`
 
 - σ 从各 `ti_target_*/bader/` 的 Bader 帧系综平均得到（`trajectory_surface_charge`）
 - Φ 由 calibration mapper 从 σ 外推（`mapper.predict(σ)`）
 - A 为电极表面积（从 POSCAR 晶胞计算，`AREA_VECTOR_INDICES`）
-- 初态 = 排序后第一个约束点（`sigma[0]`, `phi[0]`）
+- 基准 = IS/FS 中点：`σ_ref = (σ_IS + σ_FS) / 2`，`Φ_ref = (Φ_IS + Φ_FS) / 2`（最小化最大修正量）
 - 不做误差分析（修正项视为精确），保留 TIReport 的 λ 误差
 - 缺少 bader/ 目录时 WARN 并跳过修正
 - 依赖：`electrochemical.charge`（σ 计算）、`electrochemical.calibration`（σ→Φ）
