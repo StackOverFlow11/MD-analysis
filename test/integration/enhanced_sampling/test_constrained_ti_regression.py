@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-DATA_DIR = Path(__file__).resolve().parents[3] / "data_example" / "ti" / "ti_target_0.302356"
+DATA_DIR = Path(__file__).resolve().parents[3] / "data_example" / "ti" / "double_cv" / "1k" / "ti_target_0.302356"
 
 pytestmark = pytest.mark.skipif(
     not DATA_DIR.exists(), reason=f"Test data not found: {DATA_DIR}"

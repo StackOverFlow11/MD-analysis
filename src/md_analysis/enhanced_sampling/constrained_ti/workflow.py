@@ -21,6 +21,7 @@ from .analysis.block_average import analyze_block_average
 from .analysis.geweke import analyze_geweke
 from .analysis.running_average import analyze_running_average
 from .config import (
+    DEFAULT_AUTO_EQUIL_MIN_FRAMES,
     DEFAULT_CROSS_CHECK_RTOL,
     DEFAULT_EPSILON_TOL_EV,
     DEFAULT_N_MIN,
@@ -301,6 +302,101 @@ def analyze_single_point(
 
 
 # ---------------------------------------------------------------------------
+# Auto-equilibration (binary halving)
+# ---------------------------------------------------------------------------
+
+
+def _is_converged(report: ConstraintPointReport) -> bool:
+    """Check if a report indicates convergence.
+
+    For TI context (sem_max set): uses the composite ``passed`` flag.
+    For standalone (sem_max is None): checks Geweke, running-avg, and N_eff.
+    """
+    if report.passed is not None:
+        return bool(report.passed)
+    return (
+        bool(report.geweke.passed)
+        and bool(report.running_avg.passed)
+        and bool(report.autocorr.passed_neff)
+    )
+
+
+def _auto_equilibrate(
+    series: np.ndarray,
+    *,
+    dt: float,
+    xi: float,
+    time_start_fs: float,
+    weight: float | None,
+    sem_max: float | None,
+    point_index: int | None,
+    min_frames: int = DEFAULT_AUTO_EQUIL_MIN_FRAMES,
+    **engine_overrides: object,
+) -> ConstraintPointReport:
+    """Iteratively discard the first half until diagnostics pass.
+
+    At each iteration the series is halved (keep second half).  Stops when
+    the diagnostics pass or the remaining series is shorter than
+    *min_frames*.
+
+    The returned report's ``failure_reasons`` records how many frames were
+    used and how many iterations were performed.
+    """
+    n_original = len(series)
+    remaining = series
+    offset = 0
+    n_iter = 0
+
+    while True:
+        inp = ConstraintPointInput(
+            xi=xi,
+            lambda_series=remaining,
+            dt=dt,
+            time_start_fs=time_start_fs + offset * dt,
+            weight=weight,
+            sem_max=sem_max,
+            point_index=point_index,
+        )
+        report = analyze_single_point(inp, **engine_overrides)
+        n_iter += 1
+
+        if _is_converged(report):
+            break
+
+        half = len(remaining) // 2
+        if half < min_frames:
+            break
+
+        offset += half
+        remaining = remaining[half:]
+
+    # Annotate the report with auto-equilibration info
+    n_used = len(remaining)
+    pct = n_used / n_original * 100
+    info = (
+        f"Auto-equilibration: used last {n_used}/{n_original} frames "
+        f"({pct:.0f}%), {n_iter} iteration(s)."
+    )
+    return ConstraintPointReport(
+        xi=report.xi,
+        point_index=report.point_index,
+        n_analyzed=report.n_analyzed,
+        time_start_fs=report.time_start_fs,
+        time_end_fs=report.time_end_fs,
+        lambda_mean=report.lambda_mean,
+        sigma_lambda=report.sigma_lambda,
+        autocorr=report.autocorr,
+        block_avg=report.block_avg,
+        running_avg=report.running_avg,
+        geweke=report.geweke,
+        sem_final=report.sem_final,
+        sem_max=report.sem_max,
+        passed=report.passed,
+        failure_reasons=(info,) + report.failure_reasons,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Standalone single-point
 # ---------------------------------------------------------------------------
 
@@ -313,6 +409,7 @@ def analyze_standalone(
     sem_target: float | None = None,
     equilibration: int = 0,
     time_start_fs: float = 0.0,
+    auto_equilibration: bool = False,
     **engine_overrides: object,
 ) -> ConstraintPointReport:
     """Diagnose one constraint point independently (no TI context).
@@ -328,6 +425,9 @@ def analyze_standalone(
         Optional precision target (same unit as lambda).
     equilibration : int
         Frames to discard from start.
+    auto_equilibration : bool
+        If True, iteratively halve the series (keep second half) until
+        convergence diagnostics pass or data is exhausted.
     **engine_overrides
         Forwarded to analysis engines.
 
@@ -338,16 +438,30 @@ def analyze_standalone(
     series = lambda_series.copy()
     series, pre_warnings = _validate_and_trim(series, equilibration=equilibration)
 
-    inp = ConstraintPointInput(
-        xi=xi,
-        lambda_series=series,
-        dt=dt,
-        time_start_fs=time_start_fs + equilibration * dt,
-        weight=None,
-        sem_max=sem_target,
-        point_index=None,
-    )
-    report = analyze_single_point(inp, **engine_overrides)
+    t_start = time_start_fs + equilibration * dt
+
+    if auto_equilibration:
+        report = _auto_equilibrate(
+            series,
+            dt=dt,
+            xi=xi,
+            time_start_fs=t_start,
+            weight=None,
+            sem_max=sem_target,
+            point_index=None,
+            **engine_overrides,
+        )
+    else:
+        inp = ConstraintPointInput(
+            xi=xi,
+            lambda_series=series,
+            dt=dt,
+            time_start_fs=t_start,
+            weight=None,
+            sem_max=sem_target,
+            point_index=None,
+        )
+        report = analyze_single_point(inp, **engine_overrides)
 
     # Prepend pre-analysis warnings
     if pre_warnings:
@@ -384,6 +498,7 @@ def analyze_ti(
     epsilon_tol_ev: float = DEFAULT_EPSILON_TOL_EV,
     equilibration: int | list[int] = 0,
     time_starts: list[float] | None = None,
+    auto_equilibration: bool = False,
     **engine_overrides: object,
 ) -> TIReport:
     """Run full constrained-TI convergence analysis.
@@ -403,6 +518,9 @@ def analyze_ti(
     time_starts : list[float] or None
         Absolute start time (fs) per point from restart files.
         If None, defaults to 0.0 for all points.
+    auto_equilibration : bool
+        If True, iteratively halve each point's series until convergence
+        diagnostics pass or data is exhausted.
     **engine_overrides
         Forwarded to analysis engines.
 
@@ -444,16 +562,28 @@ def analyze_ti(
         # Analyzed window starts after equilibration
         t_start_analyzed = ts_list[i] + equil_list[i] * dt
 
-        inp = ConstraintPointInput(
-            xi=float(xi_values[i]),
-            lambda_series=series,
-            dt=dt,
-            time_start_fs=t_start_analyzed,
-            weight=float(weights[i]),
-            sem_max=float(sem_targets[i]),
-            point_index=i,
-        )
-        report = analyze_single_point(inp, **engine_overrides)
+        if auto_equilibration:
+            report = _auto_equilibrate(
+                series,
+                dt=dt,
+                xi=float(xi_values[i]),
+                time_start_fs=t_start_analyzed,
+                weight=float(weights[i]),
+                sem_max=float(sem_targets[i]),
+                point_index=i,
+                **engine_overrides,
+            )
+        else:
+            inp = ConstraintPointInput(
+                xi=float(xi_values[i]),
+                lambda_series=series,
+                dt=dt,
+                time_start_fs=t_start_analyzed,
+                weight=float(weights[i]),
+                sem_max=float(sem_targets[i]),
+                point_index=i,
+            )
+            report = analyze_single_point(inp, **engine_overrides)
         if pre_warnings:
             report = ConstraintPointReport(
                 xi=report.xi,
@@ -520,6 +650,7 @@ def standalone_diagnostics(
     sem_target: float | None = None,
     colvar_id: int | None = None,
     output_dir: Path | None = None,
+    auto_equilibration: bool = False,
 ) -> dict[str, Path | ConstraintPointReport]:
     """Parse + analyze + plot + CSV for one constraint point.
 
@@ -563,6 +694,7 @@ def standalone_diagnostics(
         sem_target=sem_target,
         equilibration=equilibration,
         time_start_fs=t0,
+        auto_equilibration=auto_equilibration,
     )
 
     n_total = len(lambda_series)

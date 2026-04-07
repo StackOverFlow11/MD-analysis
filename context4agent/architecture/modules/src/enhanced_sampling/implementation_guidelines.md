@@ -100,6 +100,12 @@ Nørskov 修正将恒电荷 TI 自由能转换为恒电势自由能：
 - 不做误差分析（修正项视为精确）
 - 缺少 bader/ 目录时 WARN 并跳过修正
 
+### Auto-equilibration（可选功能）
+
+`analyze_standalone` / `analyze_ti` / `standalone_diagnostics` 支持 `auto_equilibration=True`。
+二分砍前半迭代：每轮取后半段重跑四步诊断，通过则返回，帧数不足（<100）则报不收敛。
+默认关闭，不影响现有行为。
+
 ### 依赖方向
 
 `correction.py` → `electrochemical.charge.Bader.SurfaceCharge`（σ 计算）

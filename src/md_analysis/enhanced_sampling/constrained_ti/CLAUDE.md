@@ -63,6 +63,16 @@ geweke_z, geweke_reliable, drift_D,
 passed, failure_reasons
 ```
 
+## Auto-equilibration（可选）
+
+`analyze_standalone` / `analyze_ti` / `standalone_diagnostics` 均支持 `auto_equilibration=True`：
+- 二分砍前半：每轮取后半段数据重跑四步诊断
+- 通过 → 返回；数据不足（< `DEFAULT_AUTO_EQUIL_MIN_FRAMES=100`）→ 返回不收敛
+- `failure_reasons` 中记录使用帧数和迭代次数
+- 默认关闭（`False`），不影响现有行为
+- `_is_converged()` 内部函数：TI 上下文用 `passed`，standalone 检查 geweke + running_avg + N_eff
+- `_auto_equilibrate()` 内部函数：循环体调 `analyze_single_point`，完全复用现有诊断引擎
+
 ## 陷阱
 
 - `analyze_block_average` 不再接受 `sem_auto`, `dense_sampling`, `arctan_*` 参数（2026-03-24 F&P 重构已删除 arctan）
