@@ -273,6 +273,9 @@ def plot_free_energy_profile(
     ax1.set_xlabel("ξ (a.u.)")
     if len(xi) >= 2 and xi[0] > xi[-1]:
         ax1.invert_xaxis()
+    # Show all CV values as x-axis ticks
+    ax1.set_xticks(xi)
+    ax1.set_xticklabels([f"{v:.4f}" for v in xi], rotation=45, ha="right", fontsize=7)
     ax1.set_ylabel("dA/dξ (a.u.)", color="C0")
     ax1.tick_params(axis="y", labelcolor="C0")
 
@@ -338,6 +341,8 @@ def plot_corrected_free_energy_profile(
     ax1.set_xlabel("ξ (a.u.)")
     if len(xi) >= 2 and xi[0] > xi[-1]:
         ax1.invert_xaxis()
+    ax1.set_xticks(xi)
+    ax1.set_xticklabels([f"{v:.4f}" for v in xi], rotation=45, ha="right", fontsize=7)
     ax1.set_ylabel("dA/dξ (a.u.)", color="C0")
     ax1.tick_params(axis="y", labelcolor="C0")
 
