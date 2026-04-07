@@ -347,22 +347,22 @@ def plot_corrected_free_energy_profile(
         np.cumsum(tr.weights**2 * errors**2)
     ) * HA_TO_EV
 
-    # Const-q (dashed orange with error band)
+    # Const-q (dashed orange, no error band)
     ax2.plot(
         xi, result.A_const_q_eV, "--s", color="C1",
         markersize=3, linewidth=1.0, label="A(ξ) const-q", alpha=0.7,
     )
-    ax2.fill_between(
-        xi,
-        result.A_const_q_eV - cumul_sigma,
-        result.A_const_q_eV + cumul_sigma,
-        alpha=0.15, color="C1",
-    )
 
-    # Const-phi (solid red)
+    # Const-phi (solid red with error band)
     ax2.plot(
         xi, result.A_const_phi_eV, "-o", color="C3",
         markersize=3, linewidth=1.2, label="A(ξ) const-Φ",
+    )
+    ax2.fill_between(
+        xi,
+        result.A_const_phi_eV - cumul_sigma,
+        result.A_const_phi_eV + cumul_sigma,
+        alpha=0.15, color="C3",
     )
 
     ax2.set_ylabel("A(ξ) (eV)")
