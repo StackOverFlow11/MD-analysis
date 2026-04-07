@@ -70,15 +70,19 @@ from md_analysis.enhanced_sampling.constrained_ti.correction import (
 
 ```python
 analyze_standalone(series, *, dt=1.0, xi=0.0, sem_target=None,
-                   equilibration=0, **engine_overrides) → ConstraintPointReport
+                   equilibration=0, time_start_fs=0.0,
+                   auto_equilibration=False,
+                   **engine_overrides) → ConstraintPointReport
 
 analyze_ti(xi_values, lambda_series_list, dt, *,
            epsilon_tol_ev=0.05, equilibration=0,
+           time_starts=None, auto_equilibration=False,
            **engine_overrides) → TIReport
 
 standalone_diagnostics(restart_path, log_path, *, equilibration=0,
                        sem_target=None, colvar_id=None,
-                       output_dir=None) → dict[str, Path | ConstraintPointReport]
+                       output_dir=None,
+                       auto_equilibration=False) → dict[str, Path | ConstraintPointReport]
 ```
 
 ### constrained_ti.io

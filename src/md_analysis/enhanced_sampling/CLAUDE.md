@@ -67,5 +67,8 @@ TIGen 工作目录生成在 `scripts/TIGen.py`（不在此包中）。
 2. Flyvbjerg-Petersen block averaging → SEM_block（pow2 + δSEM 平台检测）
 3. Running average drift check
 4. Geweke stationarity test
-5. 恒电势自由能修正（Nørskov，`correction.py`）：从 Bader 帧提取 σ → calibration mapper 外推 Φ → 修正项
-5. sem_final: F&P plateau → ACF fallback
+5. 恒电势自由能修正（Nørskov，`correction.py`）：IS/FS 中点基准
+6. sem_final: F&P plateau → ACF fallback
+7. 可选 auto-equilibration：二分砍前半迭代直到四步诊断通过（`auto_equilibration=True`）
+8. CLI 312/313 支持 Python 切片选择约束点子集（如 `3:8`、`::2`）
+9. 自由能图 x 轴显示所有约束点 ξ 值

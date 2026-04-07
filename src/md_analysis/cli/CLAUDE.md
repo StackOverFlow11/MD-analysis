@@ -61,6 +61,19 @@ VASPKIT 风格交互式编号菜单。无 argparse，所有输入通过 `input()
 3. 如需新参数键 → 在 `_params.py` 的 `K` 类中添加常量
 4. 如需新参数类型 → 创建 `ParamCollector` 子类或使用现有泛型类
 
+## Constrained TI (312/313) 交互流程
+
+`_collect_ti_base_params` 采集共享参数，包含：
+- `K.TI_ROOT_DIR`、`K.TI_DIR_PATTERN`、`K.EQUILIBRATION`、`K.EPSILON_TOL_EV`、`K.TI_REVERSE`
+- `K.AUTO_EQUILIBRATION`：可选自动预平衡迭代（二分砍前半直到收敛）
+
+`_run_ti_core` 执行共享 TI 分析，流程：
+1. 发现约束点 → 带索引列表显示 `[0] ξ = ...`
+2. **Python 切片选择**（可选）：用户输入如 `3:8`、`::2`、`:8` 等，空回车 = 全部
+3. 可选逐点 equilibration 覆盖
+4. 加载数据 → dt 一致性检查
+5. `analyze_ti(... auto_equilibration=ctx[K.AUTO_EQUILIBRATION])` → 控制台摘要表 → 写文件
+
 ## 陷阱与历史 Bug
 
 - 菜单码重编号（bace527）：旧代码中 401/402 已改为 411/412
