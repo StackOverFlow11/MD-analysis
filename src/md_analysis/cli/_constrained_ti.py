@@ -48,6 +48,10 @@ def _collect_ti_base_params(ctx: dict) -> None:
         "Reverse integration direction (initial state = max ξ)?",
         default=False,
     )
+    ctx[K.AUTO_EQUILIBRATION] = prompt_bool(
+        "Auto-equilibration (iteratively discard first half until converged)?",
+        default=False,
+    )
 
 
 def _run_ti_core(ctx: dict):
@@ -154,6 +158,7 @@ def _run_ti_core(ctx: dict):
         epsilon_tol_ev=ctx[K.EPSILON_TOL_EV],
         equilibration=equilibration,
         time_starts=time_starts,
+        auto_equilibration=ctx.get(K.AUTO_EQUILIBRATION, False),
     )
 
     # 6. Console summary table

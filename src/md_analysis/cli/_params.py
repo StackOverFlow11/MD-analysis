@@ -81,6 +81,7 @@ class K:
     TI_DIR_PATTERN = "ti_dir_pattern"  # distinct from DIR_PATTERN (Bader)
     EPSILON_TOL_EV = "epsilon_tol_ev"
     TI_REVERSE = "ti_reverse"
+    AUTO_EQUILIBRATION = "auto_equilibration"
     # Potential input mode (continuous MD vs distributed SP)
     INPUT_MODE = "input_mode"
     SP_ROOT_DIR = "sp_root_dir"
