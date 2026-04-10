@@ -9,9 +9,9 @@ from importlib.resources import as_file, files
 from pathlib import Path
 
 from ase import Atoms
-from ase.io import iread
 
 from ..config import KEY_VASP_SCRIPT_PATH, get_config
+from ._frame_selector import FrameSelection, iter_selected_frames
 from .utils.IndexMapper import compute_index_map, write_poscar_with_map
 
 logger = logging.getLogger(__name__)
@@ -138,9 +138,13 @@ def batch_generate_bader_workdirs(
     cell_abc: tuple[float, float, float],
     output_dir: str | Path,
     *,
+    mode: str = "index",
     frame_start: int = 0,
     frame_end: int | None = None,
     frame_step: int = 1,
+    time_start_fs: float | None = None,
+    time_end_fs: float | None = None,
+    time_step_fs: float | None = None,
     script_path: str | Path | None = None,
     element_order: tuple[str, ...] | None = None,
     generate_potcar: bool = True,
@@ -157,12 +161,13 @@ def batch_generate_bader_workdirs(
         Orthogonal cell lengths (A), e.g. from ``parse_abc_from_restart``.
     output_dir : str or Path
         Parent directory; sub-directories ``bader_t{time}_i{step}`` are created.
-    frame_start : int
-        0-based index of first frame (default 0).
-    frame_end : int or None
-        0-based exclusive upper bound (default: all frames).
-    frame_step : int
-        Step between frames (default 1).
+    mode : {"index", "time"}
+        Frame selection mode. See ``FrameSelection`` for details.
+    frame_start, frame_end, frame_step : int
+        Index mode: 0-based frame slice (default: all frames, step=1).
+    time_start_fs, time_end_fs, time_step_fs : float or None
+        Time mode: inclusive [start, end] range with greedy stepping.
+        All three must be provided together.
     script_path : str, Path or None
         Submission script to copy (falls back to config).
     element_order : tuple[str, ...] or None
@@ -183,17 +188,21 @@ def batch_generate_bader_workdirs(
     output_dir = Path(output_dir)
     source = str(xyz_path)
 
-    # Collect frames to process using start/stop/step logic.
-    next_yield = frame_start
+    # Collect frames via unified selector
+    selection = FrameSelection(
+        mode=mode,  # type: ignore[arg-type]
+        frame_start=frame_start,
+        frame_end=frame_end,
+        frame_step=frame_step,
+        time_start_fs=time_start_fs,
+        time_end_fs=time_end_fs,
+        time_step_fs=time_step_fs,
+    )
     frames: list[tuple[int, Atoms]] = []
-    for idx, atoms in enumerate(iread(str(xyz_path), index=":")):
-        if frame_end is not None and idx >= frame_end:
-            break
-        if idx == next_yield:
-            atoms.set_cell(cell_abc)
-            atoms.set_pbc(True)
-            frames.append((idx, atoms))
-            next_yield += frame_step
+    for idx, atoms in iter_selected_frames(xyz_path, selection):
+        atoms.set_cell(cell_abc)
+        atoms.set_pbc(True)
+        frames.append((idx, atoms))
 
     logger.info("Batch Bader: %d frames from %s", len(frames), xyz_path)
 

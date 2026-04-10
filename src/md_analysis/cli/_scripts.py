@@ -1,4 +1,4 @@
-"""Scripts / Tools command classes (Bader 411-412, TI 421-422)."""
+"""Scripts / Tools command classes (Bader 411-412, TI 421-422, Potential 431-432, SpGen 441-442)."""
 
 from __future__ import annotations
 
@@ -7,16 +7,117 @@ from pathlib import Path
 from ._framework import MenuCommand, lazy_import
 from ._params import (
     BoolParam,
+    ConditionalParam,
     DisplayAction,
+    FloatParam,
     IntParam,
     K,
     StrParam,
     cell_abc,
     cp2k_script,
+    dp_sp_inp_template,
+    frame_mode,
     gen_potcar,
+    single_time_fs,
     sp_inp_template,
+    time_end_fs,
+    time_start_fs,
+    time_step_fs,
     vasp_script,
 )
+
+
+# ---------------------------------------------------------------------------
+# Helpers for frame selection mode (shared by Bader/Potential/SpGen commands)
+# ---------------------------------------------------------------------------
+
+_IS_INDEX_MODE = lambda ctx: ctx[K.FRAME_MODE] == "index"
+_IS_TIME_MODE = lambda ctx: ctx[K.FRAME_MODE] == "time"
+
+
+def _resolve_single_frame_from_ctx(ctx: dict):
+    """Resolve (frame_idx, atoms) from CLI ctx using frame_mode.
+
+    Logs any warnings returned by ``resolve_single_frame`` at WARNING level.
+    """
+    import logging as _logging
+    resolve_single_frame = lazy_import(
+        "md_analysis.scripts._frame_selector", "resolve_single_frame",
+    )
+
+    mode = ctx[K.FRAME_MODE]
+    if mode == "index":
+        idx, atoms, warnings = resolve_single_frame(
+            ctx[K.XYZ], mode="index", frame=ctx[K.FRAME],
+        )
+    else:
+        idx, atoms, warnings = resolve_single_frame(
+            ctx[K.XYZ], mode="time", time_fs=ctx[K.SINGLE_TIME_FS],
+        )
+
+    _logger = _logging.getLogger("md_analysis.cli")
+    for w in warnings:
+        _logger.warning(w)
+        print(f"  WARNING: {w}")
+
+    return idx, atoms
+
+
+def _frame_selection_params() -> tuple:
+    """Return the common frame-selection param block for Batch commands.
+
+    Order: mode prompt → conditional (index triplet) → conditional (time triplet).
+    """
+    return (
+        frame_mode,
+        ConditionalParam(
+            IntParam(K.FRAME_START, "Frame start (0-based)", default=0),
+            _IS_INDEX_MODE,
+        ),
+        ConditionalParam(
+            IntParam(K.FRAME_END, "Frame end (exclusive, empty=all)", default=None),
+            _IS_INDEX_MODE,
+        ),
+        ConditionalParam(
+            IntParam(K.FRAME_STEP, "Frame step", default=1),
+            _IS_INDEX_MODE,
+        ),
+        ConditionalParam(time_start_fs, _IS_TIME_MODE),
+        ConditionalParam(time_end_fs, _IS_TIME_MODE),
+        ConditionalParam(time_step_fs, _IS_TIME_MODE),
+    )
+
+
+def _single_frame_params() -> tuple:
+    """Return the common frame-selection param block for Single commands."""
+    return (
+        frame_mode,
+        ConditionalParam(
+            IntParam(K.FRAME, "Frame number (0-based)", default=0),
+            _IS_INDEX_MODE,
+        ),
+        ConditionalParam(single_time_fs, _IS_TIME_MODE),
+    )
+
+
+def _batch_frame_kwargs_from_ctx(ctx: dict) -> dict:
+    """Build kwargs for batch_generate_*_workdirs from CLI ctx.
+
+    Always passes mode + both parameter sets; FrameSelection internally
+    ignores the unused set based on mode.
+    """
+    return {
+        "mode": ctx[K.FRAME_MODE],
+        "frame_start": ctx[K.FRAME_START],
+        "frame_end": ctx[K.FRAME_END],
+        "frame_step": ctx[K.FRAME_STEP],
+        "time_start_fs": ctx[K.TIME_START_FS]
+            if ctx[K.FRAME_MODE] == "time" else None,
+        "time_end_fs": ctx[K.TIME_END_FS]
+            if ctx[K.FRAME_MODE] == "time" else None,
+        "time_step_fs": ctx[K.TIME_STEP_FS]
+            if ctx[K.FRAME_MODE] == "time" else None,
+    }
 from ._prompt import (
     prompt_choice,
     prompt_float,
@@ -78,7 +179,7 @@ class BaderSingleCmd(MenuCommand):
         StrParam(K.XYZ, "XYZ trajectory file (e.g. md-pos-1.xyz)", required=True),
         DisplayAction(lambda ctx: _print_trajectory_info(ctx[K.XYZ])),
         cell_abc,
-        IntParam(K.FRAME, "Frame number (0-based)", default=0),
+        *_single_frame_params(),
         StrParam(K.OUTDIR, "Output directory", default="."),
         StrParam(K.WORKDIR_NAME, "Work directory name", default="bader"),
         vasp_script,
@@ -86,18 +187,9 @@ class BaderSingleCmd(MenuCommand):
     )
 
     def execute(self, ctx: dict) -> None:
-        iread = lazy_import("ase.io", "iread")
         generate = lazy_import("md_analysis.scripts", "generate_bader_workdir")
 
-        print(f"\n Reading frame {ctx[K.FRAME]} from {ctx[K.XYZ]} ...")
-        atoms = None
-        for i, a in enumerate(iread(ctx[K.XYZ], index=":")):
-            if i == ctx[K.FRAME]:
-                atoms = a
-                break
-        if atoms is None:
-            print(f"  Error: frame {ctx[K.FRAME]} not found in {ctx[K.XYZ]}")
-            return
+        frame_idx, atoms = _resolve_single_frame_from_ctx(ctx)
 
         atoms.set_cell(ctx[K.CELL_ABC])
         atoms.set_pbc(True)
@@ -107,7 +199,7 @@ class BaderSingleCmd(MenuCommand):
             ctx[K.OUTDIR],
             script_path=ctx[K.SCRIPT_PATH],
             workdir_name=ctx[K.WORKDIR_NAME],
-            frame=ctx[K.FRAME],
+            frame=frame_idx,
             source=ctx[K.XYZ],
             generate_potcar=ctx[K.GEN_POTCAR],
         )
@@ -123,9 +215,7 @@ class BaderBatchCmd(MenuCommand):
         StrParam(K.XYZ, "XYZ trajectory file (e.g. md-pos-1.xyz)", required=True),
         DisplayAction(lambda ctx: _print_trajectory_info(ctx[K.XYZ])),
         cell_abc,
-        IntParam(K.FRAME_START, "Frame start (0-based)", default=0),
-        IntParam(K.FRAME_END, "Frame end (exclusive, empty=all)", default=None),
-        IntParam(K.FRAME_STEP, "Frame step", default=1),
+        *_frame_selection_params(),
         StrParam(K.OUTDIR, "Output directory", default="."),
         vasp_script,
         gen_potcar,
@@ -133,13 +223,12 @@ class BaderBatchCmd(MenuCommand):
 
     def execute(self, ctx: dict) -> None:
         batch = lazy_import("md_analysis.scripts", "batch_generate_bader_workdirs")
+        kwargs = _batch_frame_kwargs_from_ctx(ctx)
         dirs = batch(
             ctx[K.XYZ],
             ctx[K.CELL_ABC],
             ctx[K.OUTDIR],
-            frame_start=ctx[K.FRAME_START],
-            frame_end=ctx[K.FRAME_END],
-            frame_step=ctx[K.FRAME_STEP],
+            **kwargs,
             script_path=ctx[K.SCRIPT_PATH],
             generate_potcar=ctx[K.GEN_POTCAR],
             verbose=True,
@@ -308,7 +397,7 @@ class PotentialSingleCmd(MenuCommand):
         StrParam(K.XYZ, "XYZ trajectory file (e.g. md-pos-1.xyz)", required=True),
         DisplayAction(lambda ctx: _print_trajectory_info(ctx[K.XYZ])),
         cell_abc,
-        IntParam(K.FRAME, "Frame number (0-based)", default=0),
+        *_single_frame_params(),
         sp_inp_template,
         StrParam(K.OUTDIR, "Output directory", default="."),
         StrParam(K.WORKDIR_NAME, "Work directory name", default="potential"),
@@ -316,18 +405,9 @@ class PotentialSingleCmd(MenuCommand):
     )
 
     def execute(self, ctx: dict) -> None:
-        iread = lazy_import("ase.io", "iread")
         generate = lazy_import("md_analysis.scripts", "generate_potential_workdir")
 
-        print(f"\n Reading frame {ctx[K.FRAME]} from {ctx[K.XYZ]} ...")
-        atoms = None
-        for i, a in enumerate(iread(ctx[K.XYZ], index=":")):
-            if i == ctx[K.FRAME]:
-                atoms = a
-                break
-        if atoms is None:
-            print(f"  Error: frame {ctx[K.FRAME]} not found in {ctx[K.XYZ]}")
-            return
+        frame_idx, atoms = _resolve_single_frame_from_ctx(ctx)
 
         atoms.set_cell(ctx[K.CELL_ABC])
         atoms.set_pbc(True)
@@ -339,7 +419,7 @@ class PotentialSingleCmd(MenuCommand):
             cell_abc=ctx[K.CELL_ABC],
             script_path=ctx[K.SCRIPT_PATH],
             workdir_name=ctx[K.WORKDIR_NAME],
-            frame=ctx[K.FRAME],
+            frame=frame_idx,
             source=ctx[K.XYZ],
         )
 
@@ -355,9 +435,7 @@ class PotentialBatchCmd(MenuCommand):
         StrParam(K.XYZ, "XYZ trajectory file (e.g. md-pos-1.xyz)", required=True),
         DisplayAction(lambda ctx: _print_trajectory_info(ctx[K.XYZ])),
         cell_abc,
-        IntParam(K.FRAME_START, "Frame start (0-based)", default=0),
-        IntParam(K.FRAME_END, "Frame end (exclusive, empty=all)", default=None),
-        IntParam(K.FRAME_STEP, "Frame step", default=1),
+        *_frame_selection_params(),
         sp_inp_template,
         StrParam(K.OUTDIR, "Output directory", default="."),
         cp2k_script,
@@ -365,17 +443,89 @@ class PotentialBatchCmd(MenuCommand):
 
     def execute(self, ctx: dict) -> None:
         batch = lazy_import("md_analysis.scripts", "batch_generate_potential_workdirs")
+        kwargs = _batch_frame_kwargs_from_ctx(ctx)
         dirs = batch(
             ctx[K.XYZ],
             ctx[K.CELL_ABC],
             ctx[K.OUTDIR],
             inp_template_path=ctx[K.INP_TEMPLATE],
-            frame_start=ctx[K.FRAME_START],
-            frame_end=ctx[K.FRAME_END],
-            frame_step=ctx[K.FRAME_STEP],
+            **kwargs,
             script_path=ctx[K.SCRIPT_PATH],
             verbose=True,
         )
         print(f"\n Created {len(dirs)} potential work directories:")
+        for d in dirs:
+            print(f"  {d}")
+
+
+# ---------------------------------------------------------------------------
+# SpGen SP commands for DeePMD training (44x)
+# ---------------------------------------------------------------------------
+
+
+class SpGenSingleCmd(MenuCommand):
+    """Generate one SP work directory for DeePMD training."""
+
+    params = (
+        StrParam(K.XYZ, "XYZ trajectory file (e.g. md-pos-1.xyz)", required=True),
+        DisplayAction(lambda ctx: _print_trajectory_info(ctx[K.XYZ])),
+        cell_abc,
+        *_single_frame_params(),
+        dp_sp_inp_template,
+        StrParam(K.OUTDIR, "Output directory", default="."),
+        StrParam(K.WORKDIR_NAME, "Work directory name", default="sp"),
+        cp2k_script,
+    )
+
+    def execute(self, ctx: dict) -> None:
+        generate = lazy_import("md_analysis.scripts", "generate_sp_workdir")
+
+        frame_idx, atoms = _resolve_single_frame_from_ctx(ctx)
+
+        atoms.set_cell(ctx[K.CELL_ABC])
+        atoms.set_pbc(True)
+
+        workdir = generate(
+            atoms,
+            ctx[K.OUTDIR],
+            inp_template_path=ctx[K.INP_TEMPLATE],
+            cell_abc=ctx[K.CELL_ABC],
+            script_path=ctx[K.SCRIPT_PATH],
+            workdir_name=ctx[K.WORKDIR_NAME],
+            frame=frame_idx,
+            source=ctx[K.XYZ],
+        )
+
+        print(f"\n SP work directory for DeePMD training: {workdir}")
+        contents = sorted(p.name for p in workdir.iterdir())
+        print(f"  Contents: {', '.join(contents)}")
+
+
+class SpGenBatchCmd(MenuCommand):
+    """Batch-generate SP work directories for DeePMD training."""
+
+    params = (
+        StrParam(K.XYZ, "XYZ trajectory file (e.g. md-pos-1.xyz)", required=True),
+        DisplayAction(lambda ctx: _print_trajectory_info(ctx[K.XYZ])),
+        cell_abc,
+        *_frame_selection_params(),
+        dp_sp_inp_template,
+        StrParam(K.OUTDIR, "Output directory", default="."),
+        cp2k_script,
+    )
+
+    def execute(self, ctx: dict) -> None:
+        batch = lazy_import("md_analysis.scripts", "batch_generate_sp_workdirs")
+        kwargs = _batch_frame_kwargs_from_ctx(ctx)
+        dirs = batch(
+            ctx[K.XYZ],
+            ctx[K.CELL_ABC],
+            ctx[K.OUTDIR],
+            inp_template_path=ctx[K.INP_TEMPLATE],
+            **kwargs,
+            script_path=ctx[K.SCRIPT_PATH],
+            verbose=True,
+        )
+        print(f"\n Created {len(dirs)} SP work directories for DeePMD training:")
         for d in dirs:
             print(f"  {d}")

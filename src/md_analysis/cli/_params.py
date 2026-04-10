@@ -8,6 +8,7 @@ from typing import Any
 
 from ..config import (
     KEY_CP2K_SCRIPT_PATH,
+    KEY_DP_SP_INP_TEMPLATE_PATH,
     KEY_LAYER_TOL_A,
     KEY_SP_INP_TEMPLATE_PATH,
     KEY_VASP_SCRIPT_PATH,
@@ -24,6 +25,12 @@ class K:
     DZ_A = "dz_A"
     LAYER_TOL = "layer_tol"
     OUTDIR = "outdir"
+    # Trajectory frame selection (shared by Bader/Potential/SpGen batch commands)
+    FRAME_MODE = "frame_mode"
+    TIME_START_FS = "time_start_fs"
+    TIME_END_FS = "time_end_fs"
+    TIME_STEP_FS = "time_step_fs"
+    SINGLE_TIME_FS = "single_time_fs"
     OUTDIR_RESOLVED = "outdir_resolved"
     FRAME_START = "frame_start"
     FRAME_END = "frame_end"
@@ -475,4 +482,15 @@ cp2k_script = ConfigStrParam(K.SCRIPT_PATH, "Submission script path",
 sp_inp_template = ConfigStrParam(K.INP_TEMPLATE,
                                  "SP inp template path (e.g. sp.inp)",
                                  config_key=KEY_SP_INP_TEMPLATE_PATH)
+dp_sp_inp_template = ConfigStrParam(K.INP_TEMPLATE,
+                                    "DP SP inp template path (e.g. sp.inp)",
+                                    config_key=KEY_DP_SP_INP_TEMPLATE_PATH)
 gen_potcar = BoolParam(K.GEN_POTCAR, "Generate POTCAR via vaspkit?", default=True)
+
+# Trajectory frame selection (shared by Bader/Potential/SpGen Batch + Single commands)
+frame_mode = ChoiceParam(K.FRAME_MODE, "Frame selection mode",
+                         choices=["index", "time"], default="time")
+time_start_fs = FloatParam(K.TIME_START_FS, "Start time (fs)", default=0.0)
+time_end_fs = FloatParam(K.TIME_END_FS, "End time (fs)", default=1000.0)
+time_step_fs = FloatParam(K.TIME_STEP_FS, "Time step (fs)", default=10.0)
+single_time_fs = FloatParam(K.SINGLE_TIME_FS, "Target time (fs)", default=0.0)

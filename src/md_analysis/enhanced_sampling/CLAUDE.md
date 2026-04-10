@@ -6,6 +6,8 @@
 
 CLI 入口在菜单 3 下分两个子组：`30)` Slow-Growth (301-302)、`31)` Constrained TI Analysis (311-313)。
 
+Agent 入口：`dispatch("ti_full_analysis", {root_dir, output_dir, ...})`（自定义 handler，编排 discover→load→analyze→plot+CSV，支持 `point_slice` 切片选择）。
+
 TIGen 工作目录生成在 `scripts/TIGen.py`（不在此包中）。
 
 ## 子目录

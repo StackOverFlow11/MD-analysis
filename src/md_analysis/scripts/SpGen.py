@@ -1,4 +1,4 @@
-"""Generate CP2K single-point work directories for Hartree potential analysis."""
+"""Generate CP2K single-point work directories for DeePMD training data."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from pathlib import Path
 from ase import Atoms
 from ase.io import write
 
-from ..config import KEY_CP2K_SCRIPT_PATH, KEY_SP_INP_TEMPLATE_PATH, get_config
+from ..config import KEY_CP2K_SCRIPT_PATH, KEY_DP_SP_INP_TEMPLATE_PATH, get_config
 from ..exceptions import MDAnalysisError
 from ._frame_selector import FrameSelection, iter_selected_frames
 from ._inp_utils import modify_inp_for_sp
@@ -17,26 +17,27 @@ from ._inp_utils import modify_inp_for_sp
 logger = logging.getLogger(__name__)
 
 
-class PotentialGenError(MDAnalysisError):
-    """Raised when potential work directory generation fails."""
+class SpGenError(MDAnalysisError):
+    """Raised when SP work directory generation fails."""
 
 
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
-def generate_potential_workdir(
+
+def generate_sp_workdir(
     atoms: Atoms,
     output_dir: str | Path,
     *,
     inp_template_path: str | Path | None = None,
     cell_abc: tuple[float, float, float] | None = None,
     script_path: str | Path | None = None,
-    workdir_name: str = "potential",
+    workdir_name: str = "sp",
     frame: int = 0,
     source: str = "",
 ) -> Path:
-    """Create a CP2K single-point work directory for Hartree potential analysis.
+    """Create a CP2K single-point work directory for DeePMD training.
 
     Parameters
     ----------
@@ -46,14 +47,14 @@ def generate_potential_workdir(
         Parent directory under which *workdir_name* will be created.
     inp_template_path : str, Path or None
         Path to the CP2K sp.inp template file.
-        If ``None``, falls back to the persisted config value.
+        If ``None``, falls back to ``KEY_DP_SP_INP_TEMPLATE_PATH`` in config.
     cell_abc : (float, float, float) or None
         Orthogonal cell lengths (A). If ``None``, uses cell from *atoms*.
     script_path : str, Path or None
         Path to a job submission script to copy as ``script.sh``.
-        If ``None``, falls back to the persisted config value.
+        If ``None``, falls back to ``KEY_CP2K_SCRIPT_PATH`` in config.
     workdir_name : str
-        Name of the work directory (default ``"potential"``).
+        Name of the work directory (default ``"sp"``).
     frame : int
         0-based trajectory frame number (metadata only).
     source : str
@@ -66,24 +67,24 @@ def generate_potential_workdir(
 
     Raises
     ------
-    PotentialGenError
+    SpGenError
         If the inp template is not found or invalid.
     """
-    logger.info("Generating potential workdir: frame=%d, workdir=%s", frame, workdir_name)
+    logger.info("Generating SP workdir: frame=%d, workdir=%s", frame, workdir_name)
 
     # Resolve inp template
     if inp_template_path is None:
-        cfg_val = get_config(KEY_SP_INP_TEMPLATE_PATH)
+        cfg_val = get_config(KEY_DP_SP_INP_TEMPLATE_PATH)
         if cfg_val is not None:
             inp_template_path = cfg_val
     if inp_template_path is None:
-        raise PotentialGenError(
-            "No SP inp template specified. Provide inp_template_path or "
-            "set it via Settings → Set SP Inp Template Path."
+        raise SpGenError(
+            "No DP SP inp template specified. Provide inp_template_path or "
+            "set it via Settings → Set DP SP Inp Template Path."
         )
     inp_template_path = Path(inp_template_path)
     if not inp_template_path.is_file():
-        raise FileNotFoundError(f"SP inp template not found: {inp_template_path}")
+        raise FileNotFoundError(f"DP SP inp template not found: {inp_template_path}")
 
     # Resolve cell
     if cell_abc is None:
@@ -118,7 +119,7 @@ def generate_potential_workdir(
     return workdir
 
 
-def batch_generate_potential_workdirs(
+def batch_generate_sp_workdirs(
     xyz_path: str | Path,
     cell_abc: tuple[float, float, float],
     output_dir: str | Path,
@@ -134,7 +135,7 @@ def batch_generate_potential_workdirs(
     script_path: str | Path | None = None,
     verbose: bool = False,
 ) -> list[Path]:
-    """Batch-generate SP potential work directories from a CP2K XYZ trajectory.
+    """Batch-generate SP work directories from a CP2K XYZ trajectory for DP training.
 
     Parameters
     ----------
@@ -143,12 +144,13 @@ def batch_generate_potential_workdirs(
     cell_abc : (float, float, float)
         Orthogonal cell lengths (A), e.g. from ``parse_abc_from_restart``.
     output_dir : str or Path
-        Parent directory; sub-directories ``potential_t{time}_i{step}`` are created.
+        Parent directory; sub-directories ``sp_t{time}_i{step}`` are created.
     inp_template_path : str, Path or None
         Path to the CP2K sp.inp template file.
-        If ``None``, falls back to the persisted config value.
+        If ``None``, falls back to ``KEY_DP_SP_INP_TEMPLATE_PATH`` in config.
     mode : {"index", "time"}
-        Frame selection mode. See ``FrameSelection`` for details.
+        Frame selection mode. ``"index"`` uses ``frame_start/end/step``;
+        ``"time"`` uses ``time_start_fs/end_fs/step_fs`` (all required).
     frame_start, frame_end, frame_step : int
         Index mode: 0-based frame slice (default: all frames, step=1).
     time_start_fs, time_end_fs, time_step_fs : float or None
@@ -166,21 +168,20 @@ def batch_generate_potential_workdirs(
     """
     xyz_path = Path(xyz_path)
     output_dir = Path(output_dir)
-    source = str(xyz_path)
 
     # Pre-read and modify inp template once
     if inp_template_path is None:
-        cfg_val = get_config(KEY_SP_INP_TEMPLATE_PATH)
+        cfg_val = get_config(KEY_DP_SP_INP_TEMPLATE_PATH)
         if cfg_val is not None:
             inp_template_path = cfg_val
     if inp_template_path is None:
-        raise PotentialGenError(
-            "No SP inp template specified. Provide inp_template_path or "
-            "set it via Settings → Set SP Inp Template Path."
+        raise SpGenError(
+            "No DP SP inp template specified. Provide inp_template_path or "
+            "set it via Settings → Set DP SP Inp Template Path."
         )
     inp_template_path = Path(inp_template_path)
     if not inp_template_path.is_file():
-        raise FileNotFoundError(f"SP inp template not found: {inp_template_path}")
+        raise FileNotFoundError(f"DP SP inp template not found: {inp_template_path}")
 
     inp_text = inp_template_path.read_text(encoding="utf-8")
     modified_inp = modify_inp_for_sp(inp_text, cell_abc)
@@ -213,18 +214,18 @@ def batch_generate_potential_workdirs(
         atoms.set_pbc(True)
         frames.append((idx, atoms))
 
-    logger.info("Batch potential: %d frames from %s", len(frames), xyz_path)
+    logger.info("Batch SP: %d frames from %s", len(frames), xyz_path)
 
     iterator: list[tuple[int, Atoms]] | object = frames
     if verbose:
         from tqdm import tqdm
-        iterator = tqdm(frames, desc="Potential workdirs", unit="frame", ascii=" =")
+        iterator = tqdm(frames, desc="SP workdirs", unit="frame", ascii=" =")
 
     result: list[Path] = []
     for frame_idx, atoms in iterator:
         step = int(atoms.info.get("i", frame_idx))
         time_fs = float(atoms.info.get("time", 0.0))
-        workdir_name = f"potential_t{int(time_fs)}_i{step}"
+        workdir_name = f"sp_t{int(time_fs)}_i{step}"
 
         workdir = Path(output_dir) / workdir_name
         workdir.mkdir(parents=True, exist_ok=True)

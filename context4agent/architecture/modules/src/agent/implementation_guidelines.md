@@ -54,9 +54,23 @@ agent/ → exceptions.py (MDAnalysisError)
 
 优先调用最高可用编排函数：有 `main.py` 的 `run_*()` 就用它，无则直调子模块函数。
 
+### 4.5 `_normalize_outputs` 返回类型分支
+
+`_normalize_outputs`（`_handlers.py`）将 handler 返回值转为 `dict[str, str]`：
+
+| 返回类型 | 转换结果 |
+|---|---|
+| `dict` | 直接字符串化 values |
+| `Path` | `{"output": str(path)}` |
+| `list` | `{"workdir_0": ..., "workdir_1": ..., ...}`（批量脚本 `list[Path]`，如 `sp_gen_batch`） |
+| 带 `csv_path` 属性 | `{"csv": ..., "png": ...}`（若同名 PNG 存在） |
+| 其他 | `{}` + debug 日志 |
+
+添加新的返回类型分支时需确保不影响既有任务的转换行为。
+
 ## 5. 新增任务检查清单
 
-1. 在 `_handlers.py` 中用 `_make_handler()` 工厂或手写 handler
+1. 在 `_handlers.py` 中用 `_make_handler()` 工厂（简单直通）或手写 handler（需多步编排，如 `_handle_ti_full_analysis`）
 2. 调用 `register(TaskDef(...))` 注册
 3. 可选：`param_descriptions` / `param_choices` 补充 schema 注解
 4. 更新本文档的任务清单

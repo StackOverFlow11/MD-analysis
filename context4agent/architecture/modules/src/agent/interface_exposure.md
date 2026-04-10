@@ -53,7 +53,7 @@
 - `ERROR_ANALYSIS = "analysis"`
 - `ERROR_INTERNAL = "internal"`
 
-## 3. 当前注册任务（Phase 1：10 个）
+## 3. 当前注册任务（12 个）
 
 | 任务名 | 目标函数 | CLI 编号 | 类别 |
 |--------|---------|---------|------|
@@ -66,6 +66,8 @@
 | `calibration_fit_csv` | `CalibrationWorkflow:calibrate` | 231 | calibration |
 | `calibration_predict` | `CalibrationWorkflow:predict_potential` | 233 | calibration |
 | `slowgrowth_quick` | `SlowGrowthPlot:slowgrowth_analysis` | 301 | enhanced_sampling |
+| `ti_full_analysis` | `constrained_ti.workflow:analyze_ti` | 312 | enhanced_sampling |
+| `sp_gen_batch` | `scripts.SpGen:batch_generate_sp_workdirs` | 442 | scripts |
 | `config_show` | `config:load_config` | 900 | meta |
 
 ## 4. 推荐导入方式

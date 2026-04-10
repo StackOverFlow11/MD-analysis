@@ -4,6 +4,8 @@
 
 约束热力学积分 (constrained TI) 的收敛诊断模块。对每个约束点的 Lagrange 乘子时间序列做四步诊断，判断采样是否充分。不从 `md_analysis.__init__` re-export — 需直接 `from md_analysis.enhanced_sampling.constrained_ti import ...`。
 
+Agent 入口：`dispatch("ti_full_analysis", {root_dir, output_dir, pattern, reverse, equilibration, epsilon_tol_ev, auto_equilibration, point_slice})`。自定义 handler 在 `agent/_handlers.py` 中编排 `io.discover_ti_points` → `io.load_ti_series` → `workflow.analyze_ti` → `plot.plot_free_energy_profile` + `plot.plot_point_diagnostics` + CSV 输出。
+
 ## 四步诊断流程
 
 1. **ACF**（`analysis/autocorrelation.py`）→ τ_corr, N_eff, SEM_auto = σ√(2τ/N)
