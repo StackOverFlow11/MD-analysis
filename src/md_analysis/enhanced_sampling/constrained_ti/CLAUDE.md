@@ -4,7 +4,11 @@
 
 约束热力学积分 (constrained TI) 的收敛诊断模块。对每个约束点的 Lagrange 乘子时间序列做四步诊断，判断采样是否充分。不从 `md_analysis.__init__` re-export — 需直接 `from md_analysis.enhanced_sampling.constrained_ti import ...`。
 
-Agent 入口：`dispatch("ti_full_analysis", {root_dir, output_dir, pattern, reverse, equilibration, epsilon_tol_ev, auto_equilibration, point_slice})`。自定义 handler 在 `agent/_handlers.py` 中编排 `io.discover_ti_points` → `io.load_ti_series` → `workflow.analyze_ti` → `plot.plot_free_energy_profile` + `plot.plot_point_diagnostics` + CSV 输出。
+Agent 入口：`dispatch("ti_full_analysis", {root_dir, output_dir, pattern, reverse, equilibration, epsilon_tol_ev, auto_equilibration, point_slice})`。调用 workflow 层 wrapper `run_ti_full_from_root(...)`（签名与 `TaskContract` 一致）。`agent/_handlers.py` 里的 handler 是**薄层**：只把 `TIFullAnalysisReport` 的文件路径路由到 `TaskResult.outputs`、JSON 可序列化数值路由到 `TaskResult.summary`，不含业务逻辑。
+
+`summary.per_point`（14 个字段：`point_index` / `xi` / `n_analyzed` / `time_start_fs` / `time_end_fs` / `time_total_fs` / `tau_corr` / `n_eff` / `sem_final_au` / `sem_max_au` / `geweke_z` / `drift_D` / `passed` / `failure_reasons`）是**未来 Resources 层**判定"非平衡漂移 / N_eff 太少 / 遍历性假阳"等业务失败类别的信号源。
+
+**Strict discovery 差异**：`run_ti_full_from_root` 调 `discover_ti_points(..., strict=True)`，任何匹配但缺文件的 `ti_target_*/` 目录直接抛 `FileNotFoundError`（agent 映射为 `file_not_found`）；CLI 312 菜单路径保持 `strict=False`（跳过缺文件的目录并 WARN）。
 
 ## 四步诊断流程
 
@@ -30,7 +34,7 @@ otherwise           → SEM at largest valid block size
 |---|---|
 | `config.py` | 阈值常量（`DEFAULT_FP_MIN_BLOCKS=4`, `DEFAULT_FP_CONSECUTIVE=2`, `DEFAULT_CROSS_CHECK_RTOL=0.15` 等）+ 输出文件名 |
 | `models.py` | frozen dataclass: `BlockAverageResult`, `AutocorrResult`, `RunningAverageResult`, `GewekeResult`, `ConstraintPointReport`, `TIReport` |
-| `workflow.py` | 编排器：`analyze_single_point`, `analyze_standalone`, `analyze_ti`, `standalone_diagnostics`, CSV 导出 |
+| `workflow.py` | 编排器：`analyze_single_point`, `analyze_standalone`, `analyze_ti`, `standalone_diagnostics`, `run_ti_full_from_root` (agent wrapper), `TIFullAnalysisReport`, `_parse_point_slice`, CSV 导出 |
 | `plot.py` | 2×2 诊断图（running avg / ACF / block avg / summary）+ 自由能曲线图 |
 | `integration.py` | 梯形积分权重、SEM targets、自由能积分 |
 | `io.py` | 自动发现约束点目录（`discover_ti_points(reverse=False)` 支持升序/降序） |

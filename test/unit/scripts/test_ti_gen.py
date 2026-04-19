@@ -580,3 +580,424 @@ class TestFormatTargetDirname:
 
     def test_zero(self):
         assert _format_target_dirname(0.0) == "ti_target_0.000000"
+
+
+# ---------------------------------------------------------------------------
+# Tests for _plan_ti_targets (MVP: primary CV only)
+# ---------------------------------------------------------------------------
+
+
+class TestPlanTITargets:
+    """Unit tests for the internal _plan_ti_targets helper."""
+
+    def _setup_files(self, tmp_path):
+        xyz = tmp_path / "traj.xyz"
+        _write_test_xyz(xyz, n_frames=20, step_interval=5)
+        restart = _make_restart(
+            target_au=10.0, target_growth_au=0.01, total_steps=100,
+        )
+        restart_file = tmp_path / "sg.restart"
+        _write_restart_file(restart_file, restart)
+        inp_file = tmp_path / "sg.inp"
+        inp_file.write_text(_SAMPLE_INP)
+        return inp_file, xyz, restart_file
+
+    def test_numeric_mode_returns_planned_targets(self, tmp_path):
+        from md_analysis.scripts.TIGen import _plan_ti_targets
+
+        inp, xyz, restart = self._setup_files(tmp_path)
+        planned = _plan_ti_targets(
+            inp, xyz, restart, targets_au=[10.05, 10.30],
+        )
+        assert len(planned) == 2
+        for pt in planned:
+            assert hasattr(pt, "requested_cv")
+            assert hasattr(pt, "snapped_cv")
+            assert hasattr(pt, "snap_delta")
+            assert hasattr(pt, "frame_step")
+            assert hasattr(pt, "dirname")
+            assert pt.dirname.startswith("ti_target_")
+            assert pt.snap_delta >= 0
+        # First target should be closer to 10.05, snapped to a frame value
+        assert planned[0].requested_cv == 10.05
+
+    def test_time_mode_returns_expected_count(self, tmp_path):
+        from md_analysis.scripts.TIGen import _plan_ti_targets
+
+        inp, xyz, restart = self._setup_files(tmp_path)
+        planned = _plan_ti_targets(
+            inp, xyz, restart,
+            time_range={
+                "time_initial_fs": 10.0,
+                "time_final_fs": 40.0,
+                "n_points": 4,
+            },
+        )
+        assert len(planned) == 4
+
+    def test_both_modes_rejected(self, tmp_path):
+        from md_analysis.scripts.TIGen import _plan_ti_targets
+
+        inp, xyz, restart = self._setup_files(tmp_path)
+        with pytest.raises(TIGenError, match="Cannot specify both"):
+            _plan_ti_targets(
+                inp, xyz, restart,
+                targets_au=[10.0],
+                time_range={
+                    "time_initial_fs": 0, "time_final_fs": 5, "n_points": 2,
+                },
+            )
+
+    def test_neither_mode_rejected(self, tmp_path):
+        from md_analysis.scripts.TIGen import _plan_ti_targets
+
+        inp, xyz, restart = self._setup_files(tmp_path)
+        with pytest.raises(TIGenError, match="Must specify"):
+            _plan_ti_targets(inp, xyz, restart)
+
+    def test_time_range_missing_key(self, tmp_path):
+        from md_analysis.scripts.TIGen import _plan_ti_targets
+
+        inp, xyz, restart = self._setup_files(tmp_path)
+        with pytest.raises(TIGenError, match="missing required keys"):
+            _plan_ti_targets(
+                inp, xyz, restart,
+                time_range={"time_initial_fs": 0, "time_final_fs": 5},
+            )
+
+    def test_time_range_n_points_too_small(self, tmp_path):
+        from md_analysis.scripts.TIGen import _plan_ti_targets
+
+        inp, xyz, restart = self._setup_files(tmp_path)
+        with pytest.raises(TIGenError, match="n_points must be >= 2"):
+            _plan_ti_targets(
+                inp, xyz, restart,
+                time_range={
+                    "time_initial_fs": 0, "time_final_fs": 5, "n_points": 1,
+                },
+            )
+
+    def test_dirname_matches_format(self, tmp_path):
+        from md_analysis.scripts.TIGen import _plan_ti_targets
+
+        inp, xyz, restart = self._setup_files(tmp_path)
+        planned = _plan_ti_targets(inp, xyz, restart, targets_au=[10.05])
+        pt = planned[0]
+        assert pt.dirname == _format_target_dirname(pt.snapped_cv)
+
+
+# ---------------------------------------------------------------------------
+# Tests for generate_ti_batch_with_report
+# ---------------------------------------------------------------------------
+
+
+class TestGenerateTIBatchWithReport:
+    """Tests for the agent-safe batch wrapper."""
+
+    def _setup_files(self, tmp_path):
+        xyz = tmp_path / "traj.xyz"
+        _write_test_xyz(xyz, n_frames=20, step_interval=5)
+        restart = _make_restart(
+            target_au=10.0, target_growth_au=0.01, total_steps=100,
+        )
+        restart_file = tmp_path / "sg.restart"
+        _write_restart_file(restart_file, restart)
+        inp_file = tmp_path / "sg.inp"
+        inp_file.write_text(_SAMPLE_INP)
+        return inp_file, xyz, restart_file
+
+    def test_returns_report_with_all_fields(self, tmp_path):
+        from md_analysis.scripts.TIGen import (
+            generate_ti_batch_with_report, TIGenBatchReport,
+        )
+
+        inp, xyz, restart = self._setup_files(tmp_path)
+        report = generate_ti_batch_with_report(
+            inp, xyz, restart, tmp_path / "out",
+            targets_au=[10.05, 10.30],
+            steps=5000,
+        )
+        assert isinstance(report, TIGenBatchReport)
+        assert len(report.workdirs) == 2
+        assert len(report.requested_targets_au) == 2
+        assert len(report.snapped_targets_au) == 2
+        assert len(report.snap_deltas_au) == 2
+        assert report.steps == 5000
+        assert list(report.requested_targets_au) == [10.05, 10.30]
+
+    def test_creates_directories_with_files(self, tmp_path):
+        from md_analysis.scripts.TIGen import generate_ti_batch_with_report
+
+        inp, xyz, restart = self._setup_files(tmp_path)
+        report = generate_ti_batch_with_report(
+            inp, xyz, restart, tmp_path / "out",
+            targets_au=[10.05],
+        )
+        wd = report.workdirs[0]
+        assert wd.is_dir()
+        assert (wd / "cMD.inp").is_file()
+        assert (wd / "init.xyz").is_file()
+
+    def test_time_range_mode(self, tmp_path):
+        from md_analysis.scripts.TIGen import generate_ti_batch_with_report
+
+        inp, xyz, restart = self._setup_files(tmp_path)
+        report = generate_ti_batch_with_report(
+            inp, xyz, restart, tmp_path / "out",
+            time_range={
+                "time_initial_fs": 10.0,
+                "time_final_fs": 40.0,
+                "n_points": 3,
+            },
+        )
+        assert len(report.workdirs) == 3
+
+    def test_collision_raises_value_error_before_write(self, tmp_path):
+        """Collision check must fire before any mkdir/write happens."""
+        from md_analysis.scripts.TIGen import (
+            _plan_ti_targets, generate_ti_batch_with_report,
+        )
+
+        inp, xyz, restart = self._setup_files(tmp_path)
+
+        # Pre-compute the planned dirname and pre-create it with sentinel content
+        planned = _plan_ti_targets(inp, xyz, restart, targets_au=[10.05])
+        dirname = planned[0].dirname
+        collision_dir = tmp_path / "out" / dirname
+        collision_dir.mkdir(parents=True)
+        sentinel = collision_dir / "cMD.inp"
+        sentinel.write_text("SENTINEL_DO_NOT_OVERWRITE")
+
+        with pytest.raises(ValueError, match="collision"):
+            generate_ti_batch_with_report(
+                inp, xyz, restart, tmp_path / "out",
+                targets_au=[10.05],
+            )
+
+        # Sentinel unchanged
+        assert sentinel.read_text() == "SENTINEL_DO_NOT_OVERWRITE"
+
+    def test_collision_check_lists_all_offenders(self, tmp_path):
+        from md_analysis.scripts.TIGen import (
+            _plan_ti_targets, generate_ti_batch_with_report,
+        )
+
+        inp, xyz, restart = self._setup_files(tmp_path)
+        # Use well-separated targets so each snaps to a distinct dir
+        targets = [10.05, 10.80]
+        planned = _plan_ti_targets(inp, xyz, restart, targets_au=targets)
+        unique_dirnames = {pt.dirname for pt in planned}
+        assert len(unique_dirnames) >= 1  # may or may not collide; pre-create what's there
+
+        out = tmp_path / "out"
+        out.mkdir()
+        for dn in unique_dirnames:
+            (out / dn).mkdir()
+
+        with pytest.raises(ValueError) as exc_info:
+            generate_ti_batch_with_report(
+                inp, xyz, restart, out,
+                targets_au=targets,
+            )
+        msg = str(exc_info.value)
+        for dn in unique_dirnames:
+            assert dn in msg
+
+    def test_report_to_dict_is_json_serializable(self, tmp_path):
+        """``TIGenBatchReport.to_dict()`` must be directly JSON-dumpable
+        (no numpy scalars, no Path objects leaking through)."""
+        import json
+
+        from md_analysis.scripts.TIGen import generate_ti_batch_with_report
+
+        inp, xyz, restart = self._setup_files(tmp_path)
+        report = generate_ti_batch_with_report(
+            inp, xyz, restart, tmp_path / "out",
+            targets_au=[10.05, 10.30],
+            steps=5000,
+        )
+        data = report.to_dict()
+        json.dumps(data)   # raises TypeError on bad scalar/Path leak
+        assert isinstance(data["workdirs"], list)
+        assert all(isinstance(p, str) for p in data["workdirs"])
+        assert data["steps"] == 5000
+
+
+class TestAgentTIGenBatchDispatch:
+    """End-to-end: dispatch("ti_gen_batch", ...) via agent layer."""
+
+    def _setup_files(self, tmp_path):
+        xyz = tmp_path / "traj.xyz"
+        _write_test_xyz(xyz, n_frames=20, step_interval=5)
+        restart = _make_restart(
+            target_au=10.0, target_growth_au=0.01, total_steps=100,
+        )
+        restart_file = tmp_path / "sg.restart"
+        _write_restart_file(restart_file, restart)
+        inp_file = tmp_path / "sg.inp"
+        inp_file.write_text(_SAMPLE_INP)
+        return inp_file, xyz, restart_file
+
+    def test_dispatch_numeric_mode_success(self, tmp_path):
+        from md_analysis.agent import dispatch
+
+        inp, xyz, restart = self._setup_files(tmp_path)
+        result = dispatch("ti_gen_batch", {
+            "inp_path": str(inp),
+            "xyz_path": str(xyz),
+            "restart_path": str(restart),
+            "output_dir": str(tmp_path / "out"),
+            "targets_au": [10.05, 10.30],
+        })
+        assert result.success, f"expected success, got: {result.errors}"
+        assert len(result.outputs) == 2
+        assert result.summary["n_targets"] == 2
+        assert result.summary["steps"] == 10000
+        assert list(result.summary["requested_targets_au"]) == [10.05, 10.30]
+
+    def test_dispatch_time_range_mode_success(self, tmp_path):
+        from md_analysis.agent import dispatch
+
+        inp, xyz, restart = self._setup_files(tmp_path)
+        result = dispatch("ti_gen_batch", {
+            "inp_path": str(inp),
+            "xyz_path": str(xyz),
+            "restart_path": str(restart),
+            "output_dir": str(tmp_path / "out"),
+            "time_range": {
+                "time_initial_fs": 10.0,
+                "time_final_fs": 40.0,
+                "n_points": 3,
+            },
+        })
+        assert result.success, f"expected success, got: {result.errors}"
+        assert result.summary["n_targets"] == 3
+
+    def test_dispatch_collision_returns_validation_error(self, tmp_path):
+        from md_analysis.agent import dispatch
+        from md_analysis.scripts.TIGen import _plan_ti_targets
+
+        inp, xyz, restart = self._setup_files(tmp_path)
+        planned = _plan_ti_targets(inp, xyz, restart, targets_au=[10.05])
+        out = tmp_path / "out"
+        collision_dir = out / planned[0].dirname
+        collision_dir.mkdir(parents=True)
+        sentinel = collision_dir / "cMD.inp"
+        sentinel.write_text("SENTINEL")
+
+        result = dispatch("ti_gen_batch", {
+            "inp_path": str(inp),
+            "xyz_path": str(xyz),
+            "restart_path": str(restart),
+            "output_dir": str(out),
+            "targets_au": [10.05],
+        })
+        assert not result.success
+        assert result.error_type == "validation"
+        assert sentinel.read_text() == "SENTINEL"
+
+    def test_dispatch_missing_file_returns_file_not_found(self, tmp_path):
+        from md_analysis.agent import dispatch
+
+        result = dispatch("ti_gen_batch", {
+            "inp_path": str(tmp_path / "nope.inp"),
+            "xyz_path": str(tmp_path / "nope.xyz"),
+            "restart_path": str(tmp_path / "nope.restart"),
+            "output_dir": str(tmp_path / "out"),
+            "targets_au": [10.05],
+        })
+        assert not result.success
+        assert result.error_type == "file_not_found"
+
+    def test_dispatch_missing_inp_only(self, tmp_path):
+        """Only inp_path absent → file_not_found."""
+        from md_analysis.agent import dispatch
+
+        inp, xyz, restart = self._setup_files(tmp_path)
+        result = dispatch("ti_gen_batch", {
+            "inp_path": str(tmp_path / "does_not_exist.inp"),
+            "xyz_path": str(xyz),
+            "restart_path": str(restart),
+            "output_dir": str(tmp_path / "out"),
+            "targets_au": [10.05],
+        })
+        assert not result.success
+        assert result.error_type == "file_not_found"
+        # No work directory should have been created.
+        assert not (tmp_path / "out").exists() or \
+               not any((tmp_path / "out").glob("ti_target_*"))
+
+    def test_dispatch_missing_xyz_only(self, tmp_path):
+        """Only xyz_path absent → file_not_found."""
+        from md_analysis.agent import dispatch
+
+        inp, xyz, restart = self._setup_files(tmp_path)
+        result = dispatch("ti_gen_batch", {
+            "inp_path": str(inp),
+            "xyz_path": str(tmp_path / "nope.xyz"),
+            "restart_path": str(restart),
+            "output_dir": str(tmp_path / "out"),
+            "targets_au": [10.05],
+        })
+        assert not result.success
+        assert result.error_type == "file_not_found"
+        assert not (tmp_path / "out").exists() or \
+               not any((tmp_path / "out").glob("ti_target_*"))
+
+    def test_dispatch_missing_restart_only(self, tmp_path):
+        """Only restart_path absent → file_not_found."""
+        from md_analysis.agent import dispatch
+
+        inp, xyz, restart = self._setup_files(tmp_path)
+        result = dispatch("ti_gen_batch", {
+            "inp_path": str(inp),
+            "xyz_path": str(xyz),
+            "restart_path": str(tmp_path / "nope.restart"),
+            "output_dir": str(tmp_path / "out"),
+            "targets_au": [10.05],
+        })
+        assert not result.success
+        assert result.error_type == "file_not_found"
+        assert not (tmp_path / "out").exists() or \
+               not any((tmp_path / "out").glob("ti_target_*"))
+
+    def test_dispatch_missing_script_only(self, tmp_path):
+        """Only script_path absent (required inputs valid) → file_not_found.
+
+        Critical case: without the preflight, the call would succeed for
+        _plan_ti_targets() and collision check, then fail mid-batch inside
+        generate_ti_workdir() *after* a mkdir — polluting output_dir.
+        """
+        from md_analysis.agent import dispatch
+
+        inp, xyz, restart = self._setup_files(tmp_path)
+        result = dispatch("ti_gen_batch", {
+            "inp_path": str(inp),
+            "xyz_path": str(xyz),
+            "restart_path": str(restart),
+            "output_dir": str(tmp_path / "out"),
+            "targets_au": [10.05],
+            "script_path": str(tmp_path / "nope.sh"),
+        })
+        assert not result.success
+        assert result.error_type == "file_not_found"
+        # Preflight fires *before* any filesystem write.
+        assert not (tmp_path / "out").exists() or \
+               not any((tmp_path / "out").glob("ti_target_*"))
+
+    def test_dispatch_both_modes_returns_validation_error(self, tmp_path):
+        from md_analysis.agent import dispatch
+
+        inp, xyz, restart = self._setup_files(tmp_path)
+        result = dispatch("ti_gen_batch", {
+            "inp_path": str(inp),
+            "xyz_path": str(xyz),
+            "restart_path": str(restart),
+            "output_dir": str(tmp_path / "out"),
+            "targets_au": [10.05],
+            "time_range": {
+                "time_initial_fs": 0, "time_final_fs": 5, "n_points": 2,
+            },
+        })
+        assert not result.success
+        assert result.error_type == "validation"

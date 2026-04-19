@@ -7,6 +7,20 @@ Public API
 - :func:`get_task_schema`  — JSON Schema for a task's parameters
 - :class:`TaskResult`      — unified return type
 - :class:`TaskDef`         — task registration descriptor
+
+Extension API (Evolving)
+------------------------
+Extension authors declaring a new contract-backed task can import the
+Tools-layer contract types directly from the (private) ``_contracts``
+module::
+
+    from md_analysis.agent._contracts import (
+        FieldSpec, ExceptionMapping, TaskContract,
+    )
+
+These symbols are intentionally **not** re-exported from ``__all__``
+while the contract shape is still evolving toward Resources / Prompts /
+MCP-server layers.  See ``interface_exposure.md`` §2.5 for details.
 """
 
 from ._core import TaskDef, TaskHandler, TaskResult, list_tasks, register

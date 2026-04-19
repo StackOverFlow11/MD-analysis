@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import re
 import shutil
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -226,6 +227,291 @@ def _modify_inp_for_ti(
 def _format_target_dirname(cv_au: float) -> str:
     """Format a directory name from a CV value in a.u."""
     return f"ti_target_{cv_au:.6f}"
+
+
+# ---------------------------------------------------------------------------
+# Agent-facing planning helper (MVP: primary CV only)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class _PlannedTarget:
+    """One planned TI target after snap-to-nearest-frame.
+
+    Used internally by :func:`generate_ti_batch_with_report` so the agent
+    layer can surface ``requested_cv`` / ``snapped_cv`` / ``snap_delta``
+    as metrics without reparsing directory names (which lose precision
+    at 6 decimal places).
+    """
+
+    requested_cv: float
+    snapped_cv: float
+    snap_delta: float
+    frame_step: int
+    dirname: str
+
+
+def _plan_ti_targets(
+    inp_path: str | Path,  # noqa: ARG001 — kept in signature for parity w/ batch
+    xyz_path: str | Path,
+    restart_path: str | Path,
+    *,
+    targets_au: list[float] | np.ndarray | None = None,
+    time_range: dict[str, float | int] | None = None,
+) -> list[_PlannedTarget]:
+    """Plan a list of TI targets (primary CV only).
+
+    Accepts exactly one target specification:
+
+    - ``targets_au``: explicit list of CV values in atomic units
+    - ``time_range``: dict ``{time_initial_fs, time_final_fs, n_points}``
+
+    Each planned target carries the snapped CV (from the nearest SG
+    trajectory frame) plus metadata for agent-layer metrics and
+    collision checks.  ``inp_path`` is accepted for signature symmetry
+    with :func:`batch_generate_ti_workdirs` but not read here (the inp
+    file is consumed only at generation time).
+    """
+    numeric_mode = targets_au is not None
+    time_mode = time_range is not None
+    if numeric_mode and time_mode:
+        raise TIGenError(
+            "Cannot specify both targets_au and time_range. Use one mode only."
+        )
+    if not numeric_mode and not time_mode:
+        raise TIGenError(
+            "Must specify either targets_au or time_range."
+        )
+
+    restart = parse_colvar_restart(restart_path)
+    frames = _load_trajectory_cv(xyz_path, restart, colvar_id=None)
+
+    if time_mode:
+        required_keys = {"time_initial_fs", "time_final_fs", "n_points"}
+        missing = required_keys - set(time_range.keys())
+        if missing:
+            raise TIGenError(
+                f"time_range missing required keys: {sorted(missing)}"
+            )
+        t_initial = float(time_range["time_initial_fs"])
+        t_final = float(time_range["time_final_fs"])
+        n_points = int(time_range["n_points"])
+        if n_points < 2:
+            raise TIGenError(
+                f"time_range.n_points must be >= 2, got {n_points}"
+            )
+        if t_initial > t_final:
+            raise TIGenError(
+                f"time_range.time_initial_fs ({t_initial}) must be <= "
+                f"time_final_fs ({t_final})"
+            )
+        times = np.linspace(t_initial, t_final, n_points)
+        requested: list[float] = []
+        for t in times:
+            step_idx = round(t / restart.timestep_fs)
+            requested.append(_cv_at_step(restart, step_idx, colvar_id=None))
+    else:
+        requested = [float(x) for x in targets_au]  # type: ignore[union-attr]
+
+    planned: list[_PlannedTarget] = []
+    for rq in requested:
+        step, snapped, _atoms = _snap_to_nearest_frame(frames, rq)
+        planned.append(_PlannedTarget(
+            requested_cv=float(rq),
+            snapped_cv=float(snapped),
+            snap_delta=abs(float(rq) - float(snapped)),
+            frame_step=int(step),
+            dirname=_format_target_dirname(float(snapped)),
+        ))
+    return planned
+
+
+# ---------------------------------------------------------------------------
+# Agent-facing batch wrapper: report + collision check
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class TIGenBatchReport:
+    """Return value of :func:`generate_ti_batch_with_report`.
+
+    All numeric fields preserve full floating-point precision (unlike
+    ``ti_target_<cv>`` directory names, which round to 6 decimals).
+    """
+
+    workdirs: tuple[Path, ...]
+    requested_targets_au: tuple[float, ...]
+    snapped_targets_au: tuple[float, ...]
+    snap_deltas_au: tuple[float, ...]
+    steps: int
+
+    def to_dict(self) -> dict[str, object]:
+        """Return a JSON-serializable view of the report.
+
+        ``workdirs`` is converted to ``list[str]``; numeric fields are
+        coerced to native Python types so ``json.dumps(report.to_dict())``
+        never needs a custom encoder.  Direct ``dataclasses.asdict`` is
+        intentionally **not** supported as a serialization boundary.
+        """
+        return {
+            "workdirs": [str(p) for p in self.workdirs],
+            "requested_targets_au": [float(v) for v in self.requested_targets_au],
+            "snapped_targets_au": [float(v) for v in self.snapped_targets_au],
+            "snap_deltas_au": [float(v) for v in self.snap_deltas_au],
+            "steps": int(self.steps),
+        }
+
+
+def _preflight_file_inputs(
+    *,
+    inp_path: str | Path,
+    xyz_path: str | Path,
+    restart_path: str | Path,
+    script_path: str | Path | None,
+) -> None:
+    """Raise ``FileNotFoundError`` for any missing file input.
+
+    Runs before any planning / mkdir / filesystem write so callers see a
+    uniform file-missing signal.  ``script_path=None`` is allowed (falls
+    back to user config at generation time).
+    """
+    for label, path in (
+        ("inp_path", inp_path),
+        ("xyz_path", xyz_path),
+        ("restart_path", restart_path),
+    ):
+        p = Path(path)
+        if not p.is_file():
+            raise FileNotFoundError(f"{label} not found or not a file: {p}")
+    if script_path is not None:
+        sp = Path(script_path)
+        if not sp.is_file():
+            raise FileNotFoundError(
+                f"script_path not found or not a file: {sp}"
+            )
+
+
+def generate_ti_batch_with_report(
+    inp_path: str | Path,
+    xyz_path: str | Path,
+    restart_path: str | Path,
+    output_dir: str | Path,
+    *,
+    targets_au: list[float] | np.ndarray | None = None,
+    time_range: dict[str, float | int] | None = None,
+    steps: int = 10000,
+    script_path: str | Path | None = None,
+) -> TIGenBatchReport:
+    """Agent-safe batch generator with collision check and structured report.
+
+    This wrapper is intended as the backend for the ``ti_gen_batch`` agent
+    task.  Differences from :func:`batch_generate_ti_workdirs`:
+
+    - Uses an object-form ``time_range`` dict instead of three separate
+      positional-ish args (more JSON Schema friendly).
+    - Returns a :class:`TIGenBatchReport` so metrics can flow into the
+      agent layer without reparsing directory names.
+    - **Collision check**: if any planned target directory name already
+      exists under ``output_dir``, raises :class:`ValueError` *before*
+      writing anything.  The old :func:`batch_generate_ti_workdirs` does
+      not do this and retains its overwrite behaviour for CLI 422.
+    - MVP: primary CV only (no ``colvar_id``).
+
+    Parameters
+    ----------
+    inp_path, xyz_path, restart_path
+        Same as :func:`batch_generate_ti_workdirs`.
+    output_dir : str or Path
+        Parent directory for all work directories.
+    targets_au : list of float or None
+        Explicit CV targets in atomic units.  Mutually exclusive with
+        ``time_range``.
+    time_range : dict or None
+        ``{"time_initial_fs": float, "time_final_fs": float,
+        "n_points": int}``.  Mutually exclusive with ``targets_au``.
+    steps : int
+        MD steps per TI point (default 10000).
+    script_path : str, Path or None
+        Submission script to copy; falls back to ``KEY_CP2K_SCRIPT_PATH``
+        in user config.
+
+    Returns
+    -------
+    TIGenBatchReport
+
+    Raises
+    ------
+    TIGenError
+        Invalid target specification (both modes / neither mode / bad
+        ``time_range``).
+    ValueError
+        A planned target directory already exists under ``output_dir``
+        (collision check).  No files are written in this case.
+    FileNotFoundError
+        ``inp_path`` / ``xyz_path`` / ``restart_path`` / ``script_path``
+        missing on disk.
+    """
+    output_dir = Path(output_dir)
+
+    # Preflight: verify all file inputs exist before any planning / filesystem
+    # side effect.  This guarantees that missing-file errors surface uniformly
+    # as FileNotFoundError (mapped to ``file_not_found`` by the contract),
+    # regardless of which later step would have raised them.
+    _preflight_file_inputs(
+        inp_path=inp_path,
+        xyz_path=xyz_path,
+        restart_path=restart_path,
+        script_path=script_path,
+    )
+
+    planned = _plan_ti_targets(
+        inp_path=inp_path,
+        xyz_path=xyz_path,
+        restart_path=restart_path,
+        targets_au=targets_au,
+        time_range=time_range,
+    )
+
+    # Collision check — compare planned dirnames against existing ti_target_*
+    # directory names.  Use exact string match (6-decimal dirname) as key.
+    existing_names = {p.name for p in output_dir.glob("ti_target_*") if p.is_dir()} \
+        if output_dir.is_dir() else set()
+    collisions = [pl.dirname for pl in planned if pl.dirname in existing_names]
+    if collisions:
+        raise ValueError(
+            "TI workdir collision — the following target directories already "
+            f"exist under {output_dir}: {sorted(collisions)}. "
+            "Remove them or choose different targets to proceed."
+        )
+
+    # Pre-load restart / inp / frames once for efficiency.
+    restart = parse_colvar_restart(restart_path)
+    inp_text = Path(inp_path).read_text(encoding="utf-8")
+    frames = _load_trajectory_cv(xyz_path, restart, colvar_id=None)
+
+    workdirs: list[Path] = []
+    for pl in planned:
+        wd = generate_ti_workdir(
+            inp_path, xyz_path, restart_path,
+            target_au=pl.requested_cv,
+            output_dir=output_dir,
+            steps=steps,
+            colvar_id=None,
+            workdir_name=pl.dirname,
+            script_path=script_path,
+            _preloaded=frames,
+            _restart=restart,
+            _inp_text=inp_text,
+        )
+        workdirs.append(wd)
+
+    return TIGenBatchReport(
+        workdirs=tuple(workdirs),
+        requested_targets_au=tuple(pl.requested_cv for pl in planned),
+        snapped_targets_au=tuple(pl.snapped_cv for pl in planned),
+        snap_deltas_au=tuple(pl.snap_delta for pl in planned),
+        steps=steps,
+    )
 
 
 # ---------------------------------------------------------------------------

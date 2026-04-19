@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    from ._contracts import TaskContract
 
 logger = logging.getLogger(__name__)
 
@@ -58,9 +61,21 @@ class TaskHandler(Protocol):
 class TaskDef:
     """Descriptor for a dispatchable analysis task.
 
-    Schema annotations (*param_descriptions*, *param_choices*) supplement
-    what ``inspect.signature`` cannot express.  They are optional — omitting
-    them only reduces schema readability, never causes runtime errors.
+    Two schema/coercion sources, in priority order:
+
+    1. **``contract``** (preferred, Tools-layer ``TaskContract``) — when
+       present, ``get_task_schema()`` and ``dispatch()`` derive schema and
+       parameter coercion from the contract, ignoring ``target_fn`` signature.
+    2. **``target_fn`` signature + ``param_descriptions`` / ``param_choices``**
+       (legacy fallback) — used when ``contract`` is ``None``.  Omitting
+       ``param_descriptions`` / ``param_choices`` only reduces schema
+       readability, never causes runtime errors.
+
+    ``reference_fn`` is an optional dotted path ("module.path:function_name")
+    used by static tests to verify that ``contract.inputs`` aligns with a
+    real function signature.  Composite handlers whose inner ``target_fn``
+    has a different signature should set ``reference_fn`` to the wrapper
+    that matches the contract.
     """
 
     name: str
@@ -71,6 +86,8 @@ class TaskDef:
     cli_codes: tuple[str, ...] = ()
     param_descriptions: dict[str, str] = field(default_factory=dict)
     param_choices: dict[str, list[str]] = field(default_factory=dict)
+    contract: "TaskContract | None" = None
+    reference_fn: str | None = None
 
 
 # ── Registry ─────────────────────────────────────────────────────────

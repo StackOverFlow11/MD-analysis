@@ -11,6 +11,7 @@ from importlib import import_module
 from typing import Any, get_args, get_origin
 
 from ..exceptions import MDAnalysisError
+from ._contracts import ExceptionMapping, TaskContract
 from ._core import (
     ERROR_ANALYSIS,
     ERROR_FILE_NOT_FOUND,
@@ -62,53 +63,59 @@ def dispatch(task: str, params: dict[str, Any] | None = None) -> TaskResult:
             errors=[str(exc)],
         )
 
-    # Resolve target function and its signature once
-    fn, sig = _resolve_fn(task_def.target_fn)
-    coerced = _coerce_params(sig, params or {})
-
-    # Layered exception handling
+    # Coerce params + execute handler inside a single exception-handling
+    # path so coercion failures (e.g. a non-integer float for an integer
+    # field) surface as classified TaskResult objects rather than escaping
+    # the dispatch layer.
     try:
+        if task_def.contract is not None:
+            coerced = _coerce_params_from_contract(
+                task_def.contract.inputs, params or {},
+            )
+        else:
+            _, sig = _resolve_fn(task_def.target_fn)
+            coerced = _coerce_params(sig, params or {})
         return task_def.handler(coerced)
-    except (ValueError, TypeError) as exc:
-        logger.warning("Validation error in task %s: %s", task, exc)
-        return TaskResult(
-            success=False, task=task, outputs={}, summary={},
-            error_type=ERROR_VALIDATION, errors=[str(exc)],
-        )
-    except FileNotFoundError as exc:
-        logger.warning("File not found in task %s: %s", task, exc)
-        return TaskResult(
-            success=False, task=task, outputs={}, summary={},
-            error_type=ERROR_FILE_NOT_FOUND, errors=[str(exc)],
-        )
-    except PermissionError as exc:
-        logger.warning("Permission denied in task %s: %s", task, exc)
-        return TaskResult(
-            success=False, task=task, outputs={}, summary={},
-            error_type=ERROR_FILE_NOT_FOUND, errors=[str(exc)],
-        )
-    except MDAnalysisError as exc:
-        logger.error("Analysis error in task %s: %s", task, exc)
-        return TaskResult(
-            success=False, task=task, outputs={}, summary={},
-            error_type=ERROR_ANALYSIS, errors=[str(exc)],
-        )
     except Exception as exc:
-        logger.error("Unexpected error in task %s", task, exc_info=True)
-        return TaskResult(
-            success=False, task=task, outputs={}, summary={},
-            error_type=ERROR_INTERNAL,
-            errors=[f"{type(exc).__name__}: {exc}"],
-        )
+        # Contract-aware classification: first specific-to-general match wins.
+        if task_def.contract is not None:
+            mapped = _classify_exception_by_contract(
+                exc, task_def.contract.exceptions,
+            )
+            if mapped is not None:
+                if mapped in (ERROR_ANALYSIS, ERROR_INTERNAL):
+                    logger.error("Error in task %s: %s", task, exc)
+                else:
+                    logger.warning("Error in task %s: %s", task, exc)
+                return TaskResult(
+                    success=False, task=task, outputs={}, summary={},
+                    error_type=mapped,
+                    errors=[f"{type(exc).__name__}: {exc}"],
+                )
+        # Fallback: default classification by exception class hierarchy.
+        return _classify_exception_default(exc, task)
 
 
 def get_task_schema(task: str) -> dict[str, Any]:
-    """Generate JSON Schema from the target function's signature.
+    """Generate JSON Schema for an agent task.
 
-    Uses ``typing.get_type_hints()`` to resolve stringified annotations
-    (caused by ``from __future__ import annotations``).
+    When the task has a :class:`TaskContract`, the schema is built from the
+    contract (authoritative).  Otherwise falls back to introspecting
+    ``target_fn``'s signature — using ``typing.get_type_hints()`` to resolve
+    stringified annotations (caused by ``from __future__ import annotations``).
+
+    The returned shape is always OpenAI function-calling compatible:
+    ``{name, description, parameters: {type, properties, required}}``.
     """
     task_def = get_task(task)
+
+    # Contract-first: return the authoritative schema.
+    if task_def.contract is not None:
+        return task_def.contract.to_agent_schema(
+            name=task_def.name,
+            description=task_def.description,
+        )
+
     fn, sig = _resolve_fn(task_def.target_fn)
 
     # get_type_hints resolves string annotations → real types
@@ -330,3 +337,188 @@ def _serialize_default(value: Any) -> Any:
     if isinstance(value, tuple):
         return list(value)
     return value
+
+
+# ── Contract-driven coercion and exception classification ───────────────
+
+
+def _coerce_params_from_contract(
+    inputs: dict[str, Any],   # dict[str, FieldSpec], but avoid circular hint
+    params: dict[str, Any],
+) -> dict[str, Any]:
+    """Coerce a params dict using a contract's ``inputs`` spec.
+
+    Rules (see 01_contract_design.md §Coercion):
+
+    ============================================  ================================
+    Field condition                                Behaviour
+    ============================================  ================================
+    ``path_kind is not None`` + non-empty str      ``pathlib.Path(value).resolve()``
+    ``path_kind is not None`` + ``None`` / ``""``  keep as-is
+    top-level ``json_schema.type == "array"``      keep list as-is (no tuple/set cast)
+    top-level ``json_schema.type == "object"``     keep dict as-is
+    top-level ``json_schema.type == "integer"``    int / int-str / float.is_integer()
+                                                   → int; reject non-int
+    top-level ``json_schema.type == "number"``     ``float(value)``
+    top-level ``json_schema.type == "boolean"``    keep bool (no string parsing)
+    top-level ``json_schema.type == "string"``     keep str
+    no simple top-level type (``oneOf`` etc.)      keep as-is
+    ============================================  ================================
+
+    Keys not in ``inputs`` pass through unchanged (handler may accept
+    ``**kwargs``).
+    """
+    coerced: dict[str, Any] = {}
+    for key, value in params.items():
+        if key not in inputs:
+            coerced[key] = value
+            continue
+        spec = inputs[key]
+        coerced[key] = _coerce_value_from_spec(value, spec)
+    return coerced
+
+
+def _coerce_value_from_spec(value: Any, spec: Any) -> Any:
+    """Coerce a single value using a FieldSpec."""
+    if value is None:
+        return None
+
+    # Path-typed fields (regardless of json_schema.type).
+    if spec.path_kind is not None:
+        if isinstance(value, str) and value != "":
+            return pathlib.Path(value).resolve()
+        if isinstance(value, pathlib.Path):
+            return value.resolve()
+        # Empty string / other → pass through.
+        return value
+
+    # Top-level type dispatch.
+    schema_type = spec.json_schema.get("type") if spec.json_schema else None
+    if isinstance(schema_type, list):
+        # e.g. ["string", "null"] — don't try to coerce a union.
+        return value
+
+    if schema_type == "integer":
+        if isinstance(value, bool):
+            # Pythonic bool-is-int trap — keep bool as bool only if target is
+            # boolean; here we explicitly reject it for integer fields.
+            raise ValueError(
+                f"expected integer, got bool {value!r}"
+            )
+        if isinstance(value, int):
+            return value
+        if isinstance(value, float):
+            if value.is_integer():
+                return int(value)
+            raise ValueError(
+                f"expected integer, got non-integer float {value!r}"
+            )
+        if isinstance(value, str):
+            try:
+                return int(value)
+            except ValueError as exc:
+                raise ValueError(
+                    f"expected integer, got string {value!r}"
+                ) from exc
+        raise ValueError(
+            f"expected integer, got {type(value).__name__} {value!r}"
+        )
+
+    if schema_type == "number":
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return float(value)
+        if isinstance(value, str):
+            try:
+                return float(value)
+            except ValueError as exc:
+                raise ValueError(
+                    f"expected number, got string {value!r}"
+                ) from exc
+        raise ValueError(
+            f"expected number, got {type(value).__name__} {value!r}"
+        )
+
+    if schema_type == "boolean":
+        if isinstance(value, bool):
+            return value
+        raise ValueError(
+            f"expected boolean, got {type(value).__name__} {value!r}"
+        )
+
+    # "string" / "array" / "object" / missing → pass through.
+    return value
+
+
+def _classify_exception_by_contract(
+    exc: BaseException,
+    mappings: tuple[ExceptionMapping, ...],
+) -> str | None:
+    """Return the first matching ``error_type`` from ``mappings``.
+
+    The tuple is expected to be ordered specific-to-general; the first
+    ``isinstance(exc, resolved_class)`` wins.  Mappings whose FQN cannot
+    be resolved are skipped (logged at DEBUG level).
+    """
+    for em in mappings:
+        try:
+            cls = _resolve_exception_class(em.exception_fqn)
+        except (ImportError, AttributeError, ValueError) as resolve_err:
+            logger.debug(
+                "Could not resolve exception FQN %r: %s",
+                em.exception_fqn, resolve_err,
+            )
+            continue
+        if isinstance(exc, cls):
+            return em.error_type
+    return None
+
+
+def _resolve_exception_class(fqn: str) -> type[BaseException]:
+    """Resolve a dotted FQN like ``module.path.ClassName`` to a class."""
+    if ":" in fqn:
+        module_path, name = fqn.rsplit(":", 1)
+    elif "." in fqn:
+        module_path, name = fqn.rsplit(".", 1)
+    else:
+        raise ValueError(f"Invalid exception FQN (no module): {fqn!r}")
+    mod = import_module(module_path)
+    cls = getattr(mod, name)
+    if not (isinstance(cls, type) and issubclass(cls, BaseException)):
+        raise ValueError(
+            f"FQN {fqn!r} resolves to {cls!r}, which is not an exception class"
+        )
+    return cls
+
+
+def _classify_exception_default(exc: BaseException, task: str) -> TaskResult:
+    """Default exception → error_type classification (pre-contract behaviour)."""
+    if isinstance(exc, (ValueError, TypeError)):
+        logger.warning("Validation error in task %s: %s", task, exc)
+        return TaskResult(
+            success=False, task=task, outputs={}, summary={},
+            error_type=ERROR_VALIDATION, errors=[str(exc)],
+        )
+    if isinstance(exc, FileNotFoundError):
+        logger.warning("File not found in task %s: %s", task, exc)
+        return TaskResult(
+            success=False, task=task, outputs={}, summary={},
+            error_type=ERROR_FILE_NOT_FOUND, errors=[str(exc)],
+        )
+    if isinstance(exc, PermissionError):
+        logger.warning("Permission denied in task %s: %s", task, exc)
+        return TaskResult(
+            success=False, task=task, outputs={}, summary={},
+            error_type=ERROR_FILE_NOT_FOUND, errors=[str(exc)],
+        )
+    if isinstance(exc, MDAnalysisError):
+        logger.error("Analysis error in task %s: %s", task, exc)
+        return TaskResult(
+            success=False, task=task, outputs={}, summary={},
+            error_type=ERROR_ANALYSIS, errors=[str(exc)],
+        )
+    logger.error("Unexpected error in task %s", task, exc_info=True)
+    return TaskResult(
+        success=False, task=task, outputs={}, summary={},
+        error_type=ERROR_INTERNAL,
+        errors=[f"{type(exc).__name__}: {exc}"],
+    )

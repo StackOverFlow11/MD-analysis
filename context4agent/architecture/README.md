@@ -136,11 +136,12 @@
 ### 7) `md_analysis.main` / `md_analysis.cli` / `md_analysis.agent`（集成入口）
 
 - `main.py`：编程入口 `run_water_analysis()`、`run_potential_analysis()`、`run_charge_analysis()`、`run_tracked_charge_analysis()`、`run_counterion_charge_analysis()`、`run_all()`
-- `agent/`：Agent-friendly 非交互式编程入口（dispatch + JSON Schema + TaskResult）
-  - `_core.py`：`TaskResult`、`TaskHandler` Protocol、`TaskDef`、注册表
-  - `_dispatch.py`：`dispatch()` 任务执行、`get_task_schema()` 从函数签名自动生成 JSON Schema、参数类型转换
-  - `_handlers.py`：`_make_handler()` 工厂 + Phase 1 任务注册（10 个高频任务）
-  - 设计：薄适配层，不含分析逻辑；schema 从目标函数签名自动推导（无手写 ParamDef）；异常在 dispatch 层分 4 级捕获
+- `agent/`：Agent-friendly 非交互式编程入口（dispatch + JSON Schema + TaskResult + Tools-layer contract）
+  - `_core.py`：`TaskResult`、`TaskHandler` Protocol、`TaskDef`（含 `contract` / `reference_fn` 字段）、注册表
+  - `_contracts.py`：`FieldSpec` / `ExceptionMapping` / `TaskContract`（双 schema 出口：`to_agent_schema` OpenAI 形状、`to_mcp_tool_schema` MCP `inputSchema` 形状，供未来 MCP server 层）
+  - `_dispatch.py`：`dispatch()` 任务执行、`get_task_schema()`（contract-first，fallback 到函数签名推导）、contract-aware 参数转换、contract-aware 有序异常映射
+  - `_handlers.py`：`_make_handler()` 工厂 + 任务注册（14 个；其中 3 个带完整 contract：`ti_gen_batch` / `ti_full_analysis` / `bader_gen_batch`，其余 11 个走 legacy 签名推导路径）
+  - 设计：薄适配层，不含分析逻辑；新任务走 contract-first（声明 `TaskContract` 紧邻 `register` 调用）；schema 从 `FieldSpec.json_schema` 字段直通（权威，draft-07），无手写 ParamDef；异常在 dispatch 层按 contract 有序匹配（先具体后父类）+ 默认 4 级分类 fallback
 - `cli/`：VASPKIT 风格交互式 CLI 包，注册为 `md-analysis` console script
   - `__init__.py`：`main()` 入口 + banner + 顶层菜单分发
   - `_prompt.py`：可复用的输入提示辅助函数

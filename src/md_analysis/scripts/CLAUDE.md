@@ -12,6 +12,17 @@
 - 批量目录命名：`bader_t{time}_i{step}`，从 XYZ 注释行 `atoms.info` 提取
 - POTCAR 通过 `subprocess` 调用 `vaspkit 103`（需要 vaspkit 在 PATH 中）
 - 模板文件通过 `importlib.resources` 访问 `template/` 目录
+- **Agent 任务** `bader_gen_batch`（CLI 412）：新 wrapper
+  `generate_bader_batch_with_report` 在 `batch_generate_bader_workdirs` 之上
+  加 xyz/script 预检 + cell_abc 长度预检 + 结构化 report（`BaderGenBatchReport`
+  含 `workdirs` / `n_frames` / `frame_indices` / `steps` / `times_fs` /
+  `generate_potcar`，`to_dict()` 直接 JSON 可序列化）。`element_order` 接受
+  list/tuple 两种。**只准备目录，不提交 VASP 作业、不解析 Bader 结果**；
+  作业提交归 pbs-auto、结果解析归 `charge_*` 类 API。
+- `BaderGenError` 在 agent 契约里映射为 `error_type="validation"`：典型触发
+  路径是 `generate_potcar=True` 但 `vaspkit` 不在 `PATH` 上（环境前置条件
+  未满足），agent 的修复策略是"修正输入"，与 `validation` 一致；`analysis`
+  留给分析本身的数值/逻辑失败。
 
 ### TIGen
 - 修改 SG 的 inp 文件生成约束 MD 输入：
@@ -49,7 +60,7 @@
 - 复用 `_inp_utils.py` 的 cell/topology 修改逻辑，和 PotentialGen 共享
 - CLI 菜单：441（单帧）、442（批量），独立 MenuGroup "44 DeePMD SP Preparation"
 - Settings 菜单：914 `SetDpSpInpTemplateCmd`
-- **Agent 任务**：`sp_gen_batch` 注册到 agent 模块（`_handlers.py`），通过 `batch_generate_sp_workdirs` 直通。其他脚本命令（Bader/TI/PotentialGen）均为 CLI-only，SpGen 是首个暴露为 agent 任务的脚本，因为 DP 训练数据收集是自动化工作流的典型入口
+- **Agent 任务**：`sp_gen_batch` 注册到 agent 模块（`_handlers.py`），通过 `batch_generate_sp_workdirs` 直通。PotentialGen 仍是 CLI-only；BaderGen / TIGen 已各自暴露为带完整 contract 的 agent 任务（`bader_gen_batch` / `ti_gen_batch`），通过各自的 `*_with_report` wrapper 直通
 - 后端链路：SP 算完 → `dpdata` 或 `cp2kdata` 插件转训练集 → DeePMD-kit 训练
 
 ### 共享 helper：`_inp_utils.py`

@@ -1,10 +1,13 @@
 """Orchestrator for constrained-TI convergence diagnostics.
 
 Hosts:
-- ``analyze_single_point``  — single point in TI context
-- ``analyze_standalone``    — standalone single-point (no TI context)
-- ``analyze_ti``            — full multi-point TI analysis
-- ``standalone_diagnostics`` — unified entry: parse + analyze + plot + CSV
+- ``analyze_single_point``    — single point in TI context
+- ``analyze_standalone``      — standalone single-point (no TI context)
+- ``analyze_ti``              — full multi-point TI analysis
+- ``standalone_diagnostics``  — unified entry: parse + analyze + plot + CSV
+- ``run_ti_full_from_root``   — agent-facing end-to-end wrapper (discover +
+                                 load + analyze + plot + CSV + metrics)
+- ``TIFullAnalysisReport``    — JSON-serializable result of the wrapper
 - CSV export helpers
 """
 
@@ -12,7 +15,9 @@ from __future__ import annotations
 
 import csv
 import logging
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
@@ -884,3 +889,241 @@ def write_free_energy_csv(
             )
 
     return path
+
+
+# ---------------------------------------------------------------------------
+# Agent-facing end-to-end wrapper
+# ---------------------------------------------------------------------------
+
+
+_VALID_PATTERNS = ("auto", "ti_target", "xi")
+
+
+@dataclass(frozen=True)
+class TIFullAnalysisReport:
+    """Return value of :func:`run_ti_full_from_root`.
+
+    Artifacts (files) and metrics (JSON-serializable values) are carried
+    separately so the agent dispatch layer can route them to
+    ``TaskResult.outputs`` and ``TaskResult.summary`` respectively.
+
+    ``ti_report`` carries the full :class:`TIReport` object (with embedded
+    engine results).  It is *not* JSON-serializable; future Resources-layer
+    code may reference it for failure-mode detection.
+    """
+
+    # Artifacts
+    convergence_csv: Path
+    free_energy_csv: Path
+    free_energy_png: Path
+    diagnostics_pngs: tuple[Path, ...]
+    # Metrics (all JSON-serializable)
+    n_points: int
+    delta_A_eV: float
+    sigma_A_eV: float
+    all_passed: bool
+    failing_indices: tuple[int, ...]
+    per_point: tuple[dict[str, Any], ...]
+    # Raw model (not MCP-returned; for Resources-layer inspection)
+    ti_report: Any   # TIReport — typed as Any to avoid hard import ordering
+
+
+def _parse_point_slice(spec: str) -> slice:
+    """Parse a Python-slice string such as ``"0:2"``, ``":4"``, ``"::2"``.
+
+    Accepts 2–3 colon-separated parts; empty parts become ``None``.
+    Rejects forms without a colon (e.g. ``"2"``) and forms with more than
+    two colons.  Raises :class:`ValueError` with a user-readable message.
+    """
+    if ":" not in spec:
+        raise ValueError(
+            f"Invalid point_slice {spec!r}: must contain at least one ':' "
+            "(e.g. '0:2', ':4', '::2')"
+        )
+    parts = spec.split(":")
+    if not (2 <= len(parts) <= 3):
+        raise ValueError(
+            f"Invalid point_slice {spec!r}: expected 2 or 3 colon-separated "
+            f"parts, got {len(parts)}"
+        )
+    args: list[int | None] = []
+    for p in parts:
+        stripped = p.strip()
+        if stripped == "":
+            args.append(None)
+        else:
+            try:
+                args.append(int(stripped))
+            except ValueError as exc:
+                raise ValueError(
+                    f"Invalid point_slice {spec!r}: part {p!r} is not an integer"
+                ) from exc
+    return slice(*args)
+
+
+def run_ti_full_from_root(
+    root_dir: str | Path = ".",
+    output_dir: str | Path = "analysis",
+    *,
+    pattern: str = "auto",
+    reverse: bool = False,
+    equilibration: int | list[int] = 0,
+    epsilon_tol_ev: float = DEFAULT_EPSILON_TOL_EV,
+    auto_equilibration: bool = False,
+    point_slice: str | None = None,
+) -> TIFullAnalysisReport:
+    """End-to-end constrained-TI analysis from a root directory.
+
+    This is the wrapper behind the ``ti_full_analysis`` agent task.  It
+    orchestrates discover → optional slice → load → analyze → CSV / PNG
+    → metrics in a single call; the signature matches the agent contract
+    exactly (contract-first, see ``agent/_contracts.py``).
+
+    Parameters
+    ----------
+    root_dir : str or Path
+        TI root directory containing ``ti_target_*/`` or ``xi_*/`` subdirs.
+    output_dir : str or Path
+        Output directory for CSV and PNG files (created if missing).
+        Existing files are overwritten.
+    pattern : {"auto", "ti_target", "xi"}
+        Directory discovery pattern.
+    reverse : bool
+        If True, treat the max-xi point as the initial state.
+    equilibration : int or list[int]
+        Frames to discard from the start of each series.  Scalar is broadcast
+        to all points; list must have one value per loaded point.
+    epsilon_tol_ev : float
+        Free-energy tolerance in eV (must be > 0).
+    auto_equilibration : bool
+        Iteratively discard the front half until convergence (or bottom out).
+    point_slice : str or None
+        Python-slice syntax string to select a subset of discovered points
+        (e.g. ``"0:2"``, ``":4"``, ``"::2"``).  Must be a valid slice with
+        2–3 colon-separated parts.  After slicing, at least 2 points must
+        remain.
+
+    Returns
+    -------
+    TIFullAnalysisReport
+
+    Raises
+    ------
+    FileNotFoundError
+        ``root_dir`` does not exist, or a discovered point is missing
+        required files.
+    ValueError
+        ``pattern`` not in ``{"auto", "ti_target", "xi"}``; invalid
+        ``point_slice``; fewer than 2 points after slicing; inconsistent
+        ``dt`` across points.
+    InsufficientSamplingError
+        ``auto_equilibration`` bisected below the min-frames threshold for
+        some point.
+    """
+    # Lazy imports (keep top-level light and avoid import cycles).
+    from .io import discover_ti_points, load_ti_series
+    from .plot import plot_free_energy_profile, plot_point_diagnostics
+    from ...utils.RestartParser.ColvarParser import parse_colvar_restart
+
+    # ── Validate inputs ──────────────────────────────────────────────
+    if pattern not in _VALID_PATTERNS:
+        raise ValueError(
+            f"Invalid pattern {pattern!r}: must be one of {_VALID_PATTERNS}"
+        )
+    root_path = Path(root_dir)
+    if not root_path.is_dir():
+        raise FileNotFoundError(
+            f"root_dir not found or not a directory: {root_path}"
+        )
+
+    # ── 1. Discover constraint points (strict: agent-facing) ─────────
+    # strict=True so a matched ti_target_*/ dir missing .restart or
+    # .LagrangeMultLog surfaces as FileNotFoundError rather than being
+    # silently skipped (the latter is acceptable for the CLI menu path).
+    point_defs = discover_ti_points(
+        root_path, pattern=pattern, reverse=reverse, strict=True,
+    )
+
+    # ── 2. Optional slice selection (hard-validated) ─────────────────
+    if point_slice is not None and point_slice != "":
+        sl = _parse_point_slice(point_slice)   # raises ValueError on bad input
+        point_defs = point_defs[sl]
+
+    if len(point_defs) < 2:
+        raise ValueError(
+            f"After slicing, at least 2 TI points are required, got "
+            f"{len(point_defs)}. Check root_dir / pattern / point_slice."
+        )
+
+    # ── 3. Load series + parse time_starts ───────────────────────────
+    series_data = load_ti_series(point_defs)
+    xi_values = np.array([x for x, _, _ in series_data])
+    lambda_list = [s for _, s, _ in series_data]
+    dts = [d for _, _, d in series_data]
+    dt = dts[0]
+    if not all(abs(d - dt) < 1e-9 for d in dts):
+        raise ValueError(
+            f"Inconsistent dt across TI points: {dts}. All points must share "
+            "the same frame interval."
+        )
+    time_starts = [
+        parse_colvar_restart(str(p.restart_path)).time_start_fs
+        for p in point_defs
+    ]
+
+    # ── 4. Analyze ───────────────────────────────────────────────────
+    ti_report = analyze_ti(
+        xi_values,
+        lambda_list,
+        dt,
+        epsilon_tol_ev=epsilon_tol_ev,
+        equilibration=equilibration,
+        time_starts=time_starts,
+        auto_equilibration=auto_equilibration,
+    )
+
+    # ── 5. Write outputs ─────────────────────────────────────────────
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    csv_conv = write_convergence_csv(ti_report, output_dir=output_path)
+    csv_fe = write_free_energy_csv(ti_report, output_dir=output_path)
+    png_fe = plot_free_energy_profile(ti_report, output_dir=output_path)
+    diag_pngs = tuple(
+        plot_point_diagnostics(r, output_dir=output_path)
+        for r in ti_report.point_reports
+    )
+
+    # ── 6. Build per-point metrics (JSON-serializable) ───────────────
+    per_point: list[dict[str, Any]] = []
+    for idx, rep in enumerate(ti_report.point_reports):
+        per_point.append({
+            "point_index": rep.point_index if rep.point_index is not None else idx,
+            "xi": float(rep.xi),
+            "n_analyzed": int(rep.n_analyzed),
+            "time_start_fs": float(rep.time_start_fs),
+            "time_end_fs": float(rep.time_end_fs),
+            "time_total_fs": float(rep.n_analyzed * dt),
+            "tau_corr": float(rep.autocorr.tau_corr),
+            "n_eff": float(rep.autocorr.n_eff),
+            "sem_final_au": float(rep.sem_final),
+            "sem_max_au": (float(rep.sem_max) if rep.sem_max is not None else None),
+            "geweke_z": float(rep.geweke.z),
+            "drift_D": float(rep.running_avg.drift_D),
+            "passed": (bool(rep.passed) if rep.passed is not None else None),
+            "failure_reasons": list(rep.failure_reasons),
+        })
+
+    # ── 7. Assemble report ───────────────────────────────────────────
+    return TIFullAnalysisReport(
+        convergence_csv=csv_conv,
+        free_energy_csv=csv_fe,
+        free_energy_png=png_fe,
+        diagnostics_pngs=diag_pngs,
+        n_points=len(ti_report.point_reports),
+        delta_A_eV=round(ti_report.delta_A * HA_TO_EV, 6),
+        sigma_A_eV=round(ti_report.sigma_A * HA_TO_EV, 6),
+        all_passed=bool(ti_report.all_passed),
+        failing_indices=tuple(int(i) for i in ti_report.failing_indices),
+        per_point=tuple(per_point),
+        ti_report=ti_report,
+    )

@@ -49,6 +49,7 @@ def discover_ti_points(
     *,
     pattern: str = "auto",
     reverse: bool = False,
+    strict: bool = False,
 ) -> list[TIPointDefinition]:
     """Discover constraint-point directories and their files.
 
@@ -60,6 +61,16 @@ def discover_ti_points(
         Discovery pattern: "ti_target", "xi", or "auto".
     reverse : bool
         If True, sort by xi descending (initial state = max ξ).
+    strict : bool
+        If ``False`` (default, human-facing behaviour), matched directories
+        missing a ``.restart`` or ``.LagrangeMultLog`` file are logged and
+        skipped so the remaining points can still be analysed.
+
+        If ``True`` (agent-facing behaviour), any matched directory missing
+        required files raises :class:`FileNotFoundError` immediately — used
+        by ``run_ti_full_from_root()`` so the agent layer can surface the
+        problem as ``file_not_found`` instead of silently analysing a
+        subset.
 
     Returns
     -------
@@ -69,7 +80,8 @@ def discover_ti_points(
     Raises
     ------
     FileNotFoundError
-        If no matching directories are found.
+        If no matching directories are found, or (when ``strict=True``) if
+        a matched directory is missing a required file.
     """
     root = Path(root_dir)
     if not root.is_dir():
@@ -77,33 +89,33 @@ def discover_ti_points(
 
     points: list[TIPointDefinition] = []
 
-    if pattern in ("ti_target", "auto"):
+    def _collect(regex: re.Pattern) -> None:
         for d in sorted(root.iterdir()):
             if not d.is_dir():
                 continue
-            m = _TI_TARGET_RE.match(d.name)
-            if m:
-                xi = float(m.group(1))
-                try:
-                    restart = _find_restart(d)
-                    log = _find_log(d)
-                    points.append(TIPointDefinition(xi=xi, restart_path=restart, log_path=log))
-                except FileNotFoundError as e:
-                    logger.warning("Skipping %s: %s", d.name, e)
+            m = regex.match(d.name)
+            if not m:
+                continue
+            xi = float(m.group(1))
+            try:
+                restart = _find_restart(d)
+                log = _find_log(d)
+                points.append(
+                    TIPointDefinition(xi=xi, restart_path=restart, log_path=log)
+                )
+            except FileNotFoundError as e:
+                if strict:
+                    raise FileNotFoundError(
+                        f"Matched TI directory {d.name!r} is missing a "
+                        f"required file: {e}"
+                    ) from e
+                logger.warning("Skipping %s: %s", d.name, e)
+
+    if pattern in ("ti_target", "auto"):
+        _collect(_TI_TARGET_RE)
 
     if not points and pattern in ("xi", "auto"):
-        for d in sorted(root.iterdir()):
-            if not d.is_dir():
-                continue
-            m = _XI_RE.match(d.name)
-            if m:
-                xi = float(m.group(1))
-                try:
-                    restart = _find_restart(d)
-                    log = _find_log(d)
-                    points.append(TIPointDefinition(xi=xi, restart_path=restart, log_path=log))
-                except FileNotFoundError as e:
-                    logger.warning("Skipping %s: %s", d.name, e)
+        _collect(_XI_RE)
 
     if not points:
         raise FileNotFoundError(
