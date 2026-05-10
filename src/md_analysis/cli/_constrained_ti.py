@@ -10,7 +10,6 @@ from ._prompt import prompt_bool, prompt_choice, prompt_float, prompt_int, promp
 from ._enhanced_sampling import _discover_restart_file, _discover_log_file
 
 
-_VALID_PATTERNS = ("ti_target", "xi", "auto")
 _VALID_SIDES = ("aligned", "opposed")
 _VALID_METHODS = ("counterion", "layer")
 
@@ -22,21 +21,10 @@ _VALID_METHODS = ("counterion", "layer")
 def _collect_ti_base_params(ctx: dict) -> None:
     """Collect TI parameters shared by 312 and 313.
 
-    Populates: TI_ROOT_DIR, TI_DIR_PATTERN, EQUILIBRATION,
-    EPSILON_TOL_EV, TI_REVERSE.  Does NOT collect OUTDIR.
+    Populates: TI_ROOT_DIR, EQUILIBRATION, EPSILON_TOL_EV, TI_REVERSE.
+    Does NOT collect OUTDIR.
     """
     ctx[K.TI_ROOT_DIR] = prompt_str("TI root directory", default=".") or "."
-
-    while True:
-        pattern = prompt_str(
-            f"Directory pattern ({'/'.join(_VALID_PATTERNS)})",
-            default="auto",
-        ) or "auto"
-        if pattern in _VALID_PATTERNS:
-            break
-        print(f"  Invalid pattern '{pattern}'. "
-              f"Must be one of: {', '.join(_VALID_PATTERNS)}")
-    ctx[K.TI_DIR_PATTERN] = pattern
 
     ctx[K.EQUILIBRATION] = prompt_int(
         "Default equilibration frames to discard", default=0,
@@ -104,10 +92,9 @@ def _run_ti_core(ctx: dict):
     outdir = ctx[K.OUTDIR_RESOLVED]
     root_dir = Path(ctx[K.TI_ROOT_DIR])
 
-    # 1. Discover constraint points
+    # 1. Discover constraint points (auto-sniff parser, content-based filter)
     point_defs = discover_ti_points(
         root_dir,
-        pattern=ctx[K.TI_DIR_PATTERN],
         reverse=ctx[K.TI_REVERSE],
     )
     print(f"\n  Found {len(point_defs)} constraint points:")
@@ -143,18 +130,11 @@ def _run_ti_core(ctx: dict):
     else:
         equilibration = default_equil
 
-    # 3. Load series + parse time_start for each point
-    parse_colvar_restart = lazy_import(
-        "md_analysis.utils.RestartParser.ColvarParser",
-        "parse_colvar_restart",
-    )
+    # 3. Load series + use cached metadata for time_start
     series_data = load_ti_series(point_defs)
     xi_values = np.array([x for x, _, _ in series_data])
     lambda_list = [s for _, s, _ in series_data]
-    time_starts = [
-        parse_colvar_restart(str(p.restart_path)).time_start_fs
-        for p in point_defs
-    ]
+    time_starts = [float(p.metadata.time_start_fs) for p in point_defs]
 
     # 4. dt consistency check
     dts = [d for _, _, d in series_data]

@@ -896,9 +896,6 @@ def write_free_energy_csv(
 # ---------------------------------------------------------------------------
 
 
-_VALID_PATTERNS = ("auto", "ti_target", "xi")
-
-
 @dataclass(frozen=True)
 class TIFullAnalysisReport:
     """Return value of :func:`run_ti_full_from_root`.
@@ -965,7 +962,8 @@ def run_ti_full_from_root(
     root_dir: str | Path = ".",
     output_dir: str | Path = "analysis",
     *,
-    pattern: str = "auto",
+    parser: str = "auto",
+    dir_filter: str | None = None,
     reverse: bool = False,
     equilibration: int | list[int] = 0,
     epsilon_tol_ev: float = DEFAULT_EPSILON_TOL_EV,
@@ -982,12 +980,19 @@ def run_ti_full_from_root(
     Parameters
     ----------
     root_dir : str or Path
-        TI root directory containing ``ti_target_*/`` or ``xi_*/`` subdirs.
+        TI root directory containing constraint-point subdirectories.
     output_dir : str or Path
         Output directory for CSV and PNG files (created if missing).
         Existing files are overwritten.
-    pattern : {"auto", "ti_target", "xi"}
-        Directory discovery pattern.
+    parser : str, default ``"auto"``
+        Engine parser to use.  ``"auto"`` sniffs registered parsers
+        against the first matching subdirectory (currently CP2K is the
+        only registered engine).  Pass a registered parser name (e.g.
+        ``"cp2k"``) to skip sniffing.
+    dir_filter : str or None, default ``None``
+        Optional glob pattern to restrict which subdirectories are
+        treated as constraint points (e.g. ``"ti_target_*"``).
+        ``None`` means: any subdirectory the parser recognises.
     reverse : bool
         If True, treat the max-xi point as the initial state.
     equilibration : int or list[int]
@@ -1012,10 +1017,12 @@ def run_ti_full_from_root(
     FileNotFoundError
         ``root_dir`` does not exist, or a discovered point is missing
         required files.
+    ParserInferenceError
+        ``parser="auto"`` requested but no registered parser recognises
+        any candidate directory under *root_dir*.
     ValueError
-        ``pattern`` not in ``{"auto", "ti_target", "xi"}``; invalid
-        ``point_slice``; fewer than 2 points after slicing; inconsistent
-        ``dt`` across points.
+        Invalid ``point_slice``; fewer than 2 points after slicing;
+        inconsistent ``dt`` across points.
     InsufficientSamplingError
         ``auto_equilibration`` bisected below the min-frames threshold for
         some point.
@@ -1023,13 +1030,8 @@ def run_ti_full_from_root(
     # Lazy imports (keep top-level light and avoid import cycles).
     from .io import discover_ti_points, load_ti_series
     from .plot import plot_free_energy_profile, plot_point_diagnostics
-    from ...utils.RestartParser.ColvarParser import parse_colvar_restart
 
     # ── Validate inputs ──────────────────────────────────────────────
-    if pattern not in _VALID_PATTERNS:
-        raise ValueError(
-            f"Invalid pattern {pattern!r}: must be one of {_VALID_PATTERNS}"
-        )
     root_path = Path(root_dir)
     if not root_path.is_dir():
         raise FileNotFoundError(
@@ -1037,11 +1039,15 @@ def run_ti_full_from_root(
         )
 
     # ── 1. Discover constraint points (strict: agent-facing) ─────────
-    # strict=True so a matched ti_target_*/ dir missing .restart or
-    # .LagrangeMultLog surfaces as FileNotFoundError rather than being
-    # silently skipped (the latter is acceptable for the CLI menu path).
+    # strict=True so a matched directory missing required files
+    # surfaces as FileNotFoundError rather than being silently skipped
+    # (the latter is acceptable for the CLI menu path).
     point_defs = discover_ti_points(
-        root_path, pattern=pattern, reverse=reverse, strict=True,
+        root_path,
+        parser=parser,
+        dir_filter=dir_filter,
+        reverse=reverse,
+        strict=True,
     )
 
     # ── 2. Optional slice selection (hard-validated) ─────────────────
@@ -1066,10 +1072,7 @@ def run_ti_full_from_root(
             f"Inconsistent dt across TI points: {dts}. All points must share "
             "the same frame interval."
         )
-    time_starts = [
-        parse_colvar_restart(str(p.restart_path)).time_start_fs
-        for p in point_defs
-    ]
+    time_starts = [float(p.metadata.time_start_fs) for p in point_defs]
 
     # ── 4. Analyze ───────────────────────────────────────────────────
     ti_report = analyze_ti(

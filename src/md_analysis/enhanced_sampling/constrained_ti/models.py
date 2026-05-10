@@ -7,10 +7,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 
 from ...exceptions import MDAnalysisError
+
+if TYPE_CHECKING:
+    from .._parsers import ConstraintMDParser
+    from ...utils.RestartParser.ColvarParser import ColvarRestart
 
 # ---------------------------------------------------------------------------
 # Exceptions
@@ -174,8 +179,19 @@ class TIReport:
 
 @dataclass(frozen=True)
 class TIPointDefinition:
-    """Discovered constraint point file paths."""
+    """Discovered constraint point: directory + parser + cached metadata.
 
-    xi: float  # CV constraint value parsed from directory name
-    restart_path: Path  # path to *.restart file
-    log_path: Path  # path to *.LagrangeMultLog file
+    The metadata (engine config: timestep, target, etc.) is read at
+    discovery time so the heavy Lagrange-multiplier series can stay
+    lazy.  ``xi`` is exposed as a property derived from the primary CV
+    target value in the metadata — single source of truth.
+    """
+
+    directory: Path
+    parser: ConstraintMDParser
+    metadata: ColvarRestart
+
+    @property
+    def xi(self) -> float:
+        """Primary CV target value (a.u.) from cached metadata."""
+        return float(self.metadata.colvars.primary.target_au)

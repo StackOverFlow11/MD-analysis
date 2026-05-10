@@ -122,7 +122,7 @@ def _collect_bader_sigma(
     area_A2 = 0.0
 
     for i, pdef in enumerate(point_defs):
-        ti_dir = pdef.restart_path.parent
+        ti_dir = pdef.directory
         bader_dir = ti_dir / "bader"
 
         if not bader_dir.is_dir():

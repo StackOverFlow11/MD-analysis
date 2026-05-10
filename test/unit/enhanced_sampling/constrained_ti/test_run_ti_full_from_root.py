@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 
 import pytest
@@ -15,6 +16,14 @@ from md_analysis.enhanced_sampling.constrained_ti.workflow import (
 
 
 _EXAMPLE_TI_ROOT = Path(__file__).resolve().parents[4] / "data_example" / "ti" / "double_cv" / "1k"
+_EXAMPLE_POINT = _EXAMPLE_TI_ROOT / "ti_target_0.031369"
+
+
+def _seed_real_point(parent: Path, name: str) -> Path:
+    """Copy a real CP2K TI-point under *parent*/<name>."""
+    dst = parent / name
+    shutil.copytree(_EXAMPLE_POINT, dst)
+    return dst
 
 _skip_no_example = pytest.mark.skipif(
     not _EXAMPLE_TI_ROOT.is_dir(),
@@ -71,13 +80,16 @@ class TestRunTIFullInputValidation:
                 output_dir=tmp_path / "out",
             )
 
-    def test_invalid_pattern_raises_value_error(self, tmp_path):
+    def test_unknown_parser_raises(self, tmp_path):
         (tmp_path / "root").mkdir()
-        with pytest.raises(ValueError, match="Invalid pattern"):
+        from md_analysis.enhanced_sampling._parsers import (
+            ParserInferenceError,
+        )
+        with pytest.raises(ParserInferenceError):
             run_ti_full_from_root(
                 root_dir=tmp_path / "root",
                 output_dir=tmp_path / "out",
-                pattern="bogus",
+                parser="bogus_engine",
             )
 
     @_skip_no_example
@@ -125,37 +137,40 @@ class TestStrictDiscovery:
     """discover_ti_points(strict=False) keeps skip-and-warn;
     strict=True raises FileNotFoundError for incomplete matched dirs."""
 
-    def test_lenient_skips_incomplete_dir(self, tmp_path):
-        """Default strict=False: missing .restart → skipped with a warning."""
+    def test_lenient_skips_unparseable_dir(self, tmp_path):
+        """Default strict=False with a name-based filter: dirs whose
+        files exist but contain bad content are silently skipped."""
         from md_analysis.enhanced_sampling.constrained_ti.io import (
             discover_ti_points,
         )
 
-        _make_minimal_ti_dir(tmp_path, "ti_target_0.100000")
-        _make_minimal_ti_dir(
-            tmp_path, "ti_target_0.200000", with_restart=False,
-        )
+        # Real directory + 2 placeholder dirs. With dir_filter="ti_target_*"
+        # all three are name-selected, but only the real one's content
+        # parses; placeholders are skipped under lenient mode.
+        _seed_real_point(tmp_path, "ti_target_0.031369")
+        _make_minimal_ti_dir(tmp_path, "ti_target_0.200000")
         _make_minimal_ti_dir(tmp_path, "ti_target_0.300000")
 
-        points = discover_ti_points(tmp_path, pattern="ti_target")
-        assert len(points) == 2
-        xis = [p.xi for p in points]
-        assert 0.2 not in xis  # incomplete dir was skipped
+        points = discover_ti_points(
+            tmp_path, dir_filter="ti_target_*", strict=False,
+        )
+        # Only the real one survives (placeholders fail metadata parse).
+        assert len(points) == 1
+        assert points[0].directory.name == "ti_target_0.031369"
 
-    def test_strict_raises_for_incomplete_dir(self, tmp_path):
-        """strict=True: missing .restart → FileNotFoundError."""
+    def test_strict_raises_for_unparseable_dir(self, tmp_path):
+        """strict=True + dir_filter glob: a name-selected but unparseable
+        dir surfaces as FileNotFoundError."""
         from md_analysis.enhanced_sampling.constrained_ti.io import (
             discover_ti_points,
         )
 
-        _make_minimal_ti_dir(tmp_path, "ti_target_0.100000")
-        _make_minimal_ti_dir(
-            tmp_path, "ti_target_0.200000", with_restart=False,
-        )
+        _seed_real_point(tmp_path, "ti_target_0.031369")
+        _make_minimal_ti_dir(tmp_path, "ti_target_0.200000")
 
         with pytest.raises(FileNotFoundError, match="ti_target_0.200000"):
             discover_ti_points(
-                tmp_path, pattern="ti_target", strict=True,
+                tmp_path, dir_filter="ti_target_*", strict=True,
             )
 
     def test_strict_raises_for_missing_log(self, tmp_path):
@@ -165,24 +180,26 @@ class TestStrictDiscovery:
 
         _make_minimal_ti_dir(tmp_path, "ti_target_0.100000", with_log=False)
 
-        with pytest.raises(FileNotFoundError, match="ti_target_0.100000"):
+        with pytest.raises(FileNotFoundError):
             discover_ti_points(
-                tmp_path, pattern="ti_target", strict=True,
+                tmp_path, dir_filter="ti_target_*", strict=True,
             )
 
     def test_run_ti_full_surfaces_missing_file_as_filenotfound(self, tmp_path):
         """run_ti_full_from_root uses strict=True internally; an
-        incomplete matched dir must raise FileNotFoundError (not be
+        unparseable matched dir must raise FileNotFoundError (not be
         silently skipped). ``output_dir`` must not have been created."""
         root = tmp_path / "root"
         root.mkdir()
-        _make_minimal_ti_dir(root, "ti_target_0.100000")
-        _make_minimal_ti_dir(root, "ti_target_0.200000", with_restart=False)
-        _make_minimal_ti_dir(root, "ti_target_0.300000")
+        _seed_real_point(root, "ti_target_0.031369")
+        _make_minimal_ti_dir(root, "ti_target_0.200000")  # bad content
+        _seed_real_point(root, "ti_target_0.302356")
 
         with pytest.raises(FileNotFoundError, match="ti_target_0.200000"):
             run_ti_full_from_root(
-                root_dir=root, output_dir=tmp_path / "out",
+                root_dir=root,
+                output_dir=tmp_path / "out",
+                dir_filter="ti_target_*",
             )
         # Strict discovery must fail before any output side effects.
         assert not (tmp_path / "out").exists()
@@ -193,12 +210,13 @@ class TestStrictDiscovery:
 
         root = tmp_path / "root"
         root.mkdir()
-        _make_minimal_ti_dir(root, "ti_target_0.100000")
+        _seed_real_point(root, "ti_target_0.031369")
         _make_minimal_ti_dir(root, "ti_target_0.200000", with_log=False)
 
         result = dispatch("ti_full_analysis", {
             "root_dir": str(root),
             "output_dir": str(tmp_path / "out"),
+            "dir_filter": "ti_target_*",
         })
         assert not result.success
         assert result.error_type == "file_not_found"

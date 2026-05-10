@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import importlib
+
 import pytest
 
 from md_analysis.agent import get_task_schema, list_tasks
@@ -59,10 +61,11 @@ class TestSchemaPublicShape:
 
 
 class TestSchemaNonContractTasksUnchanged:
-    """Non-contract tasks (like sp_gen_batch) must retain the legacy shape."""
+    """Legacy (non-contract) tasks must retain the {name, description,
+    parameters} public shape."""
 
-    def test_sp_gen_batch_still_works(self):
-        s = get_task_schema("sp_gen_batch")
+    def test_water_three_panel_still_works(self):
+        s = get_task_schema("water_three_panel")
         assert set(s.keys()) == {"name", "description", "parameters"}
         assert s["parameters"]["type"] == "object"
 
@@ -71,6 +74,31 @@ class TestListTasksIncludesTiGenBatch:
     def test_ti_gen_batch_registered(self):
         names = [t["name"] for t in list_tasks()]
         assert "ti_gen_batch" in names
+
+
+class TestHandlerReloadRegression:
+    """Batch 0 regression: after splitting _handlers.py into task modules,
+    ``_reset_registry()`` + ``reload(_handlers)`` must still produce the
+    full 14-task registry."""
+
+    def test_reset_then_reload_restores_14_tasks(self):
+        from md_analysis.agent import _handlers
+        from md_analysis.agent._core import _reset_registry
+
+        assert len(list_tasks()) == 14  # baseline
+        _reset_registry()
+        assert len(list_tasks()) == 0
+        importlib.reload(_handlers)
+        assert len(list_tasks()) == 14
+
+    def test_reload_preserves_task_order(self):
+        from md_analysis.agent import _handlers
+        from md_analysis.agent._core import _reset_registry
+
+        expected_order = [t["name"] for t in list_tasks()]
+        _reset_registry()
+        importlib.reload(_handlers)
+        assert [t["name"] for t in list_tasks()] == expected_order
 
 
 # ---------------------------------------------------------------------------
@@ -90,7 +118,7 @@ class TestTIFullAnalysisSchema:
         s = get_task_schema("ti_full_analysis")
         props = s["parameters"]["properties"]
         expected = {
-            "root_dir", "output_dir", "pattern", "reverse",
+            "root_dir", "output_dir", "parser", "dir_filter", "reverse",
             "equilibration", "epsilon_tol_ev", "auto_equilibration",
             "point_slice",
         }
@@ -103,10 +131,15 @@ class TestTIFullAnalysisSchema:
                          "time_starts", "engine_overrides"):
             assert internal not in props, f"leaked internal param: {internal}"
 
-    def test_pattern_enum(self):
+    def test_parser_field_exists(self):
         s = get_task_schema("ti_full_analysis")
-        pattern = s["parameters"]["properties"]["pattern"]
-        assert set(pattern.get("enum", [])) == {"auto", "ti_target", "xi"}
+        parser = s["parameters"]["properties"]["parser"]
+        assert parser.get("type") == "string"
+
+    def test_dir_filter_is_nullable_string(self):
+        s = get_task_schema("ti_full_analysis")
+        df = s["parameters"]["properties"]["dir_filter"]
+        assert df.get("type") == ["string", "null"]
 
     def test_point_slice_is_nullable_string(self):
         s = get_task_schema("ti_full_analysis")
@@ -357,6 +390,55 @@ class TestCoercionErrorsWrapped:
         })
         assert not result.success
         assert result.error_type == "validation"
+
+
+class TestConfigShowContract:
+    """Batch 1: config_show is contract-backed, read-only, honours
+    ``config_path`` (previously ignored by the legacy handler)."""
+
+    def test_schema_keys(self):
+        s = get_task_schema("config_show")
+        assert set(s.keys()) == {"name", "description", "parameters"}
+
+    def test_no_required_params(self):
+        s = get_task_schema("config_show")
+        assert s["parameters"]["required"] == []
+
+    def test_config_path_is_nullable_string(self):
+        s = get_task_schema("config_show")
+        cp = s["parameters"]["properties"]["config_path"]
+        assert cp["type"] == ["string", "null"]
+
+    def test_is_contract_backed(self):
+        from md_analysis.agent._core import _TASK_REGISTRY
+        assert _TASK_REGISTRY["config_show"].contract is not None
+
+    def test_dispatch_custom_config_path(self, tmp_path):
+        import json
+        from md_analysis.agent import dispatch
+
+        cfg = tmp_path / "cfg.json"
+        cfg.write_text(json.dumps({"my_key": "my_val"}), encoding="utf-8")
+
+        r = dispatch("config_show", {"config_path": str(cfg)})
+        assert r.success
+        assert r.summary["config"] == {"my_key": "my_val"}
+
+    def test_dispatch_malformed_json_is_validation(self, tmp_path):
+        from md_analysis.agent import dispatch
+
+        cfg = tmp_path / "bad.json"
+        cfg.write_text("{not valid json", encoding="utf-8")
+
+        r = dispatch("config_show", {"config_path": str(cfg)})
+        assert not r.success
+        assert r.error_type == "validation"
+
+    def test_dispatch_default_path_returns_dict(self):
+        from md_analysis.agent import dispatch
+        r = dispatch("config_show", {})
+        assert r.success
+        assert isinstance(r.summary.get("config"), dict)
 
 
 class TestExceptionFQNResolution:
