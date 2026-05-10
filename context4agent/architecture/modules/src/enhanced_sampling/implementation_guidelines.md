@@ -90,15 +90,27 @@ otherwise           → SEM_auto  (ACF fallback)
 Nørskov 修正将恒电荷 TI 自由能转换为恒电势自由能：
 
 ```
-ΔF_Φ(ξ) = ΔF_q(ξ) + Δσ[e/Å²] × ΔΦ[V] × A[Å²] / 2
+ΔF_Φ(ξ) = ΔF_q(ξ) + [σ(ξ) − σ_ref] × [Φ(ξ) − Φ_ref] × A / 2
 ```
 
 - σ 从各 `ti_target_*/bader/` 的 Bader 帧系综平均得到
 - Φ 由 calibration mapper 从 σ 外推（`mapper.predict(σ)`）
 - A 为电极表面积（从 POSCAR 晶胞计算）
-- 初态 = 排序后第一个约束点
+- 基准 = IS/FS 中点：σ_ref = (σ_IS + σ_FS) / 2，Φ_ref = (Φ_IS + Φ_FS) / 2
 - 不做误差分析（修正项视为精确）
 - 缺少 bader/ 目录时 WARN 并跳过修正
+
+### Auto-equilibration（可选功能）
+
+`analyze_standalone` / `analyze_ti` / `standalone_diagnostics` 支持 `auto_equilibration=True`。
+二分砍前半迭代：每轮取后半段重跑四步诊断，通过则返回，帧数不足（<100）则报不收敛。
+默认关闭，不影响现有行为。CLI 312/313 通过 `K.AUTO_EQUILIBRATION` 提示控制。
+
+### 绘图约定
+
+- `plot_free_energy_profile` / `plot_corrected_free_energy_profile`：x 轴以所有约束点 ξ 值为刻度（4 位小数，45° 旋转）
+- 矫正图中误差带画在 const-φ 曲线上（而非 const-q）
+- CLI 312/313 发现点后显示带索引列表，支持 Python 切片选择子集（`3:8`、`::2` 等）
 
 ### 依赖方向
 

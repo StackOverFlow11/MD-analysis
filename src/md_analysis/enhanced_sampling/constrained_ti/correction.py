@@ -3,11 +3,13 @@
 Implements the Norskov parabolic correction that converts constant-charge
 TI free energy to constant-potential free energy:
 
-    dF_phi(xi) = dF_q(xi) + [sigma(xi) - sigma(IS)] * [Phi(xi) - Phi(IS)] * A / 2
+    dF_phi(xi) = dF_q(xi) + [sigma(xi) - sigma_ref] * [Phi(xi) - Phi_ref] * A / 2
 
 where sigma is the ensemble-averaged surface charge density from Bader analysis,
-Phi is the electrode potential predicted via sigma->phi calibration, and
-A is the electrode surface area.
+Phi is the electrode potential predicted via sigma->phi calibration,
+A is the electrode surface area, and the reference is the midpoint of the
+initial and final states: sigma_ref = (sigma_IS + sigma_FS) / 2,
+Phi_ref = (Phi_IS + Phi_FS) / 2.
 """
 
 from __future__ import annotations
@@ -120,7 +122,7 @@ def _collect_bader_sigma(
     area_A2 = 0.0
 
     for i, pdef in enumerate(point_defs):
-        ti_dir = pdef.restart_path.parent
+        ti_dir = pdef.directory
         bader_dir = ti_dir / "bader"
 
         if not bader_dir.is_dir():
@@ -229,11 +231,12 @@ def compute_constant_potential_correction(
     # Predict potential from sigma
     phi = mapper.predict(sigma_mean)  # (K,) V vs SHE
 
-    # Norskov correction: [sigma(xi) - sigma(IS)] * [phi(xi) - phi(IS)] * A / 2
-    sigma_IS = sigma_mean[0]
-    phi_IS = phi[0]
-    delta_sigma_e_A2 = (sigma_mean - sigma_IS) / E_PER_A2_TO_UC_PER_CM2
-    delta_phi = phi - phi_IS
+    # Norskov correction: [sigma(xi) - sigma_ref] * [phi(xi) - phi_ref] * A / 2
+    # Reference = midpoint of IS and FS (minimises max correction magnitude)
+    sigma_ref = (sigma_mean[0] + sigma_mean[-1]) / 2.0
+    phi_ref = (phi[0] + phi[-1]) / 2.0
+    delta_sigma_e_A2 = (sigma_mean - sigma_ref) / E_PER_A2_TO_UC_PER_CM2
+    delta_phi = phi - phi_ref
     correction_eV = delta_sigma_e_A2 * delta_phi * area_A2 / 2.0
 
     cumul_A_phi = cumul_A_q + correction_eV

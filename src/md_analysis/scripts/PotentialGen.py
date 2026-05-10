@@ -3,99 +3,22 @@
 from __future__ import annotations
 
 import logging
-import re
 import shutil
 from pathlib import Path
 
 from ase import Atoms
-from ase.io import iread, write
+from ase.io import write
 
 from ..config import KEY_CP2K_SCRIPT_PATH, KEY_SP_INP_TEMPLATE_PATH, get_config
 from ..exceptions import MDAnalysisError
+from ._frame_selector import FrameSelection, iter_selected_frames
+from ._inp_utils import modify_inp_for_sp
 
 logger = logging.getLogger(__name__)
 
 
 class PotentialGenError(MDAnalysisError):
     """Raised when potential work directory generation fails."""
-
-
-# ---------------------------------------------------------------------------
-# Regex for CELL ABC replacement
-# ---------------------------------------------------------------------------
-
-_CELL_BLOCK_RE = re.compile(
-    r"(&CELL\b)(.*?)(&END\s+CELL)",
-    re.DOTALL | re.IGNORECASE,
-)
-_ABC_LINE_RE = re.compile(
-    r"^(\s*ABC\s+)(\[.*?\]\s+)?\S+\s+\S+\s+\S+",
-    re.MULTILINE | re.IGNORECASE,
-)
-_TOPOLOGY_BLOCK_RE = re.compile(
-    r"(&TOPOLOGY\b)(.*?)(&END\s+TOPOLOGY)",
-    re.DOTALL | re.IGNORECASE,
-)
-_COORD_FILE_NAME_RE = re.compile(
-    r"^(\s*COORD_FILE_NAME)\s+\S+", re.MULTILINE | re.IGNORECASE,
-)
-_COORD_FILE_FORMAT_RE = re.compile(
-    r"^(\s*COORD_FILE_FORMAT)\s+\S+", re.MULTILINE | re.IGNORECASE,
-)
-
-
-# ---------------------------------------------------------------------------
-# Private helpers
-# ---------------------------------------------------------------------------
-
-def _replace_cell_abc(inp_text: str, a: float, b: float, c: float) -> str:
-    """Replace the ``ABC`` line inside ``&CELL`` with new values."""
-
-    def _replace_in_cell(match: re.Match) -> str:
-        header, body, footer = match.group(1), match.group(2), match.group(3)
-        new_body = _ABC_LINE_RE.sub(
-            rf"\g<1>[angstrom] {a:.4f}   {b:.4f}   {c:.4f}",
-            body,
-        )
-        return header + new_body + footer
-
-    result = _CELL_BLOCK_RE.sub(_replace_in_cell, inp_text)
-    if result == inp_text:
-        logger.warning("No &CELL ABC line found in template; cell not updated")
-    return result
-
-
-def _ensure_topology(inp_text: str) -> str:
-    """Ensure ``&TOPOLOGY`` has ``COORD_FILE_NAME init.xyz`` and ``COORD_FILE_FORMAT XYZ``."""
-
-    def _replace_topology(match: re.Match) -> str:
-        header, body, footer = match.group(1), match.group(2), match.group(3)
-
-        if _COORD_FILE_NAME_RE.search(body):
-            body = _COORD_FILE_NAME_RE.sub(r"\1 init.xyz", body)
-        else:
-            body += "      COORD_FILE_NAME init.xyz\n"
-
-        if _COORD_FILE_FORMAT_RE.search(body):
-            body = _COORD_FILE_FORMAT_RE.sub(r"\1 XYZ", body)
-        else:
-            body += "      COORD_FILE_FORMAT XYZ\n"
-
-        return header + body + footer
-
-    return _TOPOLOGY_BLOCK_RE.sub(_replace_topology, inp_text)
-
-
-def _modify_inp_for_sp(inp_text: str, cell_abc: tuple[float, float, float]) -> str:
-    """Return *inp_text* modified for single-point potential calculation.
-
-    Modifications:
-    - ``&CELL ABC`` → updated cell parameters
-    - ``&TOPOLOGY``: ensure ``COORD_FILE_NAME init.xyz`` + ``COORD_FILE_FORMAT XYZ``
-    """
-    text = _replace_cell_abc(inp_text, *cell_abc)
-    text = _ensure_topology(text)
-    return text
 
 
 # ---------------------------------------------------------------------------
@@ -175,7 +98,7 @@ def generate_potential_workdir(
 
     # 2. Modify and write sp.inp
     inp_text = inp_template_path.read_text(encoding="utf-8")
-    modified = _modify_inp_for_sp(inp_text, cell_abc)
+    modified = modify_inp_for_sp(inp_text, cell_abc)
     (workdir / "sp.inp").write_text(modified, encoding="utf-8")
 
     # 3. Submission script
@@ -201,9 +124,13 @@ def batch_generate_potential_workdirs(
     output_dir: str | Path,
     *,
     inp_template_path: str | Path | None = None,
+    mode: str = "index",
     frame_start: int = 0,
     frame_end: int | None = None,
     frame_step: int = 1,
+    time_start_fs: float | None = None,
+    time_end_fs: float | None = None,
+    time_step_fs: float | None = None,
     script_path: str | Path | None = None,
     verbose: bool = False,
 ) -> list[Path]:
@@ -220,12 +147,13 @@ def batch_generate_potential_workdirs(
     inp_template_path : str, Path or None
         Path to the CP2K sp.inp template file.
         If ``None``, falls back to the persisted config value.
-    frame_start : int
-        0-based index of first frame (default 0).
-    frame_end : int or None
-        0-based exclusive upper bound (default: all frames).
-    frame_step : int
-        Step between frames (default 1).
+    mode : {"index", "time"}
+        Frame selection mode. See ``FrameSelection`` for details.
+    frame_start, frame_end, frame_step : int
+        Index mode: 0-based frame slice (default: all frames, step=1).
+    time_start_fs, time_end_fs, time_step_fs : float or None
+        Time mode: inclusive [start, end] range with greedy stepping.
+        All three must be provided together.
     script_path : str, Path or None
         Submission script to copy (falls back to config).
     verbose : bool
@@ -255,7 +183,7 @@ def batch_generate_potential_workdirs(
         raise FileNotFoundError(f"SP inp template not found: {inp_template_path}")
 
     inp_text = inp_template_path.read_text(encoding="utf-8")
-    modified_inp = _modify_inp_for_sp(inp_text, cell_abc)
+    modified_inp = modify_inp_for_sp(inp_text, cell_abc)
 
     # Resolve script path once
     if script_path is None:
@@ -269,17 +197,21 @@ def batch_generate_potential_workdirs(
                 f"Submission script not found: {script_path}"
             )
 
-    # Collect frames
-    next_yield = frame_start
+    # Collect frames via unified selector
+    selection = FrameSelection(
+        mode=mode,  # type: ignore[arg-type]
+        frame_start=frame_start,
+        frame_end=frame_end,
+        frame_step=frame_step,
+        time_start_fs=time_start_fs,
+        time_end_fs=time_end_fs,
+        time_step_fs=time_step_fs,
+    )
     frames: list[tuple[int, Atoms]] = []
-    for idx, atoms in enumerate(iread(str(xyz_path), index=":")):
-        if frame_end is not None and idx >= frame_end:
-            break
-        if idx == next_yield:
-            atoms.set_cell(cell_abc)
-            atoms.set_pbc(True)
-            frames.append((idx, atoms))
-            next_yield += frame_step
+    for idx, atoms in iter_selected_frames(xyz_path, selection):
+        atoms.set_cell(cell_abc)
+        atoms.set_pbc(True)
+        frames.append((idx, atoms))
 
     logger.info("Batch potential: %d frames from %s", len(frames), xyz_path)
 

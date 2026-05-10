@@ -30,6 +30,8 @@ from ._scripts import (
     BaderSingleCmd,
     PotentialBatchCmd,
     PotentialSingleCmd,
+    SpGenBatchCmd,
+    SpGenSingleCmd,
     TIBatchCmd,
     TISingleCmd,
 )
@@ -37,6 +39,7 @@ from ._settings import (
     ResetDefaultsCmd,
     SetAnalysisDefaultCmd,
     SetCp2kScriptCmd,
+    SetDpSpInpTemplateCmd,
     SetPotentialReferenceCmd,
     SetSpInpTemplateCmd,
     SetVaspScriptCmd,
@@ -146,7 +149,13 @@ def build_menu_tree() -> MenuGroup:
         PotentialBatchCmd("432", "Batch Generate SP Potential Work Directories"),
     )
 
-    scripts.add(bader, ti, potential_prep)
+    sp_prep = MenuGroup("44", "DeePMD SP Preparation")
+    sp_prep.add(
+        SpGenSingleCmd("441", "Generate SP Work Directory for DP (single frame)"),
+        SpGenBatchCmd("442", "Batch Generate SP Work Directories for DP"),
+    )
+
+    scripts.add(bader, ti, potential_prep, sp_prep)
 
     # --- Settings ---
     settings = MenuGroup("9", "Settings")
@@ -162,6 +171,7 @@ def build_menu_tree() -> MenuGroup:
         SetVaspScriptCmd("911", "Set VASP Submission Script Path"),
         SetCp2kScriptCmd("912", "Set CP2K Submission Script Path"),
         SetSpInpTemplateCmd("913", "Set SP Inp Template Path"),
+        SetDpSpInpTemplateCmd("914", "Set DP SP Inp Template Path"),
     )
 
     analysis_defaults = MenuGroup("92", "Analysis Defaults")

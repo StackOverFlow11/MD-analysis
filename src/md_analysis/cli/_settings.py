@@ -74,6 +74,28 @@ class SetSpInpTemplateCmd(MenuCommand):
         print(f"  Saved: {KEY_SP_INP_TEMPLATE_PATH} = {p}")
 
 
+class SetDpSpInpTemplateCmd(MenuCommand):
+    def execute(self, ctx: dict) -> None:
+        from ..config import KEY_DP_SP_INP_TEMPLATE_PATH, get_config, set_config
+
+        current = get_config(KEY_DP_SP_INP_TEMPLATE_PATH)
+        if current:
+            print(f"  Current: {current}")
+
+        raw = prompt_str("DP SP inp template path (e.g. sp.inp)", default=current)
+        if raw is None:
+            print("  No path provided, skipping.")
+            return
+
+        p = Path(raw).expanduser().resolve()
+        if not p.is_file():
+            print(f"  Warning: file does not exist: {p}")
+            return
+
+        set_config(KEY_DP_SP_INP_TEMPLATE_PATH, str(p))
+        print(f"  Saved: {KEY_DP_SP_INP_TEMPLATE_PATH} = {p}")
+
+
 class ShowConfigCmd(MenuCommand):
     def execute(self, ctx: dict) -> None:
         from ..config import (

@@ -202,6 +202,17 @@
   - `k` 为绝对步数 `[0, 1, ..., n_steps-1]`；`target_au` 是 `step_start` 时刻的快照值
   - `colvar_id` 可选参数：指定使用哪个约束，默认使用 primary（第一个）
 
+### 2.9 `cell_resolver.py` 导出（Stable）
+
+函数：
+
+- `resolve_cell_abc(cell_abc=None, restart_path=None, md_inp_path=None, work_dir=None) -> tuple[float, float, float]`
+  - 按优先级解析正交晶胞参数：直接值 > `.restart` > `md.inp` > 工作目录自动发现
+  - 返回：`(a, b, c)` 长度，单位 Angstrom
+  - 异常：`ValueError`（所有源都无法确定或 cell_abc 长度不为 3）、`FileNotFoundError`（工作目录无可解析文件）
+  - 语义：非交互式纯函数，与 `cli/_params.py` 中的 `CellAbcParam.collect()` 互补（后者有交互式 retry 逻辑）
+  - 内部复用 `RestartParser.CellParser` 的 `parse_abc_from_restart()` / `parse_abc_from_md_inp()`
+
 ## 3. 推荐导入方式
 
 **约定**：`utils/__init__.py` 不 re-export 任何符号，所有调用方必须直接从子模块导入。
@@ -218,6 +229,7 @@
 - `from md_analysis.utils.BaderParser import load_bader_atoms, BaderParseError`
 - `from md_analysis.utils.RestartParser.CellParser import parse_abc_from_md_inp, parse_abc_from_restart`
 - `from md_analysis.utils.RestartParser import parse_colvar_restart, parse_lagrange_mult_log, ColvarMDInfo`
+- `from md_analysis.utils.cell_resolver import resolve_cell_abc`
 
 ## 4. 非公开边界（必须遵守）
 

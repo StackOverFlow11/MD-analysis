@@ -20,11 +20,12 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 |---|---|---|
 | `src/md_analysis/` | 包根：re-export, config, main.py 入口 | → `src/md_analysis/CLAUDE.md` |
 | `src/md_analysis/cli/` | 交互式菜单 CLI | → `cli/CLAUDE.md` |
+| `src/md_analysis/agent/` | Agent-friendly 非交互式入口 | dispatch + JSON Schema + TaskResult + Tools-layer TaskContract（14 tasks，3 contract-backed：`ti_gen_batch` / `ti_full_analysis` / `bader_gen_batch`） |
 | `src/md_analysis/utils/` | 底层解析器、常量、共享工具 | → `utils/CLAUDE.md` |
 | `src/md_analysis/water/` | 水分析工作流 | → `water/CLAUDE.md` |
 | `src/md_analysis/electrochemical/` | 电化学分组包（potential + charge） | → `electrochemical/CLAUDE.md` |
 | `src/md_analysis/enhanced_sampling/` | 增强采样（SG + TI 准备） | → `enhanced_sampling/CLAUDE.md` |
-| `src/md_analysis/scripts/` | 自动化脚本（BaderGen, TIGen, PotentialGen） | → `scripts/CLAUDE.md` |
+| `src/md_analysis/scripts/` | 自动化脚本（BaderGen, TIGen, PotentialGen, SpGen） | → `scripts/CLAUDE.md` |
 | `context4agent/` | 详细 API 文档（单一真相源） | 见下方 Sync Rules |
 
 ## Key Conventions

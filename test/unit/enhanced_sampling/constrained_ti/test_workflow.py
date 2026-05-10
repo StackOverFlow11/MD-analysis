@@ -258,3 +258,67 @@ class TestSEMSelection:
         assert report.all_passed is True
         for r in report.point_reports:
             assert 0 < r.sem_final < 1.0
+
+
+# ---------------------------------------------------------------------------
+# Auto-equilibration
+# ---------------------------------------------------------------------------
+
+
+class TestAutoEquilibration:
+    """Tests for auto_equilibration=True in analyze_standalone / analyze_ti."""
+
+    def test_already_converged_no_trimming(self):
+        """Clean iid series passes on first try — no extra trimming."""
+        series = make_iid(2000)
+        report = analyze_standalone(series, auto_equilibration=True)
+        # Should annotate with auto-equil info
+        info_lines = [r for r in report.failure_reasons if "Auto-equilibration" in r]
+        assert len(info_lines) == 1
+        assert "2000/2000" in info_lines[0]
+        assert "1 iteration" in info_lines[0]
+
+    def test_drifting_prefix_gets_trimmed(self):
+        """Series with big drift in first half should converge after trimming."""
+        rng = np.random.default_rng(99)
+        n = 4000
+        # First half: linear drift + noise
+        drift = np.linspace(0, 10, n // 2) + rng.normal(0, 0.5, n // 2)
+        # Second half: stationary
+        stable = rng.normal(0, 0.5, n // 2)
+        series = np.concatenate([drift, stable])
+
+        report_no_auto = analyze_standalone(series, auto_equilibration=False)
+        report_auto = analyze_standalone(series, auto_equilibration=True)
+
+        # Without auto-equil, Geweke should likely fail (massive drift)
+        assert not report_no_auto.geweke.passed
+
+        # With auto-equil, should converge on the stable tail
+        info_lines = [r for r in report_auto.failure_reasons if "Auto-equilibration" in r]
+        assert len(info_lines) == 1
+        # Should have trimmed at least once
+        assert "1 iteration" not in info_lines[0] or report_auto.geweke.passed
+
+    def test_too_short_returns_not_converged(self):
+        """Series too short to halve returns last result with annotation."""
+        # 150 frames with drift — can halve once to 75, below min_frames=100
+        series = make_drifting(150, slope=0.1)
+        report = analyze_standalone(series, auto_equilibration=True)
+        info_lines = [r for r in report.failure_reasons if "Auto-equilibration" in r]
+        assert len(info_lines) == 1
+
+    def test_ti_auto_equil_passthrough(self):
+        """analyze_ti with auto_equilibration=True runs without error."""
+        xi = np.array([1.0, 2.0, 3.0])
+        series_list = [make_ar1(5000, 0.3, seed=10 + i) for i in range(3)]
+        report = analyze_ti(
+            xi, series_list, dt=1.0,
+            epsilon_tol_ev=100.0,
+            auto_equilibration=True,
+        )
+        # Should still pass (clean data)
+        assert report.all_passed is True
+        # Each point should have auto-equil annotation
+        for r in report.point_reports:
+            assert any("Auto-equilibration" in fr for fr in r.failure_reasons)

@@ -12,7 +12,7 @@ Constrained TI convergence diagnostics, free energy integration, and constant-po
 | `models.py` | Frozen dataclasses (all result types) + exception hierarchy |
 | `workflow.py` | Orchestrator: analyze_single_point, analyze_standalone, analyze_ti, CSV exports |
 | `integration.py` | Trapezoid weights, SEM targets, free energy integration, optimal allocation |
-| `io.py` | Directory discovery (ti_target_*/xi_*, reverse support) + batch parsing |
+| `io.py` | Engine-agnostic directory discovery (parser-driven; content-based filter by default) + batch parsing. Delegates engine specifics to `enhanced_sampling/_parsers.py` (`ConstraintMDParser` Protocol). |
 | `plot.py` | 2x2 diagnostics PNG + free energy profile PNG |
 | `correction.py` | Norskov constant-potential correction + corrected CSV/PNG |
 | `analysis/` | Four independent diagnostic engines (see analysis/ mirror) |

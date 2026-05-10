@@ -10,6 +10,7 @@ Public API
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 
@@ -145,8 +146,47 @@ class SlowgrowthFull(Slowgrowth):
         *,
         colvar_id: int | None = None,
     ) -> SlowgrowthFull:
-        """Parse files and build in one step."""
+        """Parse files and build in one step (CP2K-only path)."""
         md_info = ColvarMDInfo.from_paths(restart_path, log_path)
+        return cls.from_md_info(md_info, colvar_id=colvar_id)
+
+    @classmethod
+    def from_directory(
+        cls,
+        directory: str | Path,
+        *,
+        parser: object = "auto",
+        colvar_id: int | None = None,
+    ) -> SlowgrowthFull:
+        """Build from an SG run directory using a pluggable parser.
+
+        Parameters
+        ----------
+        directory : str or Path
+            Directory containing the SG output files (engine-specific).
+        parser : ConstraintMDParser | str, default ``"auto"``
+            Engine parser.  ``"auto"`` sniffs registered parsers; pass
+            an instance or registered name (e.g. ``"cp2k"``) to skip
+            sniffing.
+        colvar_id : int, optional
+            Which collective variable to use.  Defaults to the primary CV.
+        """
+        from .._parsers import (
+            ConstraintMDParser,
+            infer_parser,
+            resolve_parser,
+        )
+        from ...utils.RestartParser.ColvarParser import ColvarMDInfo
+
+        directory = Path(directory)
+        if parser == "auto":
+            parser_obj: ConstraintMDParser = infer_parser(directory)
+        else:
+            parser_obj = resolve_parser(parser)
+        md_info = ColvarMDInfo(
+            restart=parser_obj.parse_metadata(directory),
+            lagrange=parser_obj.parse_lambda_series(directory),
+        )
         return cls.from_md_info(md_info, colvar_id=colvar_id)
 
     def segment(

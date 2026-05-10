@@ -51,9 +51,14 @@ def batch_generate_bader_workdirs(
     cell_abc: tuple[float, float, float],
     output_dir: str | Path,
     *,
+    # Unified frame selection (shared with Potential/SpGen batch functions)
+    mode: str = "index",
     frame_start: int = 0,
     frame_end: int | None = None,
     frame_step: int = 1,
+    time_start_fs: float | None = None,
+    time_end_fs: float | None = None,
+    time_step_fs: float | None = None,
     script_path: str | Path | None = None,
     element_order: tuple[str, ...] | None = None,
     generate_potcar: bool = True,
@@ -172,9 +177,14 @@ def batch_generate_potential_workdirs(
     output_dir: str | Path,
     *,
     inp_template_path: str | Path | None = None,
+    # Unified frame selection (shared with Bader/SpGen batch functions)
+    mode: str = "index",
     frame_start: int = 0,
     frame_end: int | None = None,
     frame_step: int = 1,
+    time_start_fs: float | None = None,
+    time_end_fs: float | None = None,
+    time_step_fs: float | None = None,
     script_path: str | Path | None = None,
     verbose: bool = False,
 ) -> list[Path]:
@@ -200,7 +210,152 @@ def batch_generate_potential_workdirs(
 
 ---
 
+## SP Work Directory Generation for DeePMD Training (SpGen.py)
+
+| Symbol                         | Module      | Description                                              |
+|--------------------------------|-------------|----------------------------------------------------------|
+| `SpGenError`                   | SpGen.py    | Exception for SP work directory generation failures      |
+| `generate_sp_workdir`          | SpGen.py    | Generate a CP2K SP work directory for DeePMD training    |
+| `batch_generate_sp_workdirs`   | SpGen.py    | Batch-generate SP work directories from XYZ trajectory   |
+
+### Purpose
+
+Front-end tool for DeePMD-kit training data collection. Mirrors `PotentialGen` structure but uses a distinct config key and directory prefix to avoid mixing with Hartree-potential analysis.
+
+### `generate_sp_workdir` Signature
+
+```python
+def generate_sp_workdir(
+    atoms: Atoms,
+    output_dir: str | Path,
+    *,
+    inp_template_path: str | Path | None = None,
+    cell_abc: tuple[float, float, float] | None = None,
+    script_path: str | Path | None = None,
+    workdir_name: str = "sp",
+    frame: int = 0,
+    source: str = "",
+) -> Path:
+```
+
+### `batch_generate_sp_workdirs` Signature
+
+```python
+def batch_generate_sp_workdirs(
+    xyz_path: str | Path,
+    cell_abc: tuple[float, float, float],
+    output_dir: str | Path,
+    *,
+    inp_template_path: str | Path | None = None,
+    # Unified frame selection (shared with Bader/Potential batch functions)
+    mode: str = "index",
+    frame_start: int = 0,
+    frame_end: int | None = None,
+    frame_step: int = 1,
+    time_start_fs: float | None = None,
+    time_end_fs: float | None = None,
+    time_step_fs: float | None = None,
+    script_path: str | Path | None = None,
+    verbose: bool = False,
+) -> list[Path]:
+```
+
+Frame selection behavior is delegated to `FrameSelection` / `iter_selected_frames`
+from `scripts/_frame_selector.py`. See "Frame Selection (shared)" section below.
+
+### Generated Directory Contents
+
+| File        | Source                          |
+|-------------|---------------------------------|
+| `init.xyz`  | Extracted frame from MD trajectory |
+| `sp.inp`    | User-provided template with CELL ABC auto-replaced (shared `_inp_utils.py` helpers) |
+| `script.sh` | Copied from `script_path` or persistent config |
+
+### Inp Template Path Resolution
+
+1. If `inp_template_path` explicitly provided → use it
+2. If `None` → read `KEY_DP_SP_INP_TEMPLATE_PATH` from persistent config (separate from `KEY_SP_INP_TEMPLATE_PATH`)
+3. If neither → raise `SpGenError`
+
+### Directory Naming
+
+`sp_t{int(time_fs)}_i{step}` — distinct from `potential_t*_i*` to avoid `discover_distributed_frames()` from accidentally consuming DP training dirs when doing Hartree-potential analysis.
+
+### Back-end Integration
+
+After SP calculations complete, feed the output directories to `dpdata.LabeledSystem` or the `cp2kdata` dpdata plugin to produce DeePMD training sets.
+
+### Agent Task
+
+Registered in `md_analysis.agent` as `sp_gen_batch` (category=`scripts`, CLI code=`442`). Simple pass-through handler via `_make_handler`; the `_normalize_outputs` layer converts the returned `list[Path]` into `{"workdir_0": ..., "workdir_1": ..., ...}`.
+
+---
+
+## Frame Selection (shared, `_frame_selector.py` private module)
+
+Unified trajectory slicing used by BaderGen / PotentialGen / SpGen batch
+functions (TIGen is excluded — it uses target-based snapping, not range slicing).
+
+### `FrameSelection` dataclass
+
+```python
+@dataclass(frozen=True)
+class FrameSelection:
+    mode: Literal["index", "time"] = "index"
+    # Index mode
+    frame_start: int = 0
+    frame_end: int | None = None
+    frame_step: int = 1
+    # Time mode — all three required together when mode="time"
+    time_start_fs: float | None = None
+    time_end_fs: float | None = None
+    time_step_fs: float | None = None
+```
+
+- `mode` is an explicit discriminator (not inferred from which params are `None`)
+  so JSON Schema enum generation is clean for agent dispatch.
+- `__post_init__` validates: invalid `mode` string, `frame_step < 1`, time mode
+  with incomplete params, `time_step_fs <= 0`, `time_start_fs > time_end_fs`.
+  All failures raise `FrameSelectionError(MDAnalysisError)` which
+  `agent/_dispatch.py` classifies as `ERROR_VALIDATION`.
+
+### `iter_selected_frames(xyz_path, selection) -> Iterator[(int, Atoms)]`
+
+Unified frame iterator:
+
+- **Index mode**: yields frames at indices `frame_start`, `frame_start+step`, ...
+  up to (excluding) `frame_end`. Matches pre-refactor behavior.
+- **Time mode**: greedy. At each target `t_k = t_start + k * t_step`, yield the
+  first frame with `time >= t_k` (within `[t_start, t_end]`), then advance
+  `next_target` by `t_step`. Raises `FrameSelectionError` if `atoms.info["time"]`
+  is missing.
+
+### `resolve_single_frame(xyz_path, *, mode, frame=0, time_fs=None, time_tol_fs=1e-6)`
+
+Single-frame locator for the `generate_*_workdir` CLI Single commands.
+
+- **Index mode**: returns the frame at index `frame`.
+- **Time mode**: finds the frame closest to `time_fs`, assuming monotonic
+  time (early-breaks once past the target). If
+  `|actual_time - time_fs| > time_tol_fs`, a warning message is appended
+  to the returned `warnings: list[str]`. The caller surfaces warnings:
+  - CLI: `logger.warning(...)` + print to stdout
+  - Agent: merge into `TaskResult.warnings`
+
+Returns `(frame_index, atoms, warnings)`.
+
+### Why TIGen is not covered
+
+TIGen's "time mode" maps each element of `linspace(t_initial, t_final, n_points)`
+to the nearest CV(a.u.) value, then to the nearest frame — it's a **target-based
+point selection**, not range slicing. Forcing a common abstraction would add
+complexity without reducing duplication.
+
+---
+
 ## Stability
 
-- **Stable** — single-frame and batch APIs (Bader + TI + Potential).
+- **Stable** — single-frame and batch APIs (Bader + TI + Potential + SpGen).
+- **Stable** — `FrameSelection`, `iter_selected_frames`, `resolve_single_frame`
+  are private (prefixed with `_frame_selector.py`) but the semantics are stable.
 - Not re-exported from `md_analysis` top-level `__init__.py`.

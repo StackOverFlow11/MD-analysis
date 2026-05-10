@@ -273,6 +273,9 @@ def plot_free_energy_profile(
     ax1.set_xlabel("ξ (a.u.)")
     if len(xi) >= 2 and xi[0] > xi[-1]:
         ax1.invert_xaxis()
+    # Show all CV values as x-axis ticks
+    ax1.set_xticks(xi)
+    ax1.set_xticklabels([f"{v:.4f}" for v in xi], rotation=45, ha="right", fontsize=7)
     ax1.set_ylabel("dA/dξ (a.u.)", color="C0")
     ax1.tick_params(axis="y", labelcolor="C0")
 
@@ -338,6 +341,8 @@ def plot_corrected_free_energy_profile(
     ax1.set_xlabel("ξ (a.u.)")
     if len(xi) >= 2 and xi[0] > xi[-1]:
         ax1.invert_xaxis()
+    ax1.set_xticks(xi)
+    ax1.set_xticklabels([f"{v:.4f}" for v in xi], rotation=45, ha="right", fontsize=7)
     ax1.set_ylabel("dA/dξ (a.u.)", color="C0")
     ax1.tick_params(axis="y", labelcolor="C0")
 
@@ -347,22 +352,22 @@ def plot_corrected_free_energy_profile(
         np.cumsum(tr.weights**2 * errors**2)
     ) * HA_TO_EV
 
-    # Const-q (dashed orange with error band)
+    # Const-q (dashed orange, no error band)
     ax2.plot(
         xi, result.A_const_q_eV, "--s", color="C1",
         markersize=3, linewidth=1.0, label="A(ξ) const-q", alpha=0.7,
     )
-    ax2.fill_between(
-        xi,
-        result.A_const_q_eV - cumul_sigma,
-        result.A_const_q_eV + cumul_sigma,
-        alpha=0.15, color="C1",
-    )
 
-    # Const-phi (solid red)
+    # Const-phi (solid red with error band)
     ax2.plot(
         xi, result.A_const_phi_eV, "-o", color="C3",
         markersize=3, linewidth=1.2, label="A(ξ) const-Φ",
+    )
+    ax2.fill_between(
+        xi,
+        result.A_const_phi_eV - cumul_sigma,
+        result.A_const_phi_eV + cumul_sigma,
+        alpha=0.15, color="C3",
     )
 
     ax2.set_ylabel("A(ξ) (eV)")

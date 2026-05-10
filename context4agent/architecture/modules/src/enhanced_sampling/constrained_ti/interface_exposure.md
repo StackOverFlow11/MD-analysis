@@ -21,10 +21,18 @@
 
 ### I/O (io.py)
 
+Engine-agnostic — parsing delegated to `ConstraintMDParser` (see
+`enhanced_sampling/_parsers.py`).
+
 | Function | Description |
 |----------|-------------|
-| `discover_ti_points(root_dir, *, pattern, reverse)` | Scan for ti_target_*/xi_* dirs |
-| `load_ti_series(point_defs)` | Parse restart + log for each point |
+| `discover_ti_points(root, *, parser="auto", dir_filter=None, reverse=False, strict=False)` | Discover constraint-point dirs; `parser`="auto" sniffs registered parsers, `dir_filter` is None/glob/callable |
+| `load_ti_series(point_defs)` | Parse Lagrange-multiplier series for each point (metadata is already cached on each `TIPointDefinition`) |
+
+`TIPointDefinition` fields: `directory: Path`, `parser: ConstraintMDParser`,
+`metadata: ColvarRestart`. `xi` is a property derived from
+`metadata.colvars.primary.target_au` — single source of truth, never
+parsed from directory name.
 
 ### Plot (plot.py)
 

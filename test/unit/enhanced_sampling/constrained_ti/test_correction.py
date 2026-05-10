@@ -148,18 +148,20 @@ class TestCorrectionFormula:
         mapper = _make_linear_mapper(slope=-0.01, intercept=0.0)
 
         from md_analysis.electrochemical.charge.config import E_PER_A2_TO_UC_PER_CM2
-        from md_analysis.utils.constants import HA_TO_EV
 
-        # Manually compute expected: all deltas are zero
+        # Midpoint reference: sigma_ref = sigma_const[0], phi_ref = phi[0]
+        # All deltas are zero when sigma is constant
         phi = mapper.predict(sigma_const)
-        delta_sigma_e_A2 = (sigma_const - sigma_const[0]) / E_PER_A2_TO_UC_PER_CM2
-        delta_phi = phi - phi[0]
+        sigma_ref = (sigma_const[0] + sigma_const[-1]) / 2.0
+        phi_ref = (phi[0] + phi[-1]) / 2.0
+        delta_sigma_e_A2 = (sigma_const - sigma_ref) / E_PER_A2_TO_UC_PER_CM2
+        delta_phi = phi - phi_ref
         expected_corr = delta_sigma_e_A2 * delta_phi * area / 2.0
 
         np.testing.assert_allclose(expected_corr, 0.0, atol=1e-15)
 
     def test_correction_formula_2_points(self) -> None:
-        """Hand-calculated 2-point correction."""
+        """Hand-calculated 2-point correction with midpoint reference."""
         from md_analysis.electrochemical.charge.config import E_PER_A2_TO_UC_PER_CM2
         from md_analysis.utils.constants import HA_TO_EV
 
@@ -173,37 +175,46 @@ class TestCorrectionFormula:
         mapper = _make_linear_mapper(slope=-0.005, intercept=0.0)
 
         phi = mapper.predict(sigma)  # [-0.05, -0.10]
-        delta_sigma_e_A2 = (sigma[1] - sigma[0]) / E_PER_A2_TO_UC_PER_CM2
-        delta_phi = phi[1] - phi[0]  # -0.05
-        expected_corr_1 = delta_sigma_e_A2 * delta_phi * area / 2.0
+        # Midpoint reference
+        sigma_ref = (sigma[0] + sigma[-1]) / 2.0  # 15.0
+        phi_ref = (phi[0] + phi[-1]) / 2.0  # -0.075
+        expected_corr = np.empty(2)
+        for i in range(2):
+            ds = (sigma[i] - sigma_ref) / E_PER_A2_TO_UC_PER_CM2
+            dp = phi[i] - phi_ref
+            expected_corr[i] = ds * dp * area / 2.0
 
-        cumul_A_q = np.cumsum(weights * forces) * HA_TO_EV
-        expected_A_phi = cumul_A_q.copy()
-        expected_A_phi[1] += expected_corr_1
+        # With midpoint ref, IS and FS corrections are symmetric (equal magnitude)
+        assert expected_corr[0] == pytest.approx(expected_corr[1], rel=1e-10)
 
         # Verify via data model
         corr = ConstantPotentialCorrection(
             sigma_uC_cm2=sigma,
             phi_V_SHE=phi,
-            correction_eV=np.array([0.0, expected_corr_1]),
+            correction_eV=expected_corr,
             area_A2=area,
         )
-        assert corr.correction_eV[0] == 0.0
-        assert corr.correction_eV[1] == pytest.approx(expected_corr_1, rel=1e-10)
+        for i in range(2):
+            assert corr.correction_eV[i] == pytest.approx(expected_corr[i], rel=1e-10)
 
-    def test_initial_state_correction_is_zero(self) -> None:
-        """correction[0] must always be zero (delta from IS to IS)."""
+    def test_midpoint_symmetry(self) -> None:
+        """IS and FS corrections are equal when sigma/phi are linearly spaced."""
         from md_analysis.electrochemical.charge.config import E_PER_A2_TO_UC_PER_CM2
 
         sigma = np.array([15.0, 20.0, 25.0])
         phi = np.array([-0.1, -0.2, -0.3])
         area = 150.0
 
-        delta_sigma = (sigma - sigma[0]) / E_PER_A2_TO_UC_PER_CM2
-        delta_phi = phi - phi[0]
+        sigma_ref = (sigma[0] + sigma[-1]) / 2.0  # 20.0
+        phi_ref = (phi[0] + phi[-1]) / 2.0  # -0.2
+        delta_sigma = (sigma - sigma_ref) / E_PER_A2_TO_UC_PER_CM2
+        delta_phi = phi - phi_ref
         correction = delta_sigma * delta_phi * area / 2.0
 
-        assert correction[0] == 0.0
+        # Midpoint (index 1) has zero correction
+        assert correction[1] == pytest.approx(0.0, abs=1e-15)
+        # IS and FS corrections are equal (symmetric about midpoint)
+        assert correction[0] == pytest.approx(correction[-1], rel=1e-10)
 
     def test_units_eV(self) -> None:
         """Verify dimensional analysis: e/A^2 * V * A^2 = eV."""

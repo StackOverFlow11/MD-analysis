@@ -61,6 +61,21 @@ VASPKIT 风格交互式编号菜单。无 argparse，所有输入通过 `input()
 3. 如需新参数键 → 在 `_params.py` 的 `K` 类中添加常量
 4. 如需新参数类型 → 创建 `ParamCollector` 子类或使用现有泛型类
 
+## Constrained TI (312/313) 交互流程
+
+`_collect_ti_base_params` 采集共享参数，包含：
+- `K.TI_ROOT_DIR`、`K.EQUILIBRATION`、`K.EPSILON_TOL_EV`、`K.TI_REVERSE`
+- `K.AUTO_EQUILIBRATION`：可选自动预平衡迭代（二分砍前半直到收敛）
+
+CLI 不再 prompt directory pattern：discover_ti_points 默认 `parser="auto" + dir_filter=None`（嗅探 + 内容过滤），目录命名完全自由。
+
+`_run_ti_core` 执行共享 TI 分析，流程：
+1. 发现约束点 → 带索引列表显示 `[0] ξ = ...`
+2. **Python 切片选择**（可选）：用户输入如 `3:8`、`::2`、`:8` 等，空回车 = 全部
+3. 可选逐点 equilibration 覆盖
+4. 加载数据 → dt 一致性检查
+5. `analyze_ti(... auto_equilibration=ctx[K.AUTO_EQUILIBRATION])` → 控制台摘要表 → 写文件
+
 ## 陷阱与历史 Bug
 
 - 菜单码重编号（bace527）：旧代码中 401/402 已改为 411/412
@@ -68,4 +83,4 @@ VASPKIT 风格交互式编号菜单。无 argparse，所有输入通过 `input()
 - `_discover_restart_file()` 排除 `_\d+.restart` 检查点文件（正则过滤）
 - SG 命令会检测 LagrangeMultLog 中的 overflow（NaN 步），并在终端打印警告
 - SG 命令 301/302 的 `output_name` 由父 `MenuGroup("30", output_name="slowgrowth")` 提供，`_SlowgrowthPlotCmd` 自身不定义 `output_name`（否则路径重复拼接为 `slowgrowth/slowgrowth`）
-- `K.TI_DIR_PATTERN` 仅接受 `"ti_target"/"xi"/"auto"`，注意区分 `K.DIR_PATTERN`（Bader 用）
+- `K.TI_DIR_PATTERN` 已删除（2026-05-10 IO 重构）；TI discover 现走 parser-driven 自动模式。`K.DIR_PATTERN`（Bader 用）保留
