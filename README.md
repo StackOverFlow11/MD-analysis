@@ -78,9 +78,17 @@ The VASPKIT-style numbered menu guides you through:
 - **4) Scripts / Tools**
   - **41) Bader** — single frame (411), batch (412)
   - **42) TI** — single target (421), batch (422)
-- **9) Settings** — VASP script (901), CP2K script (908), show config (902), analysis defaults (903-906), reset (907), potential reference (909)
+  - **43) SP Potential** — single (431), batch (432)
+  - **44) DeePMD SP** — single (441), batch (442)
+- **9) Settings**
+  - **90) Show / Reset** — show config (900), reset all (909)
+  - **91) Script Paths** — VASP submit (911), CP2K submit (912), SP inp template (913), DP SP inp template (914)
+  - **92) Analysis Defaults** — layer tol (921), Z bin (922), theta bin (923), water O-H cutoff (924)
+  - **93) Potential Output** — reference scale / pH / T / φ_PZC (931)
 
 Each option prompts for required inputs, then offers an optional "Modify advanced parameters?" gate.
+
+> **Chinese user docs (CLI guide / workflows / settings / pitfalls):** see [`docs/`](docs/README.md).
 
 ### Python API
 
