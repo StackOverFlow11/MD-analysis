@@ -17,14 +17,14 @@ from md_analysis.electrochemical.charge.Bader.SurfaceCharge import (
 )
 from md_analysis.utils.BaderParser import load_bader_atoms
 
-DATA_DIR = Path(__file__).resolve().parents[3] / "data_example" / "bader" / "bader_work_dir"
+DATA_DIR = Path(__file__).resolve().parents[3] / "data_example" / "bader" / "single_frame"
 
 # Files needed per frame
 _FRAME_FILES = ["POSCAR", "ACF.dat", "POTCAR"]
 
 
 def _build_fake_trajectory(tmp_path: Path, n_frames: int = 2) -> Path:
-    """Copy bader_work_dir data into bader_t*_i* subdirectories."""
+    """Copy single_frame data into bader_t*_i* subdirectories."""
     for i in range(n_frames):
         frame_dir = tmp_path / f"bader_t{i:03d}_i000"
         frame_dir.mkdir()

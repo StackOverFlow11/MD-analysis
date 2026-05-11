@@ -23,7 +23,7 @@ from md_analysis.main import (
 # ---------------------------------------------------------------------------
 
 _DATA_DIR = Path(__file__).resolve().parents[2] / "data_example" / "potential"
-_BADER_DIR = Path(__file__).resolve().parents[2] / "data_example" / "bader" / "bader_work_dir"
+_BADER_DIR = Path(__file__).resolve().parents[2] / "data_example" / "bader" / "single_frame"
 
 pytestmark = pytest.mark.skipif(
     not _DATA_DIR.exists(),
@@ -35,7 +35,7 @@ _FRAME_FILES = ["POSCAR", "ACF.dat", "POTCAR"]
 
 
 def _build_fake_trajectory(tmp_path: Path, n_frames: int = 2) -> Path:
-    """Copy bader_work_dir data into bader_t*_i* subdirectories."""
+    """Copy single_frame data into bader_t*_i* subdirectories."""
     tmp_path.mkdir(parents=True, exist_ok=True)
     for i in range(n_frames):
         frame_dir = tmp_path / f"bader_t{i:03d}_i000"
@@ -189,7 +189,7 @@ class TestRunChargeAnalysis:
 
     @pytest.mark.skipif(
         not _BADER_DIR.exists(),
-        reason=f"data_example/bader/bader_work_dir/ not found at {_BADER_DIR}",
+        reason=f"data_example/bader/single_frame/ not found at {_BADER_DIR}",
     )
     def test_happy_path(self, tmp_path: Path):
         root = _build_fake_trajectory(tmp_path / "traj", n_frames=2)
