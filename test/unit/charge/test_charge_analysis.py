@@ -1,4 +1,4 @@
-"""Unit tests for md_analysis.charge.BaderAnalysis."""
+"""Unit tests for md_analysis.electrochemical.charge.Bader."""
 
 import shutil
 from pathlib import Path
@@ -7,20 +7,24 @@ import numpy as np
 import pytest
 from ase import Atoms
 
-from md_analysis.electrochemical.charge.BaderAnalysis import (
+from md_analysis.electrochemical.charge.Bader._frame_utils import (
     _extract_t_value,
     _sorted_frame_dirs,
-    compute_frame_surface_charge,
+)
+from md_analysis.electrochemical.charge.Bader.AtomCharges import (
     frame_indexed_atom_charges,
-    surface_charge_analysis,
     trajectory_indexed_atom_charges,
+)
+from md_analysis.electrochemical.charge.Bader.SurfaceCharge import (
+    compute_frame_surface_charge,
+    surface_charge_analysis,
     trajectory_surface_charge,
 )
 from md_analysis.electrochemical.charge.config import E_PER_A2_TO_UC_PER_CM2
 from md_analysis.utils.BaderParser import load_bader_atoms
 from md_analysis.utils.StructureParser.LayerParser import detect_interface_layers
 
-DATA_DIR = Path(__file__).resolve().parents[3] / "data_example" / "bader" / "bader_work_dir"
+DATA_DIR = Path(__file__).resolve().parents[3] / "data_example" / "bader" / "single_frame"
 
 
 # ---------------------------------------------------------------------------
@@ -120,8 +124,9 @@ class TestComputeFrameSurfaceCharge:
         # Layers at frac 0.1..0.4; gap 0.4→0.1 wrapping.
         # normal_aligned = frac 0.4, normal_opposed = frac 0.1.
         # K at frac 0.05 is near the normal_opposed surface (index 1).
+        # K has net charge +0.8e → surface charge = -0.8e (charge neutrality).
         assert n_ch[1] == 1
-        assert q_ch[1] == pytest.approx(0.8)
+        assert q_ch[1] == pytest.approx(-0.8)
         assert sigma[1] != 0.0
         # Water and metal are excluded → no atoms assigned to aligned surface
         assert n_ch[0] == 0
@@ -449,8 +454,8 @@ class TestSurfaceChargeAnalysis:
     def test_csv_and_png_created(self, tmp_path):
         root = _build_fake_trajectory(tmp_path, n_frames=2)
         out = tmp_path / "output"
-        csv_path = surface_charge_analysis(root, output_dir=out)
-        assert csv_path.exists()
+        result = surface_charge_analysis(root, output_dir=out)
+        assert result.csv_path.exists()
         png_path = out / "surface_charge.png"
         assert png_path.exists()
 
@@ -458,8 +463,8 @@ class TestSurfaceChargeAnalysis:
         import csv
         root = _build_fake_trajectory(tmp_path, n_frames=2)
         out = tmp_path / "output"
-        csv_path = surface_charge_analysis(root, output_dir=out)
-        with csv_path.open(encoding="utf-8") as f:
+        result = surface_charge_analysis(root, output_dir=out)
+        with result.csv_path.open(encoding="utf-8") as f:
             reader = csv.DictReader(f)
             rows = list(reader)
         assert len(rows) == 2
@@ -473,10 +478,10 @@ class TestSurfaceChargeAnalysis:
         import csv
         root = _build_fake_trajectory(tmp_path, n_frames=4)
         out = tmp_path / "output"
-        csv_path = surface_charge_analysis(
+        result = surface_charge_analysis(
             root, output_dir=out, frame_start=1, frame_end=3,
         )
-        with csv_path.open(encoding="utf-8") as f:
+        with result.csv_path.open(encoding="utf-8") as f:
             rows = list(csv.DictReader(f))
         assert len(rows) == 2
 

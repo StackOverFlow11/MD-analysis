@@ -274,3 +274,4 @@ class TestBatchGenerateBaderWorkdirs:
         )
         assert isinstance(result, list)
         assert all(isinstance(p, Path) for p in result)
+

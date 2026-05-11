@@ -28,21 +28,21 @@ except ImportError:  # pragma: no cover
     Atoms = object  # type: ignore[misc]
     iread = None  # type: ignore[assignment]
 
-from ...utils import (
+from ...utils.StructureParser.LayerParser import (
     SurfaceGeometryError,
     detect_interface_layers,
-    _compute_bisector_cos_theta_vec,
-    _oxygen_to_hydrogen_map,
 )
 from ...utils.StructureParser.WaterParser import (
     AVOGADRO_NUMBER,
     ANGSTROM3_TO_CM3,
     WaterTopologyError,
+    _compute_bisector_cos_theta_vec,
+    _oxygen_to_hydrogen_map,
     detect_water_molecule_indices,
     get_water_oxygen_indices_array,
 )
 from ...utils.RestartParser.CellParser import parse_abc_from_md_inp as _parse_abc_from_md_inp
-from ...utils.config import (
+from ...utils.constants import (
     DEFAULT_LAYER_TOL_A,
     DEFAULT_Z_BIN_WIDTH_A,
     INTERFACE_NORMAL_ALIGNED,

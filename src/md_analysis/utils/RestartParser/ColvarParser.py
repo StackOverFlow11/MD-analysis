@@ -11,7 +11,7 @@ import numpy as np
 
 from .CellParser import parse_abc_from_restart
 
-
+from ..constants import AU_TIME_TO_FS
 from ...exceptions import MDAnalysisError
 
 
@@ -25,7 +25,12 @@ class ColvarParseError(MDAnalysisError):
 
 @dataclass(frozen=True)
 class ConstraintInfo:
-    """COLLECTIVE constraint parameters."""
+    """COLLECTIVE constraint parameters.
+
+    ``target_growth_au`` is the rate of change per atomic unit of time
+    (as stored in CP2K restart files).  Multiply by the timestep in
+    a.u. to obtain the per-step increment.
+    """
 
     colvar_id: int
     target_au: float
@@ -67,7 +72,7 @@ class ColvarRestart:
     timestep_fs: float
     total_steps: int
     colvars: ColvarInfo
-    lagrange_filename: str
+    lagrange_filename: str | None
     cell_abc_ang: tuple[float, float, float]
     fixed_atom_indices: tuple[int, ...] | None
 
@@ -122,16 +127,18 @@ class ColvarMDInfo:
     def target_series_au(self, colvar_id: int | None = None) -> np.ndarray:
         """Target CV series in atomic units, shape ``(n_steps,)``.
 
-        ``xi(k) = target_au + (k - step_start) * target_growth_au``
+        ``xi(k) = target_au + (k - step_start) * target_growth_au * dt_au``
 
-        where *k* are absolute step numbers ``[0, 1, ..., n_steps-1]``.
+        where *k* are absolute step numbers ``[0, 1, ..., n_steps-1]``
+        and *dt_au* is the MD timestep in atomic time units.
         """
         c = (
             self.restart.colvars[colvar_id]
             if colvar_id is not None
             else self.restart.colvars.primary
         )
-        return c.target_au + (self.steps - self.restart.step_start) * c.target_growth_au
+        dt_au = self.restart.timestep_fs / AU_TIME_TO_FS
+        return c.target_au + (self.steps - self.restart.step_start) * c.target_growth_au * dt_au
 
     @classmethod
     def from_paths(
@@ -223,15 +230,15 @@ def _parse_all_collective_blocks(text: str) -> ColvarInfo:
     return ColvarInfo(constraints=constraints)
 
 
-def _parse_lagrange_filename(text: str) -> str:
+def _parse_lagrange_filename(text: str) -> str | None:
     constraint_match = _CONSTRAINT_BLOCK_RE.search(text)
     if not constraint_match:
-        raise ColvarParseError("No &CONSTRAINT block found")
+        return None
     lag_match = _LAGRANGE_BLOCK_RE.search(constraint_match.group(1))
     if not lag_match:
-        raise ColvarParseError("No &LAGRANGE_MULTIPLIERS block found")
-    fn = _require_scalar(lag_match.group(1), "FILENAME", "&LAGRANGE_MULTIPLIERS")
-    return fn.strip()
+        return None
+    fn = _extract_scalar(lag_match.group(1), "FILENAME")
+    return fn.strip() if fn else None
 
 
 def _parse_fixed_atoms_list(text: str) -> tuple[int, ...] | None:
@@ -428,8 +435,9 @@ def compute_target_series(
 ) -> np.ndarray:
     """Reconstruct the target CV series in atomic units.
 
-    ``xi(k) = target_au + (k - step_start) * target_growth_au``
-    where *k* = 0, 1, ..., *n_steps* - 1 (absolute step numbers).
+    ``xi(k) = target_au + (k - step_start) * target_growth_au * dt_au``
+    where *k* = 0, 1, ..., *n_steps* - 1 (absolute step numbers)
+    and *dt_au* is the MD timestep in atomic time units.
 
     Parameters
     ----------
@@ -447,7 +455,8 @@ def compute_target_series(
     else:
         constraint = restart.colvars.primary
     k = np.arange(n_steps)
+    dt_au = restart.timestep_fs / AU_TIME_TO_FS
     return (
         constraint.target_au
-        + (k - restart.step_start) * constraint.target_growth_au
+        + (k - restart.step_start) * constraint.target_growth_au * dt_au
     )

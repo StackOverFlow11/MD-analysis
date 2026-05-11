@@ -1,0 +1,37 @@
+# utils — 开发备忘
+
+## 定位
+
+共享底层工具包，被所有分析模块依赖。包含物理常量、文件解析器、结构分析工具。
+
+## 约定
+
+- **`__init__.py` 不 re-export 任何符号**（`__all__ = []`）。所有调用方（包内/测试/外部）必须按 **子模块直接路径** 导入，例如：
+  - `from md_analysis.utils.constants import HA_TO_EV, DEFAULT_LAYER_TOL_A`
+  - `from md_analysis.utils.StructureParser.LayerParser import detect_interface_layers`
+  - `from md_analysis.utils.StructureParser.WaterParser import detect_water_molecule_indices`
+  - `from md_analysis.utils.CubeParser import slab_average_potential_ev`
+  - `from md_analysis.utils.BaderParser import load_bader_atoms`
+  - `from md_analysis.utils.RestartParser.CellParser import parse_abc_from_md_inp`
+- 下划线前缀函数（如 `_compute_bisector_cos_theta_vec`）被 water 层 cross-layer 使用，路径仍为子模块直接路径，视为不稳定的内部依赖
+- **两个 config.py**（重要！）：
+  - `utils/constants.py`：物理常量（`AU_TIME_TO_FS`、`HA_TO_EV`、`BOHR_TO_ANG`）、cSHE 常量、默认参数、轴映射
+  - `md_analysis/config.py`（上级目录）：用户持久化配置（独立命名，与 `utils/constants.py` 完全不再冲突）
+- **`_io_helpers.py`**：带下划线的私有模块，提供 `_cumulative_average()`、`_write_csv()`（dict rows）和 `_write_csv_from_arrays()`（numpy arrays），被全模块共享。所有 CSV 输出统一通过这两个函数
+- **`cell_resolver.py`**：非交互式 cell 参数解析。`resolve_cell_abc()` 按优先级（直接值 > .restart > md.inp > 自动发现）解析 cell_abc。复用 `RestartParser.CellParser` 已有函数，是 `cli/_params.py` 中 `CellAbcParam.collect()` 的非交互式等价物。供 `agent/`、脚本、Jupyter 等场景使用
+- **`_frame_discovery.py`**：带下划线的私有模块，提供 `_t(\d+)_i(\d+)` 帧目录正则 + `extract_step_time_from_dirname()` + `discover_frame_dirs()`。Bader (`bader_t*_i*`) 与 SP Potential (`potential_t*_i*`) 目录共用此模块排序帧
+- **单位约定**：距离 Å、能量 eV（内部 Hartree→eV 转换）、分数坐标 [0,1)、时间 fs
+
+## 陷阱与历史 Bug
+
+- **CubeParser**：CP2K 输出的 cube 文件使用 Fortran `D` 指数格式（如 `1.23D-04`），`_float()` 辅助函数将 `D` 替换为 `E`
+- **CubeParser**：`read_cube_atoms(path, header)` 为公开函数，从 cube 文件头解析原子坐标 + cell → `ase.Atoms`。被分布式电势分析（`_frame_source.py`）和 `PhiZProfile.py` 使用
+- **BaderParser**：POTCAR 中元素符号可能带 `_pv`/`_sv` 后缀，解析时需去除
+- **常量精度**：`AU_TIME_TO_FS = 0.02418884326585`（CODATA 值），不要随意修改
+
+## 子目录
+
+| 目录 | 用途 |
+|---|---|
+| `StructureParser/` | 金属层检测、水分子拓扑、周期聚类 → `StructureParser/CLAUDE.md` |
+| `RestartParser/` | CP2K restart 和 LagrangeMultLog 解析 → `RestartParser/CLAUDE.md` |

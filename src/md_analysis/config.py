@@ -10,6 +10,9 @@ CONFIG_DIR = Path.home() / ".config" / "md_analysis"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 
 KEY_VASP_SCRIPT_PATH = "vasp_script_path"
+KEY_CP2K_SCRIPT_PATH = "cp2k_script_path"
+KEY_SP_INP_TEMPLATE_PATH = "sp_inp_template_path"
+KEY_DP_SP_INP_TEMPLATE_PATH = "dp_sp_inp_template_path"
 
 # Keys for configurable analysis defaults (persisted in user config)
 KEY_LAYER_TOL_A = "layer_tol_A"
@@ -17,8 +20,14 @@ KEY_Z_BIN_WIDTH_A = "z_bin_width_A"
 KEY_THETA_BIN_DEG = "theta_bin_deg"
 KEY_WATER_OH_CUTOFF_A = "water_oh_cutoff_A"
 
+# Keys for potential output reference (managed by SetPotentialReferenceCmd)
+KEY_POTENTIAL_REFERENCE = "potential_reference"
+KEY_POTENTIAL_PH = "potential_ph"
+KEY_POTENTIAL_TEMPERATURE_K = "potential_temperature_K"
+KEY_POTENTIAL_PHI_PZC = "potential_phi_pzc"
+
 # Registry of configurable defaults: maps config key → metadata.
-# The "default" values mirror the hardcoded constants in utils/config.py.
+# The "default" values mirror the hardcoded constants in utils/constants.py.
 CONFIGURABLE_DEFAULTS: dict[str, dict] = {
     KEY_LAYER_TOL_A: {"default": 0.6, "label": "Layer clustering tolerance (A)"},
     KEY_Z_BIN_WIDTH_A: {"default": 0.1, "label": "Z-axis bin width (A)"},

@@ -12,7 +12,9 @@ from ..config import (
     KEY_WATER_OH_CUTOFF_A,
     KEY_Z_BIN_WIDTH_A,
 )
-from ._charge import SurfaceChargeCmd
+from ._calibration import CalibrateFromCSVCmd, CalibrateManualCmd, PredictPotentialCmd
+from ._charge import CounterionChargeCmd, SingleSideChargeCmd, SurfaceChargeCmd, TrackedChargeCmd
+from ._constrained_ti import TIConstPotCorrectionCmd, TIFullAnalysisCmd, TISingleDiagCmd
 from ._enhanced_sampling import SGPublicationPlotCmd, SGQuickPlotCmd
 from ._framework import MenuGroup
 from ._potential import (
@@ -23,10 +25,23 @@ from ._potential import (
     PhiZProfileCmd,
     ThicknessSensitivityCmd,
 )
-from ._scripts import BaderBatchCmd, BaderSingleCmd
+from ._scripts import (
+    BaderBatchCmd,
+    BaderSingleCmd,
+    PotentialBatchCmd,
+    PotentialSingleCmd,
+    SpGenBatchCmd,
+    SpGenSingleCmd,
+    TIBatchCmd,
+    TISingleCmd,
+)
 from ._settings import (
     ResetDefaultsCmd,
     SetAnalysisDefaultCmd,
+    SetCp2kScriptCmd,
+    SetDpSpInpTemplateCmd,
+    SetPotentialReferenceCmd,
+    SetSpInpTemplateCmd,
     SetVaspScriptCmd,
     ShowConfigCmd,
 )
@@ -50,7 +65,7 @@ def build_menu_tree() -> MenuGroup:
     root = MenuGroup("0", "MD-Analysis")
 
     # --- Water ---
-    water = MenuGroup("1", "Water Analysis")
+    water = MenuGroup("1", "Water Analysis", output_name="water")
     water.add(
         WaterDensityCmd("101", "Water Mass Density Profile"),
         WaterOrientationCmd("102", "Water Orientation-Weighted Density Profile"),
@@ -60,9 +75,10 @@ def build_menu_tree() -> MenuGroup:
     )
 
     # --- Electrochemical ---
-    electrochemical = MenuGroup("2", "Electrochemical Analysis")
+    electrochemical = MenuGroup("2", "Electrochemical Analysis",
+                                output_name="electrochemical")
 
-    potential = MenuGroup("21", "Potential Analysis")
+    potential = MenuGroup("21", "Potential Analysis", output_name="potential")
     potential.add(
         CenterPotentialCmd("211", "Center Slab Potential (phi_center)"),
         FermiEnergyCmd("212", "Fermi Energy Time Series"),
@@ -72,45 +88,110 @@ def build_menu_tree() -> MenuGroup:
         FullPotentialCmd("216", "Full Potential Analysis  (includes 211-215)"),
     )
 
-    charge = MenuGroup("22", "Charge Analysis")
+    charge = MenuGroup("22", "Charge Analysis", output_name="charge")
     charge.add(
         SurfaceChargeCmd("221", "Surface Charge (Counterion)", method="counterion"),
         SurfaceChargeCmd("222", "Surface Charge (Layer)", method="layer"),
         SurfaceChargeCmd("223", "Full Charge Analysis with Plots", method=None),
+        SingleSideChargeCmd("224", "Single-Side Charge + Potential"),
+        TrackedChargeCmd("225", "Tracked Atom Charges (XYZ indices)"),
+        CounterionChargeCmd("226", "Counterion Charge Tracking"),
     )
 
-    electrochemical.add(potential, charge)
+    calibration = MenuGroup("23", "Charge-Potential Calibration",
+                            output_name="calibration")
+    calibration.add(
+        CalibrateFromCSVCmd("231", "Calibrate from CSV File"),
+        CalibrateManualCmd("232", "Calibrate from Manual Input"),
+        PredictPotentialCmd("233", "Predict Potential from Charge"),
+    )
+
+    electrochemical.add(potential, charge, calibration)
 
     # --- Enhanced Sampling ---
-    enhanced = MenuGroup("3", "Enhanced Sampling")
-    enhanced.add(
-        SGQuickPlotCmd("301", "Slow-Growth Quick Plot"),
-        SGPublicationPlotCmd("302", "Slow-Growth Publication Plot"),
+    enhanced = MenuGroup("3", "Enhanced Sampling",
+                         output_name="enhanced_sampling")
+
+    slowgrowth = MenuGroup("30", "Slow-Growth", output_name="slowgrowth")
+    slowgrowth.add(
+        SGQuickPlotCmd("301", "Quick Plot"),
+        SGPublicationPlotCmd("302", "Publication Plot"),
     )
+
+    constrained_ti = MenuGroup("31", "Constrained TI Analysis",
+                               output_name="constrained_ti")
+    constrained_ti.add(
+        TISingleDiagCmd("311", "Single-Point Diagnostics"),
+        TIFullAnalysisCmd("312", "Full TI Analysis"),
+        TIConstPotCorrectionCmd("313", "Constant-Potential Correction"),
+    )
+
+    enhanced.add(slowgrowth, constrained_ti)
 
     # --- Scripts ---
     scripts = MenuGroup("4", "Scripts / Tools")
-    scripts.add(
-        BaderSingleCmd("401", "Generate Bader Work Directory (single frame)"),
-        BaderBatchCmd("402", "Batch Generate Bader Work Directories"),
+
+    bader = MenuGroup("41", "Bader Charge Preparation")
+    bader.add(
+        BaderSingleCmd("411", "Generate Bader Work Directory (single frame)"),
+        BaderBatchCmd("412", "Batch Generate Bader Work Directories"),
     )
+
+    ti = MenuGroup("42", "Thermodynamic Integration Preparation")
+    ti.add(
+        TISingleCmd("421", "Generate TI Work Directory (single target)"),
+        TIBatchCmd("422", "Batch Generate TI Work Directories"),
+    )
+
+    potential_prep = MenuGroup("43", "SP Potential Preparation")
+    potential_prep.add(
+        PotentialSingleCmd("431", "Generate SP Potential Work Directory (single frame)"),
+        PotentialBatchCmd("432", "Batch Generate SP Potential Work Directories"),
+    )
+
+    sp_prep = MenuGroup("44", "DeePMD SP Preparation")
+    sp_prep.add(
+        SpGenSingleCmd("441", "Generate SP Work Directory for DP (single frame)"),
+        SpGenBatchCmd("442", "Batch Generate SP Work Directories for DP"),
+    )
+
+    scripts.add(bader, ti, potential_prep, sp_prep)
 
     # --- Settings ---
     settings = MenuGroup("9", "Settings")
-    settings.add(
-        SetVaspScriptCmd("901", "Set VASP Submission Script Path"),
-        ShowConfigCmd("902", "Show Current Configuration"),
-        "Analysis Defaults",
-        SetAnalysisDefaultCmd("903", "Layer Clustering Tolerance (A)",
-                              config_key=KEY_LAYER_TOL_A),
-        SetAnalysisDefaultCmd("904", "Z-axis Bin Width (A)",
-                              config_key=KEY_Z_BIN_WIDTH_A),
-        SetAnalysisDefaultCmd("905", "Theta Bin Width (deg)",
-                              config_key=KEY_THETA_BIN_DEG),
-        SetAnalysisDefaultCmd("906", "Water O-H Cutoff (A)",
-                              config_key=KEY_WATER_OH_CUTOFF_A),
-        ResetDefaultsCmd("907", "Reset All Defaults"),
+
+    show_reset = MenuGroup("90", "Show / Reset")
+    show_reset.add(
+        ShowConfigCmd("900", "Show Current Configuration"),
+        ResetDefaultsCmd("909", "Reset All Defaults"),
     )
+
+    script_paths = MenuGroup("91", "Script Paths")
+    script_paths.add(
+        SetVaspScriptCmd("911", "Set VASP Submission Script Path"),
+        SetCp2kScriptCmd("912", "Set CP2K Submission Script Path"),
+        SetSpInpTemplateCmd("913", "Set SP Inp Template Path"),
+        SetDpSpInpTemplateCmd("914", "Set DP SP Inp Template Path"),
+    )
+
+    analysis_defaults = MenuGroup("92", "Analysis Defaults")
+    analysis_defaults.add(
+        SetAnalysisDefaultCmd("921", "Layer Clustering Tolerance (A)",
+                              config_key=KEY_LAYER_TOL_A),
+        SetAnalysisDefaultCmd("922", "Z-axis Bin Width (A)",
+                              config_key=KEY_Z_BIN_WIDTH_A),
+        SetAnalysisDefaultCmd("923", "Theta Bin Width (deg)",
+                              config_key=KEY_THETA_BIN_DEG),
+        SetAnalysisDefaultCmd("924", "Water O-H Cutoff (A)",
+                              config_key=KEY_WATER_OH_CUTOFF_A),
+    )
+
+    potential_output = MenuGroup("93", "Potential Output")
+    potential_output.add(
+        SetPotentialReferenceCmd("931", "Set Potential Output Reference"),
+    )
+
+    settings.add(show_reset, script_paths, analysis_defaults, potential_output)
 
     root.add(water, electrochemical, enhanced, scripts, "", settings)
     root.build_flat_index()

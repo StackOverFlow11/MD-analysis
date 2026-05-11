@@ -5,8 +5,6 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-import numpy as np
-
 from ._framework import MenuCommand, lazy_import
 from ._params import K
 from ._prompt import prompt_int, prompt_str
@@ -38,6 +36,10 @@ def _discover_log_file(workdir: Path) -> str | None:
 
 def _print_sg_info(restart_path: str, log_path: str) -> None:
     """Parse and display trajectory metadata."""
+    import numpy as np
+
+    from ..utils.constants import AU_TIME_TO_FS
+
     ColvarMDInfo = lazy_import(
         "md_analysis.utils.RestartParser.ColvarParser", "ColvarMDInfo",
     )
@@ -48,14 +50,15 @@ def _print_sg_info(restart_path: str, log_path: str) -> None:
         return
 
     cv = info.restart.colvars.primary
+    dt_au = info.restart.timestep_fs / AU_TIME_TO_FS
+    growth_per_step = cv.target_growth_au * dt_au
     print(f"\n  Trajectory info:")
     print(f"    Steps:        {info.n_steps}")
     print(f"    Timestep:     {info.restart.timestep_fs} fs")
     print(f"    CV target:    {cv.target_au:.6f} a.u.")
-    print(f"    CV growth:    {cv.target_growth_au:.6e} a.u./step")
-    target_start = cv.target_au + (0 - info.restart.step_start) * cv.target_growth_au
-    target_end = cv.target_au + (info.n_steps - 1 - info.restart.step_start) * cv.target_growth_au
-    print(f"    CV range:     [{target_start:.6f}, {target_end:.6f}] a.u.")
+    print(f"    CV growth:    {growth_per_step:.6e} a.u./step")
+    xi = info.target_series_au()
+    print(f"    CV range:     [{xi[0]:.6f}, {xi[-1]:.6f}] a.u.")
     print(f"    Valid index:   0 .. {info.n_steps - 1}")
 
     # Warn about overflow (nan) steps
@@ -78,7 +81,6 @@ def _print_sg_info(restart_path: str, log_path: str) -> None:
 class _SlowgrowthPlotCmd(MenuCommand):
     """Base for slow-growth plot commands."""
 
-    output_subdir = ""
     _plot_style: str = "both"
 
     def _collect_all_params(self) -> dict:
@@ -124,7 +126,7 @@ class _SlowgrowthPlotCmd(MenuCommand):
             "md_analysis.enhanced_sampling.slowgrowth.SlowGrowthPlot",
             "slowgrowth_analysis",
         )
-        outdir = Path(ctx[K.OUTDIR]).resolve()
+        outdir = ctx[K.OUTDIR_RESOLVED]
         slowgrowth_analysis(
             ctx[K.RESTART_PATH],
             ctx[K.LOG_PATH],

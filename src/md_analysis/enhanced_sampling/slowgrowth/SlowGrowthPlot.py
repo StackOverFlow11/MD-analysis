@@ -16,7 +16,7 @@ from pathlib import Path
 import numpy as np
 
 from ...utils._io_helpers import _write_csv
-from ...utils.config import HA_TO_EV
+from ...utils.constants import HA_TO_EV
 from .SlowGrowth import Slowgrowth, SlowgrowthFull
 from .config import (
     DEFAULT_SG_CSV_NAME,
@@ -71,16 +71,19 @@ def plot_slowgrowth_quick(
     output_dir: Path | None = None,
     png_name: str = DEFAULT_SG_QUICK_PNG_NAME,
     absolute_steps: np.ndarray | None = None,
+    ma_window: int = 50,
 ) -> Path:
     """Dual-axis quick plot with CV bottom axis and MD-step top axis.
 
-    Left y-axis: Lagrange multiplier (a.u.), right y-axis: free energy (eV).
+    Left y-axis: free energy (eV), right y-axis: Lagrange multiplier (a.u.).
 
     Parameters
     ----------
     absolute_steps : np.ndarray, optional
         Original (pre-reversal) step indices for annotating the barrier
         peak with its absolute MD step number.  Falls back to ``sg.steps``.
+    ma_window : int, optional
+        Window size for the Lagrange multiplier moving average (default 50).
     """
     import matplotlib
     matplotlib.use("Agg")
@@ -94,23 +97,38 @@ def plot_slowgrowth_quick(
 
     fig, ax_left = plt.subplots(figsize=(8, 5), dpi=180)
 
-    # Left axis — Lagrange multiplier
+    # Left axis — free energy
     ax_left.plot(
-        sg.target_au, sg.lagrange_shake,
-        color="tab:blue", lw=0.8, alpha=0.7,
-    )
-    ax_left.set_xlabel("Collective Variable (a.u.)")
-    ax_left.set_ylabel("Lagrange Multiplier (a.u.)", color="tab:blue")
-    ax_left.tick_params(axis="y", labelcolor="tab:blue")
-
-    # Right axis — free energy
-    ax_right = ax_left.twinx()
-    ax_right.plot(
         sg.target_au, fe_ev,
         color="tab:red", lw=2.0,
     )
-    ax_right.set_ylabel("Free Energy (eV)", color="tab:red")
-    ax_right.tick_params(axis="y", labelcolor="tab:red")
+    ax_left.set_xlabel("Collective Variable (a.u.)")
+    ax_left.set_ylabel("Free Energy (eV)", color="tab:red")
+    ax_left.tick_params(axis="y", labelcolor="tab:red")
+
+    # Right axis — Lagrange multiplier
+    ax_right = ax_left.twinx()
+    ax_right.plot(
+        sg.target_au, sg.lagrange_shake,
+        color="tab:blue", lw=0.8, alpha=0.7,
+    )
+    # Moving average of Lagrange multiplier
+    if ma_window > 1 and len(sg.lagrange_shake) >= ma_window:
+        kernel = np.ones(ma_window) / ma_window
+        lm_ma = np.convolve(sg.lagrange_shake, kernel, mode="valid")
+        ma_x = sg.target_au[ma_window - 1:]
+        ax_right.plot(ma_x, lm_ma, color="darkblue", lw=1.5, label=f"MA({ma_window})")
+        # Annotate last MA value
+        last_ma = float(lm_ma[-1])
+        ax_right.annotate(
+            f"MA = {last_ma:.4f}",
+            xy=(ma_x[-1], last_ma),
+            xytext=(ma_x[-1], last_ma + 0.1 * (ax_right.get_ylim()[1] - ax_right.get_ylim()[0])),
+            arrowprops=dict(arrowstyle="->", color="darkblue", lw=1.5),
+            fontsize=9, color="darkblue", ha="center",
+        )
+    ax_right.set_ylabel("Lagrange Multiplier (a.u.)", color="tab:blue")
+    ax_right.tick_params(axis="y", labelcolor="tab:blue")
 
     # Top axis — MD step (secondary x)
     ax_top = ax_left.secondary_xaxis(
@@ -122,11 +140,15 @@ def plot_slowgrowth_quick(
     )
     ax_top.set_xlabel("MD Step")
 
+    # Ensure time flows left-to-right: invert x-axis when CV is decreasing
+    if len(sg.target_au) > 1 and sg.target_au[-1] < sg.target_au[0]:
+        ax_left.invert_xaxis()
+
     # Barrier annotation — arrow pointing to peak with absolute step
     peak_idx = int(np.nanargmax(fe_ev))
     delta_f_barrier = float(fe_ev[peak_idx] - fe_ev[0])
     peak_abs_step = int(abs_steps[peak_idx])
-    ax_right.annotate(
+    ax_left.annotate(
         f"$\\Delta F^\\dagger$ = {delta_f_barrier:.4f} eV\n(step {peak_abs_step})",
         xy=(sg.target_au[peak_idx], fe_ev[peak_idx]),
         xytext=(sg.target_au[peak_idx], fe_ev[peak_idx] + 0.15 * abs(delta_f_barrier or 0.01)),
@@ -136,7 +158,7 @@ def plot_slowgrowth_quick(
 
     # Total free-energy annotation — arrow pointing to endpoint
     delta_f_total = float(fe_ev[-1] - fe_ev[0])
-    ax_right.annotate(
+    ax_left.annotate(
         f"$\\Delta F$ = {delta_f_total:.4f} eV",
         xy=(sg.target_au[-1], fe_ev[-1]),
         xytext=(sg.target_au[-1], fe_ev[-1] + 0.15 * abs(delta_f_total or 0.01)),
@@ -164,7 +186,10 @@ def plot_slowgrowth_publication(
     output_dir: Path | None = None,
     png_name: str = DEFAULT_SG_PUBLICATION_PNG_NAME,
 ) -> Path:
-    """Publication-quality dual-axis plot with energy values in legend."""
+    """Publication-quality dual-axis plot with energy values in legend.
+
+    Left y-axis: free energy (eV), right y-axis: Lagrange multiplier (a.u.).
+    """
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -185,23 +210,27 @@ def plot_slowgrowth_publication(
     with rc_context(rc_overrides):
         fig, ax_left = plt.subplots(figsize=(8, 5), dpi=180)
 
-        # Left axis — Lagrange multiplier
+        # Left axis — free energy
         ax_left.plot(
-            sg.target_au, sg.lagrange_shake,
-            color="tab:blue", lw=0.8, alpha=0.7,
-        )
-        ax_left.set_xlabel("Collective Variable (a.u.)")
-        ax_left.set_ylabel("Lagrange Multiplier (a.u.)", color="tab:blue")
-        ax_left.tick_params(axis="y", labelcolor="tab:blue")
-
-        # Right axis — free energy
-        ax_right = ax_left.twinx()
-        ax_right.plot(
             sg.target_au, fe_ev,
             color="tab:red", lw=2.0,
         )
-        ax_right.set_ylabel("Free Energy (eV)", color="tab:red")
-        ax_right.tick_params(axis="y", labelcolor="tab:red")
+        ax_left.set_xlabel("Collective Variable (a.u.)")
+        ax_left.set_ylabel("Free Energy (eV)", color="tab:red")
+        ax_left.tick_params(axis="y", labelcolor="tab:red")
+
+        # Right axis — Lagrange multiplier
+        ax_right = ax_left.twinx()
+        ax_right.plot(
+            sg.target_au, sg.lagrange_shake,
+            color="tab:blue", lw=0.8, alpha=0.7,
+        )
+        ax_right.set_ylabel("Lagrange Multiplier (a.u.)", color="tab:blue")
+        ax_right.tick_params(axis="y", labelcolor="tab:blue")
+
+        # Ensure time flows left-to-right: invert x-axis when CV is decreasing
+        if len(sg.target_au) > 1 and sg.target_au[-1] < sg.target_au[0]:
+            ax_left.invert_xaxis()
 
         # Legend with energy values (invisible handles)
         peak_idx = int(np.nanargmax(fe_ev))
@@ -213,8 +242,8 @@ def plot_slowgrowth_publication(
             Line2D([], [], color="none",
                    label=f"$\\Delta F$ = {delta_f_total:.4f} eV"),
         ]
-        ax_right.legend(handles=legend_handles, loc="best",
-                        frameon=True, handlelength=0)
+        ax_left.legend(handles=legend_handles, loc="best",
+                       frameon=True, handlelength=0)
 
         ax_left.grid(True, alpha=0.25)
         fig.tight_layout()

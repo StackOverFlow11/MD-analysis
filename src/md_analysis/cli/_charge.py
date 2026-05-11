@@ -1,14 +1,14 @@
-"""Charge analysis command classes (221-223)."""
+"""Charge analysis command classes (221-226)."""
 
 from __future__ import annotations
 
-import csv as _csv
 from pathlib import Path
 
 from ._framework import MenuCommand, lazy_import
 from ._params import (
     K,
     FixedParam,
+    atom_indices_xyz,
     charge_method,
     dir_pattern,
     frame_slice,
@@ -18,60 +18,181 @@ from ._params import (
     normal_axis,
     outdir,
     root_dir,
+    target_side,
 )
-
-
-def _print_ensemble_summary(csv_path: Path) -> None:
-    """Print ensemble average summary from the charge CSV."""
-    if not csv_path.exists():
-        return
-
-    with csv_path.open(encoding="utf-8") as f:
-        reader = _csv.DictReader(f)
-        rows = list(reader)
-
-    if not rows:
-        return
-
-    import numpy as np
-
-    aligned = np.array([float(r["sigma_aligned_uC_cm2"]) for r in rows])
-    opposed = np.array([float(r["sigma_opposed_uC_cm2"]) for r in rows])
-    print(f"\n Ensemble average ({len(rows)} frames):")
-    print(f"   sigma_aligned: {aligned.mean():8.4f} +/- {aligned.std():.4f} uC/cm^2")
-    print(f"   sigma_opposed: {opposed.mean():8.4f} +/- {opposed.std():.4f} uC/cm^2")
 
 
 class SurfaceChargeCmd(MenuCommand):
     advanced_params = (root_dir, dir_pattern, normal_axis, metal_elements,
                        layer_tol, n_surface_layers, outdir, frame_slice)
-    output_subdir = ""
 
     def __init__(self, code: str, label: str, *, method: str | None = None):
         super().__init__(code, label)
         if method is not None:
             self.params = (FixedParam(K.METHOD, method),)
+            self.output_name = method          # e.g. "counterion" or "layer"
         else:
             self.params = (charge_method,)
+            # output_name stays "" — dynamic method, handled in execute()
 
     def execute(self, ctx: dict) -> None:
-        analyze = lazy_import("md_analysis.main", "run_charge_analysis")
-        results = analyze(
-            output_dir=Path(ctx[K.OUTDIR]),
-            root_dir=ctx[K.ROOT_DIR],
+        analyze = lazy_import(
+            "md_analysis.electrochemical.charge",
+            "surface_charge_analysis",
+        )
+        from ..config import (
+            KEY_POTENTIAL_PH,
+            KEY_POTENTIAL_PHI_PZC,
+            KEY_POTENTIAL_REFERENCE,
+            KEY_POTENTIAL_TEMPERATURE_K,
+            get_config,
+        )
+
+        # Static method (221/222): framework resolved via output_name
+        # Dynamic method (223): append method to avoid overwriting
+        if K.OUTDIR_RESOLVED in ctx:
+            out = Path(ctx[K.OUTDIR_RESOLVED])
+        else:
+            out = (Path(ctx.get(K.OUTDIR, "analysis"))
+                   / self.output_subdir)
+
+        if not self.output_name:
+            out = out / ctx[K.METHOD]
+
+        out.mkdir(parents=True, exist_ok=True)
+
+        result = analyze(
+            ctx[K.ROOT_DIR],
             metal_symbols=ctx[K.METAL_ELEMENTS],
             normal=ctx[K.NORMAL],
             method=ctx[K.METHOD],
             layer_tol_A=ctx[K.LAYER_TOL],
             n_surface_layers=ctx[K.N_SURFACE_LAYERS],
             dir_pattern=ctx[K.DIR_PATTERN],
+            output_dir=out,
+            frame_start=ctx[K.FRAME_START],
+            frame_end=ctx[K.FRAME_END],
+            frame_step=ctx[K.FRAME_STEP],
+            verbose=True,
+            potential_reference=get_config(KEY_POTENTIAL_REFERENCE, "SHE"),
+            potential_pH=get_config(KEY_POTENTIAL_PH, 0.0),
+            potential_temperature_K=get_config(KEY_POTENTIAL_TEMPERATURE_K, 298.15),
+            potential_phi_pzc=get_config(KEY_POTENTIAL_PHI_PZC),
+        )
+        print(f"\n Analysis complete. Output:\n   charge_csv: {result.csv_path}")
+        print(f"\n Ensemble average ({result.n_frames} frames):")
+        print(f"   sigma_aligned: {result.sigma_aligned_mean:8.4f} "
+              f"+/- {result.sigma_aligned_std:.4f} uC/cm^2")
+        print(f"   sigma_opposed: {result.sigma_opposed_mean:8.4f} "
+              f"+/- {result.sigma_opposed_std:.4f} uC/cm^2")
+
+
+class SingleSideChargeCmd(MenuCommand):
+    """Single-side surface charge density with potential extrapolation."""
+
+    params = (charge_method, target_side)
+    advanced_params = (root_dir, dir_pattern, normal_axis, metal_elements,
+                       layer_tol, n_surface_layers, outdir, frame_slice)
+
+    def execute(self, ctx: dict) -> None:
+        analyze = lazy_import(
+            "md_analysis.electrochemical.charge",
+            "surface_charge_analysis",
+        )
+        from ..config import (
+            KEY_POTENTIAL_PH,
+            KEY_POTENTIAL_PHI_PZC,
+            KEY_POTENTIAL_REFERENCE,
+            KEY_POTENTIAL_TEMPERATURE_K,
+            get_config,
+        )
+
+        method = ctx[K.METHOD]
+        side = ctx[K.TARGET_SIDE]
+        out = Path(ctx.get(K.OUTDIR, "analysis")) / self.output_subdir / f"{method}_{side}"
+        if K.OUTDIR_RESOLVED in ctx:
+            out = Path(ctx[K.OUTDIR_RESOLVED]) / f"{method}_{side}"
+        out.mkdir(parents=True, exist_ok=True)
+
+        result = analyze(
+            ctx[K.ROOT_DIR],
+            metal_symbols=ctx[K.METAL_ELEMENTS],
+            normal=ctx[K.NORMAL],
+            method=method,
+            layer_tol_A=ctx[K.LAYER_TOL],
+            n_surface_layers=ctx[K.N_SURFACE_LAYERS],
+            dir_pattern=ctx[K.DIR_PATTERN],
+            output_dir=out,
+            frame_start=ctx[K.FRAME_START],
+            frame_end=ctx[K.FRAME_END],
+            frame_step=ctx[K.FRAME_STEP],
+            verbose=True,
+            potential_reference=get_config(KEY_POTENTIAL_REFERENCE, "SHE"),
+            potential_pH=get_config(KEY_POTENTIAL_PH, 0.0),
+            potential_temperature_K=get_config(KEY_POTENTIAL_TEMPERATURE_K, 298.15),
+            potential_phi_pzc=get_config(KEY_POTENTIAL_PHI_PZC),
+            target_side=side,
+        )
+        print(f"\n Analysis complete ({side} side). Output:\n   charge_csv: {result.csv_path}")
+
+        if side == "aligned":
+            s_mean, s_std = result.sigma_aligned_mean, result.sigma_aligned_std
+        else:
+            s_mean, s_std = result.sigma_opposed_mean, result.sigma_opposed_std
+        print(f"\n Ensemble average ({result.n_frames} frames, {side} side):")
+        print(f"   sigma: {s_mean:8.4f} +/- {s_std:.4f} uC/cm^2")
+        if result.phi_cumavg_last is not None:
+            print(f"   phi:   {result.phi_cumavg_last:8.4f} V vs "
+                  f"{result.phi_reference} (cum. avg)")
+
+
+class TrackedChargeCmd(MenuCommand):
+    """Track Bader net charges for specified XYZ atoms."""
+
+    output_name = "tracked"
+    params = (atom_indices_xyz,)
+    advanced_params = (root_dir, dir_pattern, outdir, frame_slice)
+
+    def execute(self, ctx: dict) -> None:
+        analyze = lazy_import(
+            "md_analysis.electrochemical.charge",
+            "tracked_atom_charge_analysis",
+        )
+        csv_path = analyze(
+            ctx[K.ROOT_DIR],
+            atom_indices_xyz=ctx[K.ATOM_INDICES_XYZ],
+            dir_pattern=ctx[K.DIR_PATTERN],
+            output_dir=ctx[K.OUTDIR_RESOLVED],
             frame_start=ctx[K.FRAME_START],
             frame_end=ctx[K.FRAME_END],
             frame_step=ctx[K.FRAME_STEP],
             verbose=True,
         )
-        print("\n Analysis complete. Outputs:")
-        for name, path in results.items():
-            print(f"   {name}: {path}")
+        print(f"\n Analysis complete. Output:\n   tracked_csv: {csv_path}")
 
-        _print_ensemble_summary(results["charge_csv"])
+
+class CounterionChargeCmd(MenuCommand):
+    """Detect counterions per-frame and track their Bader charges."""
+
+    output_name = "counterion_tracking"
+    advanced_params = (root_dir, dir_pattern, normal_axis, metal_elements,
+                       layer_tol, outdir, frame_slice)
+
+    def execute(self, ctx: dict) -> None:
+        analyze = lazy_import(
+            "md_analysis.electrochemical.charge",
+            "counterion_charge_analysis",
+        )
+        csv_path = analyze(
+            ctx[K.ROOT_DIR],
+            metal_symbols=ctx[K.METAL_ELEMENTS],
+            normal=ctx[K.NORMAL],
+            layer_tol_A=ctx[K.LAYER_TOL],
+            dir_pattern=ctx[K.DIR_PATTERN],
+            output_dir=ctx[K.OUTDIR_RESOLVED],
+            frame_start=ctx[K.FRAME_START],
+            frame_end=ctx[K.FRAME_END],
+            frame_step=ctx[K.FRAME_STEP],
+            verbose=True,
+        )
+        print(f"\n Analysis complete. Output:\n   counterion_csv: {csv_path}")

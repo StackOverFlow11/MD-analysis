@@ -10,9 +10,11 @@ Public API
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 
+from ...utils.constants import AU_TIME_TO_FS
 from ...utils.RestartParser.ColvarParser import ColvarMDInfo
 
 
@@ -65,7 +67,7 @@ class Slowgrowth:
         - ``times_fs``: reset to start from 0
         - ``steps``: reset to ``[0, 1, ..., n-1]``
         """
-        fe_reversed = -self.free_energy_au[::-1]
+        fe_reversed = self.free_energy_au[::-1].copy()
         fe_reversed = fe_reversed - fe_reversed[0]
 
         return Slowgrowth(
@@ -114,14 +116,16 @@ class SlowgrowthFull(Slowgrowth):
             if colvar_id is not None
             else md_info.restart.colvars.primary
         )
-        target_growth_au = constraint.target_growth_au
+        # Convert growth rate from per-a.u.-time to per-step (dξ/step)
+        dt_au = md_info.restart.timestep_fs / AU_TIME_TO_FS
+        target_growth_per_step = constraint.target_growth_au * dt_au
 
         steps = md_info.steps
         times_fs = md_info.times_fs
         target_au = md_info.target_series_au(colvar_id)
         lagrange_shake = md_info.lagrange.collective_shake
 
-        free_energy_au = _integrate_midpoint(lagrange_shake, target_growth_au)
+        free_energy_au = _integrate_midpoint(lagrange_shake, target_growth_per_step)
 
         return cls(
             steps=steps,
@@ -130,7 +134,7 @@ class SlowgrowthFull(Slowgrowth):
             lagrange_shake=lagrange_shake,
             free_energy_au=free_energy_au,
             timestep_fs=md_info.restart.timestep_fs,
-            target_growth_au=target_growth_au,
+            target_growth_au=target_growth_per_step,
             md_info=md_info,
         )
 
@@ -142,8 +146,47 @@ class SlowgrowthFull(Slowgrowth):
         *,
         colvar_id: int | None = None,
     ) -> SlowgrowthFull:
-        """Parse files and build in one step."""
+        """Parse files and build in one step (CP2K-only path)."""
         md_info = ColvarMDInfo.from_paths(restart_path, log_path)
+        return cls.from_md_info(md_info, colvar_id=colvar_id)
+
+    @classmethod
+    def from_directory(
+        cls,
+        directory: str | Path,
+        *,
+        parser: object = "auto",
+        colvar_id: int | None = None,
+    ) -> SlowgrowthFull:
+        """Build from an SG run directory using a pluggable parser.
+
+        Parameters
+        ----------
+        directory : str or Path
+            Directory containing the SG output files (engine-specific).
+        parser : ConstraintMDParser | str, default ``"auto"``
+            Engine parser.  ``"auto"`` sniffs registered parsers; pass
+            an instance or registered name (e.g. ``"cp2k"``) to skip
+            sniffing.
+        colvar_id : int, optional
+            Which collective variable to use.  Defaults to the primary CV.
+        """
+        from .._parsers import (
+            ConstraintMDParser,
+            infer_parser,
+            resolve_parser,
+        )
+        from ...utils.RestartParser.ColvarParser import ColvarMDInfo
+
+        directory = Path(directory)
+        if parser == "auto":
+            parser_obj: ConstraintMDParser = infer_parser(directory)
+        else:
+            parser_obj = resolve_parser(parser)
+        md_info = ColvarMDInfo(
+            restart=parser_obj.parse_metadata(directory),
+            lagrange=parser_obj.parse_lambda_series(directory),
+        )
         return cls.from_md_info(md_info, colvar_id=colvar_id)
 
     def segment(

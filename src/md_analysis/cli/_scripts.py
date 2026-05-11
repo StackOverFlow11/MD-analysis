@@ -1,12 +1,130 @@
-"""Scripts / Tools command classes (401-402)."""
+"""Scripts / Tools command classes (Bader 411-412, TI 421-422, Potential 431-432, SpGen 441-442)."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
 from ._framework import MenuCommand, lazy_import
-from ._params import K, cell_abc
-from ._prompt import prompt_bool, prompt_int, prompt_str, prompt_str_required
+from ._params import (
+    BoolParam,
+    ConditionalParam,
+    DisplayAction,
+    FloatParam,
+    IntParam,
+    K,
+    StrParam,
+    cell_abc,
+    cp2k_script,
+    dp_sp_inp_template,
+    frame_mode,
+    gen_potcar,
+    single_time_fs,
+    sp_inp_template,
+    time_end_fs,
+    time_start_fs,
+    time_step_fs,
+    vasp_script,
+)
+
+
+# ---------------------------------------------------------------------------
+# Helpers for frame selection mode (shared by Bader/Potential/SpGen commands)
+# ---------------------------------------------------------------------------
+
+_IS_INDEX_MODE = lambda ctx: ctx[K.FRAME_MODE] == "index"
+_IS_TIME_MODE = lambda ctx: ctx[K.FRAME_MODE] == "time"
+
+
+def _resolve_single_frame_from_ctx(ctx: dict):
+    """Resolve (frame_idx, atoms) from CLI ctx using frame_mode.
+
+    Logs any warnings returned by ``resolve_single_frame`` at WARNING level.
+    """
+    import logging as _logging
+    resolve_single_frame = lazy_import(
+        "md_analysis.scripts._frame_selector", "resolve_single_frame",
+    )
+
+    mode = ctx[K.FRAME_MODE]
+    if mode == "index":
+        idx, atoms, warnings = resolve_single_frame(
+            ctx[K.XYZ], mode="index", frame=ctx[K.FRAME],
+        )
+    else:
+        idx, atoms, warnings = resolve_single_frame(
+            ctx[K.XYZ], mode="time", time_fs=ctx[K.SINGLE_TIME_FS],
+        )
+
+    _logger = _logging.getLogger("md_analysis.cli")
+    for w in warnings:
+        _logger.warning(w)
+        print(f"  WARNING: {w}")
+
+    return idx, atoms
+
+
+def _frame_selection_params() -> tuple:
+    """Return the common frame-selection param block for Batch commands.
+
+    Order: mode prompt → conditional (index triplet) → conditional (time triplet).
+    """
+    return (
+        frame_mode,
+        ConditionalParam(
+            IntParam(K.FRAME_START, "Frame start (0-based)", default=0),
+            _IS_INDEX_MODE,
+        ),
+        ConditionalParam(
+            IntParam(K.FRAME_END, "Frame end (exclusive, empty=all)", default=None),
+            _IS_INDEX_MODE,
+        ),
+        ConditionalParam(
+            IntParam(K.FRAME_STEP, "Frame step", default=1),
+            _IS_INDEX_MODE,
+        ),
+        ConditionalParam(time_start_fs, _IS_TIME_MODE),
+        ConditionalParam(time_end_fs, _IS_TIME_MODE),
+        ConditionalParam(time_step_fs, _IS_TIME_MODE),
+    )
+
+
+def _single_frame_params() -> tuple:
+    """Return the common frame-selection param block for Single commands."""
+    return (
+        frame_mode,
+        ConditionalParam(
+            IntParam(K.FRAME, "Frame number (0-based)", default=0),
+            _IS_INDEX_MODE,
+        ),
+        ConditionalParam(single_time_fs, _IS_TIME_MODE),
+    )
+
+
+def _batch_frame_kwargs_from_ctx(ctx: dict) -> dict:
+    """Build kwargs for batch_generate_*_workdirs from CLI ctx.
+
+    Always passes mode + both parameter sets; FrameSelection internally
+    ignores the unused set based on mode.
+    """
+    return {
+        "mode": ctx[K.FRAME_MODE],
+        "frame_start": ctx[K.FRAME_START],
+        "frame_end": ctx[K.FRAME_END],
+        "frame_step": ctx[K.FRAME_STEP],
+        "time_start_fs": ctx[K.TIME_START_FS]
+            if ctx[K.FRAME_MODE] == "time" else None,
+        "time_end_fs": ctx[K.TIME_END_FS]
+            if ctx[K.FRAME_MODE] == "time" else None,
+        "time_step_fs": ctx[K.TIME_STEP_FS]
+            if ctx[K.FRAME_MODE] == "time" else None,
+    }
+from ._prompt import (
+    prompt_choice,
+    prompt_float,
+    prompt_int,
+    prompt_str,
+    prompt_str_required,
+)
 
 
 def _print_trajectory_info(xyz_path: str) -> None:
@@ -47,44 +165,31 @@ def _print_trajectory_info(xyz_path: str) -> None:
     print()
 
 
-def _resolve_script_path() -> str | None:
-    """Prompt for VASP submission script path with config default."""
-    from ..config import KEY_VASP_SCRIPT_PATH, get_config
+def _resolve_cp2k_script_path() -> str | None:
+    """Prompt for CP2K submission script path with config default."""
+    from ..config import KEY_CP2K_SCRIPT_PATH, get_config
 
-    default_script = get_config(KEY_VASP_SCRIPT_PATH)
+    default_script = get_config(KEY_CP2K_SCRIPT_PATH)
     return prompt_str("Submission script path", default=default_script)
 
 
 class BaderSingleCmd(MenuCommand):
-    output_subdir = ""
 
-    def _collect_all_params(self) -> dict:
-        """Custom flow: show trajectory info between prompts."""
-        print()
-        ctx: dict = {}
-        ctx[K.XYZ] = prompt_str_required("XYZ trajectory file (e.g. md-pos-1.xyz)")
-        _print_trajectory_info(ctx[K.XYZ])
-        cell_abc.collect(ctx)
-        ctx[K.FRAME] = prompt_int("Frame number (0-based)", default=0) or 0
-        ctx[K.OUTDIR] = prompt_str("Output directory", default=".") or "."
-        ctx[K.WORKDIR_NAME] = prompt_str("Work directory name", default="bader") or "bader"
-        ctx[K.SCRIPT_PATH] = _resolve_script_path()
-        ctx[K.GEN_POTCAR] = prompt_bool("Generate POTCAR via vaspkit?", default=True)
-        return ctx
+    params = (
+        StrParam(K.XYZ, "XYZ trajectory file (e.g. md-pos-1.xyz)", required=True),
+        DisplayAction(lambda ctx: _print_trajectory_info(ctx[K.XYZ])),
+        cell_abc,
+        *_single_frame_params(),
+        StrParam(K.OUTDIR, "Output directory", default="."),
+        StrParam(K.WORKDIR_NAME, "Work directory name", default="bader"),
+        vasp_script,
+        gen_potcar,
+    )
 
     def execute(self, ctx: dict) -> None:
-        iread = lazy_import("ase.io", "iread")
         generate = lazy_import("md_analysis.scripts", "generate_bader_workdir")
 
-        print(f"\n Reading frame {ctx[K.FRAME]} from {ctx[K.XYZ]} ...")
-        atoms = None
-        for i, a in enumerate(iread(ctx[K.XYZ], index=":")):
-            if i == ctx[K.FRAME]:
-                atoms = a
-                break
-        if atoms is None:
-            print(f"  Error: frame {ctx[K.FRAME]} not found in {ctx[K.XYZ]}")
-            return
+        frame_idx, atoms = _resolve_single_frame_from_ctx(ctx)
 
         atoms.set_cell(ctx[K.CELL_ABC])
         atoms.set_pbc(True)
@@ -94,7 +199,7 @@ class BaderSingleCmd(MenuCommand):
             ctx[K.OUTDIR],
             script_path=ctx[K.SCRIPT_PATH],
             workdir_name=ctx[K.WORKDIR_NAME],
-            frame=ctx[K.FRAME],
+            frame=frame_idx,
             source=ctx[K.XYZ],
             generate_potcar=ctx[K.GEN_POTCAR],
         )
@@ -105,36 +210,322 @@ class BaderSingleCmd(MenuCommand):
 
 
 class BaderBatchCmd(MenuCommand):
-    output_subdir = ""
 
-    def _collect_all_params(self) -> dict:
-        """Custom flow: show trajectory info between prompts."""
-        print()
-        ctx: dict = {}
-        ctx[K.XYZ] = prompt_str_required("XYZ trajectory file (e.g. md-pos-1.xyz)")
-        _print_trajectory_info(ctx[K.XYZ])
-        cell_abc.collect(ctx)
-        ctx[K.FRAME_START] = prompt_int("Frame start (0-based)", default=0) or 0
-        ctx[K.FRAME_END] = prompt_int("Frame end (exclusive, empty=all)", default=None)
-        ctx[K.FRAME_STEP] = prompt_int("Frame step", default=1) or 1
-        ctx[K.OUTDIR] = prompt_str("Output directory", default=".") or "."
-        ctx[K.SCRIPT_PATH] = _resolve_script_path()
-        ctx[K.GEN_POTCAR] = prompt_bool("Generate POTCAR via vaspkit?", default=True)
-        return ctx
+    params = (
+        StrParam(K.XYZ, "XYZ trajectory file (e.g. md-pos-1.xyz)", required=True),
+        DisplayAction(lambda ctx: _print_trajectory_info(ctx[K.XYZ])),
+        cell_abc,
+        *_frame_selection_params(),
+        StrParam(K.OUTDIR, "Output directory", default="."),
+        vasp_script,
+        gen_potcar,
+    )
 
     def execute(self, ctx: dict) -> None:
         batch = lazy_import("md_analysis.scripts", "batch_generate_bader_workdirs")
+        kwargs = _batch_frame_kwargs_from_ctx(ctx)
         dirs = batch(
             ctx[K.XYZ],
             ctx[K.CELL_ABC],
             ctx[K.OUTDIR],
-            frame_start=ctx[K.FRAME_START],
-            frame_end=ctx[K.FRAME_END],
-            frame_step=ctx[K.FRAME_STEP],
+            **kwargs,
             script_path=ctx[K.SCRIPT_PATH],
             generate_potcar=ctx[K.GEN_POTCAR],
             verbose=True,
         )
         print(f"\n Created {len(dirs)} Bader work directories:")
+        for d in dirs:
+            print(f"  {d}")
+
+
+# ---------------------------------------------------------------------------
+# TI commands (42x)
+# ---------------------------------------------------------------------------
+
+def _print_sg_cv_info(restart_path: str, xyz_path: str) -> None:
+    """Display SG trajectory CV range and frame info for TI target selection."""
+    parse_colvar_restart = lazy_import(
+        "md_analysis.utils.RestartParser.ColvarParser", "parse_colvar_restart",
+    )
+    try:
+        restart = parse_colvar_restart(restart_path)
+    except Exception as exc:
+        print(f"  (Could not parse restart: {exc})")
+        return
+
+    cv = restart.colvars.primary
+    au_time_to_fs = lazy_import("md_analysis.utils.constants", "AU_TIME_TO_FS")
+    dt_au = restart.timestep_fs / au_time_to_fs
+    growth_per_step = cv.target_growth_au * dt_au
+
+    print(f"\n  SG info:")
+    print(f"    Timestep:     {restart.timestep_fs} fs")
+    print(f"    CV target:    {cv.target_au:.6f} a.u. (at step {restart.step_start})")
+    print(f"    CV growth:    {growth_per_step:.6e} a.u./step")
+    print(f"    Cell:         {restart.cell_abc_ang[0]:.4f} x "
+          f"{restart.cell_abc_ang[1]:.4f} x {restart.cell_abc_ang[2]:.4f} A")
+    print()
+
+
+class TISingleCmd(MenuCommand):
+    """Generate one TI constrained-MD work directory."""
+
+
+    def _collect_all_params(self) -> dict:
+        print()
+        ctx: dict = {}
+        ctx[K.RESTART_PATH] = prompt_str_required(
+            "SG restart file (e.g. slowgrowth-1.restart)"
+        )
+        ctx[K.INP_PATH] = prompt_str_required(
+            "SG input file (e.g. sg.inp)"
+        )
+        ctx[K.XYZ] = prompt_str_required(
+            "SG trajectory file (e.g. slowgrowth-pos-1.xyz)"
+        )
+        _print_trajectory_info(ctx[K.XYZ])
+        _print_sg_cv_info(ctx[K.RESTART_PATH], ctx[K.XYZ])
+
+        ctx[K.TARGET_AU] = prompt_float("Target CV value (a.u.)", default=0.0)
+        ctx[K.STEPS] = prompt_int("MD steps for constrained-MD", default=10000) or 10000
+        ctx[K.COLVAR_ID] = prompt_int("Colvar ID (empty=primary)", default=None)
+        ctx[K.OUTDIR] = prompt_str("Output directory", default=".") or "."
+        ctx[K.WORKDIR_NAME] = prompt_str(
+            "Work directory name (empty=auto)", default=None,
+        )
+        ctx[K.SCRIPT_PATH] = _resolve_cp2k_script_path()
+        return ctx
+
+    def execute(self, ctx: dict) -> None:
+        generate = lazy_import("md_analysis.scripts", "generate_ti_workdir")
+        workdir = generate(
+            ctx[K.INP_PATH],
+            ctx[K.XYZ],
+            ctx[K.RESTART_PATH],
+            ctx[K.TARGET_AU],
+            ctx[K.OUTDIR],
+            steps=ctx[K.STEPS],
+            colvar_id=ctx[K.COLVAR_ID],
+            workdir_name=ctx[K.WORKDIR_NAME],
+            script_path=ctx[K.SCRIPT_PATH],
+        )
+        print(f"\n TI work directory created: {workdir}")
+        contents = sorted(p.name for p in workdir.iterdir())
+        print(f"  Contents: {', '.join(contents)}")
+
+
+class TIBatchCmd(MenuCommand):
+    """Batch-generate TI constrained-MD work directories."""
+
+
+    def _collect_all_params(self) -> dict:
+        print()
+        ctx: dict = {}
+        ctx[K.RESTART_PATH] = prompt_str_required(
+            "SG restart file (e.g. slowgrowth-1.restart)"
+        )
+        ctx[K.INP_PATH] = prompt_str_required(
+            "SG input file (e.g. sg.inp)"
+        )
+        ctx[K.XYZ] = prompt_str_required(
+            "SG trajectory file (e.g. slowgrowth-pos-1.xyz)"
+        )
+        _print_trajectory_info(ctx[K.XYZ])
+        _print_sg_cv_info(ctx[K.RESTART_PATH], ctx[K.XYZ])
+
+        mode = prompt_choice(
+            "Target specification mode",
+            ["time", "values"],
+            default="time",
+        )
+
+        if mode == "time":
+            ctx[K.TIME_INITIAL_FS] = prompt_float(
+                "Initial time (fs)", default=0.0,
+            )
+            ctx[K.TIME_FINAL_FS] = prompt_float(
+                "Final time (fs)", default=0.0,
+            )
+            ctx[K.N_POINTS] = prompt_int(
+                "Number of TI points", default=10,
+            ) or 10
+            ctx[K.TARGETS_AU] = None
+        else:
+            raw = prompt_str_required(
+                "Target CV values in a.u. (space-separated)"
+            )
+            ctx[K.TARGETS_AU] = [float(x) for x in raw.split()]
+            ctx[K.TIME_INITIAL_FS] = None
+            ctx[K.TIME_FINAL_FS] = None
+            ctx[K.N_POINTS] = None
+
+        ctx[K.STEPS] = prompt_int("MD steps for constrained-MD", default=10000) or 10000
+        ctx[K.COLVAR_ID] = prompt_int("Colvar ID (empty=primary)", default=None)
+        ctx[K.OUTDIR] = prompt_str("Output directory", default=".") or "."
+        ctx[K.SCRIPT_PATH] = _resolve_cp2k_script_path()
+        return ctx
+
+    def execute(self, ctx: dict) -> None:
+        batch = lazy_import("md_analysis.scripts", "batch_generate_ti_workdirs")
+        dirs = batch(
+            ctx[K.INP_PATH],
+            ctx[K.XYZ],
+            ctx[K.RESTART_PATH],
+            ctx[K.OUTDIR],
+            targets_au=ctx[K.TARGETS_AU],
+            time_initial_fs=ctx[K.TIME_INITIAL_FS],
+            time_final_fs=ctx[K.TIME_FINAL_FS],
+            n_points=ctx[K.N_POINTS],
+            steps=ctx[K.STEPS],
+            colvar_id=ctx[K.COLVAR_ID],
+            script_path=ctx[K.SCRIPT_PATH],
+            verbose=True,
+        )
+        print(f"\n Created {len(dirs)} TI work directories:")
+        for d in dirs:
+            print(f"  {d}")
+
+
+# ---------------------------------------------------------------------------
+# Potential SP commands (43x)
+# ---------------------------------------------------------------------------
+
+class PotentialSingleCmd(MenuCommand):
+    """Generate one SP potential work directory."""
+
+    params = (
+        StrParam(K.XYZ, "XYZ trajectory file (e.g. md-pos-1.xyz)", required=True),
+        DisplayAction(lambda ctx: _print_trajectory_info(ctx[K.XYZ])),
+        cell_abc,
+        *_single_frame_params(),
+        sp_inp_template,
+        StrParam(K.OUTDIR, "Output directory", default="."),
+        StrParam(K.WORKDIR_NAME, "Work directory name", default="potential"),
+        cp2k_script,
+    )
+
+    def execute(self, ctx: dict) -> None:
+        generate = lazy_import("md_analysis.scripts", "generate_potential_workdir")
+
+        frame_idx, atoms = _resolve_single_frame_from_ctx(ctx)
+
+        atoms.set_cell(ctx[K.CELL_ABC])
+        atoms.set_pbc(True)
+
+        workdir = generate(
+            atoms,
+            ctx[K.OUTDIR],
+            inp_template_path=ctx[K.INP_TEMPLATE],
+            cell_abc=ctx[K.CELL_ABC],
+            script_path=ctx[K.SCRIPT_PATH],
+            workdir_name=ctx[K.WORKDIR_NAME],
+            frame=frame_idx,
+            source=ctx[K.XYZ],
+        )
+
+        print(f"\n Potential work directory created: {workdir}")
+        contents = sorted(p.name for p in workdir.iterdir())
+        print(f"  Contents: {', '.join(contents)}")
+
+
+class PotentialBatchCmd(MenuCommand):
+    """Batch-generate SP potential work directories."""
+
+    params = (
+        StrParam(K.XYZ, "XYZ trajectory file (e.g. md-pos-1.xyz)", required=True),
+        DisplayAction(lambda ctx: _print_trajectory_info(ctx[K.XYZ])),
+        cell_abc,
+        *_frame_selection_params(),
+        sp_inp_template,
+        StrParam(K.OUTDIR, "Output directory", default="."),
+        cp2k_script,
+    )
+
+    def execute(self, ctx: dict) -> None:
+        batch = lazy_import("md_analysis.scripts", "batch_generate_potential_workdirs")
+        kwargs = _batch_frame_kwargs_from_ctx(ctx)
+        dirs = batch(
+            ctx[K.XYZ],
+            ctx[K.CELL_ABC],
+            ctx[K.OUTDIR],
+            inp_template_path=ctx[K.INP_TEMPLATE],
+            **kwargs,
+            script_path=ctx[K.SCRIPT_PATH],
+            verbose=True,
+        )
+        print(f"\n Created {len(dirs)} potential work directories:")
+        for d in dirs:
+            print(f"  {d}")
+
+
+# ---------------------------------------------------------------------------
+# SpGen SP commands for DeePMD training (44x)
+# ---------------------------------------------------------------------------
+
+
+class SpGenSingleCmd(MenuCommand):
+    """Generate one SP work directory for DeePMD training."""
+
+    params = (
+        StrParam(K.XYZ, "XYZ trajectory file (e.g. md-pos-1.xyz)", required=True),
+        DisplayAction(lambda ctx: _print_trajectory_info(ctx[K.XYZ])),
+        cell_abc,
+        *_single_frame_params(),
+        dp_sp_inp_template,
+        StrParam(K.OUTDIR, "Output directory", default="."),
+        StrParam(K.WORKDIR_NAME, "Work directory name", default="sp"),
+        cp2k_script,
+    )
+
+    def execute(self, ctx: dict) -> None:
+        generate = lazy_import("md_analysis.scripts", "generate_sp_workdir")
+
+        frame_idx, atoms = _resolve_single_frame_from_ctx(ctx)
+
+        atoms.set_cell(ctx[K.CELL_ABC])
+        atoms.set_pbc(True)
+
+        workdir = generate(
+            atoms,
+            ctx[K.OUTDIR],
+            inp_template_path=ctx[K.INP_TEMPLATE],
+            cell_abc=ctx[K.CELL_ABC],
+            script_path=ctx[K.SCRIPT_PATH],
+            workdir_name=ctx[K.WORKDIR_NAME],
+            frame=frame_idx,
+            source=ctx[K.XYZ],
+        )
+
+        print(f"\n SP work directory for DeePMD training: {workdir}")
+        contents = sorted(p.name for p in workdir.iterdir())
+        print(f"  Contents: {', '.join(contents)}")
+
+
+class SpGenBatchCmd(MenuCommand):
+    """Batch-generate SP work directories for DeePMD training."""
+
+    params = (
+        StrParam(K.XYZ, "XYZ trajectory file (e.g. md-pos-1.xyz)", required=True),
+        DisplayAction(lambda ctx: _print_trajectory_info(ctx[K.XYZ])),
+        cell_abc,
+        *_frame_selection_params(),
+        dp_sp_inp_template,
+        StrParam(K.OUTDIR, "Output directory", default="."),
+        cp2k_script,
+    )
+
+    def execute(self, ctx: dict) -> None:
+        batch = lazy_import("md_analysis.scripts", "batch_generate_sp_workdirs")
+        kwargs = _batch_frame_kwargs_from_ctx(ctx)
+        dirs = batch(
+            ctx[K.XYZ],
+            ctx[K.CELL_ABC],
+            ctx[K.OUTDIR],
+            inp_template_path=ctx[K.INP_TEMPLATE],
+            **kwargs,
+            script_path=ctx[K.SCRIPT_PATH],
+            verbose=True,
+        )
+        print(f"\n Created {len(dirs)} SP work directories for DeePMD training:")
         for d in dirs:
             print(f"  {d}")

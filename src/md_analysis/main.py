@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from .electrochemical.potential.config import DEFAULT_THICKNESS_ANG
-from .utils.config import CHARGE_METHOD_COUNTERION, DEFAULT_LAYER_TOL_A
+from .utils.constants import CHARGE_METHOD_COUNTERION, DEFAULT_LAYER_TOL_A
 
 logger = logging.getLogger(__name__)
 
@@ -35,8 +35,9 @@ def run_water_analysis(
 ) -> dict[str, Path]:
     """Run water analysis (three-panel plot + CSVs).
 
-    Outputs are written under ``output_dir/water/`` with sub-directories
-    for density, orientation, and adsorbed-layer results.
+    All outputs are written directly into *output_dir*. Callers that want
+    the canonical ``<root>/water/`` layout should pass
+    ``output_dir=<root> / "water"`` (``run_all`` does this automatically).
 
     Returns a dict mapping output names to file paths.
     """
@@ -52,7 +53,7 @@ def run_water_analysis(
         DEFAULT_WATER_THREE_PANEL_PLOT_PNG_NAME,
     )
 
-    water_dir = Path(output_dir) / "water"
+    water_dir = Path(output_dir)
     water_dir.mkdir(parents=True, exist_ok=True)
 
     png_path = plot_water_three_panel_analysis(
@@ -97,11 +98,20 @@ def run_potential_analysis(
     frame_end: int | None = None,
     frame_step: int | None = None,
     verbose: bool = False,
+    # --- distributed mode params ---
+    input_mode: str = "continuous",
+    sp_root_dir: Path | str | None = None,
+    sp_dir_pattern: str = "potential_t*_i*",
+    sp_cube_filename: str = "sp_potential-v_hartree-1_0.cube",
+    sp_out_filename: str = "sp.out",
 ) -> dict[str, Path]:
     """Run all potential analysis workflows.
 
-    Outputs are written under ``output_dir/potential/`` with sub-directories
-    for center, fermi, electrode, and phi_z results.
+    Per-sub-analysis outputs are written into ``output_dir/<sub>/`` where
+    ``<sub>`` is ``center``/``fermi``/``electrode``/``phi_z``/``thickness_sensitivity``.
+    Callers that want the canonical ``<root>/electrochemical/potential/``
+    layout should pass ``output_dir=<root> / "electrochemical" / "potential"``
+    (``run_all`` does this automatically).
 
     Returns a dict mapping output names to file paths.
     """
@@ -115,10 +125,23 @@ def run_potential_analysis(
         thickness_sensitivity_analysis,
     )
 
-    pot_dir = Path(output_dir) / "potential"
+    pot_dir = Path(output_dir)
     results: dict[str, Path] = {}
 
-    if compute_u and md_out_path is not None:
+    # Shared distributed-mode kwargs
+    _dist = {
+        "input_mode": input_mode,
+        "sp_root_dir": sp_root_dir,
+        "sp_dir_pattern": sp_dir_pattern,
+        "sp_cube_filename": sp_cube_filename,
+        "sp_out_filename": sp_out_filename,
+    }
+    is_distributed = input_mode == "distributed"
+
+    # In distributed mode, Fermi data comes from sp.out in each subdir
+    has_fermi = is_distributed or md_out_path is not None
+
+    if compute_u and has_fermi:
         # Full electrode potential analysis (includes center + fermi)
         electrode_dir = pot_dir / "electrode"
         electrode_dir.mkdir(parents=True, exist_ok=True)
@@ -136,6 +159,7 @@ def run_potential_analysis(
             frame_end=frame_end,
             frame_step=frame_step,
             verbose=verbose,
+            **_dist,
         )
         results["electrode_csv"] = u_csv
     else:
@@ -154,6 +178,7 @@ def run_potential_analysis(
             frame_end=frame_end,
             frame_step=frame_step,
             verbose=verbose,
+            **_dist,
         )
         results["center_csv"] = center_csv
 
@@ -167,6 +192,7 @@ def run_potential_analysis(
                 frame_start=frame_start,
                 frame_end=frame_end,
                 frame_step=frame_step,
+                **_dist,
             )
             results["fermi_csv"] = fermi_csv
 
@@ -181,11 +207,12 @@ def run_potential_analysis(
             frame_end=frame_end,
             frame_step=frame_step,
             verbose=verbose,
+            **_dist,
         )
         results["phi_z_png"] = phi_z_png
 
-    # Thickness sensitivity sweep (requires Fermi energies from md.out)
-    if md_out_path is not None:
+    # Thickness sensitivity sweep
+    if has_fermi:
         ts_dir = pot_dir / "thickness_sensitivity"
         ts_dir.mkdir(parents=True, exist_ok=True)
         ts_csv = thickness_sensitivity_analysis(
@@ -202,6 +229,7 @@ def run_potential_analysis(
             frame_end=frame_end,
             frame_step=frame_step,
             verbose=verbose,
+            **_dist,
         )
         results["thickness_sensitivity_csv"] = ts_csv
 
@@ -225,7 +253,12 @@ def run_charge_analysis(
 ) -> dict[str, Path]:
     """Run surface charge density analysis (CSV + PNG).
 
-    Outputs are written under ``output_dir/charge/<method>/``.
+    Outputs are written into ``output_dir/<method>/`` (the method sub-dir
+    is mandatory so aligned/counterion/layer runs don't collide). Callers
+    that want the canonical ``<root>/electrochemical/charge/<method>/``
+    layout should pass ``output_dir=<root> / "electrochemical" / "charge"``
+    (``run_all`` does this automatically).
+
     Returns a dict mapping output names to file paths.
     """
     logger.info("Starting charge analysis: method=%s, output_dir=%s", method, output_dir)
@@ -236,10 +269,10 @@ def run_charge_analysis(
         DEFAULT_SURFACE_CHARGE_PNG_NAME,
     )
 
-    charge_dir = Path(output_dir) / "charge" / method
+    charge_dir = Path(output_dir) / method
     charge_dir.mkdir(parents=True, exist_ok=True)
 
-    csv_path = surface_charge_analysis(
+    result = surface_charge_analysis(
         root_dir,
         metal_symbols=metal_symbols,
         normal=normal,
@@ -255,8 +288,110 @@ def run_charge_analysis(
     )
 
     return {
-        "charge_csv": csv_path,
-        "charge_png": csv_path.parent / DEFAULT_SURFACE_CHARGE_PNG_NAME,
+        "charge_csv": result.csv_path,
+        "charge_png": result.csv_path.parent / DEFAULT_SURFACE_CHARGE_PNG_NAME,
+    }
+
+
+def run_tracked_charge_analysis(
+    *,
+    output_dir: Path,
+    root_dir: str | Path = ".",
+    atom_indices_xyz: Iterable[int],
+    dir_pattern: str = "bader_t*_i*",
+    frame_start: int | None = None,
+    frame_end: int | None = None,
+    frame_step: int | None = None,
+    verbose: bool = False,
+) -> dict[str, Path]:
+    """Track Bader net charges for specified XYZ atoms (CSV + PNG).
+
+    Outputs are written into ``output_dir/tracked/``. Callers that want
+    the canonical ``<root>/electrochemical/charge/tracked/`` layout should
+    pass ``output_dir=<root> / "electrochemical" / "charge"`` (``run_all``
+    does this automatically).
+
+    Returns a dict mapping output names to file paths.
+    """
+    logger.info("Starting tracked charge analysis: output_dir=%s", output_dir)
+
+    from .electrochemical.charge import tracked_atom_charge_analysis
+    from .electrochemical.charge.Bader.AtomCharges import (
+        DEFAULT_TRACKED_CHARGE_CSV,
+        DEFAULT_TRACKED_CHARGE_PNG,
+    )
+
+    tracked_dir = Path(output_dir) / "tracked"
+    tracked_dir.mkdir(parents=True, exist_ok=True)
+
+    csv_path = tracked_atom_charge_analysis(
+        root_dir,
+        atom_indices_xyz=atom_indices_xyz,
+        dir_pattern=dir_pattern,
+        output_dir=tracked_dir,
+        frame_start=frame_start,
+        frame_end=frame_end,
+        frame_step=frame_step,
+        verbose=verbose,
+    )
+
+    return {
+        "tracked_charge_csv": csv_path,
+        "tracked_charge_png": csv_path.parent / DEFAULT_TRACKED_CHARGE_PNG,
+    }
+
+
+def run_counterion_charge_analysis(
+    *,
+    output_dir: Path,
+    root_dir: str | Path = ".",
+    metal_symbols: Iterable[str] | None = None,
+    normal: str = "c",
+    layer_tol_A: float = DEFAULT_LAYER_TOL_A,
+    dir_pattern: str = "bader_t*_i*",
+    frame_start: int | None = None,
+    frame_end: int | None = None,
+    frame_step: int | None = None,
+    verbose: bool = False,
+) -> dict[str, Path]:
+    """Detect counterions per-frame and track their Bader charges (CSV + PNG).
+
+    Outputs are written into ``output_dir/counterion_tracking/``. Callers
+    that want the canonical ``<root>/electrochemical/charge/counterion_tracking/``
+    layout should pass ``output_dir=<root> / "electrochemical" / "charge"``
+    (``run_all`` does this automatically).
+
+    Returns a dict mapping output names to file paths.
+    """
+    logger.info("Starting counterion charge analysis: output_dir=%s", output_dir)
+
+    from .electrochemical.charge import counterion_charge_analysis
+    from .electrochemical.charge.Bader.AtomCharges import (
+        DEFAULT_COUNTERION_CHARGE_CSV,
+        DEFAULT_COUNTERION_CHARGE_PNG,
+        DEFAULT_COUNTERION_SUMMARY_CSV,
+    )
+
+    ci_dir = Path(output_dir) / "counterion_tracking"
+    ci_dir.mkdir(parents=True, exist_ok=True)
+
+    csv_path = counterion_charge_analysis(
+        root_dir,
+        metal_symbols=metal_symbols,
+        normal=normal,
+        layer_tol_A=layer_tol_A,
+        dir_pattern=dir_pattern,
+        output_dir=ci_dir,
+        frame_start=frame_start,
+        frame_end=frame_end,
+        frame_step=frame_step,
+        verbose=verbose,
+    )
+
+    return {
+        "counterion_charge_csv": csv_path,
+        "counterion_summary_csv": csv_path.parent / DEFAULT_COUNTERION_SUMMARY_CSV,
+        "counterion_charge_png": csv_path.parent / DEFAULT_COUNTERION_CHARGE_PNG,
     }
 
 
@@ -280,10 +415,12 @@ def run_all(
     """
     logger.info("Starting full analysis: output_dir=%s", output_dir)
 
+    root = Path(output_dir)
     results: dict[str, Path] = {}
 
     results.update(run_water_analysis(
-        xyz_path, md_inp_path, cell_abc=cell_abc, output_dir=output_dir,
+        xyz_path, md_inp_path, cell_abc=cell_abc,
+        output_dir=root / "water",
         frame_start=frame_start, frame_end=frame_end, frame_step=frame_step,
         verbose=verbose,
     ))
@@ -297,7 +434,7 @@ def run_all(
         }
     }
     results.update(run_potential_analysis(
-        output_dir=output_dir,
+        output_dir=root / "electrochemical" / "potential",
         cube_pattern=cube_pattern,
         md_out_path=md_out_path,
         xyz_path=xyz_path,

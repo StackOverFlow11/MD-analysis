@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "created": "2026-04-05T05:11:46+00:00",
+  "reference": "SHE",
+  "metadata": {},
+  "data": {
+    "potentials_V": [
+      -1.0559,
+      -1.4166,
+      -1.7497,
+      -2.3184
+    ],
+    "charge_densities_uC_cm2": [
+      0.0,
+      -13.5417,
+      -27.1521,
+      -39.4966
+    ]
+  },
+  "fit": {
+    "method": "differential_capacitance",
+    "phi_nodes": [
+      -2.3184,
+      -1.7497,
+      -1.4166,
+      -1.0559
+    ],
+    "sigma_nodes": [
+      -39.4966,
+      -27.1521,
+      -13.5417,
+      0.0
+    ],
+    "capacitances": [
+      21.706523650430807,
+      40.85980186130292,
+      37.542833379539786
+    ],
+    "r_squared": 1.0,
+    "rmse": 0.0,
+    "equation": "piecewise linear (3 intervals, C = [21.71, 40.86, 37.54] μF/cm²)"
+  }
+}

@@ -1,5 +1,10 @@
 # CLI Composite + Command Refactoring Design
 
+> **NOTE (2026-03-27)**: 本文档是初始设计文档，部分细节已过时。当前实现以源码和 `cli/CLAUDE.md` 为准。
+> 主要变化：`output_subdir` 硬编码已被 `output_name` 树推导机制取代；
+> Charge 已扩展为 221-226（6 个命令类）；Bader 411-412、TI 421-422；
+> `_charge.py` 现含 `SurfaceChargeCmd`、`SingleSideChargeCmd`、`TrackedChargeCmd`、`CounterionChargeCmd`。
+
 ## Design Goals
 
 1. **Composite** tree structure: one `group.add(Cmd(...))` = menu text + dispatch + registration

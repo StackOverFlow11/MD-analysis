@@ -15,3 +15,8 @@ DEFAULT_THICKNESS_SENSITIVITY_CSV_NAME: str = "thickness_sensitivity.csv"
 DEFAULT_THICKNESS_SENSITIVITY_PNG_NAME: str = "thickness_sensitivity.png"
 
 DEFAULT_THICKNESS_ANG: float = 7.5
+
+# Distributed single-point defaults
+DEFAULT_SP_DIR_PATTERN: str = "potential_t*_i*"
+DEFAULT_SP_CUBE_FILENAME: str = "sp_potential-v_hartree-1_0.cube"
+DEFAULT_SP_OUT_FILENAME: str = "sp.out"

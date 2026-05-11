@@ -7,22 +7,24 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from md_analysis.electrochemical.charge.BaderAnalysis import (
+from md_analysis.electrochemical.charge.Bader.AtomCharges import (
+    trajectory_indexed_atom_charges,
+)
+from md_analysis.electrochemical.charge.Bader.SurfaceCharge import (
     compute_frame_surface_charge,
     surface_charge_analysis,
-    trajectory_indexed_atom_charges,
     trajectory_surface_charge,
 )
 from md_analysis.utils.BaderParser import load_bader_atoms
 
-DATA_DIR = Path(__file__).resolve().parents[3] / "data_example" / "bader" / "bader_work_dir"
+DATA_DIR = Path(__file__).resolve().parents[3] / "data_example" / "bader" / "single_frame"
 
 # Files needed per frame
 _FRAME_FILES = ["POSCAR", "ACF.dat", "POTCAR"]
 
 
 def _build_fake_trajectory(tmp_path: Path, n_frames: int = 2) -> Path:
-    """Copy bader_work_dir data into bader_t*_i* subdirectories."""
+    """Copy single_frame data into bader_t*_i* subdirectories."""
     for i in range(n_frames):
         frame_dir = tmp_path / f"bader_t{i:03d}_i000"
         frame_dir.mkdir()
@@ -125,12 +127,12 @@ class TestSurfaceChargeAnalysis:
     def test_end_to_end(self, tmp_path):
         root = _build_fake_trajectory(tmp_path, n_frames=3)
         out = tmp_path / "output"
-        csv_path = surface_charge_analysis(root, output_dir=out)
+        result = surface_charge_analysis(root, output_dir=out)
 
-        assert csv_path.exists()
+        assert result.csv_path.exists()
         assert (out / "surface_charge.png").exists()
 
-        with csv_path.open(encoding="utf-8") as f:
+        with result.csv_path.open(encoding="utf-8") as f:
             rows = list(csv.DictReader(f))
         assert len(rows) == 3
 
@@ -147,10 +149,10 @@ class TestSurfaceChargeAnalysis:
             for fname in _FRAME_FILES:
                 shutil.copy2(DATA_DIR / fname, frame_dir / fname)
         out = tmp_path / "output"
-        csv_path = surface_charge_analysis(
+        result = surface_charge_analysis(
             tmp_path, output_dir=out, dir_pattern="bader_t*_i*",
         )
-        with csv_path.open(encoding="utf-8") as f:
+        with result.csv_path.open(encoding="utf-8") as f:
             rows = list(csv.DictReader(f))
         # First row should be t=50, second t=1000
         assert int(rows[0]["step"]) == 50

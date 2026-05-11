@@ -9,6 +9,7 @@ from .CenterPotential import (
     thickness_sensitivity_analysis,
 )
 from .PhiZProfile import phi_z_planeavg_analysis
+from ._frame_source import PotentialFrame, discover_continuous_frames, discover_distributed_frames
 from .config import (
     DEFAULT_CENTER_POTENTIAL_CSV_NAME,
     DEFAULT_CENTER_POTENTIAL_PNG_NAME,
@@ -19,6 +20,9 @@ from .config import (
     DEFAULT_PHI_Z_PNG_NAME,
     DEFAULT_PHI_Z_STATS_CSV_NAME,
     DEFAULT_SLAB_CENTER_CSV_NAME,
+    DEFAULT_SP_CUBE_FILENAME,
+    DEFAULT_SP_DIR_PATTERN,
+    DEFAULT_SP_OUT_FILENAME,
     DEFAULT_THICKNESS_SENSITIVITY_CSV_NAME,
     DEFAULT_THICKNESS_SENSITIVITY_PNG_NAME,
     DEFAULT_THICKNESS_ANG,
@@ -30,6 +34,9 @@ __all__ = [
     "electrode_potential_analysis",
     "thickness_sensitivity_analysis",
     "phi_z_planeavg_analysis",
+    "PotentialFrame",
+    "discover_continuous_frames",
+    "discover_distributed_frames",
     "DEFAULT_CENTER_POTENTIAL_CSV_NAME",
     "DEFAULT_CENTER_POTENTIAL_PNG_NAME",
     "DEFAULT_ELECTRODE_POTENTIAL_CSV_NAME",
@@ -39,6 +46,9 @@ __all__ = [
     "DEFAULT_PHI_Z_PNG_NAME",
     "DEFAULT_PHI_Z_STATS_CSV_NAME",
     "DEFAULT_SLAB_CENTER_CSV_NAME",
+    "DEFAULT_SP_CUBE_FILENAME",
+    "DEFAULT_SP_DIR_PATTERN",
+    "DEFAULT_SP_OUT_FILENAME",
     "DEFAULT_THICKNESS_SENSITIVITY_CSV_NAME",
     "DEFAULT_THICKNESS_SENSITIVITY_PNG_NAME",
     "DEFAULT_THICKNESS_ANG",
