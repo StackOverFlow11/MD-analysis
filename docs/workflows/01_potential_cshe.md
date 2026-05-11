@@ -107,7 +107,7 @@ CLI 自动从 `md.inp` 的 `&CELL ABC [angstrom] X Y Z` 行解析。或者从 `*
 
 ```
 md_run/
-├── md.inp ──────► CellParser ─────► cell_abc (Å)
+├── md.inp ──────► formats.cp2k_cell ──► cell_abc (Å)
 ├── md.out ──────► _parse_md_out_fermi (regex) ─────► [(step, time_fs, E_F_au)]
 ├── md-pos-1.xyz ► ASE per-frame iter ──────────────► atoms (incl. cell)
 └── *.cube ──────► formats/cube ──┐

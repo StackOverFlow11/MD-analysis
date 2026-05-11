@@ -62,7 +62,7 @@
 - `gap_midpoint_periodic(...)`
   - 计算间隙中点
 
-### 2.3 `CubeParser.py` 导出（Stable）
+### 2.3 `cube.py` 导出（Stable）
 
 数据结构：
 
@@ -102,7 +102,7 @@
 - `circular_mean_fractional(f)`
   - 输入：分数坐标数组
   - 输出：`float`，[0, 1) 范围的圆周均值
-  - 语义：委托给 `ClusterUtils._circular_mean(values, period=1.0)`
+  - 语义：委托给 `cluster._circular_mean(values, period=1.0)`
 - `mic_delta_fractional(df)`
   - 输入：分数坐标差分数组
   - 输出：`np.ndarray`，[-0.5, 0.5) 范围的最小镜像差
@@ -128,7 +128,7 @@
 - `get_water_oxygen_indices_array(...)`
   - 输出：`(n_water, 1)` 氧索引数组
 
-### 2.6 `BaderParser.py` 导出（Stable）
+### 2.6 `bader.py` 导出（Stable）
 
 异常：
 
@@ -195,7 +195,7 @@
 函数：
 
 - `parse_colvar_restart(restart_path) -> ColvarRestart`
-  - 解析 CP2K COLVAR restart 文件，使用 `finditer` 解析所有 `&COLLECTIVE` 块，内部复用 `CellParser.parse_abc_from_restart()`
+  - 解析 CP2K COLVAR restart 文件，使用 `finditer` 解析所有 `&COLLECTIVE` 块，内部复用 `formats.cp2k_cell.parse_abc_from_restart()`
 - `parse_lagrange_mult_log(log_path) -> LagrangeMultLog`
   - 解析 LagrangeMultLog 文件，自动检测单约束/多约束格式
 - `compute_target_series(restart, n_steps, *, colvar_id=None) -> np.ndarray`

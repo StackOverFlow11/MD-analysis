@@ -2,7 +2,7 @@
 
 ## Layer dependency
 
-- `md_analysis.charge` depends on `md_analysis.utils` (BaderParser, LayerParser, WaterParser, config constants, `_io_helpers`)
+- `md_analysis.charge` depends on `md_analysis.utils` (formats.bader, structure.layer, structure.water, config constants, `_io_helpers`)
 - `md_analysis.charge` does NOT depend on `md_analysis.water` or `md_analysis.potential`
 
 ## Module layout

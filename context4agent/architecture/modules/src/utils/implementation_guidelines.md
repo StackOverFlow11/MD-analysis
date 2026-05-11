@@ -60,7 +60,7 @@
 - 被 `structure/layer.py` 和 `md_analysis.potential.CenterPotential` 调用。
 - 不依赖 ASE 或其他上层模块。
 
-### `CubeParser.py`
+### `cube.py`
 
 - 负责 Gaussian cube 文件的读取与解析。
 - 负责 plane-averaged φ(z) 计算和 slab-averaged potential 计算。
@@ -78,7 +78,7 @@
 - 不负责水分子拓扑识别、角度 PDF 统计。
 - 使用 `constants.py` 中的 `AXIS_MAP` 常量（取代原有的模块局部 `_AXIS_MAP` 字典）。
 - 使用 `constants.py` 中的 `INTERFACE_NORMAL_ALIGNED`/`INTERFACE_NORMAL_OPPOSED` 常量作为界面标签。
-- `circular_mean_fractional()` 委托给 `ClusterUtils._circular_mean(values, period=1.0)`。
+- `circular_mean_fractional()` 委托给 `cluster._circular_mean(values, period=1.0)`。
 
 ### `formats/cp2k_cell.py`
 
@@ -92,7 +92,7 @@
 ### `formats/cp2k_colvar.py`
 
 - 负责 CP2K COLVAR（集合变量约束）模拟的 restart 文件和 LagrangeMultLog 文件解析。
-- 复用 `CellParser.parse_abc_from_restart()` 获取 cell 参数，避免重复实现。
+- 复用 `formats.cp2k_cell.parse_abc_from_restart()` 获取 cell 参数，避免重复实现。
 - 使用 `finditer` 解析所有 `&COLLECTIVE` 块，支持多约束场景，结果包装为 `ColvarInfo` 容器。
 - 不解析 COLVAR 定义（CV 类型由 CP2K 决定，种类繁多，不逐一写正则）。
 - 支持 `&FIXED_ATOMS` 的 `LIST` 行解析：逗号/空格分隔、`N..M` 范围展开、`\` 续行。
@@ -128,7 +128,7 @@
 - 最后一段边界直接落在 `Lz`，避免累计误差
 - bin 归属使用 `searchsorted(..., side="right") - 1` 再 clip，确保边界可控
 
-## 3. `LayerParser.py` 实现准则
+## 3. `layer.py` 实现准则
 
 ### 3.1 输入与默认值
 
@@ -151,7 +151,7 @@
 - `Layer` 与 `SurfaceDetectionResult` 保持 dataclass 不可变语义
 - 对外返回应优先使用 tuple，避免可变容器泄漏
 
-## 4. `WaterParser.py` 实现准则
+## 4. `water.py` 实现准则
 
 ### 4.1 水分子标记
 

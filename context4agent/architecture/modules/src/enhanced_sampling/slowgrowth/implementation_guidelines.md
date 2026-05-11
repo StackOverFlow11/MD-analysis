@@ -40,7 +40,7 @@ $$
 
 ## 溢出处理
 
-CP2K 输出中 `***` 值由 `ColvarParser._safe_float()` 转换为 `np.nan`。含 NaN 的步在积分中传播（midpoint rule 中任一侧为 NaN 则该段积分为 NaN）。CLI 中 `_print_sg_info()` 检测并警告用户使用 `initial_step` / `final_step` 避开这些索引。
+CP2K 输出中 `***` 值由 `cp2k_colvar._safe_float()` 转换为 `np.nan`。含 NaN 的步在积分中传播（midpoint rule 中任一侧为 NaN 则该段积分为 NaN）。CLI 中 `_print_sg_info()` 检测并警告用户使用 `initial_step` / `final_step` 避开这些索引。
 
 ## 依赖
 

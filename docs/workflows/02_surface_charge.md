@@ -106,7 +106,7 @@ bader_runs/bader_t<step>_i<frame>/
                                       │
               ┌───────────────────────┴──────────────────────────┐
               ▼ counterion                                       ▼ layer
-         过滤非金属非水原子                            LayerParser 找界面金属层
+         过滤非金属非水原子                            structure.layer 找界面金属层
          按 z > / < midpoint 分两侧                   每层电荷之和
               │                                               │
               └─────────► σ_aligned, σ_opposed (μC/cm²) ◄─────┘

@@ -221,8 +221,8 @@ src/md_analysis/
 test/
 ├── conftest.py             # shared fixtures
 ├── unit/
-│   ├── utils/              # ClusterUtils, LayerParser, WaterParser, BaderParser, CellParser,
-│   │                       #   CubeParser, ColvarParser (SlowGrowth parser)
+│   ├── utils/              # tests for formats.{cube,bader,cp2k_cell,cp2k_colvar,cp2k_stdout,cp2k_xyz}
+│   │                       #   + structure.{layer,water,cluster} + io._frame_discovery
 │   ├── cli/                # MenuCommand error handling, settings defaults
 │   ├── calibration/        # CalibrationData, Mapper, reference conversion, workflow
 │   ├── charge/             # surface charge, atom charges, tracked charges
@@ -257,7 +257,7 @@ pytest test/
 pytest test/unit/utils/test_water_parser.py
 
 # Specific module tests
-pytest test/unit/utils/test_slowgrowth_parser.py   # ColvarParser tests
+pytest test/unit/utils/test_slowgrowth_parser.py   # cp2k_colvar tests
 pytest test/unit/charge/test_charge_analysis.py     # Bader charge tests
 pytest test/integration/                             # all integration tests
 ```

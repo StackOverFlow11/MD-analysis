@@ -2,7 +2,7 @@
 
 ## Layer dependency
 
-- `md_analysis.potential` depends on `md_analysis.utils` (CubeParser, ClusterUtils, config, `_io_helpers`)
+- `md_analysis.potential` depends on `md_analysis.utils` (formats.cube, structure.cluster, config, `_io_helpers`)
 - `md_analysis.potential` does NOT depend on `md_analysis.water`
 
 ## Module layout
@@ -22,12 +22,12 @@ Two input modes, unified through `PotentialFrame`:
 
 All 5 analysis functions accept `input_mode` parameter (default `"continuous"`) and route to the appropriate discovery function via `_resolve_frames()`. Downstream analysis logic operates on `list[PotentialFrame]` uniformly.
 
-In distributed mode, atoms for interface detection come from the cube file itself (`read_cube_atoms()` in CubeParser), eliminating the need for a separate xyz trajectory.
+In distributed mode, atoms for interface detection come from the cube file itself (`read_cube_atoms()` in formats.cube), eliminating the need for a separate xyz trajectory.
 
 ## Key imports from `utils`
 
-- `discover_cube_files` — 从 `CubeParser` 导入，取代 `CenterPotential.py` 中原有的内联 glob+检查逻辑
-- `_float` — 从 `CubeParser` 导入的 Fortran 浮点解析 helper（私有但跨模块使用），用于解析 md.out 中的数值
+- `discover_cube_files` — 从 `formats.cube` 导入，取代 `CenterPotential.py` 中原有的内联 glob+检查逻辑
+- `_float` — 从 `formats.cube` 导入的 Fortran 浮点解析 helper（私有但跨模块使用），用于解析 md.out 中的数值
 - `_cumulative_average`, `_write_csv` — 从 `utils._io_helpers` 导入的私有共享 helper，取代原有的模块内重复实现
 
 ## Cube file conventions
@@ -38,10 +38,10 @@ In distributed mode, atoms for interface detection come from the cube file itsel
 
 ## Interface detection for slab centering
 
-Delegates to `LayerParser.detect_interface_layers` for metal layer clustering
+Delegates to `structure.layer.detect_interface_layers` for metal layer clustering
 and interface labeling. `_extract_interface_geometry` extracts interface layer
 Cartesian coordinates and water gap midpoint from the `SurfaceDetectionResult`.
-`gap_midpoint_periodic` is still imported directly from `ClusterUtils`.
+`gap_midpoint_periodic` is still imported directly from `structure.cluster`.
 
 ## Electrode potential formula (cSHE)
 
@@ -54,7 +54,7 @@ Constants from `md_analysis.utils.constants`:
 - `MU_HPLUS_G0_EV = 15.81`
 - `DELTA_E_ZP_EV = 0.35`
 
-## slab_average_potential_ev (CubeParser)
+## slab_average_potential_ev (formats.cube)
 
 Core single-frame computation used by `center_slab_potential_analysis` and `thickness_sensitivity_analysis`:
 

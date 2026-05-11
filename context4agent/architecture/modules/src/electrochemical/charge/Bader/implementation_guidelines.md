@@ -28,7 +28,7 @@ Core Bader charge analysis sub-package. Handles surface charge density (two meth
 ## Dependencies
 
 - `utils.formats.bader` (load_bader_atoms)
-- `utils.structure` (LayerParser, WaterParser)
+- `utils.structure` (structure.layer, structure.water)
 - `utils.constants` (AREA_VECTOR_INDICES, AXIS_MAP)
 - `scripts.utils.IndexMapper` (remap_array, read_index_map_from_poscar)
 - `electrochemical.calibration` (optional, for phi extrapolation)

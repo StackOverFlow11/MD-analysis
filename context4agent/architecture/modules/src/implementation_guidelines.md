@@ -52,7 +52,7 @@
 - 禁止反向依赖：子包不应依赖 `md_analysis` 顶层内部状态
 - 禁止跨层耦合：
   - `md_analysis.water`、`md_analysis.electrochemical.potential`、`md_analysis.electrochemical.charge` 之间不互相依赖
-  - 顶层不得感知具体实现文件（如 `WaterParser.py`）
+  - 顶层不得感知具体实现文件（如 `water.py`）
 
 ## 5. 导出变更规则
 

@@ -65,4 +65,4 @@ Fermi 能解析：连续模式 → `engines.cp2k.read_fermi_series(md_out_path)`
 - `discover_cube_files` 的 glob pattern 必须匹配 CP2K 的输出命名（如 `*-HARTREE-*.cube`）
 - 分布式模式下，未完成计算的子目录（无 cube 文件）会被自动跳过（debug 级别日志）
 - 分布式模式下 sp.out 无 `STEP NUMBER` 行（单点计算），`_parse_sp_out_fermi()` 只提取 Fermi 值，step 从目录名获取
-- `read_cube_atoms()` 已从 PhiZProfile 私有函数提升为 CubeParser 公开函数
+- `read_cube_atoms()` 已从 PhiZProfile 私有函数提升为 formats.cube 公开函数
