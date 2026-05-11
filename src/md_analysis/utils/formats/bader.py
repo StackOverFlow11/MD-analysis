@@ -9,7 +9,7 @@ from ase import Atoms
 from ase.io import read as ase_read
 
 
-from ..exceptions import MDAnalysisError
+from ...exceptions import MDAnalysisError
 
 
 class BaderParseError(MDAnalysisError):

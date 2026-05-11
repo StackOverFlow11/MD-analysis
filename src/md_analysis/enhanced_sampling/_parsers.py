@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Callable, Protocol, runtime_checkable
 
 from ..exceptions import MDAnalysisError
-from ..utils.RestartParser.ColvarParser import (
+from ..utils.formats.cp2k_colvar import (
     ColvarRestart,
     LagrangeMultLog,
     parse_colvar_restart,

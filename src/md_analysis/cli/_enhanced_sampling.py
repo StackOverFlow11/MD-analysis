@@ -41,7 +41,7 @@ def _print_sg_info(restart_path: str, log_path: str) -> None:
     from ..utils.constants import AU_TIME_TO_FS
 
     ColvarMDInfo = lazy_import(
-        "md_analysis.utils.RestartParser.ColvarParser", "ColvarMDInfo",
+        "md_analysis.utils.formats.cp2k_colvar", "ColvarMDInfo",
     )
     try:
         info = ColvarMDInfo.from_paths(restart_path, log_path)

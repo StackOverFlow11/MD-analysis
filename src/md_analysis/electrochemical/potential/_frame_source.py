@@ -24,7 +24,7 @@ from typing import Optional
 
 import numpy as np
 
-from ...utils.CubeParser import (
+from ...utils.formats.cube import (
     CubeHeader,
     _float,
     discover_cube_files,

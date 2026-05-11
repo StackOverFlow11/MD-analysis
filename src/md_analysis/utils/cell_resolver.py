@@ -6,7 +6,7 @@ file, or auto-discovery in a work directory).
 
 This module complements the interactive ``CellAbcParam.collect()`` in
 ``cli/_params.py``, which adds retry logic and user prompts.  Both share
-the same underlying parsers from ``RestartParser.CellParser``.
+the same underlying parsers from ``utils.formats.cp2k_cell``.
 """
 
 from __future__ import annotations
@@ -53,7 +53,7 @@ def resolve_cell_abc(
             raise ValueError(f"cell_abc must have 3 elements, got {len(abc)}")
         return abc  # type: ignore[return-value]
 
-    from .RestartParser.CellParser import parse_abc_from_md_inp, parse_abc_from_restart
+    from .formats.cp2k_cell import parse_abc_from_md_inp, parse_abc_from_restart
 
     if restart_path is not None:
         return parse_abc_from_restart(Path(restart_path))
@@ -72,7 +72,7 @@ def resolve_cell_abc(
 
 def _auto_discover(work_dir: Path) -> tuple[float, float, float]:
     """Search *work_dir* for .restart or md.inp files."""
-    from .RestartParser.CellParser import parse_abc_from_md_inp, parse_abc_from_restart
+    from .formats.cp2k_cell import parse_abc_from_md_inp, parse_abc_from_restart
 
     # Prefer .restart (exclude _N.restart checkpoint files)
     for f in sorted(work_dir.glob("*.restart")):

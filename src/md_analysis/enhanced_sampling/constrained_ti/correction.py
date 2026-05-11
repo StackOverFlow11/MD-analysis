@@ -60,7 +60,7 @@ class ConstantPotentialResult:
 
 def _get_electrode_area(bader_dir: Path, normal: str) -> float:
     """Compute electrode surface area from first Bader frame's POSCAR."""
-    from ...utils.BaderParser import load_bader_atoms
+    from ...utils.formats.bader import load_bader_atoms
     from ...electrochemical.charge.config import (
         DEFAULT_ACF_FILENAME,
         DEFAULT_POTCAR_FILENAME,

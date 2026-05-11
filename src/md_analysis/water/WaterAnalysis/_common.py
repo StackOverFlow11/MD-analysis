@@ -41,7 +41,7 @@ from ...utils.StructureParser.WaterParser import (
     detect_water_molecule_indices,
     get_water_oxygen_indices_array,
 )
-from ...utils.RestartParser.CellParser import parse_abc_from_md_inp as _parse_abc_from_md_inp
+from ...utils.formats.cp2k_cell import parse_abc_from_md_inp as _parse_abc_from_md_inp
 from ...utils.constants import (
     DEFAULT_LAYER_TOL_A,
     DEFAULT_Z_BIN_WIDTH_A,

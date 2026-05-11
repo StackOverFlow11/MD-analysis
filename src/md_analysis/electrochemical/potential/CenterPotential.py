@@ -31,7 +31,7 @@ from ...utils.constants import (
     TRANSITION_METAL_SYMBOLS,
 )
 from ...utils._io_helpers import _cumulative_average, _write_csv
-from ...utils.CubeParser import (
+from ...utils.formats.cube import (
     _float,
     discover_cube_files,
     extract_step_from_cube_filename,

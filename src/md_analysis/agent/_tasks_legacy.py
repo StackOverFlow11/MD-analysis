@@ -2296,7 +2296,7 @@ _SLOWGROWTH_QUICK_CONTRACT = TaskContract(
     exceptions=(
         ExceptionMapping(
             exception_fqn=(
-                "md_analysis.utils.RestartParser.ColvarParser.ColvarParseError"
+                "md_analysis.utils.formats.cp2k_colvar.ColvarParseError"
             ),
             triggered_by="Malformed restart or LagrangeMultLog content",
             error_type="validation",

@@ -11,7 +11,7 @@ import numpy as np
 from ase import Atoms
 
 from ....utils._io_helpers import _cumulative_average, _write_csv
-from ....utils.BaderParser import load_bader_atoms
+from ....utils.formats.bader import load_bader_atoms
 from ....utils.constants import (
     AREA_VECTOR_INDICES,
     AXIS_MAP,

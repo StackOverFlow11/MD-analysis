@@ -5,7 +5,7 @@ import directly from the relevant submodule:
 
 - physical constants        -> ``md_analysis.utils.constants``
 - structure / layer parsers -> ``md_analysis.utils.StructureParser.*``
-- cube / bader / restart    -> ``md_analysis.utils.CubeParser`` / ``.BaderParser`` / ``.RestartParser``
+- file format parsers       -> ``md_analysis.utils.formats.{cube,bader,cp2k_cell,cp2k_colvar}``
 
 Rationale: a centralised re-export hub must be kept in sync with every
 submodule change and offers no additional information over a direct

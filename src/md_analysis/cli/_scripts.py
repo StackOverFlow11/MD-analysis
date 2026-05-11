@@ -245,7 +245,7 @@ class BaderBatchCmd(MenuCommand):
 def _print_sg_cv_info(restart_path: str, xyz_path: str) -> None:
     """Display SG trajectory CV range and frame info for TI target selection."""
     parse_colvar_restart = lazy_import(
-        "md_analysis.utils.RestartParser.ColvarParser", "parse_colvar_restart",
+        "md_analysis.utils.formats.cp2k_colvar", "parse_colvar_restart",
     )
     try:
         restart = parse_colvar_restart(restart_path)

@@ -19,7 +19,7 @@ from md_analysis.scripts.TIGen import (
     batch_generate_ti_workdirs,
     generate_ti_workdir,
 )
-from md_analysis.utils.RestartParser.ColvarParser import (
+from md_analysis.utils.formats.cp2k_colvar import (
     ColvarRestart,
     ColvarInfo,
     ConstraintInfo,

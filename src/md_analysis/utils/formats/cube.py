@@ -14,7 +14,7 @@ from typing import Optional
 
 import numpy as np
 
-from .constants import BOHR_TO_ANG, HA_TO_EV
+from ..constants import BOHR_TO_ANG, HA_TO_EV
 
 logger = logging.getLogger(__name__)
 

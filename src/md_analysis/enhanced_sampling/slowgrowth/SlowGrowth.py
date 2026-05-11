@@ -15,7 +15,7 @@ from pathlib import Path
 import numpy as np
 
 from ...utils.constants import AU_TIME_TO_FS
-from ...utils.RestartParser.ColvarParser import ColvarMDInfo
+from ...utils.formats.cp2k_colvar import ColvarMDInfo
 
 
 # ---------------------------------------------------------------------------
@@ -176,7 +176,7 @@ class SlowgrowthFull(Slowgrowth):
             infer_parser,
             resolve_parser,
         )
-        from ...utils.RestartParser.ColvarParser import ColvarMDInfo
+        from ...utils.formats.cp2k_colvar import ColvarMDInfo
 
         directory = Path(directory)
         if parser == "auto":

@@ -678,7 +678,7 @@ def standalone_diagnostics(
     -------
     dict with keys "report", "diagnostics_png", "csv".
     """
-    from ...utils.RestartParser.ColvarParser import ColvarMDInfo
+    from ...utils.formats.cp2k_colvar import ColvarMDInfo
 
     md_info = ColvarMDInfo.from_paths(restart_path, log_path)
     lambda_series = md_info.lagrange.collective_shake

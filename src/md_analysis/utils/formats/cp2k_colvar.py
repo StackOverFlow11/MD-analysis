@@ -9,7 +9,7 @@ from typing import Iterator
 
 import numpy as np
 
-from .CellParser import parse_abc_from_restart
+from .cp2k_cell import parse_abc_from_restart
 
 from ..constants import AU_TIME_TO_FS
 from ...exceptions import MDAnalysisError
@@ -375,7 +375,7 @@ def _parse_multi_constraint_log(
 def parse_colvar_restart(restart_path: str | Path) -> ColvarRestart:
     """Parse COLVAR metadata from a CP2K restart file.
 
-    Reuses :func:`~md_analysis.utils.CellParser.parse_abc_from_restart` for
+    Reuses :func:`~md_analysis.utils.formats.cp2k_cell.parse_abc_from_restart` for
     cell parameters.
     """
     path = Path(restart_path)

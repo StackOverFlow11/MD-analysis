@@ -1,11 +1,11 @@
-"""Tests for md_analysis.utils.BaderParser."""
+"""Tests for md_analysis.utils.formats.bader."""
 
 from pathlib import Path
 
 import numpy as np
 import pytest
 
-from md_analysis.utils.BaderParser import (
+from md_analysis.utils.formats.bader import (
     BaderParseError,
     _read_acf,
     _read_potcar_zval,

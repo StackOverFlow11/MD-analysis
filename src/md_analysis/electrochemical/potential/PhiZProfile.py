@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 from ...utils._io_helpers import _write_csv_from_arrays
 
 from ...utils.constants import BOHR_TO_ANG, DEFAULT_LAYER_TOL_A, TRANSITION_METAL_SYMBOLS
-from ...utils.CubeParser import (
+from ...utils.formats.cube import (
     CubeHeader,
     _float,
     discover_cube_files,

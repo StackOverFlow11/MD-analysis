@@ -15,7 +15,7 @@ from ...exceptions import MDAnalysisError
 
 if TYPE_CHECKING:
     from .._parsers import ConstraintMDParser
-    from ...utils.RestartParser.ColvarParser import ColvarRestart
+    from ...utils.formats.cp2k_colvar import ColvarRestart
 
 # ---------------------------------------------------------------------------
 # Exceptions
