@@ -1,4 +1,4 @@
-"""Tests for utils._frame_discovery shared helpers."""
+"""Tests for utils.io._frame_discovery shared helpers."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from md_analysis.utils._frame_discovery import (
+from md_analysis.utils.io._frame_discovery import (
     FRAME_DIR_STEP_TIME_RE,
     discover_frame_dirs,
     extract_step_time_from_dirname,

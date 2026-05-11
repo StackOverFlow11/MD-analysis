@@ -267,7 +267,7 @@ def write_corrected_free_energy_csv(
     output_dir: Path | None = None,
 ) -> Path:
     """Write corrected free-energy CSV."""
-    from ...utils._io_helpers import _write_csv
+    from ...utils.io._io_helpers import _write_csv
 
     out = Path(output_dir) if output_dir else Path(".")
     out.mkdir(parents=True, exist_ok=True)

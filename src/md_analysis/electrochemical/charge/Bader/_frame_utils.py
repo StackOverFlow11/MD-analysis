@@ -1,6 +1,6 @@
 """Private helpers for discovering and sorting Bader frame directories.
 
-Delegates to the shared :mod:`md_analysis.utils._frame_discovery` helpers.
+Delegates to the shared :mod:`md_analysis.utils.io._frame_discovery` helpers.
 Kept as a thin compatibility layer so that call-sites in ``SurfaceCharge``,
 ``AtomCharges`` and ``BaderData`` continue to import from this module.
 """
@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ....utils._frame_discovery import (
+from ....utils.io._frame_discovery import (
     discover_frame_dirs as _discover_frame_dirs,
     extract_step_time_from_dirname,
 )

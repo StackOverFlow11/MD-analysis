@@ -9,7 +9,7 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-from ..utils._io_helpers import _write_csv_from_arrays
+from ..utils.io._io_helpers import _write_csv_from_arrays
 
 from ._plot import plot_three_panel as _plot_three_panel
 from .config import DEFAULT_ADSORBED_WATER_PROFILE_CSV_NAME

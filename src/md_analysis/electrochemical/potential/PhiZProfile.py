@@ -15,7 +15,7 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-from ...utils._io_helpers import _write_csv_from_arrays
+from ...utils.io._io_helpers import _write_csv_from_arrays
 
 from ...utils.constants import BOHR_TO_ANG, DEFAULT_LAYER_TOL_A, TRANSITION_METAL_SYMBOLS
 from ...utils.formats.cube import (

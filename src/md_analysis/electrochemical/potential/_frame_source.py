@@ -32,7 +32,7 @@ from ...utils.formats.cube import (
     read_cube_atoms,
     read_cube_header_and_values,
 )
-from ...utils._frame_discovery import extract_step_time_from_dirname
+from ...utils.io._frame_discovery import extract_step_time_from_dirname
 from ...utils.constants import (
     BOHR_TO_ANG,
     HA_TO_EV,

@@ -17,7 +17,7 @@ from pathlib import Path
 
 import numpy as np
 
-from ...utils._io_helpers import _write_csv
+from ...utils.io._io_helpers import _write_csv
 from ...utils.constants import HA_TO_EV
 from .SlowGrowth import Slowgrowth, SlowgrowthFull
 from .config import (

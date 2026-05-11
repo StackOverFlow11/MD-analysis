@@ -30,7 +30,7 @@ from ...utils.constants import (
     MU_HPLUS_G0_EV,
     TRANSITION_METAL_SYMBOLS,
 )
-from ...utils._io_helpers import _cumulative_average, _write_csv
+from ...utils.io._io_helpers import _cumulative_average, _write_csv
 from ...utils.formats.cube import (
     _float,
     discover_cube_files,
