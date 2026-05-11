@@ -31,8 +31,18 @@ submodules.
 
 from __future__ import annotations
 
-from .cp2k import CP2KParser
-from .models import ConstraintMetadata, LambdaSeries, PotentialFrame
+from .cp2k import (
+    CP2KParser,
+    read_constraint_metadata,
+    read_fermi_series,
+    read_lambda_series,
+)
+from .models import (
+    ConstraintMetadata,
+    FermiRecord,
+    LambdaSeries,
+    PotentialFrame,
+)
 from .protocols import (
     ConstraintMDParser,
     ParserInferenceError,
@@ -54,9 +64,13 @@ __all__ = [
     "CP2KParser",
     "ConstraintMetadata",
     "LambdaSeries",
+    "FermiRecord",
     "PotentialFrame",
     "register_parser",
     "get_parser",
     "infer_parser",
     "resolve_parser",
+    "read_constraint_metadata",
+    "read_lambda_series",
+    "read_fermi_series",
 ]

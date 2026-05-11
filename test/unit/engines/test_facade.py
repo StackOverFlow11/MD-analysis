@@ -6,7 +6,13 @@ not silently break ``from md_analysis.engines import ...`` consumers.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+TI_POINT = REPO_ROOT / "data_example" / "ti" / "double_cv" / "1k" / "ti_target_0.031369"
+MD_OUT = REPO_ROOT / "data_example" / "potential" / "dense" / "md.out"
 
 
 def test_public_symbols_importable_from_package_root() -> None:
@@ -15,11 +21,15 @@ def test_public_symbols_importable_from_package_root() -> None:
         CP2KParser,
         ConstraintMDParser,
         ConstraintMetadata,
+        FermiRecord,
         LambdaSeries,
         ParserInferenceError,
         PotentialFrame,
         get_parser,
         infer_parser,
+        read_constraint_metadata,
+        read_fermi_series,
+        read_lambda_series,
         register_parser,
         resolve_parser,
     )
@@ -33,10 +43,14 @@ def test_public_symbols_importable_from_package_root() -> None:
     assert PotentialFrame is not None
     assert ConstraintMetadata is not None
     assert LambdaSeries is not None
+    assert FermiRecord is not None
     assert callable(register_parser)
     assert callable(get_parser)
     assert callable(infer_parser)
     assert callable(resolve_parser)
+    assert callable(read_constraint_metadata)
+    assert callable(read_lambda_series)
+    assert callable(read_fermi_series)
 
 
 def test_legacy_dataclass_aliases_resolve_to_renamed_types() -> None:
@@ -96,3 +110,130 @@ def test_explicit_vasp_construction_raises_not_implemented(tmp_path) -> None:
 
     with pytest.raises(NotImplementedError):
         parser.parse_lambda_series(tmp_path)
+
+
+# ---------------------------------------------------------------------------
+# Phase 7b1 — module-level facade behaviour
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.skipif(
+    not TI_POINT.exists(), reason="TI fixture missing"
+)
+def test_read_constraint_metadata_matches_parser() -> None:
+    """The facade must return the same result as the underlying parser."""
+    from md_analysis.engines import (
+        CP2KParser,
+        ConstraintMetadata,
+        read_constraint_metadata,
+    )
+
+    via_facade = read_constraint_metadata(TI_POINT)
+    via_parser = CP2KParser().parse_metadata(TI_POINT)
+
+    assert isinstance(via_facade, ConstraintMetadata)
+    # Values must match exactly — facade is a thin wrapper, not a new pass.
+    assert via_facade.project_name == via_parser.project_name
+    assert via_facade.step_start == via_parser.step_start
+    assert via_facade.timestep_fs == via_parser.timestep_fs
+    assert via_facade.total_steps == via_parser.total_steps
+    assert (
+        via_facade.colvars.primary.target_au
+        == via_parser.colvars.primary.target_au
+    )
+
+
+@pytest.mark.skipif(
+    not TI_POINT.exists(), reason="TI fixture missing"
+)
+def test_read_lambda_series_matches_parser() -> None:
+    """The facade must return the same result as the underlying parser."""
+    import numpy as np
+
+    from md_analysis.engines import (
+        CP2KParser,
+        LambdaSeries,
+        read_lambda_series,
+    )
+
+    via_facade = read_lambda_series(TI_POINT)
+    via_parser = CP2KParser().parse_lambda_series(TI_POINT)
+
+    assert isinstance(via_facade, LambdaSeries)
+    assert via_facade.n_steps == via_parser.n_steps
+    assert via_facade.n_constraints == via_parser.n_constraints
+    np.testing.assert_array_equal(via_facade.shake, via_parser.shake)
+    np.testing.assert_array_equal(via_facade.rattle, via_parser.rattle)
+
+
+def test_read_constraint_metadata_accepts_string_path(tmp_path) -> None:
+    """``str`` paths should work as well as ``Path`` (path-friendly facade)."""
+    from md_analysis.engines import ParserInferenceError, read_constraint_metadata
+
+    # Pointing at an empty directory must raise FileNotFoundError because
+    # CP2KParser._find_restart cannot find a *.restart file there. This
+    # also implicitly verifies that the facade did accept a str argument
+    # without TypeError.
+    with pytest.raises(FileNotFoundError):
+        read_constraint_metadata(str(tmp_path))
+
+
+@pytest.mark.skipif(
+    not MD_OUT.exists(), reason="md.out fixture missing"
+)
+def test_read_fermi_series_returns_typed_records() -> None:
+    """``read_fermi_series`` must yield ``FermiRecord`` instances with the
+    same data as the legacy dict-based parser."""
+    from md_analysis.engines import FermiRecord, read_fermi_series
+    from md_analysis.utils.formats.cp2k_stdout import parse_md_out_fermi
+
+    typed = read_fermi_series(MD_OUT)
+    legacy = parse_md_out_fermi(MD_OUT)
+
+    assert len(typed) == len(legacy)
+    assert all(isinstance(r, FermiRecord) for r in typed)
+
+    # Field-by-field agreement
+    for record, raw in zip(typed, legacy):
+        assert record.step == raw["step"]
+        assert record.time_fs == raw["time_fs"]
+        assert record.fermi_raw == raw["fermi_raw"]
+
+
+def test_parse_md_out_fermi_still_returns_dict() -> None:
+    """The underlying legacy parser MUST keep returning ``list[dict]``;
+    Phase 7b1 intentionally does not migrate ``CenterPotential`` away
+    from dict-style access, so the dict shape must be preserved."""
+    from md_analysis.utils.formats.cp2k_stdout import parse_md_out_fermi
+
+    if not MD_OUT.exists():
+        pytest.skip("md.out fixture missing")
+
+    records = parse_md_out_fermi(MD_OUT)
+    assert isinstance(records, list)
+    if records:
+        first = records[0]
+        assert isinstance(first, dict)
+        assert {"step", "time_fs", "fermi_raw"} <= set(first.keys())
+
+
+def test_fermi_record_from_legacy_dict_round_trip() -> None:
+    """``FermiRecord.from_legacy_dict`` bridges a legacy dict 1-to-1."""
+    from md_analysis.engines import FermiRecord
+
+    d = {"step": 42, "time_fs": 12.5, "fermi_raw": -0.123456}
+    rec = FermiRecord.from_legacy_dict(d)
+
+    assert rec.step == 42
+    assert rec.time_fs == 12.5
+    assert rec.fermi_raw == pytest.approx(-0.123456)
+
+
+def test_fermi_record_handles_none_time_fs() -> None:
+    """``time_fs`` is allowed to be ``None`` (matches legacy dict semantics)."""
+    from md_analysis.engines import FermiRecord
+
+    rec = FermiRecord.from_legacy_dict(
+        {"step": 7, "time_fs": None, "fermi_raw": 0.1}
+    )
+    assert rec.time_fs is None
