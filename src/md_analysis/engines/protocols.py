@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Callable, Protocol, runtime_checkable
 
 from ..exceptions import MDAnalysisError
-from .models import ColvarRestart, LagrangeMultLog
+from .models import ConstraintMetadata, LambdaSeries
 
 
 class ParserInferenceError(MDAnalysisError):
@@ -42,7 +42,7 @@ class ConstraintMDParser(Protocol):
         """
         ...
 
-    def parse_metadata(self, directory: Path) -> ColvarRestart:
+    def parse_metadata(self, directory: Path) -> ConstraintMetadata:
         """Parse engine metadata: timestep, target value, growth rate, etc.
 
         Cheap operation (KB-sized file). Discovery layer uses this to
@@ -50,7 +50,7 @@ class ConstraintMDParser(Protocol):
         """
         ...
 
-    def parse_lambda_series(self, directory: Path) -> LagrangeMultLog:
+    def parse_lambda_series(self, directory: Path) -> LambdaSeries:
         """Parse the Lagrange-multiplier (constraint force) time series.
 
         Heavy operation. Called only when analysis actually needs the data.

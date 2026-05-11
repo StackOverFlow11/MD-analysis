@@ -63,8 +63,15 @@ class ColvarInfo:
 
 
 @dataclass(frozen=True)
-class ColvarRestart:
-    """Metadata parsed from a COLVAR restart file."""
+class ConstraintMetadata:
+    """Metadata parsed from a constraint-MD restart file.
+
+    Engine-neutral payload returned by ``ConstraintMDParser.parse_metadata``.
+    Field set is the historical ``ColvarRestart`` shape (renamed in
+    Phase 5b of the utils/engines refactor); see the module-level
+    ``ColvarRestart`` alias below for backwards-compatible references
+    that will be dropped in a later phase.
+    """
 
     project_name: str
     step_start: int
@@ -78,8 +85,15 @@ class ColvarRestart:
 
 
 @dataclass(frozen=True)
-class LagrangeMultLog:
-    """Lagrange multiplier time series."""
+class LambdaSeries:
+    """Lagrange multiplier (constraint force) time series.
+
+    Engine-neutral payload returned by ``ConstraintMDParser.parse_lambda_series``.
+    Field set is the historical ``LagrangeMultLog`` shape (renamed in
+    Phase 5b); see the module-level ``LagrangeMultLog`` alias below.
+    The ``LagrangeMultLog`` *file suffix* (``*.LagrangeMultLog``) is a
+    CP2K output filename and is NOT renamed.
+    """
 
     shake: np.ndarray
     rattle: np.ndarray
@@ -97,17 +111,26 @@ class LagrangeMultLog:
         return self.rattle if self.n_constraints == 1 else self.rattle[:, 0]
 
 
+# Phase 5b backwards-compatible aliases. The canonical names are
+# ``ConstraintMetadata`` / ``LambdaSeries``; the old names are kept so
+# transitional consumers (tests, the ``enhanced_sampling/_parsers.py``
+# shim, etc.) keep importing without churn. Plan to drop these in the
+# phase that finishes the engines/ migration.
+ColvarRestart = ConstraintMetadata
+LagrangeMultLog = LambdaSeries
+
+
 @dataclass(frozen=True)
 class ColvarMDInfo:
     """Complete slow-growth MD session: restart config + Lagrange multiplier data.
 
-    Combines :class:`ColvarRestart` (input configuration) with
-    :class:`LagrangeMultLog` (output multiplier data) and provides
+    Combines :class:`ConstraintMetadata` (input configuration) with
+    :class:`LambdaSeries` (output multiplier data) and provides
     correctly aligned step/time/target arrays.
     """
 
-    restart: ColvarRestart
-    lagrange: LagrangeMultLog
+    restart: ConstraintMetadata
+    lagrange: LambdaSeries
 
     @property
     def n_steps(self) -> int:
@@ -372,7 +395,7 @@ def _parse_multi_constraint_log(
 # ---------------------------------------------------------------------------
 
 
-def parse_colvar_restart(restart_path: str | Path) -> ColvarRestart:
+def parse_colvar_restart(restart_path: str | Path) -> ConstraintMetadata:
     """Parse COLVAR metadata from a CP2K restart file.
 
     Reuses :func:`~md_analysis.utils.formats.cp2k_cell.parse_abc_from_restart` for
@@ -393,7 +416,7 @@ def parse_colvar_restart(restart_path: str | Path) -> ColvarRestart:
     cell_abc_ang = parse_abc_from_restart(restart_path)
     fixed_atoms = _parse_fixed_atoms_list(text)
 
-    return ColvarRestart(
+    return ConstraintMetadata(
         project_name=proj_match.group(1),
         step_start=md["step_start"],
         time_start_fs=md["time_start_fs"],
@@ -406,7 +429,7 @@ def parse_colvar_restart(restart_path: str | Path) -> ColvarRestart:
     )
 
 
-def parse_lagrange_mult_log(log_path: str | Path) -> LagrangeMultLog:
+def parse_lagrange_mult_log(log_path: str | Path) -> LambdaSeries:
     """Parse a LagrangeMultLog file. Auto-detects single/multi constraint."""
     path = Path(log_path)
     lines = path.read_text(encoding="utf-8").splitlines()
@@ -417,18 +440,18 @@ def parse_lagrange_mult_log(log_path: str | Path) -> LagrangeMultLog:
 
     if fmt == "single":
         shake, rattle, n_steps = _parse_single_constraint_log(lines)
-        return LagrangeMultLog(
+        return LambdaSeries(
             shake=shake, rattle=rattle, n_steps=n_steps, n_constraints=1,
         )
 
     shake, rattle, n_steps, n_constraints = _parse_multi_constraint_log(lines)
-    return LagrangeMultLog(
+    return LambdaSeries(
         shake=shake, rattle=rattle, n_steps=n_steps, n_constraints=n_constraints,
     )
 
 
 def compute_target_series(
-    restart: ColvarRestart,
+    restart: ConstraintMetadata,
     n_steps: int,
     *,
     colvar_id: int | None = None,
@@ -441,7 +464,7 @@ def compute_target_series(
 
     Parameters
     ----------
-    restart : ColvarRestart
+    restart : ConstraintMetadata
         Parsed restart metadata.  ``target_au`` is the target value
         **at** ``step_start`` (the restart snapshot), not the initial value.
     n_steps : int

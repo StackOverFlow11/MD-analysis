@@ -19,7 +19,7 @@ from ..utils.formats.cp2k_colvar import (
     parse_colvar_restart,
     parse_lagrange_mult_log,
 )
-from .models import ColvarRestart, LagrangeMultLog
+from .models import ConstraintMetadata, LambdaSeries
 
 
 class CP2KParser:
@@ -41,10 +41,10 @@ class CP2KParser:
             return False
         return True
 
-    def parse_metadata(self, directory: Path) -> ColvarRestart:
+    def parse_metadata(self, directory: Path) -> ConstraintMetadata:
         return parse_colvar_restart(self._find_restart(directory))
 
-    def parse_lambda_series(self, directory: Path) -> LagrangeMultLog:
+    def parse_lambda_series(self, directory: Path) -> LambdaSeries:
         return parse_lagrange_mult_log(self._find_log(directory))
 
     # ------------------------------------------------------------------

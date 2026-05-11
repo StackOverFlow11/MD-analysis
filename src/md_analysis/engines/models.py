@@ -2,26 +2,28 @@
 
 Frozen dataclasses returned by engine adapter modules
 (``engines.cp2k``, future ``engines.vasp``). Upper analysis layers
-(``electrochemical``, ``enhanced_sampling``, ``water``) should depend on
-these neutral types rather than engine-specific parser output.
+(``electrochemical``, ``enhanced_sampling``, ``water``) depend on these
+neutral types rather than engine-specific parser output.
 
-Phase 5a status
----------------
-This module currently re-uses two existing dataclasses without rename:
+Status (Phase 5b)
+-----------------
+- ``PotentialFrame``      — moved here from ``electrochemical.potential
+                             ._frame_source``; field set unchanged
+- ``ConstraintMetadata``  — canonical name, renamed from
+                             ``ColvarRestart`` in Phase 5b; field set
+                             unchanged
+- ``LambdaSeries``        — canonical name, renamed from
+                             ``LagrangeMultLog`` in Phase 5b; field set
+                             unchanged
 
-- ``PotentialFrame``     — moved here from ``electrochemical.potential
-                            ._frame_source``; field set unchanged
-- ``ColvarRestart``      — re-exported from ``utils.formats.cp2k_colvar``
-                            for transitional convenience; will be
-                            renamed to ``ConstraintMetadata`` in
-                            Phase 5b
-- ``LagrangeMultLog``    — re-exported from ``utils.formats.cp2k_colvar``;
-                            will be renamed to ``LambdaSeries`` in
-                            Phase 5b
+The legacy ``ColvarRestart`` / ``LagrangeMultLog`` names are kept as
+module-level aliases in ``utils.formats.cp2k_colvar`` so the
+``enhanced_sampling/_parsers.py`` shim and existing tests keep working
+during the transition. They will be removed in a later cleanup phase.
 
 Additional neutral types (``ConstraintPoint``, ``ConstraintSet``,
 ``ConstraintRun``, ``FermiRecord``) listed in the refactor plan are
-deferred until concrete consumers exist (Phase 5b / Phase 7).
+deferred until concrete consumers exist (Phase 7 onward).
 """
 
 from __future__ import annotations
@@ -32,10 +34,7 @@ from pathlib import Path
 import numpy as np
 
 from ..utils.formats.cube import CubeHeader
-# Phase 5b will rename these locally:
-#   ColvarRestart    -> ConstraintMetadata
-#   LagrangeMultLog  -> LambdaSeries
-from ..utils.formats.cp2k_colvar import ColvarRestart, LagrangeMultLog
+from ..utils.formats.cp2k_colvar import ConstraintMetadata, LambdaSeries
 
 try:
     from ase import Atoms
@@ -65,6 +64,6 @@ class PotentialFrame:
 
 __all__ = [
     "PotentialFrame",
-    "ColvarRestart",
-    "LagrangeMultLog",
+    "ConstraintMetadata",
+    "LambdaSeries",
 ]

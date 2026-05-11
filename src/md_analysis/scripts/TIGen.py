@@ -13,12 +13,10 @@ from ase import Atoms
 from ase.io import iread, write
 
 from ..config import KEY_CP2K_SCRIPT_PATH, get_config
+from ..engines.models import ConstraintMetadata
 from ..exceptions import MDAnalysisError
 from ..utils.constants import AU_TIME_TO_FS
-from ..utils.formats.cp2k_colvar import (
-    ColvarRestart,
-    parse_colvar_restart,
-)
+from ..utils.formats.cp2k_colvar import parse_colvar_restart
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +71,7 @@ _COORD_FILE_FORMAT_RE = re.compile(
 # ---------------------------------------------------------------------------
 
 
-def _cv_at_step(restart: ColvarRestart, step: int,
+def _cv_at_step(restart: ConstraintMetadata, step: int,
                 colvar_id: int | None = None) -> float:
     """Compute the target CV value (a.u.) at a given absolute step."""
     c = (restart.colvars[colvar_id]
@@ -85,7 +83,7 @@ def _cv_at_step(restart: ColvarRestart, step: int,
 
 def _load_trajectory_cv(
     xyz_path: str | Path,
-    restart: ColvarRestart,
+    restart: ConstraintMetadata,
     colvar_id: int | None = None,
 ) -> list[tuple[int, float, Atoms]]:
     """Load all trajectory frames, returning ``(step, cv_au, atoms)`` triples.
@@ -531,7 +529,7 @@ def generate_ti_workdir(
     workdir_name: str | None = None,
     script_path: str | Path | None = None,
     _preloaded: list[tuple[int, float, Atoms]] | None = None,
-    _restart: ColvarRestart | None = None,
+    _restart: ConstraintMetadata | None = None,
     _inp_text: str | None = None,
 ) -> Path:
     """Create a CP2K constrained-MD work directory for one TI sampling point.

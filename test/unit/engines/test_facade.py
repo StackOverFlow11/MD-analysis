@@ -14,6 +14,8 @@ def test_public_symbols_importable_from_package_root() -> None:
     from md_analysis.engines import (
         CP2KParser,
         ConstraintMDParser,
+        ConstraintMetadata,
+        LambdaSeries,
         ParserInferenceError,
         PotentialFrame,
         get_parser,
@@ -29,10 +31,26 @@ def test_public_symbols_importable_from_package_root() -> None:
     assert ParserInferenceError is not None
     assert CP2KParser is not None
     assert PotentialFrame is not None
+    assert ConstraintMetadata is not None
+    assert LambdaSeries is not None
     assert callable(register_parser)
     assert callable(get_parser)
     assert callable(infer_parser)
     assert callable(resolve_parser)
+
+
+def test_legacy_dataclass_aliases_resolve_to_renamed_types() -> None:
+    """``ColvarRestart`` / ``LagrangeMultLog`` aliases in ``cp2k_colvar``
+    must point at the renamed engines-neutral types so existing imports
+    transparently see the same class (single source of truth)."""
+    from md_analysis.engines import ConstraintMetadata, LambdaSeries
+    from md_analysis.utils.formats.cp2k_colvar import (
+        ColvarRestart,
+        LagrangeMultLog,
+    )
+
+    assert ColvarRestart is ConstraintMetadata
+    assert LagrangeMultLog is LambdaSeries
 
 
 def test_default_registration_makes_cp2k_resolvable() -> None:

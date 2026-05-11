@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .models import ColvarRestart, LagrangeMultLog
+from .models import ConstraintMetadata, LambdaSeries
 
 
 _NOT_IMPLEMENTED_MSG = (
@@ -43,10 +43,10 @@ class VASPParser:
     def is_constraint_directory(self, directory: Path) -> bool:  # noqa: ARG002
         raise NotImplementedError(_NOT_IMPLEMENTED_MSG)
 
-    def parse_metadata(self, directory: Path) -> ColvarRestart:  # noqa: ARG002
+    def parse_metadata(self, directory: Path) -> ConstraintMetadata:  # noqa: ARG002
         raise NotImplementedError(_NOT_IMPLEMENTED_MSG)
 
-    def parse_lambda_series(self, directory: Path) -> LagrangeMultLog:  # noqa: ARG002
+    def parse_lambda_series(self, directory: Path) -> LambdaSeries:  # noqa: ARG002
         raise NotImplementedError(_NOT_IMPLEMENTED_MSG)
 
 
