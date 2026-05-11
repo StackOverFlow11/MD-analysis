@@ -12,7 +12,9 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 TI_POINT = REPO_ROOT / "data_example" / "ti" / "double_cv" / "1k" / "ti_target_0.031369"
-MD_OUT = REPO_ROOT / "data_example" / "potential" / "dense" / "md.out"
+DENSE_DIR = REPO_ROOT / "data_example" / "potential" / "dense"
+MD_OUT = DENSE_DIR / "md.out"
+DISTRIBUTED_DIR = REPO_ROOT / "data_example" / "potential" / "distributed"
 
 
 def test_public_symbols_importable_from_package_root() -> None:
@@ -28,6 +30,8 @@ def test_public_symbols_importable_from_package_root() -> None:
         get_parser,
         infer_parser,
         read_constraint_metadata,
+        read_continuous_potential_frames,
+        read_distributed_potential_frames,
         read_fermi_series,
         read_lambda_series,
         register_parser,
@@ -51,6 +55,8 @@ def test_public_symbols_importable_from_package_root() -> None:
     assert callable(read_constraint_metadata)
     assert callable(read_lambda_series)
     assert callable(read_fermi_series)
+    assert callable(read_continuous_potential_frames)
+    assert callable(read_distributed_potential_frames)
 
 
 def test_legacy_dataclass_aliases_resolve_to_renamed_types() -> None:
@@ -237,3 +243,93 @@ def test_fermi_record_handles_none_time_fs() -> None:
         {"step": 7, "time_fs": None, "fermi_raw": 0.1}
     )
     assert rec.time_fs is None
+
+
+# ---------------------------------------------------------------------------
+# Phase 7b2 — potential-frame facade
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.skipif(
+    not DENSE_DIR.exists() or not MD_OUT.exists(),
+    reason="dense potential fixture missing",
+)
+def test_read_continuous_potential_frames_matches_legacy_wrapper() -> None:
+    """The facade and the legacy thin wrapper must produce the same
+    list of ``PotentialFrame`` objects (same steps, same fermi_raw,
+    same cube paths). This pins the wrapper as a true pass-through."""
+    from md_analysis.electrochemical.potential._frame_source import (
+        discover_continuous_frames,
+    )
+    from md_analysis.engines import read_continuous_potential_frames
+
+    via_facade = read_continuous_potential_frames(
+        "md-POTENTIAL-v_hartree-1_*.cube",
+        workdir=DENSE_DIR,
+        md_out_path=MD_OUT,
+        xyz_path=DENSE_DIR / "md-pos-1.xyz",
+        center_mode="cell",
+    )
+    via_wrapper = discover_continuous_frames(
+        "md-POTENTIAL-v_hartree-1_*.cube",
+        workdir=DENSE_DIR,
+        md_out_path=MD_OUT,
+        xyz_path=DENSE_DIR / "md-pos-1.xyz",
+        center_mode="cell",
+    )
+
+    assert len(via_facade) == len(via_wrapper)
+    for a, b in zip(via_facade, via_wrapper):
+        assert a.step == b.step
+        assert a.cube_path == b.cube_path
+        assert a.fermi_raw == b.fermi_raw
+
+
+@pytest.mark.skipif(
+    not DISTRIBUTED_DIR.exists(),
+    reason="distributed potential fixture missing",
+)
+def test_read_distributed_potential_frames_matches_legacy_wrapper() -> None:
+    """Same parity check for mode B (distributed SP subdirectories)."""
+    from md_analysis.electrochemical.potential._frame_source import (
+        discover_distributed_frames,
+    )
+    from md_analysis.engines import read_distributed_potential_frames
+
+    via_facade = read_distributed_potential_frames(
+        DISTRIBUTED_DIR,
+        center_mode="cell",
+    )
+    via_wrapper = discover_distributed_frames(
+        DISTRIBUTED_DIR,
+        center_mode="cell",
+    )
+
+    assert len(via_facade) == len(via_wrapper)
+    for a, b in zip(via_facade, via_wrapper):
+        assert a.step == b.step
+        assert a.time_fs == b.time_fs
+        assert a.cube_path == b.cube_path
+        assert a.fermi_raw == b.fermi_raw
+
+
+def test_read_distributed_potential_frames_raises_on_missing_root(
+    tmp_path,
+) -> None:
+    """Behaviour preservation: ``FileNotFoundError`` when root_dir doesn't
+    exist, matching the legacy wrapper."""
+    from md_analysis.engines import read_distributed_potential_frames
+
+    with pytest.raises(FileNotFoundError):
+        read_distributed_potential_frames(tmp_path / "missing")
+
+
+def test_read_distributed_potential_frames_raises_on_empty_root(
+    tmp_path,
+) -> None:
+    """Behaviour preservation: ``FileNotFoundError`` when no subdirs
+    match the pattern."""
+    from md_analysis.engines import read_distributed_potential_frames
+
+    with pytest.raises(FileNotFoundError):
+        read_distributed_potential_frames(tmp_path, center_mode="cell")

@@ -34,6 +34,8 @@ from __future__ import annotations
 from .cp2k import (
     CP2KParser,
     read_constraint_metadata,
+    read_continuous_potential_frames,
+    read_distributed_potential_frames,
     read_fermi_series,
     read_lambda_series,
 )
@@ -73,4 +75,6 @@ __all__ = [
     "read_constraint_metadata",
     "read_lambda_series",
     "read_fermi_series",
+    "read_continuous_potential_frames",
+    "read_distributed_potential_frames",
 ]
