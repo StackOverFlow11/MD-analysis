@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import shutil
+from dataclasses import dataclass
 from pathlib import Path
 
 from ase import Atoms
@@ -243,3 +244,186 @@ def batch_generate_sp_workdirs(
         result.append(workdir)
 
     return result
+
+
+# ---------------------------------------------------------------------------
+# Agent-facing batch wrapper: structured report + preflight
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class SpGenBatchReport:
+    """Return value of :func:`generate_sp_batch_with_report`.
+
+    Captures the created directories plus frame metadata so the agent
+    layer can surface MCP metrics without reparsing directory names.
+    """
+
+    workdirs: tuple[Path, ...]
+    n_frames: int
+    frame_indices: tuple[int, ...]
+    steps: tuple[int, ...]
+    times_fs: tuple[float, ...]
+
+    def to_dict(self) -> dict[str, object]:
+        """Return a JSON-serializable view of the report.
+
+        ``workdirs`` is converted to ``list[str]``; numeric fields are
+        coerced to native Python types so ``json.dumps(report.to_dict())``
+        never needs a custom encoder.  Direct ``dataclasses.asdict`` is
+        intentionally **not** supported as a serialization boundary.
+        """
+        return {
+            "workdirs": [str(p) for p in self.workdirs],
+            "n_frames": int(self.n_frames),
+            "frame_indices": [int(v) for v in self.frame_indices],
+            "steps": [int(v) for v in self.steps],
+            "times_fs": [float(v) for v in self.times_fs],
+        }
+
+
+def generate_sp_batch_with_report(
+    xyz_path: str | Path,
+    cell_abc: tuple[float, float, float] | list[float],
+    output_dir: str | Path,
+    *,
+    inp_template_path: str | Path | None = None,
+    mode: str = "index",
+    frame_start: int = 0,
+    frame_end: int | None = None,
+    frame_step: int = 1,
+    time_start_fs: float | None = None,
+    time_end_fs: float | None = None,
+    time_step_fs: float | None = None,
+    script_path: str | Path | None = None,
+    verbose: bool = False,
+) -> SpGenBatchReport:
+    """Batch-generate SP work directories with a structured report.
+
+    Agent-safe wrapper around :func:`batch_generate_sp_workdirs`:
+
+    - Resolves ``inp_template_path`` from ``KEY_DP_SP_INP_TEMPLATE_PATH``
+      when omitted; raises :class:`SpGenError` (``validation``) if neither
+      parameter nor config supplies one.
+    - Resolves ``script_path`` from ``KEY_CP2K_SCRIPT_PATH`` when omitted.
+    - Preflights ``xyz_path``, the resolved template path, and the
+      resolved script path before any trajectory loading or ``mkdir`` so
+      missing files surface uniformly as :class:`FileNotFoundError`
+      (mapped to ``file_not_found``).
+    - Normalises ``cell_abc`` to a length-3 tuple with positive
+      components before loading frames so malformed input fails cheaply.
+    - Returns a :class:`SpGenBatchReport` carrying workdirs plus
+      per-frame metadata (``frame_indices`` / ``steps`` / ``times_fs``)
+      derived from ASE's ``atoms.info`` — **not** from the directory
+      names (which truncate the time to an integer).
+
+    Existing same-name ``sp_t{time}_i{step}/`` directories are
+    **overwritten** for ``init.xyz`` / ``sp.inp`` / ``script.sh``; this
+    mirrors :func:`batch_generate_sp_workdirs` current behaviour.
+    """
+    # 1. Preflight xyz_path before any other work.
+    xyz = Path(xyz_path)
+    if not xyz.is_file():
+        raise FileNotFoundError(f"xyz_path not found or not a file: {xyz}")
+
+    # 2. Resolve inp template (explicit → user config).  Missing → SpGenError.
+    if inp_template_path is None:
+        cfg_val = get_config(KEY_DP_SP_INP_TEMPLATE_PATH)
+        if cfg_val is not None:
+            inp_template_path = cfg_val
+    if inp_template_path is None:
+        raise SpGenError(
+            "No DP SP inp template specified. Provide inp_template_path or "
+            "set it via Settings → Set DP SP Inp Template Path."
+        )
+    tmpl = Path(inp_template_path)
+    if not tmpl.is_file():
+        raise FileNotFoundError(f"DP SP inp template not found: {tmpl}")
+
+    # 3. Resolve script path (explicit → user config).  Missing → FileNotFoundError.
+    if script_path is None:
+        cfg_val = get_config(KEY_CP2K_SCRIPT_PATH)
+        if cfg_val is not None:
+            script_path = cfg_val
+    if script_path is not None:
+        sp = Path(script_path)
+        if not sp.is_file():
+            raise FileNotFoundError(
+                f"Submission script not found: {sp}"
+            )
+
+    # 4. Normalise cell_abc before loading the trajectory.
+    cell = tuple(float(x) for x in cell_abc)
+    if len(cell) != 3:
+        raise ValueError(
+            f"cell_abc must have length 3, got length {len(cell)}"
+        )
+    if any(c <= 0.0 for c in cell):
+        raise ValueError(
+            f"cell_abc components must be positive, got {cell}"
+        )
+
+    # 5. Pre-modify sp.inp text once (cell substitution shared across frames).
+    inp_text = tmpl.read_text(encoding="utf-8")
+    modified_inp = modify_inp_for_sp(inp_text, cell)
+
+    # 6. Collect frames separately to build report metadata without
+    #    reparsing directory names.
+    selection = FrameSelection(
+        mode=mode,  # type: ignore[arg-type]
+        frame_start=frame_start,
+        frame_end=frame_end,
+        frame_step=frame_step,
+        time_start_fs=time_start_fs,
+        time_end_fs=time_end_fs,
+        time_step_fs=time_step_fs,
+    )
+    frames: list[tuple[int, Atoms]] = []
+    for idx, atoms in iter_selected_frames(xyz, selection):
+        atoms.set_cell(cell)
+        atoms.set_pbc(True)
+        frames.append((idx, atoms))
+
+    logger.info(
+        "SP wrapper: %d frames selected from %s (mode=%s)",
+        len(frames), xyz, mode,
+    )
+
+    iterator: list[tuple[int, Atoms]] | object = frames
+    if verbose:
+        from tqdm import tqdm
+        iterator = tqdm(frames, desc="SP workdirs", unit="frame", ascii=" =")
+
+    out_dir = Path(output_dir)
+
+    workdirs: list[Path] = []
+    frame_indices: list[int] = []
+    steps: list[int] = []
+    times_fs: list[float] = []
+
+    for frame_idx, atoms in iterator:
+        step = int(atoms.info.get("i", frame_idx))
+        time_fs = float(atoms.info.get("time", 0.0))
+        workdir_name = f"sp_t{int(time_fs)}_i{step}"
+
+        workdir = out_dir / workdir_name
+        workdir.mkdir(parents=True, exist_ok=True)
+
+        write(str(workdir / "init.xyz"), atoms, format="xyz")
+        (workdir / "sp.inp").write_text(modified_inp, encoding="utf-8")
+
+        if script_path is not None:
+            shutil.copy2(script_path, workdir / "script.sh")
+
+        workdirs.append(workdir)
+        frame_indices.append(int(frame_idx))
+        steps.append(step)
+        times_fs.append(time_fs)
+
+    return SpGenBatchReport(
+        workdirs=tuple(workdirs),
+        n_frames=len(workdirs),
+        frame_indices=tuple(frame_indices),
+        steps=tuple(steps),
+        times_fs=tuple(times_fs),
+    )

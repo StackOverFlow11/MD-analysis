@@ -3,6 +3,7 @@
 Public API
 ----------
 - ``slowgrowth_analysis``          — parse, slice, plot + CSV in one call
+- ``slowgrowth_analysis_with_report`` — same as above + structured report
 - ``plot_slowgrowth_quick``        — quick dual-axis plot with MD-step top axis
 - ``plot_slowgrowth_publication``   — publication-quality dual-axis plot
 - ``write_slowgrowth_csv``         — tabular CSV export
@@ -11,6 +12,7 @@ Public API
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -370,3 +372,134 @@ def slowgrowth_analysis(
         print(f"  {key}: {path}")
 
     return results
+
+
+# ---------------------------------------------------------------------------
+# Agent-facing wrapper: structured report
+# ---------------------------------------------------------------------------
+
+
+_VALID_PLOT_STYLES = frozenset({"quick", "publication", "both"})
+
+
+@dataclass(frozen=True)
+class SlowgrowthAnalysisReport:
+    """Return value of :func:`slowgrowth_analysis_with_report`.
+
+    ``artifacts`` maps artifact-kind keys (``csv``, ``quick_png``,
+    ``publication_png``) to the corresponding on-disk :class:`Path`.
+    """
+
+    artifacts: dict[str, Path]
+    n_steps: int
+    target_start_au: float
+    target_end_au: float
+    delta_F_eV: float
+    delta_F_barrier_eV: float
+    barrier_step: int
+    is_reversed: bool
+
+    def to_dict(self) -> dict[str, object]:
+        """Return a JSON-serializable view.
+
+        ``artifacts`` is converted to ``dict[str, str]`` and numeric
+        fields are coerced to native Python types.  Use this rather than
+        ``dataclasses.asdict`` for serialization.
+        """
+        return {
+            "artifacts": {k: str(v) for k, v in self.artifacts.items()},
+            "n_steps": int(self.n_steps),
+            "target_start_au": float(self.target_start_au),
+            "target_end_au": float(self.target_end_au),
+            "delta_F_eV": float(self.delta_F_eV),
+            "delta_F_barrier_eV": float(self.delta_F_barrier_eV),
+            "barrier_step": int(self.barrier_step),
+            "is_reversed": bool(self.is_reversed),
+        }
+
+
+def slowgrowth_analysis_with_report(
+    restart_path: str,
+    log_path: str,
+    *,
+    initial_step: int = 0,
+    final_step: int | None = None,
+    output_dir: Path | None = None,
+    plot_style: str = "both",
+    colvar_id: int | None = None,
+) -> SlowgrowthAnalysisReport:
+    """Agent-safe wrapper around :func:`slowgrowth_analysis`.
+
+    Produces the same CSV / PNG artifacts but also returns a structured
+    :class:`SlowgrowthAnalysisReport` carrying convergence / barrier
+    metrics.  The plotting / CSV math is unchanged; this wrapper merely
+    computes summary numbers from the selected ``SlowgrowthSegment``.
+
+    Raises
+    ------
+    ValueError
+        If ``plot_style`` is not in ``{"quick", "publication", "both"}``,
+        or if the selected segment is empty (e.g. ``initial_step ==
+        final_step``).  The underlying :func:`slowgrowth_analysis`
+        already tolerates ``plot_style`` mismatches silently, so this
+        wrapper validates explicitly for the agent boundary.
+    """
+    if plot_style not in _VALID_PLOT_STYLES:
+        raise ValueError(
+            f"plot_style must be one of {sorted(_VALID_PLOT_STYLES)!r}, "
+            f"got {plot_style!r}"
+        )
+
+    full = SlowgrowthFull.from_paths(
+        restart_path, log_path, colvar_id=colvar_id,
+    )
+
+    resolved_final = full.n_steps if final_step is None else final_step
+    is_reversed = initial_step > resolved_final
+
+    if is_reversed:
+        pre_rev = full.segment(resolved_final, initial_step)
+        absolute_steps = pre_rev.steps[::-1].copy()
+        seg = pre_rev.reversed()
+    else:
+        seg = full.segment(initial_step, resolved_final)
+        absolute_steps = seg.steps.copy()
+
+    if seg.n_steps == 0:
+        raise ValueError(
+            f"Selected slow-growth segment is empty "
+            f"(initial_step={initial_step}, final_step={final_step})"
+        )
+
+    outdir = (output_dir or Path(".")).resolve()
+    outdir.mkdir(parents=True, exist_ok=True)
+
+    artifacts: dict[str, Path] = {}
+    artifacts["csv"] = write_slowgrowth_csv(seg, output_dir=outdir)
+    if plot_style in ("quick", "both"):
+        artifacts["quick_png"] = plot_slowgrowth_quick(
+            seg, output_dir=outdir, absolute_steps=absolute_steps,
+        )
+    if plot_style in ("publication", "both"):
+        artifacts["publication_png"] = plot_slowgrowth_publication(
+            seg, output_dir=outdir,
+        )
+
+    fe_ev = seg.free_energy_au * HA_TO_EV
+    peak_idx = int(np.nanargmax(fe_ev))
+    # ``absolute_steps`` preserves the original MD step numbering — it is
+    # NOT reset to ``0..N-1`` like ``seg.steps`` after ``reversed()``.
+    barrier_step = int(absolute_steps[peak_idx])
+    delta_F_eV = float(fe_ev[-1] - fe_ev[0])
+    delta_F_barrier_eV = float(np.nanmax(fe_ev) - fe_ev[0])
+
+    return SlowgrowthAnalysisReport(
+        artifacts=artifacts,
+        n_steps=int(seg.n_steps),
+        target_start_au=float(seg.target_au[0]),
+        target_end_au=float(seg.target_au[-1]),
+        delta_F_eV=delta_F_eV,
+        delta_F_barrier_eV=delta_F_barrier_eV,
+        barrier_step=barrier_step,
+        is_reversed=is_reversed,
+    )
