@@ -225,7 +225,7 @@ _TI_FULL_CONTRACT = TaskContract(
         ),
         ExceptionMapping(
             exception_fqn=(
-                "md_analysis.enhanced_sampling._parsers.ParserInferenceError"
+                "md_analysis.engines.protocols.ParserInferenceError"
             ),
             triggered_by=(
                 "parser='auto' but no registered parser recognises any "

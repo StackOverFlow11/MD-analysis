@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from md_analysis.enhanced_sampling._parsers import (
+from md_analysis.engines import (
     CP2KParser,
     ConstraintMDParser,
     ParserInferenceError,
@@ -162,7 +162,7 @@ def test_register_parser_then_infer(tmp_path):
         assert parser.name == "fake_engine"
     finally:
         # Clean up registry to avoid bleed between tests
-        from md_analysis.enhanced_sampling._parsers import _REGISTRY
+        from md_analysis.engines.protocols import _REGISTRY
         _REGISTRY.pop("fake_engine", None)
 
 

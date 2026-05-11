@@ -171,7 +171,7 @@ class SlowgrowthFull(Slowgrowth):
         colvar_id : int, optional
             Which collective variable to use.  Defaults to the primary CV.
         """
-        from .._parsers import (
+        from ...engines import (
             ConstraintMDParser,
             infer_parser,
             resolve_parser,

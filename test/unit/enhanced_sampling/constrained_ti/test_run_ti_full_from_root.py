@@ -82,7 +82,7 @@ class TestRunTIFullInputValidation:
 
     def test_unknown_parser_raises(self, tmp_path):
         (tmp_path / "root").mkdir()
-        from md_analysis.enhanced_sampling._parsers import (
+        from md_analysis.engines import (
             ParserInferenceError,
         )
         with pytest.raises(ParserInferenceError):

@@ -13,12 +13,12 @@ from typing import Callable
 
 import numpy as np
 
-from .._parsers import (
-    _REGISTRY,
+from ...engines import (
     ConstraintMDParser,
     infer_parser,
     resolve_parser,
 )
+from ...engines.protocols import _REGISTRY
 from .models import TIPointDefinition
 
 logger = logging.getLogger(__name__)
