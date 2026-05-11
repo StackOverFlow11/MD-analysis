@@ -19,8 +19,16 @@ placeholders.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from ...engines.models import FermiRecord
+if TYPE_CHECKING:
+    # Type-only forward reference; the canonical home of ``FermiRecord``
+    # is ``md_analysis.engines.models``. Importing at runtime would
+    # invert the architectural direction (``engines`` ->
+    # ``utils/formats``); the TYPE_CHECKING guard keeps the annotations
+    # useful for static analysis without creating a runtime
+    # ``utils/formats`` -> ``engines`` edge.
+    from ...engines.models import FermiRecord
 
 _NOT_IMPLEMENTED_MSG = (
     "VASP OUTCAR parsing is not implemented yet. See "
@@ -29,7 +37,7 @@ _NOT_IMPLEMENTED_MSG = (
 )
 
 
-def parse_outcar_fermi(outcar_path: str | Path) -> list[FermiRecord]:  # noqa: ARG001
+def parse_outcar_fermi(outcar_path: str | Path) -> "list[FermiRecord]":  # noqa: ARG001
     """Parse the per-step Fermi level (Hartree) series from a VASP
     ``OUTCAR`` file.
 

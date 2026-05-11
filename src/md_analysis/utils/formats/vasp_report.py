@@ -28,8 +28,16 @@ default.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from ...engines.models import ConstraintMetadata, LambdaSeries
+if TYPE_CHECKING:
+    # Type-only forward reference; the canonical home of these neutral
+    # dataclasses is ``md_analysis.engines.models``. Importing them at
+    # runtime would invert the architectural direction
+    # (``engines`` -> ``utils/formats``); the TYPE_CHECKING guard keeps
+    # the annotations meaningful for static analysis without creating a
+    # runtime ``utils/formats`` -> ``engines`` edge.
+    from ...engines.models import ConstraintMetadata, LambdaSeries
 
 _NOT_IMPLEMENTED_MSG = (
     "VASP REPORT parsing is not implemented yet. See "
@@ -38,7 +46,7 @@ _NOT_IMPLEMENTED_MSG = (
 )
 
 
-def parse_vasp_report_metadata(report_path: str | Path) -> ConstraintMetadata:  # noqa: ARG001
+def parse_vasp_report_metadata(report_path: str | Path) -> "ConstraintMetadata":  # noqa: ARG001
     """Parse constraint metadata (target / growth / timestep / ...) from
     a VASP ``REPORT`` file.
 
@@ -48,7 +56,7 @@ def parse_vasp_report_metadata(report_path: str | Path) -> ConstraintMetadata:  
     raise NotImplementedError(_NOT_IMPLEMENTED_MSG)
 
 
-def parse_vasp_report_lambda_series(report_path: str | Path) -> LambdaSeries:  # noqa: ARG001
+def parse_vasp_report_lambda_series(report_path: str | Path) -> "LambdaSeries":  # noqa: ARG001
     """Parse the per-step Lagrange-multiplier (constraint force) series
     from a VASP ``REPORT`` file.
 
