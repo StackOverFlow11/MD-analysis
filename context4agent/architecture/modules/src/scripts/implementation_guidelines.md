@@ -22,7 +22,7 @@
 - `tqdm`: optional progress bar for batch generation
 
 ### TIGen
-- `md_analysis.utils.RestartParser.ColvarParser`: `parse_colvar_restart`, `ColvarRestart`
+- `md_analysis.utils.formats.cp2k_colvar`: `parse_colvar_restart`, `ColvarRestart`
 - `md_analysis.utils.constants`: `AU_TIME_TO_FS`
 - `ase.io`: `iread` (trajectory reading), `write` (init.xyz output)
 - `tqdm`: optional progress bar for batch generation

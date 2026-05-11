@@ -110,7 +110,7 @@ md_run/
 ├── md.inp ──────► CellParser ─────► cell_abc (Å)
 ├── md.out ──────► _parse_md_out_fermi (regex) ─────► [(step, time_fs, E_F_au)]
 ├── md-pos-1.xyz ► ASE per-frame iter ──────────────► atoms (incl. cell)
-└── *.cube ──────► CubeParser ──┐
+└── *.cube ──────► formats/cube ──┐
                                  │
    ┌─────────────────────────────┘
    │
@@ -142,7 +142,7 @@ sp_runs/
 └── potential_t<step>_i<frame>/
     ├── sp.out ────────────► fermi via FERMI_RE per directory
     ├── init.xyz ───────────► atoms + cell
-    └── sp-v_hartree-1_0.cube ─► CubeParser
+    └── sp-v_hartree-1_0.cube ─► formats/cube
 
     ↑ 每个目录组装一个 PotentialFrame，按 _t(\d+) 排序
     ↓

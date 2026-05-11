@@ -26,7 +26,7 @@ Interactive CLI package providing a VASPKIT-style numbered menu interface. Repla
 - `cli` -> `enhanced_sampling.slowgrowth` (via `lazy_import` for `slowgrowth_analysis`)
 - `cli` -> `enhanced_sampling.constrained_ti` (via `lazy_import` for `standalone_diagnostics`, `analyze_ti`, `discover_ti_points`, etc.)
 - `cli` -> `utils.CellParser` (for `parse_abc_from_restart`, `parse_abc_from_md_inp`)
-- `cli` -> `utils.RestartParser.ColvarParser` (via `lazy_import` for `ColvarMDInfo`, used by `_enhanced_sampling.py` info display)
+- `cli` -> `utils.formats.cp2k_colvar` (via `lazy_import` for `ColvarMDInfo`, used by `_enhanced_sampling.py` info display)
 - `cli` -> `config` (for persistent user configuration, `CONFIGURABLE_DEFAULTS` registry, and `delete_config`)
 - No reverse dependencies: no other module imports from `cli`
 

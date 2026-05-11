@@ -85,7 +85,7 @@ standalone_diagnostics(restart_path, log_path, *, equilibration=0,
                        auto_equilibration=False) → dict[str, Path | ConstraintPointReport]
 ```
 
-### enhanced_sampling._parsers
+### engines
 
 引擎抽象层（半私有，下划线前缀）。
 

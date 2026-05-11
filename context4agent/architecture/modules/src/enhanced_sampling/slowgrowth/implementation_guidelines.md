@@ -44,9 +44,9 @@ CP2K 输出中 `***` 值由 `ColvarParser._safe_float()` 转换为 `np.nan`。�
 
 ## 依赖
 
-- `utils.RestartParser.ColvarParser`：`ColvarMDInfo`（解析 restart + log）
+- `utils.formats.cp2k_colvar`：`ColvarMDInfo`（解析 restart + log）
 - `utils.constants`：`HA_TO_EV`（Hartree → eV 转换）
-- `utils._io_helpers`：`_write_csv`（CSV 写入）
+- `utils.io._io_helpers`：`_write_csv`（CSV 写入）
 - `matplotlib`：延迟导入（`import matplotlib; matplotlib.use("Agg")`）
 
 ## 绘图细节

@@ -17,9 +17,18 @@ TIGen 工作目录生成在 `scripts/TIGen.py`（不在此包中）。
 | `slowgrowth/` | SG 数据结构、积分、绘图 → `slowgrowth/CLAUDE.md` |
 | `constrained_ti/` | 约束 TI 收敛诊断（ACF + F&P block avg + Geweke） → `constrained_ti/CLAUDE.md` |
 
-## 共享模块
+## Engine 抽象层（Phase 6 接入）
 
-- `_parsers.py`（半私有）：`ConstraintMDParser` Protocol + `CP2KParser` 实现 + `infer_parser` / `register_parser` / `get_parser` / `resolve_parser` + `ParserInferenceError`。这是 engine 抽象层，TI 和 SG 的 IO 层都靠它解耦 CP2K 文件格式假设。新增 engine（如 VASP）= 实现 Protocol 三方法 + `register_parser("vasp", VASPParser)`，下游分析不动。
+约束 MD 的 parser 协议、注册表和 CP2K 实现已经统一搬到 `md_analysis.engines`（详见 `engines/CLAUDE.md`）。SG / TI 的 IO 层直接 import：
+
+```python
+from md_analysis.engines import (
+    ConstraintMDParser, ParserInferenceError,
+    CP2KParser, infer_parser, resolve_parser,
+)
+```
+
+旧的 `enhanced_sampling/_parsers.py` shim 已经在 Phase 6 删除；不要再创建本地 parser 缓存层。新增 engine（如 VASP）= 实现 Protocol 三方法 + `register_parser("vasp", VASPParser)`，下游 TI/SG 分析层不动。
 
 ## SG → TI 的输入数据契约
 
@@ -30,8 +39,8 @@ TIGen 工作目录生成在 `scripts/TIGen.py`（不在此包中）。
 - t₀, step_start（绝对起始时间/步）
 - dξ/dt TARGET_GROWTH（仅 SG 需要；TI 应为 0）
 
-这些通过 `ConstraintMDParser.parse_metadata(directory) → ColvarRestart` 和
-`parse_lambda_series(directory) → LagrangeMultLog` 两个方法返回。
+这些通过 `ConstraintMDParser.parse_metadata(directory) → ConstraintMetadata` 和
+`parse_lambda_series(directory) → LambdaSeries` 两个方法返回（dataclass 在 `engines.models`；Phase 5b 之前的旧名 `ColvarRestart` / `LagrangeMultLog` 仍作为 alias 在 `utils.formats.cp2k_colvar` 暴露，运行时是同一个类）。
 
 ## 慢增长 (SG) → 热力学积分 (TI) 工作流
 

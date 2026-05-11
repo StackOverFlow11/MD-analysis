@@ -5,7 +5,7 @@
 > ⚠️ **utils/engines 重构进行中**（见 `context4agent/requirements/current_reconstructions.md`）。
 > Phase 2-8 期间 `agent` 实现细节会有变动：
 > - `_handlers.py` 已拆分为 `_handler_utils.py` + `_tasks_legacy.py` + `_tasks_ti.py` + `_tasks_scripts.py`
-> - 依赖路径（`utils/RestartParser/CellParser.py` 等）会迁移到 `utils/formats/` 和 `engines/`
+> - 依赖路径（`utils/formats/cp2k_cell.py` 等）会迁移到 `utils/formats/` 和 `engines/`
 > - 本文档下方依赖图与模块结构表将在 Phase 9 集中重写
 
 ## 1. 职责边界
@@ -27,7 +27,7 @@
 
 ```
 agent/ → main.py → water/ | electrochemical/ | enhanced_sampling/
-agent/ → utils/cell_resolver.py → utils/RestartParser/CellParser.py
+agent/ → utils/io/cell_resolver.py → utils/formats/cp2k_cell.py
 agent/ → exceptions.py (MDAnalysisError)
 ```
 

@@ -163,19 +163,33 @@ src/md_analysis/
 │   ├── _constrained_ti.py  #   constrained TI sub-menu (311-313)
 │   ├── _scripts.py         #   scripts/tools sub-menu (411-412, 421-422)
 │   └── _settings.py        #   settings sub-menu (901-909)
-├── utils/                  # single-frame low-level tools
+├── utils/                  # single-frame low-level tools (split into 3 layers)
 │   ├── constants.py        #   physical constants, unit conversions, cSHE parameters, defaults
-│   ├── _io_helpers.py      #   private shared I/O helpers (_cumulative_average, _write_csv)
-│   ├── _frame_discovery.py #   private: frame directory discovery (bader_t*_i* / potential_t*_i*)
-│   ├── CubeParser.py       #   cube file I/O, plane-averaged φ(z), slab-averaged potential
-│   ├── BaderParser.py      #   VASP Bader charge parsing (ACF.dat + POTCAR)
-│   ├── StructureParser/    #   structure analysis sub-package
-│   │   ├── ClusterUtils.py #     1D periodic clustering + gap detection
-│   │   ├── LayerParser.py  #     metal layer detection, interface identification
-│   │   └── WaterParser.py  #     water topology, density/orientation/angle profiles
-│   └── RestartParser/      #   CP2K restart file parsing sub-package
-│       ├── CellParser.py   #     cell parameter parsing (.restart + md.inp)
-│       └── ColvarParser.py #     COLVAR restart + LagrangeMultLog parsing
+│   ├── formats/            #   single-file parsers
+│   │   ├── cube.py         #     cube file I/O, plane-averaged φ(z), slab-averaged potential
+│   │   ├── bader.py        #     VASP Bader charge parsing (ACF.dat + POTCAR)
+│   │   ├── cp2k_cell.py    #     cell parameter parsing (.restart + md.inp)
+│   │   ├── cp2k_colvar.py  #     COLVAR restart + LagrangeMultLog parsing (ConstraintMetadata / LambdaSeries)
+│   │   ├── cp2k_stdout.py  #     md.out / sp.out Fermi-level + step/time parsing
+│   │   ├── cp2k_xyz.py     #     CP2K xyz step-comment parser + per-step Atoms streaming
+│   │   ├── vasp_report.py  #     VASP REPORT placeholder (NotImplementedError)
+│   │   ├── vasp_outcar.py  #     VASP OUTCAR placeholder
+│   │   └── vasp_locpot.py  #     VASP LOCPOT placeholder
+│   ├── structure/          #   geometric / chemical-semantics helpers
+│   │   ├── cluster.py      #     1D periodic clustering + gap detection
+│   │   ├── layer.py        #     metal layer detection, interface identification
+│   │   └── water.py        #     water topology, density/orientation/angle profiles
+│   └── io/                 #   path discovery + IO dispatch
+│       ├── _frame_discovery.py  # private: frame directory discovery (bader_t*_i* / potential_t*_i*)
+│       ├── _io_helpers.py       # private shared I/O helpers (_cumulative_average, _write_csv)
+│       └── cell_resolver.py     # non-interactive cell_abc resolution
+├── engines/                # CP2K / VASP engine facade + neutral dataclasses
+│   ├── __init__.py         #   public facade (Protocol, registry, models, CP2K read_*)
+│   ├── protocols.py        #   ConstraintMDParser Protocol + parser registry
+│   ├── models.py           #   ConstraintMetadata / LambdaSeries / PotentialFrame / FermiRecord
+│   ├── cp2k.py             #   CP2KParser + read_constraint_metadata / read_lambda_series /
+│   │                       #     read_fermi_series / read_continuous|distributed_potential_frames
+│   └── vasp.py             #   VASPParser placeholder (NotImplementedError, NOT auto-registered)
 ├── water/                  # multi-frame water analysis workflows
 │   ├── config.py           #   water analysis defaults + output filename constants
 │   ├── Water.py            #   plot_water_three_panel_analysis() — primary entry point

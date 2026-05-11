@@ -4,6 +4,8 @@
 >
 > 本文档定义 `md_analysis.utils` 的符号级公开接口与暴露边界。
 
+> ⚠️ **Phase 9 部分同步状态**：`utils/` 在 Phase 2-4 重组为 `formats/` / `structure/` / `io/` 三层，对应的导入路径串和子目录引用已在本文档全文做 sed 替换；下方按子模块组织的符号清单（§2 各小节）的章节标题和分组结构尚未按新三层重新排版。开发者请以 `src/md_analysis/utils/CLAUDE.md` 为准；本文档章节结构会在后续清理 pass 中重写。
+
 ## 1. 接口角色定义
 
 - `md_analysis.utils` 是"底层实现能力的直接导入层"。
@@ -49,7 +51,7 @@
   - `CHARGE_METHOD_COUNTERION = "counterion"`
   - `CHARGE_METHOD_LAYER = "layer"`
 
-### 2.2 `StructureParser/ClusterUtils.py` 导出（Stable）
+### 2.2 `structure/cluster.py` 导出（Stable）
 
 函数：
 
@@ -87,7 +89,7 @@
   - 复用已解析的 `CubeHeader` 获取 cell 向量，仅重读原子行
   - 用于分布式电势分析（`_frame_source.py`）和 `PhiZProfile.py` slab 居中
 
-### 2.4 `StructureParser/LayerParser.py` 导出（Stable）
+### 2.4 `structure/layer.py` 导出（Stable）
 
 数据结构与异常：
 
@@ -113,7 +115,7 @@
   - 输入：`SurfaceDetectionResult`
   - 输出：可读文本摘要 `str`
 
-### 2.5 `StructureParser/WaterParser.py` 导出（Stable）
+### 2.5 `structure/water.py` 导出（Stable）
 
 异常：
 
@@ -140,7 +142,7 @@
   - 输出：增强的 `ase.Atoms`，附加 `atoms.arrays["bader_charge"]`（原始电子数）和 `atoms.arrays["bader_net_charge"]`（ZVAL - bader_charge，正值 = 失去电子）
   - 语义：解析 VASP Bader 电荷分析结果，与结构信息合并
 
-### 2.7 `RestartParser/CellParser.py` 导出（Stable）
+### 2.7 `formats/cp2k_cell.py` 导出（Stable）
 
 异常：
 
@@ -164,7 +166,7 @@
 > `_compute_water_orientation_theta_pdf_in_c_fraction_window` 三个函数已降级为内部（`_` 前缀），不再属于公开 API。
 > 它们针对全 cell z 轴分箱，与 `water` 层的界面-到-中点分析语义不同，不适合作为公开接口暴露。
 
-### 2.8 `RestartParser/ColvarParser.py` 导出（Stable）
+### 2.8 `formats/cp2k_colvar.py` 导出（Stable）
 
 异常：
 
@@ -211,25 +213,25 @@
   - 返回：`(a, b, c)` 长度，单位 Angstrom
   - 异常：`ValueError`（所有源都无法确定或 cell_abc 长度不为 3）、`FileNotFoundError`（工作目录无可解析文件）
   - 语义：非交互式纯函数，与 `cli/_params.py` 中的 `CellAbcParam.collect()` 互补（后者有交互式 retry 逻辑）
-  - 内部复用 `RestartParser.CellParser` 的 `parse_abc_from_restart()` / `parse_abc_from_md_inp()`
+  - 内部复用 `formats.cp2k_cell` 的 `parse_abc_from_restart()` / `parse_abc_from_md_inp()`
 
 ## 3. 推荐导入方式
 
 **约定**：`utils/__init__.py` 不 re-export 任何符号，所有调用方必须直接从子模块导入。
 详细规则见 `implementation_guidelines.md` 的"子模块直接导入"约定。
 
-- `from md_analysis.utils.StructureParser.LayerParser import detect_interface_layers, Layer, SurfaceDetectionResult`
-- `from md_analysis.utils.StructureParser.WaterParser import detect_water_molecule_indices, get_water_oxygen_indices_array`
-- `from md_analysis.utils.CubeParser import read_cube_header_and_values, slab_average_potential_ev, discover_cube_files`
+- `from md_analysis.utils.structure.layer import detect_interface_layers, Layer, SurfaceDetectionResult`
+- `from md_analysis.utils.structure.water import detect_water_molecule_indices, get_water_oxygen_indices_array`
+- `from md_analysis.utils.formats.cube import read_cube_header_and_values, slab_average_potential_ev, discover_cube_files`
 - `from md_analysis.utils.constants import DEFAULT_Z_BIN_WIDTH_A, DEFAULT_THETA_BIN_DEG`
 - `from md_analysis.utils.constants import HA_TO_EV, BOHR_TO_ANG, AU_TIME_TO_FS`
 - `from md_analysis.utils.constants import AXIS_MAP, AREA_VECTOR_INDICES`
 - `from md_analysis.utils.constants import INTERFACE_NORMAL_ALIGNED, INTERFACE_NORMAL_OPPOSED`
 - `from md_analysis.utils.constants import CHARGE_METHOD_COUNTERION, CHARGE_METHOD_LAYER`
-- `from md_analysis.utils.BaderParser import load_bader_atoms, BaderParseError`
-- `from md_analysis.utils.RestartParser.CellParser import parse_abc_from_md_inp, parse_abc_from_restart`
-- `from md_analysis.utils.RestartParser import parse_colvar_restart, parse_lagrange_mult_log, ColvarMDInfo`
-- `from md_analysis.utils.cell_resolver import resolve_cell_abc`
+- `from md_analysis.utils.formats.bader import load_bader_atoms, BaderParseError`
+- `from md_analysis.utils.formats.cp2k_cell import parse_abc_from_md_inp, parse_abc_from_restart`
+- `from md_analysis.utils.formats import parse_colvar_restart, parse_lagrange_mult_log, ColvarMDInfo`
+- `from md_analysis.utils.io.cell_resolver import resolve_cell_abc`
 
 ## 4. 非公开边界（必须遵守）
 

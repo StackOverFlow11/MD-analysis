@@ -38,9 +38,31 @@
 | 目录 | 用途 |
 |---|---|
 | `cli/` | 交互式 CLI → `cli/CLAUDE.md` |
-| `agent/` | Agent-friendly 非交互式编程入口（dispatch + JSON Schema + TaskResult） |
-| `utils/` | 底层工具 → `utils/CLAUDE.md` |
+| `agent/` | Agent-friendly 非交互式编程入口（dispatch + JSON Schema + TaskResult）。⚠️ utils/engines 重构期间不作为承诺面 |
+| `engines/` | CP2K/VASP 引擎门面 + engine-neutral dataclass → `engines/CLAUDE.md` |
+| `utils/` | 底层工具（formats / structure / io 三层）→ `utils/CLAUDE.md` |
 | `water/` | 水分析 → `water/CLAUDE.md` |
 | `electrochemical/` | 电化学 → `electrochemical/CLAUDE.md` |
 | `enhanced_sampling/` | 增强采样 → `enhanced_sampling/CLAUDE.md` |
 | `scripts/` | 自动化脚本 → `scripts/CLAUDE.md` |
+
+## 依赖方向（utils/engines 重构后）
+
+```
+cli / scripts / agent
+   ↓
+main.py / workflows (upper)
+   ↓
+water / electrochemical / enhanced_sampling   ← 业务工作流
+   ↓
+engines                                       ← CP2K / VASP 门面 + engine-neutral models
+   ↓
+utils/{formats, structure, io}, constants     ← 单文件解析 + 几何 helper + 路径发现
+   ↓
+exceptions
+```
+
+约束：
+- `engines/` 只允许 import `utils/`、`exceptions` 和自身内部；**不允许**反向 import `electrochemical` / `water` / `enhanced_sampling` / `cli` / `scripts` / `agent`
+- `utils/` 运行时**不**依赖 `engines/`（只允许 `TYPE_CHECKING` 块下的字符串注解）
+- 业务工作流 import `engines.cp2k.read_*` facade，而不是直接走 `utils.formats.cp2k_*`
