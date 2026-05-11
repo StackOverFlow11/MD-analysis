@@ -333,3 +333,72 @@ def test_read_distributed_potential_frames_raises_on_empty_root(
 
     with pytest.raises(FileNotFoundError):
         read_distributed_potential_frames(tmp_path, center_mode="cell")
+
+
+# ---------------------------------------------------------------------------
+# Phase 8 — VASP placeholders
+# ---------------------------------------------------------------------------
+
+
+def test_vasp_report_module_raises_not_implemented(tmp_path) -> None:
+    """``vasp_report`` placeholders must hard-error rather than return a
+    silently-empty default."""
+    from md_analysis.utils.formats.vasp_report import (
+        parse_vasp_report_lambda_series,
+        parse_vasp_report_metadata,
+    )
+
+    fake_report = tmp_path / "REPORT"
+
+    with pytest.raises(NotImplementedError):
+        parse_vasp_report_metadata(fake_report)
+
+    with pytest.raises(NotImplementedError):
+        parse_vasp_report_lambda_series(fake_report)
+
+
+def test_vasp_outcar_module_raises_not_implemented(tmp_path) -> None:
+    """``vasp_outcar.parse_outcar_fermi`` must hard-error."""
+    from md_analysis.utils.formats.vasp_outcar import parse_outcar_fermi
+
+    fake_outcar = tmp_path / "OUTCAR"
+
+    with pytest.raises(NotImplementedError):
+        parse_outcar_fermi(fake_outcar)
+
+
+def test_vasp_locpot_module_raises_not_implemented(tmp_path) -> None:
+    """``vasp_locpot`` placeholders must hard-error."""
+    from md_analysis.utils.formats.vasp_locpot import (
+        read_locpot,
+        read_locpot_plane_avg,
+    )
+
+    fake_locpot = tmp_path / "LOCPOT"
+
+    with pytest.raises(NotImplementedError):
+        read_locpot(fake_locpot)
+
+    with pytest.raises(NotImplementedError):
+        read_locpot_plane_avg(fake_locpot)
+
+
+def test_vasp_format_modules_not_imported_during_auto_discovery(
+    tmp_path,
+) -> None:
+    """A directory containing VASP marker files must NOT be matched by
+    the default ``infer_parser`` — otherwise the placeholder stubs would
+    fire when callers pass ``parser='auto'``.
+
+    Builds a directory that looks like a VASP run (REPORT + OUTCAR +
+    LOCPOT) and verifies ``infer_parser`` raises ``ParserInferenceError``
+    rather than returning a parser that would then crash on use.
+    """
+    from md_analysis.engines import ParserInferenceError, infer_parser
+
+    (tmp_path / "REPORT").write_text("")
+    (tmp_path / "OUTCAR").write_text("")
+    (tmp_path / "LOCPOT").write_text("")
+
+    with pytest.raises(ParserInferenceError):
+        infer_parser(tmp_path)
