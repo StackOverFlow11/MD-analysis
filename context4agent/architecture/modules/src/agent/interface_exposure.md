@@ -4,6 +4,14 @@
 >
 > 本文档定义 `md_analysis.agent` 的符号级公开接口与暴露边界。
 
+> ⚠️ **utils/engines 重构进行中**（见 `context4agent/requirements/current_reconstructions.md`）。
+> Phase 2-8 期间 `agent` 层不作为公开接口承诺面：
+> - `target_fn` 字符串会随模块迁移（`utils/RestartParser` → `utils/formats/cp2k_colvar` 等）同步更新
+> - Phase 5 之后 dataclass 名称会有 rename：`ColvarRestart` → `ConstraintMetadata`、`LagrangeMultLog` → `LambdaSeries`
+> - 本文档下方细节将在 Phase 9 集中重写
+>
+> 重构期间集成请以代码为准，不要基于本文档当前细节做下游对接。
+
 ## 1. 接口角色定义
 
 - `md_analysis.agent` 是面向 AI agent 的非交互式编程入口。

@@ -2,6 +2,12 @@
 
 > 对应代码：`src/md_analysis/agent/`
 
+> ⚠️ **utils/engines 重构进行中**（见 `context4agent/requirements/current_reconstructions.md`）。
+> Phase 2-8 期间 `agent` 实现细节会有变动：
+> - `_handlers.py` 已拆分为 `_handler_utils.py` + `_tasks_legacy.py` + `_tasks_ti.py` + `_tasks_scripts.py`
+> - 依赖路径（`utils/RestartParser/CellParser.py` 等）会迁移到 `utils/formats/` 和 `engines/`
+> - 本文档下方依赖图与模块结构表将在 Phase 9 集中重写
+
 ## 1. 职责边界
 
 - **是**：参数转换（str→Path）、任务注册与分发、JSON Schema 生成、统一异常包装
