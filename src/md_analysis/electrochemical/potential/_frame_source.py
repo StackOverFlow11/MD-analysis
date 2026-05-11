@@ -18,12 +18,12 @@ from __future__ import annotations
 
 import logging
 import re
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
 import numpy as np
 
+from ...engines.models import PotentialFrame
 from ...utils.formats.cube import (
     CubeHeader,
     _float,
@@ -53,17 +53,10 @@ TIME_RE = re.compile(r"TIME\s*\[fs\]\s*=\s*([+-]?\d+(?:\.\d*)?(?:[EeDd][+-]?\d+)
 XYZ_STEP_RE = re.compile(r"\bi\s*=\s*(\d+)\b")
 
 
-@dataclass(frozen=True)
-class PotentialFrame:
-    """One frame of potential analysis data (immutable)."""
-
-    step: int
-    time_fs: float | None
-    cube_path: Path
-    header: CubeHeader
-    values: np.ndarray
-    fermi_raw: float | None  # Hartree; None if unavailable
-    atoms: Atoms | None  # for interface detection (with cell set)
+# ``PotentialFrame`` lives in ``md_analysis.engines.models`` (Phase 5a).
+# It is re-imported above so existing
+# ``from md_analysis.electrochemical.potential._frame_source import PotentialFrame``
+# call sites keep working during the Phase 5/6 migration.
 
 
 # ---------------------------------------------------------------------------
