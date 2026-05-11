@@ -19,17 +19,42 @@ Dependency direction:
 ``engines`` MUST NOT import from ``electrochemical``, ``water``,
 ``enhanced_sampling``, ``scripts``, or ``cli`` (those are upper layers
 that consume engine output).
+
+The public API surface (Protocol + registry + CP2K parser + neutral
+dataclasses) is re-exported here so callers can write::
+
+    from md_analysis.engines import get_parser, infer_parser, PotentialFrame
+
+without reaching into the ``engines.protocols`` / ``engines.models``
+submodules.
 """
 
 from __future__ import annotations
 
-# Triggering imports register the default CP2K parser at package
-# import time so callers can use ``infer_parser`` / ``get_parser("cp2k")``
-# without an explicit registration step.
-from .protocols import register_parser as _register_parser
-from .cp2k import CP2KParser as _CP2KParser
+from .cp2k import CP2KParser
+from .models import PotentialFrame
+from .protocols import (
+    ConstraintMDParser,
+    ParserInferenceError,
+    get_parser,
+    infer_parser,
+    register_parser,
+    resolve_parser,
+)
 
-_register_parser("cp2k", _CP2KParser)
+# Default engine registration (import-time side-effect): every public
+# entry point (``infer_parser``, ``get_parser("cp2k")`` …) sees the CP2K
+# adapter as soon as the package is imported.
+register_parser("cp2k", CP2KParser)
 
 
-__all__: list[str] = []
+__all__ = [
+    "ConstraintMDParser",
+    "ParserInferenceError",
+    "CP2KParser",
+    "PotentialFrame",
+    "register_parser",
+    "get_parser",
+    "infer_parser",
+    "resolve_parser",
+]
