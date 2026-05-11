@@ -12,7 +12,10 @@ restart / md.inp / colvar log, etc.). Modules here:
 
 Consumers should import directly from the relevant submodule, e.g.::
 
-    from md_analysis.utils.formats.cube import read_cube
+    from md_analysis.utils.formats.cube import (
+        read_cube_header_and_values,
+        slab_average_potential_ev,
+    )
     from md_analysis.utils.formats.bader import load_bader_atoms
     from md_analysis.utils.formats.cp2k_cell import parse_abc_from_restart
     from md_analysis.utils.formats.cp2k_colvar import parse_colvar_restart
