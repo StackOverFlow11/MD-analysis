@@ -28,11 +28,11 @@ except ImportError:  # pragma: no cover
     Atoms = object  # type: ignore[misc]
     iread = None  # type: ignore[assignment]
 
-from ...utils.StructureParser.LayerParser import (
+from ...utils.structure.layer import (
     SurfaceGeometryError,
     detect_interface_layers,
 )
-from ...utils.StructureParser.WaterParser import (
+from ...utils.structure.water import (
     AVOGADRO_NUMBER,
     ANGSTROM3_TO_CM3,
     WaterTopologyError,

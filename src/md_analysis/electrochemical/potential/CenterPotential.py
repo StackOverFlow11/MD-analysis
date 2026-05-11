@@ -38,8 +38,8 @@ from ...utils.formats.cube import (
     read_cube_header_and_values,
     slab_average_potential_ev,
 )
-from ...utils.StructureParser.ClusterUtils import gap_midpoint_periodic
-from ...utils.StructureParser.LayerParser import detect_interface_layers
+from ...utils.structure.cluster import gap_midpoint_periodic
+from ...utils.structure.layer import detect_interface_layers
 
 try:
     from ase import Atoms

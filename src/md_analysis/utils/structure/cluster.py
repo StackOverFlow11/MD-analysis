@@ -2,7 +2,7 @@
 
 Provides generic tools for grouping values along a periodic axis
 and identifying the largest inter-cluster gap. Used by
-``LayerParser`` for metal-layer detection and by ``CubeParser`` /
+``layer`` for metal-layer detection and by ``formats.cube`` /
 ``potential`` for interface identification from Cartesian coordinates.
 """
 

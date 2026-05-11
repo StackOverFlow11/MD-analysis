@@ -22,7 +22,7 @@ from md_analysis.electrochemical.charge.Bader.SurfaceCharge import (
 )
 from md_analysis.electrochemical.charge.config import E_PER_A2_TO_UC_PER_CM2
 from md_analysis.utils.formats.bader import load_bader_atoms
-from md_analysis.utils.StructureParser.LayerParser import detect_interface_layers
+from md_analysis.utils.structure.layer import detect_interface_layers
 
 DATA_DIR = Path(__file__).resolve().parents[3] / "data_example" / "bader" / "single_frame"
 

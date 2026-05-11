@@ -11,7 +11,7 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 from ...utils._io_helpers import _write_csv_from_arrays
-from ...utils.StructureParser.WaterParser import (
+from ...utils.structure.water import (
     _compute_bisector_cos_theta_vec,
     _oxygen_to_hydrogen_map,
     _theta_bin_count_from_ndeg,

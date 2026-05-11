@@ -9,14 +9,14 @@ from ..utils.constants import (
     DEFAULT_Z_BIN_WIDTH_A,
     WATER_MOLAR_MASS_G_PER_MOL,
 )
-from ..utils.StructureParser.LayerParser import (
+from ..utils.structure.layer import (
     Layer,
     SurfaceDetectionResult,
     SurfaceGeometryError,
     detect_interface_layers,
     format_detection_summary,
 )
-from ..utils.StructureParser.WaterParser import (
+from ..utils.structure.water import (
     WaterTopologyError,
     detect_water_molecule_indices,
     get_water_oxygen_indices_array,

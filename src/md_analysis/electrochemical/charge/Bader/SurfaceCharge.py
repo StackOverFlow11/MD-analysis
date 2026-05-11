@@ -19,12 +19,12 @@ from ....utils.constants import (
     CHARGE_METHOD_LAYER,
     DEFAULT_LAYER_TOL_A,
 )
-from ....utils.StructureParser.LayerParser import (
+from ....utils.structure.layer import (
     circular_mean_fractional,
     detect_interface_layers,
     mic_delta_fractional,
 )
-from ....utils.StructureParser.WaterParser import detect_water_molecule_indices
+from ....utils.structure.water import detect_water_molecule_indices
 from ..config import (
     DEFAULT_ACF_FILENAME,
     DEFAULT_DIR_PATTERN,

@@ -39,7 +39,7 @@ from ..constants import (
     INTERFACE_NORMAL_ALIGNED,
     INTERFACE_NORMAL_OPPOSED,
 )
-from .ClusterUtils import _circular_mean, cluster_1d_periodic, find_largest_gap_periodic
+from .cluster import _circular_mean, cluster_1d_periodic, find_largest_gap_periodic
 
 
 NormalSpec = Literal["a", "b", "c"] | Sequence[float]
