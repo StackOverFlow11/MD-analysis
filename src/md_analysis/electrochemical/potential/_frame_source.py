@@ -17,13 +17,22 @@ Public API
 from __future__ import annotations
 
 import logging
-import re
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 
 from ...engines.models import PotentialFrame
+from ...utils.formats.cp2k_stdout import (
+    FERMI_RE,
+    STEP_RE,
+    TIME_RE,
+    parse_md_out_fermi as _parse_md_out_fermi,
+    parse_sp_out_fermi as _parse_sp_out_fermi,
+)
+from ...utils.formats.cp2k_xyz import (
+    XYZ_STEP_RE,
+    read_xyz_atoms_for_steps as _read_xyz_atoms_for_steps,
+)
 from ...utils.formats.cube import (
     CubeHeader,
     _float,
@@ -46,122 +55,20 @@ except ImportError:  # pragma: no cover
 
 logger = logging.getLogger(__name__)
 
-# Regex shared with CenterPotential for md.out parsing
-FERMI_RE = re.compile(r"Fermi energy:\s*([+-]?\d+(?:\.\d*)?(?:[EeDd][+-]?\d+)?)")
-STEP_RE = re.compile(r"STEP NUMBER\s*=\s*(\d+)")
-TIME_RE = re.compile(r"TIME\s*\[fs\]\s*=\s*([+-]?\d+(?:\.\d*)?(?:[EeDd][+-]?\d+)?)")
-XYZ_STEP_RE = re.compile(r"\bi\s*=\s*(\d+)\b")
-
 
 # ``PotentialFrame`` lives in ``md_analysis.engines.models`` (Phase 5a).
-# It is re-imported above so existing
-# ``from md_analysis.electrochemical.potential._frame_source import PotentialFrame``
-# call sites keep working during the Phase 5/6 migration.
+# CP2K stdout / xyz parsing primitives (``FERMI_RE`` / ``STEP_RE`` /
+# ``TIME_RE`` / ``XYZ_STEP_RE``, ``_parse_md_out_fermi`` /
+# ``_parse_sp_out_fermi`` / ``_read_xyz_atoms_for_steps``) moved to
+# ``utils.formats.cp2k_stdout`` and ``utils.formats.cp2k_xyz`` in
+# Phase 7a; they are re-imported above under their historical names so
+# existing call sites — and the upcoming ``engines.cp2k`` facade in
+# Phase 7b — keep working unchanged.
 
 
 # ---------------------------------------------------------------------------
 # Mode A: Continuous MD
 # ---------------------------------------------------------------------------
-
-def _parse_md_out_fermi(md_out_path: Path) -> list[dict]:
-    """Parse ``(step, time_fs, fermi_raw)`` records from CP2K md.out."""
-    records: list[dict] = []
-    fermi_pending_raw: Optional[float] = None
-    last_rec: Optional[dict] = None
-
-    with md_out_path.open("r", encoding="utf-8", errors="replace") as f:
-        for line in f:
-            m = FERMI_RE.search(line)
-            if m:
-                fermi_pending_raw = _float(m.group(1))
-                continue
-
-            m = STEP_RE.search(line)
-            if m:
-                step = int(m.group(1))
-                rec = {"step": step, "time_fs": None, "fermi_raw": None}
-                if fermi_pending_raw is not None:
-                    rec["fermi_raw"] = fermi_pending_raw
-                    fermi_pending_raw = None
-                records.append(rec)
-                last_rec = rec
-                continue
-
-            m = TIME_RE.search(line)
-            if m and last_rec is not None and last_rec["time_fs"] is None:
-                last_rec["time_fs"] = _float(m.group(1))
-
-    return [r for r in records if r["fermi_raw"] is not None]
-
-
-def _read_xyz_atoms_for_steps(
-    xyz_path: Path,
-    steps: set[int],
-    *,
-    metal_elements: Optional[set[str]] = None,
-) -> tuple[dict[int, Atoms], set[str]]:
-    """Stream-parse a CP2K xyz trajectory and build Atoms for given steps."""
-    if not xyz_path.exists():
-        raise FileNotFoundError(xyz_path)
-
-    steps = {int(s) for s in steps}
-    out: dict[int, Atoms] = {}
-    inferred_metal: Optional[set[str]] = (
-        set(metal_elements) if metal_elements is not None else None
-    )
-    inferred_done = inferred_metal is not None
-
-    with xyz_path.open("r", encoding="utf-8", errors="replace") as f:
-        while True:
-            natoms_line = f.readline()
-            if not natoms_line:
-                break
-            natoms_line = natoms_line.strip()
-            if not natoms_line:
-                continue
-            try:
-                natoms = int(natoms_line.split()[0])
-            except ValueError:
-                continue
-
-            comment = f.readline()
-            if not comment:
-                break
-            m = XYZ_STEP_RE.search(comment)
-            step = int(m.group(1)) if m else None
-            need_this = (step is not None) and (step in steps)
-
-            need_parse = need_this or not inferred_done
-            if need_parse:
-                symbols: list[str] = []
-                positions: list[list[float]] = []
-                for _ in range(natoms):
-                    line = f.readline()
-                    if not line:
-                        break
-                    parts = line.split()
-                    if len(parts) < 4:
-                        continue
-                    symbols.append(parts[0])
-                    if need_this:
-                        positions.append(
-                            [_float(parts[1]), _float(parts[2]), _float(parts[3])]
-                        )
-
-                if not inferred_done:
-                    inferred_metal = set(symbols) & set(TRANSITION_METAL_SYMBOLS)
-                    inferred_done = True
-
-                if need_this and step is not None:
-                    out[int(step)] = Atoms(symbols=symbols, positions=positions)
-            else:
-                for _ in range(natoms):
-                    if not f.readline():
-                        break
-
-    if inferred_metal is None:
-        inferred_metal = set()
-    return out, inferred_metal
 
 
 def discover_continuous_frames(
@@ -283,19 +190,6 @@ def discover_continuous_frames(
 # ---------------------------------------------------------------------------
 # Mode B: Distributed single-point
 # ---------------------------------------------------------------------------
-
-def _parse_sp_out_fermi(sp_out_path: Path) -> float | None:
-    """Extract the last Fermi energy (Hartree) from a single-point sp.out.
-
-    Returns ``None`` if no ``Fermi energy:`` line is found.
-    """
-    fermi_raw: float | None = None
-    with sp_out_path.open("r", encoding="utf-8", errors="replace") as f:
-        for line in f:
-            m = FERMI_RE.search(line)
-            if m:
-                fermi_raw = _float(m.group(1))
-    return fermi_raw
 
 
 def discover_distributed_frames(

@@ -444,9 +444,9 @@ def fermi_energy_analysis(
     if not md_out_path.exists():
         raise FileNotFoundError(f"md.out not found: {md_out_path}")
 
-    from ._frame_source import _parse_md_out_fermi
+    from ...utils.formats.cp2k_stdout import parse_md_out_fermi
 
-    fermi_records = _parse_md_out_fermi(md_out_path)
+    fermi_records = parse_md_out_fermi(md_out_path)
     if not fermi_records:
         raise RuntimeError(f"No (step, Fermi energy) records parsed from: {md_out_path}")
     fermi_records = fermi_records[frame_start:frame_end:frame_step]
