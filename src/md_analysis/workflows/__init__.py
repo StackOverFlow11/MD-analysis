@@ -15,6 +15,13 @@ from __future__ import annotations
 
 from .calibration import run_calibration_fit, run_calibration_predict
 from .charge import run_counterion_charge, run_surface_charge, run_tracked_charge
+from .enhanced_sampling import (
+    run_slowgrowth_publication_plot,
+    run_slowgrowth_quick_plot,
+    run_ti_constant_potential_correction,
+    run_ti_full_analysis,
+    run_ti_single_diagnostics,
+)
 from .models import MissingArtifactError, WorkflowResult, require_artifacts_exist
 from .potential import run_potential_full
 from .water import run_water_three_panel
@@ -33,4 +40,10 @@ __all__ = [
     # Calibration workflows (Phase 4.1)
     "run_calibration_fit",
     "run_calibration_predict",
+    # Enhanced-sampling workflows (Phase 4.2)
+    "run_slowgrowth_quick_plot",
+    "run_slowgrowth_publication_plot",
+    "run_ti_single_diagnostics",
+    "run_ti_full_analysis",
+    "run_ti_constant_potential_correction",
 ]
