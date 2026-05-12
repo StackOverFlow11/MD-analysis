@@ -190,7 +190,9 @@ class FullPotentialCmd(MenuCommand):
     advanced_params = (outdir, frame_slice)
 
     def execute(self, ctx: dict) -> None:
-        analyze = lazy_import("md_analysis.main", "run_potential_analysis")
+        analyze = lazy_import(
+            "md_analysis.workflows.potential", "run_potential_full",
+        )
 
         kwargs: dict = {
             "output_dir": ctx[K.OUTDIR_RESOLVED],
@@ -222,7 +224,7 @@ class FullPotentialCmd(MenuCommand):
                 md_out = None
             kwargs["md_out_path"] = md_out
 
-        results = analyze(**kwargs)
+        result = analyze(**kwargs)
         print("\n Analysis complete. Outputs:")
-        for name, path in results.items():
+        for name, path in result.artifacts.items():
             print(f"   {name}: {path}")

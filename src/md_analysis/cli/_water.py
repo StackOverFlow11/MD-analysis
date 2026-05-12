@@ -114,8 +114,10 @@ class WaterThreePanelCmd(MenuCommand):
     # output_name inherited from parent MenuGroup("1", output_name="water")
 
     def execute(self, ctx: dict) -> None:
-        analyze = lazy_import("md_analysis.main", "run_water_analysis")
-        results = analyze(
+        analyze = lazy_import(
+            "md_analysis.workflows.water", "run_water_three_panel",
+        )
+        result = analyze(
             xyz_path=Path(ctx[K.XYZ]),
             cell_abc=ctx[K.CELL_ABC],
             output_dir=ctx[K.OUTDIR_RESOLVED],
@@ -127,5 +129,5 @@ class WaterThreePanelCmd(MenuCommand):
             verbose=True,
         )
         print("\n Analysis complete. Outputs:")
-        for name, path in results.items():
+        for name, path in result.artifacts.items():
             print(f"   {name}: {path}")
