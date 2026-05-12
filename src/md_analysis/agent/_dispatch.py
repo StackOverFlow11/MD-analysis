@@ -42,7 +42,7 @@ def dispatch(task: str, params: dict[str, Any] | None = None) -> TaskResult:
     Parameters
     ----------
     task : str
-        Registered task name (e.g. ``"water_three_panel"``).
+        Registered task name (e.g. ``"ti_full_analysis"``).
     params : dict, optional
         Task parameters.  Path-typed values accept plain strings.
 

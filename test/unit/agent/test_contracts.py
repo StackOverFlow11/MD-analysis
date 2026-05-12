@@ -60,16 +60,6 @@ class TestSchemaPublicShape:
         assert required == {"inp_path", "xyz_path", "restart_path", "output_dir"}
 
 
-class TestSchemaNonContractTasksUnchanged:
-    """Legacy (non-contract) tasks must retain the {name, description,
-    parameters} public shape."""
-
-    def test_water_three_panel_still_works(self):
-        s = get_task_schema("water_three_panel")
-        assert set(s.keys()) == {"name", "description", "parameters"}
-        assert s["parameters"]["type"] == "object"
-
-
 class TestListTasksIncludesTiGenBatch:
     def test_ti_gen_batch_registered(self):
         names = [t["name"] for t in list_tasks()]
@@ -79,15 +69,16 @@ class TestListTasksIncludesTiGenBatch:
 class TestHandlerReloadRegression:
     """Batch 0 regression: after splitting _handlers.py into task modules,
     ``_reset_registry()`` + ``reload(_handlers)`` must still produce the
-    full registry (currently 11 after the Phase 3 charge legacy cleanup
-    removed charge_surface / charge_tracked / charge_counterion)."""
+    full registry (currently 8 after Phase 5 Step B removed
+    water_three_panel / potential_full / run_all on top of the Phase 3
+    charge legacy cleanup)."""
 
     def test_reset_then_reload_restores_full_registry(self):
         from md_analysis.agent import _handlers
         from md_analysis.agent._core import _reset_registry
 
         baseline = len(list_tasks())
-        assert baseline == 11
+        assert baseline == 8
         _reset_registry()
         assert len(list_tasks()) == 0
         importlib.reload(_handlers)
@@ -208,7 +199,9 @@ class TestBaderGenBatchSchema:
         assert "bader_gen_batch" in names
         # 14 -> 11 after Phase 3 charge legacy cleanup removed
         # charge_surface / charge_tracked / charge_counterion.
-        assert len(names) == 11
+        # 11 -> 8 after Phase 5 Step B removed water_three_panel /
+        # potential_full / run_all.
+        assert len(names) == 8
 
 
 # ---------------------------------------------------------------------------

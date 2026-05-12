@@ -251,9 +251,10 @@ class TestContractBackedRegistryCount:
     """Batch 5 exit criterion: every registered task is contract-backed.
 
     Headcount was 14 originally; Phase 3 charge legacy cleanup removed
-    ``charge_surface`` / ``charge_tracked`` / ``charge_counterion``,
-    bringing the registry to 11. Further entrance-refactor phases
-    will continue to shrink this number as legacy wrappers are
+    ``charge_surface`` / ``charge_tracked`` / ``charge_counterion``
+    (14 -> 11). Phase 5 Step B then removed ``water_three_panel`` /
+    ``potential_full`` / ``run_all`` (11 -> 8). Further entrance-refactor
+    phases may continue to shrink this number as legacy wrappers are
     consolidated into ``md_analysis.workflows``.
     """
 
@@ -261,7 +262,7 @@ class TestContractBackedRegistryCount:
         from md_analysis.agent._core import _TASK_REGISTRY
         # Exhaustive + registry-size guard, so accidentally unregistering
         # a task or adding a new one without a contract breaks this test.
-        assert len(_TASK_REGISTRY) == 11
+        assert len(_TASK_REGISTRY) == 8
         for name, t in _TASK_REGISTRY.items():
             assert t.contract is not None, (
                 f"task {name!r} is not contract-backed"
