@@ -32,10 +32,11 @@ auto-registered at engines package import).
 | `discover_ti_points(root, *, parser="auto", dir_filter=None, reverse=False, strict=False)` | Discover constraint-point dirs; `parser`="auto" sniffs registered parsers, `dir_filter` is None/glob/callable |
 | `load_ti_series(point_defs)` | Parse Lagrange-multiplier series for each point (metadata is already cached on each `TIPointDefinition`) |
 
-`TIPointDefinition` fields: `directory: Path`, `parser: ConstraintMDParser`,
-`metadata: ColvarRestart`. `xi` is a property derived from
-`metadata.colvars.primary.target_au` — single source of truth, never
-parsed from directory name.
+`TIPointDefinition` fields: `directory: Path`,
+`parser: md_analysis.engines.protocols.ConstraintMDParser`,
+`metadata: md_analysis.engines.models.ConstraintMetadata`. `xi` is a
+property derived from `metadata.colvars.primary.target_au` — single
+source of truth, never parsed from directory name.
 
 ### Plot (plot.py)
 

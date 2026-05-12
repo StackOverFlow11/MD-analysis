@@ -87,14 +87,16 @@ standalone_diagnostics(restart_path, log_path, *, equilibration=0,
 
 ### engines
 
-引擎抽象层（半私有，下划线前缀）。
+引擎抽象层，canonical 位置在 `md_analysis.engines`（不再是早期的
+`enhanced_sampling/_parsers.py` shim — 该 shim 已在 engines 重构中
+删除）。
 
 ```python
 class ConstraintMDParser(Protocol):
     name: str
     def is_constraint_directory(self, directory: Path) -> bool: ...
-    def parse_metadata(self, directory: Path) -> ColvarRestart: ...
-    def parse_lambda_series(self, directory: Path) -> LagrangeMultLog: ...
+    def parse_metadata(self, directory: Path) -> ConstraintMetadata: ...
+    def parse_lambda_series(self, directory: Path) -> LambdaSeries: ...
 
 CP2KParser  # 内置实现（recognises *.restart + *.LagrangeMultLog）
 infer_parser(directory) -> ConstraintMDParser  # sniff 注册的 parser
@@ -102,6 +104,11 @@ register_parser(name, factory)                  # 添加新 engine（如 VASPPar
 get_parser(name) -> ConstraintMDParser
 ParserInferenceError                             # sniff 失败异常
 ```
+
+`ConstraintMetadata` / `LambdaSeries` 是 engine-neutral dataclass（定义
+在 `utils.formats.cp2k_colvar`，由 `engines.models` re-export）；旧名
+`ColvarRestart` / `LagrangeMultLog` 仍在 `utils.formats.cp2k_colvar`
+作为运行时同身的 alias 保留，方便 transitional consumer。
 
 ### constrained_ti.io
 
