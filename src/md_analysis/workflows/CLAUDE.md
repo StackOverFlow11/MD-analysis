@@ -7,7 +7,7 @@
 是同一批名字的薄 re-export facade（79 行 import-only）；CLI / notebook / agent
 handler 都通过本包调用业务流程，业务模块本身不持有 workflow 编排逻辑。
 
-入口重构计划见 `context4agent/requirements/entrance_reconstruction.md`；
+入口重构收尾计划见 `context4agent/requirements/refactor_repair_plan.md`；
 当前共 21 个 `run_*` + `WorkflowResult`，分 8 个子模块。
 
 ## 模块布局

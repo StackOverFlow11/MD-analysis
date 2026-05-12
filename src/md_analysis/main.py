@@ -8,8 +8,8 @@ matches the historical ``from md_analysis.main import ...`` shape).
 
 The legacy ``run_*_analysis`` and ``run_all`` names that previously
 lived here were removed in Phase 7a of the entrance refactor — the
-plan is described in
-``context4agent/requirements/entrance_reconstruction.md``. New code
+completion/repair plan is tracked in
+``context4agent/requirements/refactor_repair_plan.md``. New code
 should depend on either ``md_analysis.workflows`` or this facade,
 not on the removed legacy names.
 

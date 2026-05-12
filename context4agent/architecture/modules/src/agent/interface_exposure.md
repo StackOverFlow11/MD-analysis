@@ -4,13 +4,9 @@
 >
 > 本文档定义 `md_analysis.agent` 的符号级公开接口与暴露边界。
 
-> ⚠️ **utils/engines 重构进行中**（见 `context4agent/requirements/current_reconstructions.md`）。
-> Phase 2-8 期间 `agent` 层不作为公开接口承诺面：
-> - `target_fn` 字符串会随模块迁移（`utils/formats` → `utils/formats/cp2k_colvar` 等）同步更新
-> - Phase 5 之后 dataclass 名称会有 rename：`ColvarRestart` → `ConstraintMetadata`、`LagrangeMultLog` → `LambdaSeries`
-> - 本文档下方细节将在 Phase 9 集中重写
->
-> 重构期间集成请以代码为准，不要基于本文档当前细节做下游对接。
+> ⚠️ **重构主体已完成，剩余收尾见 `context4agent/requirements/refactor_repair_plan.md`。**
+> 当前 `agent` 层保留 contract-backed 任务集合；若后续继续统一 CLI / workflow
+> 表面，请以修补计划中的验收项为准。
 
 ## 1. 接口角色定义
 

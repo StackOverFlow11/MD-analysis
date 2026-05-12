@@ -2,11 +2,9 @@
 
 > 对应代码：`src/md_analysis/agent/`
 
-> ⚠️ **utils/engines 重构进行中**（见 `context4agent/requirements/current_reconstructions.md`）。
-> Phase 2-8 期间 `agent` 实现细节会有变动：
-> - `_handlers.py` 已拆分为 `_handler_utils.py` + `_tasks_legacy.py` + `_tasks_ti.py` + `_tasks_scripts.py`
-> - 依赖路径（`utils/formats/cp2k_cell.py` 等）会迁移到 `utils/formats/` 和 `engines/`
-> - 本文档下方依赖图与模块结构表将在 Phase 9 集中重写
+> ⚠️ **重构主体已完成，剩余收尾见 `context4agent/requirements/refactor_repair_plan.md`。**
+> 当前文档描述的是完成后的 contract-backed agent 实现；后续若继续统一 CLI /
+> workflow 表面，应同步更新本文档。
 
 ## 1. 职责边界
 

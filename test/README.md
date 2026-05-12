@@ -67,12 +67,25 @@ test/
 
 ## Running tests
 
+Two equivalent ways to point pytest at the current working tree:
+
 ```bash
-pip install .          # install package first (not editable)
-pytest test/           # run all tests
-pytest test/unit/      # unit tests only
-pytest test/unit/charge/test_charge_analysis.py -v  # single file
+# Option A — editable install (recommended; PYTHONPATH not needed):
+pip install -e .
+pytest test/
+pytest test/unit/
+pytest test/unit/charge/test_charge_analysis.py -v
+
+# Option B — explicit PYTHONPATH (no install required, useful in CI):
+PYTHONPATH=src pytest test/
+PYTHONPATH=src pytest test/unit/
+PYTHONPATH=src pytest test/unit/charge/test_charge_analysis.py -v
 ```
+
+A plain `pip install .` (non-editable) followed by `pytest` is fragile
+because pytest will import the site-packages copy rather than the
+working tree; if you must use a non-editable install, still prefix
+the test commands with `PYTHONPATH=src`.
 
 ## Conventions
 

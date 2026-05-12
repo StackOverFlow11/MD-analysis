@@ -24,8 +24,8 @@ from .models import ConstraintMetadata, LambdaSeries
 
 _NOT_IMPLEMENTED_MSG = (
     "VASPParser is a placeholder; VASP constraint-MD support is not "
-    "implemented yet. See context4agent/requirements/current_reconstructions.md "
-    "Phase 8 for the roll-out plan."
+    "implemented yet. See context4agent/requirements/refactor_repair_plan.md "
+    "for the VASP extension notes."
 )
 
 

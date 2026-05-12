@@ -10,10 +10,14 @@
 
 ```bash
 pip install numpy matplotlib ase pytest tqdm
-pip install .
+pip install -e .   # editable 安装；开发者推荐
 ```
 
 完成后会有一个 `md-analysis` 命令在你的 PATH 下。
+
+> 如果不想用 editable 安装，可以用 `pip install .` 然后在测试 / 调用脚本时
+> 加 `PYTHONPATH=src` 前缀，让 Python 优先加载工作区源码而不是 site-packages
+> 里的旧版本。
 
 ---
 

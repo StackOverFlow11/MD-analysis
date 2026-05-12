@@ -21,8 +21,8 @@ from pathlib import Path
 
 _NOT_IMPLEMENTED_MSG = (
     "VASP LOCPOT parsing is not implemented yet. See "
-    "context4agent/requirements/current_reconstructions.md Phase 8 for "
-    "the planned rollout."
+    "context4agent/requirements/refactor_repair_plan.md for the planned "
+    "VASP rollout."
 )
 
 

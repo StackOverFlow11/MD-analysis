@@ -8,7 +8,7 @@ are monkey-patched so this test does not depend on the
 ``data_example/potential/`` fixture (which is missing the
 ``md.inp`` file expected by the legacy integration test path —
 this is a pre-existing baseline gap documented in
-``context4agent/requirements/current_reconstructions.md`` and is
+``context4agent/requirements/refactor_repair_plan.md`` and is
 out of scope for the entrance refactor).
 """
 

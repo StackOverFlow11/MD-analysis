@@ -54,8 +54,14 @@ Lightweight analysis utilities for periodic metal-water interfaces from CP2K MD 
 
 ```bash
 pip install numpy matplotlib ase pytest tqdm
-pip install .
+pip install -e .   # editable install — recommended for development;
+                   # without -e, tests may import a stale site-packages copy.
 ```
+
+If you skip the editable install (or use a non-editable `pip install .`),
+prefix every test command with `PYTHONPATH=src` so pytest imports the
+current working tree instead of any older copy installed in your
+environment.
 
 ### CLI (interactive menu)
 
@@ -268,16 +274,20 @@ context4agent/              # architecture contracts, decisions, requirements
 ## Running Tests
 
 ```bash
-# All tests (requires pip install . first)
-pytest test/
+# All tests — prefix with PYTHONPATH=src if you used a non-editable
+# install, otherwise pytest may import a stale site-packages copy:
+PYTHONPATH=src pytest test/
 
 # Single unit test file
-pytest test/unit/utils/test_water_parser.py
+PYTHONPATH=src pytest test/unit/utils/test_water_parser.py
 
 # Specific module tests
-pytest test/unit/utils/test_slowgrowth_parser.py   # cp2k_colvar tests
-pytest test/unit/charge/test_charge_analysis.py     # Bader charge tests
-pytest test/integration/                             # all integration tests
+PYTHONPATH=src pytest test/unit/utils/test_slowgrowth_parser.py   # cp2k_colvar tests
+PYTHONPATH=src pytest test/unit/charge/test_charge_analysis.py     # Bader charge tests
+PYTHONPATH=src pytest test/integration/                             # all integration tests
+
+# With an editable install (`pip install -e .`) the PYTHONPATH=src
+# prefix is unnecessary.
 ```
 
 ## Architecture Notes

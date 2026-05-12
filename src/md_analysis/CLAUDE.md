@@ -15,7 +15,7 @@
 - **NullHandler**：`__init__.py` 在 `md_analysis` logger 上设置 `NullHandler()`（PEP 282），CLI 或应用程序负责配置实际 handler
 - **异常层次**：所有领域异常继承 `MDAnalysisError`（在 `exceptions.py` 定义），调用方可 `except MDAnalysisError` 统一捕获
 - **编程入口**：`workflows/` 提供 21 个 `run_*()` 函数，全部返回 `WorkflowResult`（`artifacts` / `metadata` / `extra`）。`main.py` 是同一批名字的薄 re-export facade（79 行 import-only）。完整清单参见 `workflows/CLAUDE.md`；composite `run_interface_analysis` 取代旧 `run_all`。
-- **Agent 入口**：`agent/` 提供 `dispatch(task, params)` 统一调度、`get_task_schema()` 自动 JSON Schema、`list_tasks()` 任务枚举，并提供 Tools-layer 结构化契约（`_contracts.py`：`FieldSpec` / `ExceptionMapping` / `TaskContract`，双出口 `to_agent_schema` / `to_mcp_tool_schema`）。薄适配层，不含分析逻辑。入口重构 Phase 3 / 5B 删了 6 个 legacy task（water_three_panel / potential_full / charge_*×3 / run_all），剩余 8 个任务**全部带完整 `TaskContract`**。⚠️ **入口重构进行中**（`context4agent/requirements/entrance_reconstruction.md`）：`agent` 暂不作为稳定承诺面，Phase 7 / 8 完成后做整体 review 再恢复 stable 承诺。
+- **Agent 入口**：`agent/` 提供 `dispatch(task, params)` 统一调度、`get_task_schema()` 自动 JSON Schema、`list_tasks()` 任务枚举，并提供 Tools-layer 结构化契约（`_contracts.py`：`FieldSpec` / `ExceptionMapping` / `TaskContract`，双出口 `to_agent_schema` / `to_mcp_tool_schema`）。薄适配层，不含分析逻辑。入口重构 Phase 3 / 5B 删了 6 个 legacy task（water_three_panel / potential_full / charge_*×3 / run_all），剩余 8 个任务**全部带完整 `TaskContract`**。重构主体已完成；剩余测试、文档和 CLI 表面收尾见 `context4agent/requirements/refactor_repair_plan.md`。
 - **`run_*` 目录契约**：每个 `run_*()` 的 `output_dir` 参数即**最终写入目录**（不再自动前置 `water/`、`electrochemical/potential/` 等），仅保留必要的内部子目录（如 surface charge 的 `<method>/`）。调用方需自行提供完整路径；`run_interface_analysis` 会按下述标准布局分派路径。
 - **标准输出目录结构**（`run_interface_analysis` 以及 CLI 菜单路径均按此推导）：
   - `<outdir>/water/`
