@@ -24,6 +24,16 @@ from .enhanced_sampling import (
 )
 from .models import MissingArtifactError, WorkflowResult, require_artifacts_exist
 from .potential import run_potential_full
+from .scripts import (
+    run_bader_batch,
+    run_bader_single,
+    run_potential_batch,
+    run_potential_single,
+    run_sp_batch,
+    run_sp_single,
+    run_ti_batch,
+    run_ti_single,
+)
 from .water import run_water_three_panel
 
 __all__ = [
@@ -46,4 +56,13 @@ __all__ = [
     "run_ti_single_diagnostics",
     "run_ti_full_analysis",
     "run_ti_constant_potential_correction",
+    # Scripts / work-directory generators (Phase 4.3)
+    "run_bader_single",
+    "run_bader_batch",
+    "run_ti_single",
+    "run_ti_batch",
+    "run_potential_single",
+    "run_potential_batch",
+    "run_sp_single",
+    "run_sp_batch",
 ]
