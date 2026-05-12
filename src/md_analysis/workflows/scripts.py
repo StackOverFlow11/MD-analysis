@@ -99,9 +99,11 @@ def _flatten_workdirs_to_artifacts(
 ) -> dict[str, Path]:
     """Pack a sequence of generated workdirs into the flat artifact map.
 
-    Keys are stable, zero-padded ``workdir_<i>`` so ``require_artifacts_exist``
+    Keys are stable, indexed ``workdir_<i>`` (no zero-padding; ``i``
+    is the decimal enumeration index) so ``require_artifacts_exist``
     failures can be cross-referenced with ``metadata["workdir_paths"]``
-    by index.
+    by index. Callers that need lexicographic sort order should sort
+    by ``metadata["workdir_paths"]`` index, not by stringified key.
     """
     return {f"workdir_{i}": Path(w) for i, w in enumerate(workdirs)}
 
