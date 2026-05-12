@@ -13,10 +13,20 @@ for backwards compatibility; new code should prefer the explicit
 
 from __future__ import annotations
 
+from .charge import run_counterion_charge, run_surface_charge, run_tracked_charge
 from .models import MissingArtifactError, WorkflowResult, require_artifacts_exist
+from .potential import run_potential_full
+from .water import run_water_three_panel
 
 __all__ = [
+    # Models
     "MissingArtifactError",
     "WorkflowResult",
     "require_artifacts_exist",
+    # Leaf workflows (Phase 2)
+    "run_water_three_panel",
+    "run_potential_full",
+    "run_surface_charge",
+    "run_tracked_charge",
+    "run_counterion_charge",
 ]

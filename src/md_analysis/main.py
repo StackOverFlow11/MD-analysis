@@ -42,32 +42,18 @@ def run_water_analysis(
 ) -> dict[str, Path]:
     """Run water analysis (three-panel plot + CSVs).
 
-    All outputs are written directly into *output_dir*. Callers that want
-    the canonical ``<root>/water/`` layout should pass
-    ``output_dir=<root> / "water"`` (``run_all`` does this automatically).
-
-    Returns a dict mapping output names to file paths.
+    Thin shim around
+    :func:`md_analysis.workflows.water.run_water_three_panel`; returns
+    ``dict[str, Path]`` for backwards compatibility. New code should
+    prefer the workflow function, which returns ``WorkflowResult``.
     """
-    logger.info("Starting water analysis: xyz=%s, output_dir=%s", xyz_path, output_dir)
+    from .workflows.water import run_water_three_panel
 
-    from .water import plot_water_three_panel_analysis
-    from .water.config import (
-        DEFAULT_WATER_MASS_DENSITY_CSV_NAME,
-        DEFAULT_WATER_ORIENTATION_WEIGHTED_DENSITY_CSV_NAME,
-        DEFAULT_ADSORBED_WATER_PROFILE_CSV_NAME,
-        DEFAULT_ADSORBED_WATER_RANGE_TXT_NAME,
-        DEFAULT_ADSORBED_WATER_THETA_DISTRIBUTION_CSV_NAME,
-        DEFAULT_WATER_THREE_PANEL_PLOT_PNG_NAME,
-    )
-
-    water_dir = Path(output_dir)
-    water_dir.mkdir(parents=True, exist_ok=True)
-
-    png_path = plot_water_three_panel_analysis(
-        xyz_path=xyz_path,
-        md_inp_path=md_inp_path,
+    result = run_water_three_panel(
+        xyz_path,
+        md_inp_path,
         cell_abc=cell_abc,
-        output_dir=water_dir,
+        output_dir=output_dir,
         layer_tol_A=layer_tol_A,
         frame_start=frame_start,
         frame_end=frame_end,
@@ -75,15 +61,7 @@ def run_water_analysis(
         verbose=verbose,
         **kwargs,
     )
-
-    return {
-        "density_csv": water_dir / DEFAULT_WATER_MASS_DENSITY_CSV_NAME,
-        "orientation_csv": water_dir / DEFAULT_WATER_ORIENTATION_WEIGHTED_DENSITY_CSV_NAME,
-        "adsorbed_profile_csv": water_dir / DEFAULT_ADSORBED_WATER_PROFILE_CSV_NAME,
-        "adsorbed_range_txt": water_dir / DEFAULT_ADSORBED_WATER_RANGE_TXT_NAME,
-        "adsorbed_theta_csv": water_dir / DEFAULT_ADSORBED_WATER_THETA_DISTRIBUTION_CSV_NAME,
-        "plot_png": png_path,
-    }
+    return dict(result.artifacts)
 
 
 def run_potential_analysis(
@@ -114,133 +92,38 @@ def run_potential_analysis(
 ) -> dict[str, Path]:
     """Run all potential analysis workflows.
 
-    Per-sub-analysis outputs are written into ``output_dir/<sub>/`` where
-    ``<sub>`` is ``center``/``fermi``/``electrode``/``phi_z``/``thickness_sensitivity``.
-    Callers that want the canonical ``<root>/electrochemical/potential/``
-    layout should pass ``output_dir=<root> / "electrochemical" / "potential"``
-    (``run_all`` does this automatically).
-
-    Returns a dict mapping output names to file paths.
+    Thin shim around
+    :func:`md_analysis.workflows.potential.run_potential_full`; returns
+    ``dict[str, Path]`` for backwards compatibility. New code should
+    prefer the workflow function, which returns ``WorkflowResult``.
     """
-    logger.info("Starting potential analysis: output_dir=%s", output_dir)
+    from .workflows.potential import run_potential_full
 
-    from .electrochemical.potential import (
-        center_slab_potential_analysis,
-        fermi_energy_analysis,
-        electrode_potential_analysis,
-        phi_z_planeavg_analysis,
-        thickness_sensitivity_analysis,
+    result = run_potential_full(
+        output_dir=output_dir,
+        cube_pattern=cube_pattern,
+        md_out_path=md_out_path,
+        xyz_path=xyz_path,
+        thickness_ang=thickness_ang,
+        center_mode=center_mode,
+        metal_elements=metal_elements,
+        layer_tol_ang=layer_tol_ang,
+        fermi_unit=fermi_unit,
+        compute_u=compute_u,
+        compute_phi_z=compute_phi_z,
+        max_curves=max_curves,
+        thickness_end=thickness_end,
+        frame_start=frame_start,
+        frame_end=frame_end,
+        frame_step=frame_step,
+        verbose=verbose,
+        input_mode=input_mode,
+        sp_root_dir=sp_root_dir,
+        sp_dir_pattern=sp_dir_pattern,
+        sp_cube_filename=sp_cube_filename,
+        sp_out_filename=sp_out_filename,
     )
-
-    pot_dir = Path(output_dir)
-    results: dict[str, Path] = {}
-
-    # Shared distributed-mode kwargs
-    _dist = {
-        "input_mode": input_mode,
-        "sp_root_dir": sp_root_dir,
-        "sp_dir_pattern": sp_dir_pattern,
-        "sp_cube_filename": sp_cube_filename,
-        "sp_out_filename": sp_out_filename,
-    }
-    is_distributed = input_mode == "distributed"
-
-    # In distributed mode, Fermi data comes from sp.out in each subdir
-    has_fermi = is_distributed or md_out_path is not None
-
-    if compute_u and has_fermi:
-        # Full electrode potential analysis (includes center + fermi)
-        electrode_dir = pot_dir / "electrode"
-        electrode_dir.mkdir(parents=True, exist_ok=True)
-        u_csv = electrode_potential_analysis(
-            cube_pattern,
-            md_out_path,
-            output_dir=electrode_dir,
-            thickness_ang=thickness_ang,
-            center_mode=center_mode,
-            xyz_path=xyz_path,
-            metal_elements=metal_elements,
-            layer_tol_ang=layer_tol_ang,
-            fermi_unit=fermi_unit,
-            frame_start=frame_start,
-            frame_end=frame_end,
-            frame_step=frame_step,
-            verbose=verbose,
-            **_dist,
-        )
-        results["electrode_csv"] = u_csv
-    else:
-        # Run individually
-        center_dir = pot_dir / "center"
-        center_dir.mkdir(parents=True, exist_ok=True)
-        center_csv = center_slab_potential_analysis(
-            cube_pattern,
-            output_dir=center_dir,
-            thickness_ang=thickness_ang,
-            center_mode=center_mode,
-            xyz_path=xyz_path,
-            metal_elements=metal_elements,
-            layer_tol_ang=layer_tol_ang,
-            frame_start=frame_start,
-            frame_end=frame_end,
-            frame_step=frame_step,
-            verbose=verbose,
-            **_dist,
-        )
-        results["center_csv"] = center_csv
-
-        if md_out_path is not None:
-            fermi_dir = pot_dir / "fermi"
-            fermi_dir.mkdir(parents=True, exist_ok=True)
-            fermi_csv = fermi_energy_analysis(
-                md_out_path,
-                output_dir=fermi_dir,
-                fermi_unit=fermi_unit,
-                frame_start=frame_start,
-                frame_end=frame_end,
-                frame_step=frame_step,
-                **_dist,
-            )
-            results["fermi_csv"] = fermi_csv
-
-    if compute_phi_z:
-        phi_z_dir = pot_dir / "phi_z"
-        phi_z_dir.mkdir(parents=True, exist_ok=True)
-        phi_z_png = phi_z_planeavg_analysis(
-            cube_pattern,
-            output_dir=phi_z_dir,
-            max_curves=max_curves,
-            frame_start=frame_start,
-            frame_end=frame_end,
-            frame_step=frame_step,
-            verbose=verbose,
-            **_dist,
-        )
-        results["phi_z_png"] = phi_z_png
-
-    # Thickness sensitivity sweep
-    if has_fermi:
-        ts_dir = pot_dir / "thickness_sensitivity"
-        ts_dir.mkdir(parents=True, exist_ok=True)
-        ts_csv = thickness_sensitivity_analysis(
-            cube_pattern,
-            md_out_path,
-            output_dir=ts_dir,
-            thickness_end=thickness_end,
-            center_mode=center_mode,
-            xyz_path=xyz_path,
-            metal_elements=metal_elements,
-            layer_tol_ang=layer_tol_ang,
-            fermi_unit=fermi_unit,
-            frame_start=frame_start,
-            frame_end=frame_end,
-            frame_step=frame_step,
-            verbose=verbose,
-            **_dist,
-        )
-        results["thickness_sensitivity_csv"] = ts_csv
-
-    return results
+    return dict(result.artifacts)
 
 
 def run_charge_analysis(
@@ -260,44 +143,28 @@ def run_charge_analysis(
 ) -> dict[str, Path]:
     """Run surface charge density analysis (CSV + PNG).
 
-    Outputs are written into ``output_dir/<method>/`` (the method sub-dir
-    is mandatory so aligned/counterion/layer runs don't collide). Callers
-    that want the canonical ``<root>/electrochemical/charge/<method>/``
-    layout should pass ``output_dir=<root> / "electrochemical" / "charge"``
-    (``run_all`` does this automatically).
-
-    Returns a dict mapping output names to file paths.
+    Thin shim around
+    :func:`md_analysis.workflows.charge.run_surface_charge`; returns
+    ``dict[str, Path]`` for backwards compatibility. New code should
+    prefer the workflow function, which returns ``WorkflowResult``.
     """
-    logger.info("Starting charge analysis: method=%s, output_dir=%s", method, output_dir)
+    from .workflows.charge import run_surface_charge
 
-    from .electrochemical.charge import surface_charge_analysis
-    from .electrochemical.charge.config import (
-        DEFAULT_SURFACE_CHARGE_CSV_NAME,
-        DEFAULT_SURFACE_CHARGE_PNG_NAME,
-    )
-
-    charge_dir = Path(output_dir) / method
-    charge_dir.mkdir(parents=True, exist_ok=True)
-
-    result = surface_charge_analysis(
-        root_dir,
+    result = run_surface_charge(
+        output_dir=output_dir,
+        root_dir=root_dir,
         metal_symbols=metal_symbols,
         normal=normal,
         method=method,
         layer_tol_A=layer_tol_A,
         n_surface_layers=n_surface_layers,
         dir_pattern=dir_pattern,
-        output_dir=charge_dir,
         frame_start=frame_start,
         frame_end=frame_end,
         frame_step=frame_step,
         verbose=verbose,
     )
-
-    return {
-        "charge_csv": result.csv_path,
-        "charge_png": result.csv_path.parent / DEFAULT_SURFACE_CHARGE_PNG_NAME,
-    }
+    return dict(result.artifacts)
 
 
 def run_tracked_charge_analysis(
@@ -313,39 +180,24 @@ def run_tracked_charge_analysis(
 ) -> dict[str, Path]:
     """Track Bader net charges for specified XYZ atoms (CSV + PNG).
 
-    Outputs are written into ``output_dir/tracked/``. Callers that want
-    the canonical ``<root>/electrochemical/charge/tracked/`` layout should
-    pass ``output_dir=<root> / "electrochemical" / "charge"`` (``run_all``
-    does this automatically).
-
-    Returns a dict mapping output names to file paths.
+    Thin shim around
+    :func:`md_analysis.workflows.charge.run_tracked_charge`; returns
+    ``dict[str, Path]`` for backwards compatibility. New code should
+    prefer the workflow function, which returns ``WorkflowResult``.
     """
-    logger.info("Starting tracked charge analysis: output_dir=%s", output_dir)
+    from .workflows.charge import run_tracked_charge
 
-    from .electrochemical.charge import tracked_atom_charge_analysis
-    from .electrochemical.charge.Bader.AtomCharges import (
-        DEFAULT_TRACKED_CHARGE_CSV,
-        DEFAULT_TRACKED_CHARGE_PNG,
-    )
-
-    tracked_dir = Path(output_dir) / "tracked"
-    tracked_dir.mkdir(parents=True, exist_ok=True)
-
-    csv_path = tracked_atom_charge_analysis(
-        root_dir,
+    result = run_tracked_charge(
+        output_dir=output_dir,
+        root_dir=root_dir,
         atom_indices_xyz=atom_indices_xyz,
         dir_pattern=dir_pattern,
-        output_dir=tracked_dir,
         frame_start=frame_start,
         frame_end=frame_end,
         frame_step=frame_step,
         verbose=verbose,
     )
-
-    return {
-        "tracked_charge_csv": csv_path,
-        "tracked_charge_png": csv_path.parent / DEFAULT_TRACKED_CHARGE_PNG,
-    }
+    return dict(result.artifacts)
 
 
 def run_counterion_charge_analysis(
@@ -363,43 +215,26 @@ def run_counterion_charge_analysis(
 ) -> dict[str, Path]:
     """Detect counterions per-frame and track their Bader charges (CSV + PNG).
 
-    Outputs are written into ``output_dir/counterion_tracking/``. Callers
-    that want the canonical ``<root>/electrochemical/charge/counterion_tracking/``
-    layout should pass ``output_dir=<root> / "electrochemical" / "charge"``
-    (``run_all`` does this automatically).
-
-    Returns a dict mapping output names to file paths.
+    Thin shim around
+    :func:`md_analysis.workflows.charge.run_counterion_charge`; returns
+    ``dict[str, Path]`` for backwards compatibility. New code should
+    prefer the workflow function, which returns ``WorkflowResult``.
     """
-    logger.info("Starting counterion charge analysis: output_dir=%s", output_dir)
+    from .workflows.charge import run_counterion_charge
 
-    from .electrochemical.charge import counterion_charge_analysis
-    from .electrochemical.charge.Bader.AtomCharges import (
-        DEFAULT_COUNTERION_CHARGE_CSV,
-        DEFAULT_COUNTERION_CHARGE_PNG,
-        DEFAULT_COUNTERION_SUMMARY_CSV,
-    )
-
-    ci_dir = Path(output_dir) / "counterion_tracking"
-    ci_dir.mkdir(parents=True, exist_ok=True)
-
-    csv_path = counterion_charge_analysis(
-        root_dir,
+    result = run_counterion_charge(
+        output_dir=output_dir,
+        root_dir=root_dir,
         metal_symbols=metal_symbols,
         normal=normal,
         layer_tol_A=layer_tol_A,
         dir_pattern=dir_pattern,
-        output_dir=ci_dir,
         frame_start=frame_start,
         frame_end=frame_end,
         frame_step=frame_step,
         verbose=verbose,
     )
-
-    return {
-        "counterion_charge_csv": csv_path,
-        "counterion_summary_csv": csv_path.parent / DEFAULT_COUNTERION_SUMMARY_CSV,
-        "counterion_charge_png": csv_path.parent / DEFAULT_COUNTERION_CHARGE_PNG,
-    }
+    return dict(result.artifacts)
 
 
 # ---------------------------------------------------------------------------
