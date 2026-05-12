@@ -18,12 +18,14 @@ Entry point: `md-analysis` console script → `md_analysis.cli:main` (VASPKIT-st
 
 | 目录 | 用途 | 详情 |
 |---|---|---|
-| `src/md_analysis/` | 包根：re-export, config, main.py 入口 | → `src/md_analysis/CLAUDE.md` |
+| `src/md_analysis/` | 包根：re-export, config, `main.py` (79 行 import-only facade) | → `src/md_analysis/CLAUDE.md` |
+| `src/md_analysis/workflows/` | 程序化入口 facade（21 个 `run_*` + `WorkflowResult`，canonical 模块） | 见 `workflows/__init__.py` 的 `__all__` |
 | `src/md_analysis/cli/` | 交互式菜单 CLI | → `cli/CLAUDE.md` |
-| `src/md_analysis/agent/` | Agent-friendly 非交互式入口 | dispatch + JSON Schema + TaskResult + Tools-layer TaskContract（14 tasks，3 contract-backed：`ti_gen_batch` / `ti_full_analysis` / `bader_gen_batch`） |
-| `src/md_analysis/utils/` | 底层解析器、常量、共享工具 | → `utils/CLAUDE.md` |
+| `src/md_analysis/agent/` | Agent-friendly 非交互式入口 | dispatch + JSON Schema + TaskResult + Tools-layer TaskContract（**8 tasks，全部 contract-backed**：`calibration_fit_csv` / `calibration_predict` / `slowgrowth_quick` / `ti_full_analysis` / `bader_gen_batch` / `ti_gen_batch` / `sp_gen_batch` / `config_show`；入口重构 Phase 3 / 5B 删除了 6 个 legacy task） |
+| `src/md_analysis/utils/` | 底层解析器、常量、共享工具（`formats/` / `structure/` / `io/`） | → `utils/CLAUDE.md` |
+| `src/md_analysis/engines/` | CP2K/VASP 引擎门面 + engine-neutral dataclass | → `engines/CLAUDE.md` |
 | `src/md_analysis/water/` | 水分析工作流 | → `water/CLAUDE.md` |
-| `src/md_analysis/electrochemical/` | 电化学分组包（potential + charge） | → `electrochemical/CLAUDE.md` |
+| `src/md_analysis/electrochemical/` | 电化学分组包（potential + charge + calibration） | → `electrochemical/CLAUDE.md` |
 | `src/md_analysis/enhanced_sampling/` | 增强采样（SG + TI 准备） | → `enhanced_sampling/CLAUDE.md` |
 | `src/md_analysis/scripts/` | 自动化脚本（BaderGen, TIGen, PotentialGen, SpGen） | → `scripts/CLAUDE.md` |
 | `context4agent/` | 详细 API 文档（单一真相源） | 见下方 Sync Rules |

@@ -96,20 +96,37 @@ Each option prompts for required inputs, then offers an optional "Modify advance
 from md_analysis.water import plot_water_three_panel_analysis
 
 plot_water_three_panel_analysis(
-    xyz_path="data_example/potential/md-pos-1.xyz",
-    md_inp_path="data_example/potential/md.inp",
+    xyz_path="data_example/potential/dense/md-pos-1.xyz",
+    md_inp_path="data_example/potential/dense/md.inp",
     output_dir="output/",
 )
 ```
 
-Or use the programmatic entry points:
+Or use the programmatic entry points (canonical module:
+`md_analysis.workflows`; the same names are re-exported by
+`md_analysis.main` as a thin facade):
 
 ```python
-from md_analysis.main import (
-    run_water_analysis, run_potential_analysis, run_charge_analysis,
-    run_tracked_charge_analysis, run_counterion_charge_analysis, run_all,
+from md_analysis.workflows import (
+    run_water_three_panel, run_potential_full,
+    run_surface_charge, run_tracked_charge, run_counterion_charge,
+    run_interface_analysis,  # composite: water + potential
 )
+
+# Each run_* returns a WorkflowResult; iterate result.artifacts:
+result = run_water_three_panel(
+    xyz_path="data_example/potential/dense/md-pos-1.xyz",
+    md_inp_path="data_example/potential/dense/md.inp",
+    output_dir="output/water/",
+)
+for name, path in result.artifacts.items():
+    print(name, path)
 ```
+
+> The legacy `run_*_analysis` / `run_all` names that previously lived
+> in `md_analysis.main` were removed in the entrance refactor
+> (Phase 7a) without an alias — switch to the names above and read
+> `WorkflowResult.artifacts` instead of the old `dict[str, Path]`.
 
 Generate VASP Bader work directories from an MD trajectory:
 
@@ -135,10 +152,11 @@ batch_generate_bader_workdirs(
 
 ### Example input data
 
-- `data_example/potential/md-pos-1.xyz` — trajectory frames
-- `data_example/potential/md.inp` — cell parameters (`ABC [angstrom] a b c`)
-- `data_example/potential/md.out` — CP2K output with Fermi energies
-- `data_example/potential/md-POTENTIAL-v_hartree-1_*.cube` — Hartree potential cube snapshots
+- `data_example/potential/dense/md-pos-1.xyz` — trajectory frames (continuous mode)
+- `data_example/potential/dense/md.inp` — cell parameters (`ABC [angstrom] a b c`)
+- `data_example/potential/dense/md.out` — CP2K output with Fermi energies
+- `data_example/potential/dense/md-POTENTIAL-v_hartree-1_*.cube` — Hartree potential cube snapshots
+- `data_example/potential/distributed/potential_t*_i*/` — per-frame SP subdirs (distributed mode)
 - `data_example/bader/bader_work_dir/` — POSCAR, ACF.dat, POTCAR for Bader charge tests
 - `data_example/sg/` — CP2K COLVAR restart + LagrangeMultLog files (4 scenarios: angle, distance, combinedCV, more_constrain)
 

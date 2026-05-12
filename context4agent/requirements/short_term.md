@@ -11,7 +11,7 @@
   - 电势分析（`electrochemical/potential/`）：center slab potential、Fermi energy、electrode potential U vs SHE、φ(z) overlay、thickness sensitivity
   - 增强抽样（`enhanced_sampling/`）：慢增长自由能绘图（quick / publication）+ CSV 导出 + 约束 TI 收敛诊断与自由能积分 + CLI 集成
   - 集成入口：CLI（`md-analysis` 命令）、编程入口（`md_analysis.workflows`，21 个 `run_*` 函数返回 `WorkflowResult`；`main.py` 是同名薄 re-export facade）、Agent 入口（`agent/`：dispatch + JSON Schema + TaskResult + Tools-layer `TaskContract`；入口重构 Phase 3 / 5B 删了 6 个 legacy task，**剩余 8 个任务全部带完整 contract**）
-- Bader 电荷解析（`utils/BaderParser.py`）：从 VASP Bader 输出（ACF.dat + POTCAR）读取原始电子数与净电荷，附加到 ASE Atoms
+- Bader 电荷解析（`utils/formats/bader.py`）：从 VASP Bader 输出（ACF.dat + POTCAR）读取原始电子数与净电荷，附加到 ASE Atoms
   - Bader 电荷下游分析（`electrochemical/charge/Bader/`）：
     - 核心数据结构 `BaderTrajectoryData` + `load_bader_trajectory()` — 加载轨迹并通过 IndexMap remap 回 XYZ 原子序
     - 单帧表面电荷密度 `compute_frame_surface_charge(method=...)`，支持 `"counterion"`（反离子/溶质）和 `"layer"`（界面层净电荷）两种计算方法
@@ -92,8 +92,8 @@
     - ✅ 提交脚本路径支持持久化配置（`~/.config/md_analysis/config.json`）
     - ✅ 多帧批量生成：`batch_generate_bader_workdirs(xyz_path, cell_abc, output_dir, *, frame_start/end/step, ...)`
     - ✅ CLI 支持：411（单帧）+ 412（批量），cell 来源支持 `.restart` 和 `md.inp`
-    - ✅ RestartParser：`parse_abc_from_restart()` 从 CP2K `.restart` 文件解析正交 cell 参数
-    - ✅ ColvarParser：解析 CP2K COLVAR restart 元数据（COLLECTIVE、CONSTRAINT、FIXED_ATOMS）和 LagrangeMultLog（单约束/多约束自动检测），重建 ξ(t) 目标序列；溢出值 `***` 自动处理为 `np.nan`
+    - ✅ `utils/formats/cp2k_cell.py`：`parse_abc_from_restart()` / `parse_abc_from_md_inp()` 从 CP2K `.restart` 或 `md.inp` 解析正交 cell 参数
+    - ✅ `utils/formats/cp2k_colvar.py`：解析 CP2K COLVAR restart 元数据（COLLECTIVE、CONSTRAINT、FIXED_ATOMS）和 LagrangeMultLog（单约束/多约束自动检测），重建 ξ(t) 目标序列；溢出值 `***` 自动处理为 `np.nan`。**当前 canonical 入口在 `md_analysis.engines.cp2k`**（`CP2KParser.parse_metadata` / `parse_lambda_series`，配 `ConstraintMetadata` / `LambdaSeries` engine-neutral dataclass），`utils/formats/cp2k_colvar` 是单文件解析层
   - 持久化用户配置（`config.py`）：
     - ✅ `load_config`、`save_config`、`get_config`、`set_config`、`delete_config`
     - ✅ `CONFIGURABLE_DEFAULTS` 注册表：`layer_tol_A`、`z_bin_width_A`、`theta_bin_deg`、`water_oh_cutoff_A`

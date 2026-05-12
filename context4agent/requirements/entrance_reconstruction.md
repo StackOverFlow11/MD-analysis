@@ -19,7 +19,7 @@
 > | Phase 6 Step B | ⏸ 未执行 | charge / calibration / enhanced_sampling / scripts CLI 改走 `workflows.*` facade —— 清化 CLI 表面，**不是 main.py 瘦身的硬阻塞**，可后置 |
 > | Phase 7a | ✅ 完成 | **BREAKING**：删 main.py 5 个 `run_*_analysis` shim + `run_all`；main.py 退化为 79 行 import-only facade，re-export 22 个 workflows 符号；修 integration test 用新名 + 修正 fixture 到 `data_example/potential/dense/`（commit de053f9）|
 > | Phase 7b | ✅ 完成 | 用户/源码侧文档同步（`docs/` + `src/md_analysis/CLAUDE.md` + `cli/DESIGN.md`，commit 441cc1a）|
-> | Phase 8 | 🚧 进行中 | `context4agent/` 镜像同步（本 commit）|
+> | Phase 8 | ✅ 完成 | `context4agent/` 镜像同步 + 根 `README.md` / `CLAUDE.md` 同步 + 新增 `workflows/CLAUDE.md`（commits 5970fbc + docs follow-up）|
 >
 > 旧 API → 新 API 对应表（Phase 7a 删除，无 alias）：
 >
