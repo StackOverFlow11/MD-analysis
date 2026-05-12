@@ -21,8 +21,11 @@
 
 ### I/O (io.py)
 
-Engine-agnostic — parsing delegated to `ConstraintMDParser` (see
-`enhanced_sampling/_parsers.py`).
+Engine-agnostic — parsing delegated to `ConstraintMDParser` Protocol
+exposed by `md_analysis.engines.protocols` (the legacy
+`enhanced_sampling/_parsers.py` shim has been removed; CP2K
+implementation lives in `md_analysis.engines.cp2k.CP2KParser` and is
+auto-registered at engines package import).
 
 | Function | Description |
 |----------|-------------|

@@ -43,98 +43,104 @@
 
 ## 当前已知缺口
 
-1. **Integration fixture 路径未完全同步**
-   - `data_example/potential/` 根目录下不再有 continuous fixture 文件。
-   - 实际 continuous fixture 位于 `data_example/potential/dense/`。
-   - 当前全量 integration 仍有若干测试指向旧路径，导致 `pytest test/integration`
-     失败。
+> 状态摘要（2026-05-12）：Phase 0–3 ✅ 完成（commits `ea30387`、`886a013`）；
+> Phase 4 / Phase 5 仍按下文计划保留为后置项。
 
-2. **验收命令容易 import 到已安装旧包**
-   - 当前环境中直接执行 `pytest` 可能 import site-packages 里的旧
-     `md_analysis`。
-   - 本仓库内验收应使用 `PYTHONPATH=src pytest ...`，或先执行
-     `pip install -e .`。
+1. ~~**Integration fixture 路径未完全同步**~~ — ✅ Phase 1 已修
+   （commit `ea30387`，11 个测试文件从 `data_example/potential/` 改为
+   `data_example/potential/dense/`，integration 全套 44 passed）。
 
-3. **CLI 表面仍未完全收敛到 workflows**
+2. ~~**验收命令容易 import 到已安装旧包**~~ — ✅ Phase 2 已修
+   （commit `886a013`，`README.md` / `test/README.md` / `docs/quickstart.md`
+   推荐 `pip install -e .` 或显式 `PYTHONPATH=src`）。
+
+3. **CLI 表面仍未完全收敛到 workflows**（Phase 4 后置项）
    - `cli/_charge.py`、`cli/_calibration.py`、`cli/_enhanced_sampling.py`、
      `cli/_constrained_ti.py`、`cli/_scripts.py` 仍有直接调用底层业务模块的路径。
    - 这不是 `main.py` facade 成功与否的阻塞项，但会让 CLI 与 notebook/API 的
-     行为面继续分叉。
+     行为面继续分叉。后续视真实需求决定是否做。
 
-4. **旧计划路径引用需要清理**
-   - 删除旧计划文件后，源码 docstring、CLAUDE/context 文档、测试说明不能再指向
-     已删除的 `current_reconstructions.md` 或 `entrance_reconstruction.md`。
+4. ~~**旧计划路径引用需要清理**~~ — ✅ Phase 3 已修
+   （commit `886a013`，源码 docstring / CLAUDE / context4agent / 测试说明全部
+   指向本文件；`rg "current_reconstructions|entrance_reconstruction"` 在 src /
+   test / docs / context4agent 范围零命中本文件除外）。
 
 ---
 
-## Phase 0：冻结现状与验收基线
+## Phase 0：冻结现状与验收基线 ✅ 完成
 
 **目的**：确认“主体重构已完成”，避免后续 agent 重复执行旧迁移。
 
-- [ ] 记录 `git status --short`
-- [ ] 确认旧计划文件已删除：
+- [x] 记录 `git status --short`
+- [x] 确认旧计划文件已删除：
   - `context4agent/requirements/current_reconstructions.md`
   - `context4agent/requirements/entrance_reconstruction.md`
-- [ ] 确认新计划为唯一重构收尾入口：
+- [x] 确认新计划为唯一重构收尾入口：
   - `context4agent/requirements/refactor_repair_plan.md`
-- [ ] 跑最小健康检查：
-  - `PYTHONPATH=src pytest test/unit/workflows test/unit/engines -q`
-  - `PYTHONPATH=src pytest test/integration/test_main.py -q`
+- [x] 跑最小健康检查：
+  - `PYTHONPATH=src pytest test/unit/workflows test/unit/engines -q` → 105 passed
+  - `PYTHONPATH=src pytest test/integration/test_main.py -q` → 8 passed
 
 **Acceptance**：小范围 workflows / engines / main facade 验收通过；没有 agent 再引用旧计划作为执行入口。
 
 ---
 
-## Phase 1：修复 integration fixture 路径
+## Phase 1：修复 integration fixture 路径 ✅ 完成
 
 **目的**：让全量 integration 测试反映当前 `data_example/potential/dense/` 布局。
 
-- [ ] 更新 `test/integration/potential/test_center_potential.py`
-  - `_DATA_DIR` 改为 `data_example/potential/dense`
-  - docstring / skip reason 同步
-- [ ] 更新 `test/integration/potential/test_phi_z_profile.py`
-  - `_DATA_DIR` 改为 `data_example/potential/dense`
-  - docstring / skip reason 同步
-- [ ] 更新 water / utils integration 测试里的旧 fixture 路径：
-  - `test/integration/water/test_*`
-  - `test/integration/utils/test_water_layer_pipeline.py`
-  - preview helper 脚本可顺手同步，但不作为 pytest 阻塞项
-- [ ] 扫描确认：
-  - `rg 'data_example.*potential.*md-(pos|POTENTIAL)|data_example.*potential.*md\\.inp|data_example.*potential.*md\\.out' test/integration`
-- [ ] 跑：
-  - `PYTHONPATH=src pytest test/integration -q`
+实现：commit `ea30387`（11 个测试文件，34+/24-）。
 
-**Acceptance**：全量 integration 不再因缺失 `data_example/potential/{md.inp,md.out,md-pos-1.xyz,cube}` 失败。
+- [x] 更新 `test/integration/potential/test_center_potential.py`
+  - `_DATA_DIR` 改为 `data_example/potential/dense`
+  - docstring / skip reason 同步
+- [x] 更新 `test/integration/potential/test_phi_z_profile.py`
+  - `_DATA_DIR` 改为 `data_example/potential/dense`
+  - docstring / skip reason 同步
+- [x] 更新 water / utils integration 测试里的旧 fixture 路径：
+  - `test/integration/water/test_*`（5 个测试文件）
+  - `test/integration/utils/test_water_layer_pipeline.py`
+  - 3 个 preview helper 脚本顺手同步
+- [x] 扫描确认：
+  - `rg 'data_example.*potential.*md-(pos|POTENTIAL)|data_example.*potential.*md\\.inp|data_example.*potential.*md\\.out' test/integration` → 仅 dense/ 路径
+- [x] 跑：
+  - `PYTHONPATH=src pytest test/integration -q` → **44 passed**（之前 11 failed / 33 passed）
+
+**Acceptance**：✅ 全量 integration 不再因缺失 `data_example/potential/{md.inp,md.out,md-pos-1.xyz,cube}` 失败。
 
 ---
 
-## Phase 2：统一验收命令与开发文档
+## Phase 2：统一验收命令与开发文档 ✅ 完成
 
 **目的**：避免测试误用 site-packages 旧版本。
 
-- [ ] 更新 `README.md` 的测试命令：
-  - 推荐 `pip install -e .`
-  - 或明确用 `PYTHONPATH=src pytest ...`
-- [ ] 更新 `test/README.md` 中的测试命令说明
-- [ ] 更新 `context4agent/requirements/README.md`，说明本文件是重构收尾计划
-- [ ] 如有必要，更新 `docs/quickstart.md` 中与测试/本地运行相关的命令
+实现：commit `886a013`。
 
-**Acceptance**：新用户或 agent 按文档执行时，会 import 当前工作区源码，而不是环境中的旧安装包。
+- [x] 更新 `README.md` 的测试命令：
+  - 推荐 `pip install -e .`（"Install" section + "All tests" block）
+  - 显式 `PYTHONPATH=src pytest ...` 作为非 editable 安装时的前缀
+- [x] 更新 `test/README.md` 中的测试命令说明（两选项 + 显式警告非 editable + 无前缀的坑）
+- [x] 更新 `context4agent/requirements/README.md`，说明本文件是重构收尾计划
+- [x] 更新 `docs/quickstart.md` 中与测试/本地运行相关的命令
+
+**Acceptance**：✅ 新用户或 agent 按文档执行时，会 import 当前工作区源码，而不是环境中的旧安装包。
 
 ---
 
-## Phase 3：清理旧计划引用
+## Phase 3：清理旧计划引用 ✅ 完成
 
 **目的**：删除旧计划后不留下坏链接。
 
-- [ ] 扫描：
-  - `rg 'current_reconstructions|entrance_reconstruction' src test docs context4agent README.md -g '!context4agent/requirements/refactor_repair_plan.md'`
-- [ ] 将仍有意义的引用改为：
-  - `context4agent/requirements/refactor_repair_plan.md`
-- [ ] 对“重构进行中”的文字改成“主体已完成，剩余收尾见修补计划”
-- [ ] VASP placeholder 的错误消息改为指向本文件中的 VASP 扩展说明
+实现：commit `886a013`（绝大部分由用户手动改完，CC 整合 + 提交）。
 
-**Acceptance**：上述 `rg` 无结果，或只剩本文件中对旧文件的归档说明。
+- [x] 扫描：
+  - `rg 'current_reconstructions|entrance_reconstruction' src test docs context4agent README.md -g '!context4agent/requirements/refactor_repair_plan.md'` → 0 命中
+- [x] 将仍有意义的引用改为：
+  - `context4agent/requirements/refactor_repair_plan.md`
+- [x] 对“重构进行中”的文字改成“主体已完成，剩余收尾见修补计划”
+- [x] VASP placeholder 的错误消息改为指向本文件中的 VASP 扩展说明（`engines/vasp.py` + 3 个 `utils/formats/vasp_*.py`）
+
+**Acceptance**：✅ 上述 `rg` 无结果（本文件归档说明除外）。
 
 ---
 
@@ -189,8 +195,13 @@ PYTHONPATH=src pytest test/unit/workflows test/unit/engines -q
 PYTHONPATH=src pytest test/integration/test_main.py -q
 rg "current_reconstructions|entrance_reconstruction" src test docs context4agent README.md -g '!context4agent/requirements/refactor_repair_plan.md'
 rg "md_analysis.utils.(CubeParser|BaderParser|RestartParser|StructureParser)" src test docs context4agent
-rg "enhanced_sampling._parsers" src test docs context4agent
+rg "enhanced_sampling._parsers" src test docs context4agent -g '!context4agent/requirements/refactor_repair_plan.md'
 ```
+
+> 最后一条扫描 `enhanced_sampling._parsers` 时只允许“历史说明”类命中
+> （例如 `"该 shim 已经在 Phase 6 删除"`、`"早期由 _parsers.py 适配"`），
+> 不允许当前架构描述里把它当作活跃模块。当前 canonical 入口为
+> `md_analysis.engines`（`engines.protocols.ConstraintMDParser` + `engines.cp2k.CP2KParser`）。
 
 如果不使用 `PYTHONPATH=src`，必须先运行：
 
@@ -202,12 +213,12 @@ pip install -e .
 
 ## 当前审查基线
 
-最近一次审查记录：
+最近一次审查记录（Phase 0–3 收尾完成后，2026-05-12）：
 
-- `PYTHONPATH=src pytest test/unit -q`：719 passed
-- `PYTHONPATH=src pytest test/unit/workflows test/unit/engines -q`：105 passed
-- `PYTHONPATH=src pytest test/integration/test_main.py -q`：8 passed
-- `PYTHONPATH=src pytest test/integration -q`：33 passed, 11 failed
+- `PYTHONPATH=src pytest test/unit -q`：**719 passed**
+- `PYTHONPATH=src pytest test/unit/workflows test/unit/engines -q`：**105 passed**
+- `PYTHONPATH=src pytest test/integration/test_main.py -q`：**8 passed**
+- `PYTHONPATH=src pytest test/integration -q`：**44 passed**（Phase 1 修复了之前的 11 failed）
 
-11 个 integration 失败集中在旧 `data_example/potential/` fixture 路径；这正是
-Phase 1 的修补目标。
+剩余待评估的工作只剩 Phase 4（CLI facade 收敛）和 Phase 5（VASP placeholder
+后续扩展记录），均为后置项，按需启动；Phase 0–3 不应再被任何 agent 重新执行。

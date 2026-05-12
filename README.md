@@ -264,7 +264,11 @@ test/
     └── test_main.py        # programmatic entry points (run_* functions)
 
 data_example/               # minimal reproducible input data
-├── potential/              #   cube files, md.out, md-pos-1.xyz, md.inp, .restart files
+├── potential/
+│   ├── dense/              #   continuous-mode fixture: md.inp / md.out /
+│   │                       #   md-pos-1.xyz / md-POTENTIAL-v_hartree-1_*.cube
+│   └── distributed/        #   distributed-mode fixture: per-frame potential_t*_i*/
+│                           #   sub-directories with cube + sp.out
 ├── bader/                  #   bader_work_dir/ with POSCAR, ACF.dat, POTCAR
 ├── sg/                     #   COLVAR restart + LagrangeMultLog test data (4 scenarios)
 └── ti/                     #   8 ti_target_* constraint-point directories for TI regression tests

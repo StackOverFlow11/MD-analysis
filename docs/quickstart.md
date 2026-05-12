@@ -55,7 +55,7 @@ $ md-analysis
 
  ---------- Full Water Three-Panel Analysis  (includes 101-104) ----------
 
- XYZ trajectory file: data_example/potential/md-pos-1.xyz
+ XYZ trajectory file: data_example/potential/dense/md-pos-1.xyz
  Cell parameters
    1) Auto from md.inp (../md.inp / ./md.inp)
    2) Manual
