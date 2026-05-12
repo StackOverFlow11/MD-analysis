@@ -13,6 +13,7 @@ for backwards compatibility; new code should prefer the explicit
 
 from __future__ import annotations
 
+from .calibration import run_calibration_fit, run_calibration_predict
 from .charge import run_counterion_charge, run_surface_charge, run_tracked_charge
 from .models import MissingArtifactError, WorkflowResult, require_artifacts_exist
 from .potential import run_potential_full
@@ -29,4 +30,7 @@ __all__ = [
     "run_surface_charge",
     "run_tracked_charge",
     "run_counterion_charge",
+    # Calibration workflows (Phase 4.1)
+    "run_calibration_fit",
+    "run_calibration_predict",
 ]
