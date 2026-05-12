@@ -383,7 +383,11 @@ def run_ti_constant_potential_correction(
     point_defs = discover_ti_points(
         root_p, parser=parser, dir_filter=dir_filter, reverse=reverse,
     )
-    if point_slice is not None:
+    # Mirror run_ti_full_from_root's two-pronged "no-slice" check: both
+    # None and "" mean "use all points". Treating "" as a slice spec
+    # would raise ValueError from _parse_point_slice and silently leave
+    # ti_report.point_reports out of sync with point_defs.
+    if point_slice is not None and point_slice != "":
         point_defs = point_defs[_parse_point_slice(point_slice)]
 
     # Phase 3: load mapper from calibration JSON.
