@@ -296,4 +296,3 @@ def run_all(
         **pot_kwargs,
     )
     return dict(result.artifacts)
-
