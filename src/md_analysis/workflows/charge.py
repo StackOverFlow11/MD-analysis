@@ -176,11 +176,16 @@ def run_counterion_charge(
     Callers that want the canonical
     ``<root>/electrochemical/charge/counterion_tracking/`` layout
     should pass ``output_dir=<root>/electrochemical/charge``.
+
+    The PNG artifact is only listed when the underlying analysis
+    actually produced one. If no counterion was detected in any
+    frame, ``plot_counterion_charges`` short-circuits without
+    writing a file and ``artifacts`` correspondingly omits
+    ``counterion_charge_png`` so :func:`require_artifacts_exist`
+    does not flag an empty-counterion run as broken.
     """
-    from ..electrochemical.charge import counterion_charge_analysis
     from ..electrochemical.charge.Bader.AtomCharges import (
-        DEFAULT_COUNTERION_CHARGE_PNG,
-        DEFAULT_COUNTERION_SUMMARY_CSV,
+        counterion_charge_analysis_with_report,
     )
 
     root_p = Path(root_dir)
@@ -190,7 +195,7 @@ def run_counterion_charge(
 
     logger.info("Starting counterion charge analysis: output_dir=%s", ci_dir)
 
-    csv_path_raw = counterion_charge_analysis(
+    report = counterion_charge_analysis_with_report(
         root_p,
         metal_symbols=metal_symbols,
         normal=normal,
@@ -203,15 +208,17 @@ def run_counterion_charge(
         verbose=verbose,
     )
 
-    csv_path = Path(csv_path_raw)
     artifacts: dict[str, Path] = {
-        "counterion_charge_csv": csv_path,
-        "counterion_summary_csv": csv_path.parent / DEFAULT_COUNTERION_SUMMARY_CSV,
-        "counterion_charge_png": csv_path.parent / DEFAULT_COUNTERION_CHARGE_PNG,
+        "counterion_charge_csv": Path(report.csv_path),
+        "counterion_summary_csv": Path(report.summary_path),
     }
+    if report.png_path is not None:
+        artifacts["counterion_charge_png"] = Path(report.png_path)
     metadata: dict[str, Any] = {
         "normal": normal,
         "layer_tol_A": layer_tol_A,
+        "n_frames": report.n_frames,
+        "n_unique_counterions": report.n_unique_counterions,
     }
     return WorkflowResult(
         name="counterion_charge",
