@@ -79,17 +79,19 @@ class TestListTasksIncludesTiGenBatch:
 class TestHandlerReloadRegression:
     """Batch 0 regression: after splitting _handlers.py into task modules,
     ``_reset_registry()`` + ``reload(_handlers)`` must still produce the
-    full 14-task registry."""
+    full registry (currently 11 after the Phase 3 charge legacy cleanup
+    removed charge_surface / charge_tracked / charge_counterion)."""
 
-    def test_reset_then_reload_restores_14_tasks(self):
+    def test_reset_then_reload_restores_full_registry(self):
         from md_analysis.agent import _handlers
         from md_analysis.agent._core import _reset_registry
 
-        assert len(list_tasks()) == 14  # baseline
+        baseline = len(list_tasks())
+        assert baseline == 11
         _reset_registry()
         assert len(list_tasks()) == 0
         importlib.reload(_handlers)
-        assert len(list_tasks()) == 14
+        assert len(list_tasks()) == baseline
 
     def test_reload_preserves_task_order(self):
         from md_analysis.agent import _handlers
@@ -201,10 +203,12 @@ class TestBaderGenBatchSchema:
         assert ca["minItems"] == 3 and ca["maxItems"] == 3
         assert ca["items"]["type"] == "number"
 
-    def test_registered_task_count_14(self):
+    def test_registered_task_count(self):
         names = [t["name"] for t in list_tasks()]
         assert "bader_gen_batch" in names
-        assert len(names) == 14
+        # 14 -> 11 after Phase 3 charge legacy cleanup removed
+        # charge_surface / charge_tracked / charge_counterion.
+        assert len(names) == 11
 
 
 # ---------------------------------------------------------------------------
