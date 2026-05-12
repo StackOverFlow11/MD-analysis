@@ -135,8 +135,8 @@ def main() -> None:
     if (args.c_start is None) != (args.c_end is None):
         raise ValueError("Please provide both --c-start and --c-end, or provide neither")
 
-    xyz_path = REPO_ROOT / "data_example" / "potential" / "md-pos-1.xyz"
-    md_inp_path = REPO_ROOT / "data_example" / "potential" / "md.inp"
+    xyz_path = REPO_ROOT / "data_example" / "potential" / "dense" / "md-pos-1.xyz"
+    md_inp_path = REPO_ROOT / "data_example" / "potential" / "dense" / "md.inp"
     out_dir = REPO_ROOT / "test" / "_tmp_preview"
     out_dir.mkdir(parents=True, exist_ok=True)
 

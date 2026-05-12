@@ -42,8 +42,8 @@ def _z_edges_and_centers_A(lz_A: float, dz_A: float) -> tuple[np.ndarray, np.nda
 
 
 def main() -> None:
-    xyz_path = REPO_ROOT / "data_example" / "potential" / "md-pos-1.xyz"
-    md_inp_path = REPO_ROOT / "data_example" / "potential" / "md.inp"
+    xyz_path = REPO_ROOT / "data_example" / "potential" / "dense" / "md-pos-1.xyz"
+    md_inp_path = REPO_ROOT / "data_example" / "potential" / "dense" / "md.inp"
     out_dir = REPO_ROOT / "test" / "_tmp_preview"
     out_dir.mkdir(parents=True, exist_ok=True)
 

@@ -37,8 +37,8 @@ def _z_bin_centers_A(lz_A: float, dz_A: float, nbins: int) -> np.ndarray:
 
 def main() -> None:
     repo_root = REPO_ROOT
-    xyz_path = repo_root / "data_example" / "potential" / "md-pos-1.xyz"
-    md_inp_path = repo_root / "data_example" / "potential" / "md.inp"
+    xyz_path = repo_root / "data_example" / "potential" / "dense" / "md-pos-1.xyz"
+    md_inp_path = repo_root / "data_example" / "potential" / "dense" / "md.inp"
 
     atoms = read(str(xyz_path), index=-1)
     a, b, c = _parse_abc_from_md_inp(md_inp_path)

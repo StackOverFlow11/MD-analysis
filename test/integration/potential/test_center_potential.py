@@ -1,6 +1,8 @@
 """Integration tests for center_slab_potential_analysis and related functions.
 
-Uses data_example/potential/ as input data.
+Uses ``data_example/potential/dense/`` as input data (continuous-mode
+fixture; the legacy root-level layout was moved into ``dense/`` during
+the utils/engines refactor).
 Can also be run as a standalone script: python test/integration/potential/test_center_potential.py
 """
 
@@ -20,12 +22,15 @@ from md_analysis.electrochemical.potential import (
 )
 
 # Resolve data directory relative to this file
-_DATA_DIR = Path(__file__).resolve().parents[3] / "data_example" / "potential"
+_DATA_DIR = (
+    Path(__file__).resolve().parents[3]
+    / "data_example" / "potential" / "dense"
+)
 
 # Skip all tests if data directory doesn't exist
 pytestmark = pytest.mark.skipif(
     not _DATA_DIR.exists(),
-    reason=f"data_example/potential/ not found at {_DATA_DIR}",
+    reason=f"data_example/potential/dense/ not found at {_DATA_DIR}",
 )
 
 

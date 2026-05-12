@@ -1,6 +1,8 @@
 """Integration tests for phi_z_planeavg_analysis.
 
-Uses data_example/potential/ as input data.
+Uses ``data_example/potential/dense/`` as input data (continuous-mode
+fixture; the legacy root-level layout was moved into ``dense/`` during
+the utils/engines refactor).
 Can also be run as a standalone script: python test/integration/potential/test_phi_z_profile.py
 """
 
@@ -14,11 +16,14 @@ import pytest
 from md_analysis.electrochemical.potential import phi_z_planeavg_analysis
 
 # Resolve data directory relative to this file
-_DATA_DIR = Path(__file__).resolve().parents[3] / "data_example" / "potential"
+_DATA_DIR = (
+    Path(__file__).resolve().parents[3]
+    / "data_example" / "potential" / "dense"
+)
 
 pytestmark = pytest.mark.skipif(
     not _DATA_DIR.exists(),
-    reason=f"data_example/potential/ not found at {_DATA_DIR}",
+    reason=f"data_example/potential/dense/ not found at {_DATA_DIR}",
 )
 
 

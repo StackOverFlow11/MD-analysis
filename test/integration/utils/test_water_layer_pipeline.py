@@ -19,8 +19,8 @@ from md_analysis.utils.structure.water import get_water_oxygen_indices_array
 
 def test_last_frame_pipeline_outputs_have_consistent_shapes() -> None:
     repo_root = Path(__file__).resolve().parents[3]
-    xyz_path = repo_root / "data_example" / "potential" / "md-pos-1.xyz"
-    md_inp_path = repo_root / "data_example" / "potential" / "md.inp"
+    xyz_path = repo_root / "data_example" / "potential" / "dense" / "md-pos-1.xyz"
+    md_inp_path = repo_root / "data_example" / "potential" / "dense" / "md.inp"
 
     atoms = ase_io.read(str(xyz_path), index=-1)
     a, b, c = _parse_abc_from_md_inp(md_inp_path)
