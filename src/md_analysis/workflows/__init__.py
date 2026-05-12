@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from .calibration import run_calibration_fit, run_calibration_predict
 from .charge import run_counterion_charge, run_surface_charge, run_tracked_charge
+from .composite import run_interface_analysis
 from .enhanced_sampling import (
     run_slowgrowth_publication_plot,
     run_slowgrowth_quick_plot,
@@ -65,4 +66,6 @@ __all__ = [
     "run_potential_batch",
     "run_sp_single",
     "run_sp_batch",
+    # Composite workflows (Phase 5)
+    "run_interface_analysis",
 ]
