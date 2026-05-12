@@ -417,7 +417,8 @@ class WaterDensityCmd(MenuCommand):
 
 `WaterOrientationCmd`, `AdWaterOrientationCmd`, `AdWaterThetaCmd` follow the same
 pattern, differing only in `execute()`. `WaterThreePanelCmd` calls
-`run_water_analysis` from `md_analysis.main`.
+`run_water_three_panel` from `md_analysis.workflows.water` and iterates
+`result.artifacts.items()`.
 
 ### Potential (`_potential.py`)
 
@@ -482,11 +483,13 @@ class SurfaceChargeCmd(MenuCommand):
         ...
 
     def execute(self, ctx):
-        analyze = lazy_import("md_analysis.main", "run_charge_analysis")
-        results = analyze(
+        analyze = lazy_import(
+            "md_analysis.workflows.charge", "run_surface_charge",
+        )
+        result = analyze(
             output_dir=ctx[K.OUTDIR_RESOLVED], method=ctx[K.METHOD], ...
         )
-        # print results + ensemble summary
+        # iterate result.artifacts + ensemble summary
 ```
 
 Tree assembly:
@@ -778,15 +781,15 @@ set_input_source(scripted_input(["md-pos-1.xyz", ".restart", "cp2k.restart", ...
 | 模式 | output_subdir | execute() 传什么 | 谁创建子目录 |
 |---|---|---|---|
 | **直接调用模块函数** (101-104, 211-215) | `"water"`, `"potential/center"` 等 | `ctx[K.OUTDIR_RESOLVED]` (已含子路径) | 基类 `run()` |
-| **调用 `run_*_analysis` 包装** (105, 216, 223) | `""` (空) | `Path(ctx[K.OUTDIR])` (原始路径) | `run_*_analysis()` 内部 |
+| **调用 `workflows.*` 包装** (105, 216, 223) | `""` (空) | `Path(ctx[K.OUTDIR])` (原始路径) | `workflows.*` 内部 |
 
-第二种模式下 `run_*_analysis()` 自己创建 `output_dir/water/`、`output_dir/charge/<method>/`
+第二种模式下 `workflows.*` 自己创建 `output_dir/water/`、`output_dir/charge/<method>/`
 等子目录。基类 `run()` 检测到 `output_subdir` 为空时跳过 outdir 创建，也不设置
 `ctx[K.OUTDIR_RESOLVED]`。
 
 **Charge 的动态子目录**：`SurfaceChargeCmd` 使用模式二（`output_subdir = ""`），调用
-`run_charge_analysis(output_dir=Path(ctx[K.OUTDIR]), method=ctx[K.METHOD], ...)`，由
-`run_charge_analysis` 内部创建 `output_dir/charge/<method>/`。不需要在基类层面处理动态
+`run_surface_charge(output_dir=Path(ctx[K.OUTDIR]), method=ctx[K.METHOD], ...)`，由
+`run_surface_charge` 内部创建 `output_dir/charge/<method>/`。不需要在基类层面处理动态
 `output_subdir`。
 
 ### 2. Scripts 命令中 CellAbcParam 的使用方式

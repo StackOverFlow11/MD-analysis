@@ -185,26 +185,24 @@ ti_diagnostics_<i>.png        # 每点 2x2 图（running avg / ACF / block / Gew
 
 ## Agent 任务列表
 
-非交互入口 `agent.dispatch(task, params)` 的完整任务清单：
+非交互入口 `agent.dispatch(task, params)` 的完整任务清单（**全部 contract-backed**，
+入口重构 Phase 3 / 5B 已移除 water/potential/charge/composite 6 个 legacy task）：
 
 | Task | 关联菜单 | 契约层级 |
 |---|---|---|
-| `water_three_panel` | 105 | legacy |
-| `potential_full` | 216 | legacy |
-| `charge_surface` | 221/222/223 | legacy |
-| `charge_tracked` | 225 | legacy |
-| `charge_counterion` | 226 | legacy |
-| `calibration_fit_csv` | 231 | legacy |
-| `calibration_predict` | 233 | legacy |
-| `slowgrowth_quick` | 301 | legacy |
+| `calibration_fit_csv` | 231 | **TaskContract** |
+| `calibration_predict` | 233 | **TaskContract** |
+| `slowgrowth_quick` | 301 | **TaskContract** |
 | `ti_full_analysis` | 312 | **TaskContract**（含 parser/dir_filter） |
 | `bader_gen_batch` | 412 | **TaskContract** |
 | `ti_gen_batch` | 422 | **TaskContract** |
-| `sp_gen_batch` | 442 | legacy |
-| `run_all` | (聚合) | legacy |
-| `config_show` | 900 | legacy |
+| `sp_gen_batch` | 442 | **TaskContract** |
+| `config_show` | 900 | **TaskContract**（read-only） |
 
-> "TaskContract" 标记的任务有完整的 `FieldSpec` + `ExceptionMapping` 描述，schema 自动生成，能映射 MCP tool schema；其他 legacy 任务由 `target_fn` 签名推导 schema。
+> 所有任务都有完整的 `FieldSpec` + `ExceptionMapping` 描述，schema 自动生成，能映射
+> MCP tool schema。Phase 3 / 5B 删除的旧 task：`water_three_panel`、`potential_full`、
+> `charge_surface`、`charge_tracked`、`charge_counterion`、`run_all`。对应业务现在
+> 通过 `md_analysis.workflows.run_*` 直接调用即可，无需经过 agent dispatch。
 
 ---
 

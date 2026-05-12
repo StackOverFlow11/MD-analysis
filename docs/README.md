@@ -38,7 +38,7 @@
 
 CLI 是给人交互用的。如果你想在脚本里调用、批量跑多体系、或者从 Jupyter 调用，应该用：
 
-- **`md_analysis.main` 的 `run_*_analysis()`** — 程序化入口，跟 CLI 菜单一一对应
+- **`md_analysis.workflows` 的 `run_*()`** — 程序化入口，跟 CLI 菜单一一对应；返回 `WorkflowResult`（`md_analysis.main` 是同一批名字的薄 re-export facade）
 - **`md_analysis.agent.dispatch(task, params)`** — agent-friendly 统一调度入口（可序列化、JSON Schema）
 
 详见 [workflows.md 末尾"非交互场景出口"](workflows.md#非交互场景出口)。

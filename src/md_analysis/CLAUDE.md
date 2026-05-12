@@ -14,10 +14,10 @@
   - 混淆这两个是常见错误
 - **NullHandler**：`__init__.py` 在 `md_analysis` logger 上设置 `NullHandler()`（PEP 282），CLI 或应用程序负责配置实际 handler
 - **异常层次**：所有领域异常继承 `MDAnalysisError`（在 `exceptions.py` 定义），调用方可 `except MDAnalysisError` 统一捕获
-- **编程入口**：`main.py` 提供 `run_water_analysis()`、`run_potential_analysis()`、`run_charge_analysis()`、`run_tracked_charge_analysis()`、`run_counterion_charge_analysis()`、`run_all()`
-- **Agent 入口**：`agent/` 提供 `dispatch(task, params)` 统一调度、`get_task_schema()` 自动 JSON Schema、`list_tasks()` 任务枚举，并提供 Tools-layer 结构化契约（`_contracts.py`：`FieldSpec` / `ExceptionMapping` / `TaskContract`，双出口 `to_agent_schema` / `to_mcp_tool_schema`）。薄适配层，不含分析逻辑。当前 14 个任务**全部带完整 `TaskContract`**，target_fn 一律指向各模块的 `*_with_report` 包装器（返回 frozen dataclass）。⚠️ **utils/engines 重构进行中**（`context4agent/requirements/current_reconstructions.md`）：Phase 2-8 期间 `agent` 不作为公开接口承诺面，`target_fn` 字符串和上游 dataclass 名会随模块迁移同步更新；最终架构稳定后做一轮 review 再恢复 stable 承诺
-- **`run_*` 目录契约**：每个 `run_*_analysis()` 的 `output_dir` 参数即**最终写入目录**（不再自动前置 `water/`、`electrochemical/potential/` 等），仅保留必要的内部子目录（如 charge 的 `<method>/`）。调用方需自行提供完整路径；`run_all` 会按下述标准布局分派路径。
-- **标准输出目录结构**（`run_all` 以及 CLI 菜单路径均按此推导）：
+- **编程入口**：`workflows/` 提供 21 个 `run_*()` 函数，全部返回 `WorkflowResult`（`artifacts` / `metadata` / `extra`）。`main.py` 是同一批名字的薄 re-export facade（79 行 import-only）。完整清单参见 `workflows/CLAUDE.md`；composite `run_interface_analysis` 取代旧 `run_all`。
+- **Agent 入口**：`agent/` 提供 `dispatch(task, params)` 统一调度、`get_task_schema()` 自动 JSON Schema、`list_tasks()` 任务枚举，并提供 Tools-layer 结构化契约（`_contracts.py`：`FieldSpec` / `ExceptionMapping` / `TaskContract`，双出口 `to_agent_schema` / `to_mcp_tool_schema`）。薄适配层，不含分析逻辑。入口重构 Phase 3 / 5B 删了 6 个 legacy task（water_three_panel / potential_full / charge_*×3 / run_all），剩余 8 个任务**全部带完整 `TaskContract`**。⚠️ **入口重构进行中**（`context4agent/requirements/entrance_reconstruction.md`）：`agent` 暂不作为稳定承诺面，Phase 7 / 8 完成后做整体 review 再恢复 stable 承诺。
+- **`run_*` 目录契约**：每个 `run_*()` 的 `output_dir` 参数即**最终写入目录**（不再自动前置 `water/`、`electrochemical/potential/` 等），仅保留必要的内部子目录（如 surface charge 的 `<method>/`）。调用方需自行提供完整路径；`run_interface_analysis` 会按下述标准布局分派路径。
+- **标准输出目录结构**（`run_interface_analysis` 以及 CLI 菜单路径均按此推导）：
   - `<outdir>/water/`
   - `<outdir>/electrochemical/potential/<sub>/`（`<sub>`：`center`/`fermi`/`electrode`/`phi_z`/`thickness_sensitivity`）
   - `<outdir>/electrochemical/charge/<method>/`
@@ -30,7 +30,7 @@
 ## 陷阱与历史 Bug
 
 - `config.py` 的 `save_config()` 会自动创建父目录，但首次 `get_config()` 前配置文件可能不存在 — 返回 `None` 而非报错
-- `main.py` 中的 import 全部延迟到函数体内（避免启动时加载 numpy/matplotlib）
+- `workflows/*.py` 把重业务模块（matplotlib、ase、底层分析）`import` 延迟到函数体内（避免启动时加载 numpy/matplotlib）；`main.py` 是 import-only facade，模块顶层只 import `workflows` 包内的 `run_*` 名字，本身不引入业务依赖
 - `CONFIGURABLE_DEFAULTS` 注册表的键必须与 `utils/constants.py` 中的默认常量一一对应
 
 ## 子目录
@@ -38,7 +38,8 @@
 | 目录 | 用途 |
 |---|---|
 | `cli/` | 交互式 CLI → `cli/CLAUDE.md` |
-| `agent/` | Agent-friendly 非交互式编程入口（dispatch + JSON Schema + TaskResult）。⚠️ utils/engines 重构期间不作为承诺面 |
+| `workflows/` | 程序化入口 facade（21 个 `run_*` + `WorkflowResult`） |
+| `agent/` | Agent-friendly 非交互式编程入口（dispatch + JSON Schema + TaskResult）。⚠️ 入口重构期间不作为承诺面 |
 | `engines/` | CP2K/VASP 引擎门面 + engine-neutral dataclass → `engines/CLAUDE.md` |
 | `utils/` | 底层工具（formats / structure / io 三层）→ `utils/CLAUDE.md` |
 | `water/` | 水分析 → `water/CLAUDE.md` |
