@@ -80,24 +80,22 @@
 - `ERROR_ANALYSIS = "analysis"`
 - `ERROR_INTERNAL = "internal"`
 
-## 3. 当前注册任务（14 个）
+## 3. 当前注册任务（8 个，全部 contract-backed）
+
+入口重构 Phase 3 / 5B 删除了 6 个 legacy task（`water_three_panel` / `potential_full`
+/ `charge_surface` / `charge_tracked` / `charge_counterion` / `run_all`），对应业务
+通过 `md_analysis.workflows.run_*` 直接调用即可。剩余任务全部带完整 `TaskContract`：
 
 | 任务名 | 目标函数 | CLI 编号 | 类别 | 有 contract |
 |--------|---------|---------|------|---|
-| `water_three_panel` | `main:run_water_analysis` | 105 | water | — |
-| `potential_full` | `main:run_potential_analysis` | 216 | potential | — |
-| `charge_surface` | `main:run_charge_analysis` | 221-223 | charge | — |
-| `charge_tracked` | `main:run_tracked_charge_analysis` | 225 | charge | — |
-| `charge_counterion` | `main:run_counterion_charge_analysis` | 226 | charge | — |
-| `run_all` | `main:run_all` | — | composite | — |
-| `calibration_fit_csv` | `CalibrationWorkflow:calibrate` | 231 | calibration | — |
-| `calibration_predict` | `CalibrationWorkflow:predict_potential` | 233 | calibration | — |
-| `slowgrowth_quick` | `SlowGrowthPlot:slowgrowth_analysis` | 301 | enhanced_sampling | — |
+| `calibration_fit_csv` | `CalibrationWorkflow:calibrate_with_report` | 231 | calibration | ✅ |
+| `calibration_predict` | `CalibrationWorkflow:predict_potential_with_report` | 233 | calibration | ✅ |
+| `slowgrowth_quick` | `SlowGrowthPlot:slowgrowth_analysis_with_report` | 301 | enhanced_sampling | ✅ |
 | `ti_full_analysis` | `constrained_ti.workflow:run_ti_full_from_root` | 312 | enhanced_sampling | ✅ |
 | `bader_gen_batch` | `scripts.BaderGen:generate_bader_batch_with_report` | 412 | scripts | ✅ |
 | `ti_gen_batch` | `scripts.TIGen:generate_ti_batch_with_report` | 422 | scripts | ✅ |
-| `sp_gen_batch` | `scripts.SpGen:batch_generate_sp_workdirs` | 442 | scripts | — |
-| `config_show` | `config:load_config` | 900 | meta | — |
+| `sp_gen_batch` | `scripts.SpGen:generate_sp_batch_with_report` | 442 | scripts | ✅ |
+| `config_show` | `config:load_config` | 900 | meta | ✅ |
 
 ## 4. 推荐导入方式
 

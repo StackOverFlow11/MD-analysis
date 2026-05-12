@@ -19,7 +19,7 @@ Interactive CLI package providing a VASPKIT-style numbered menu interface. Repla
 
 ## Dependencies
 
-- `cli` -> `main` (for integrated workflow functions like `run_water_analysis`)
+- `cli` -> `workflows` (for integrated workflow facades like `run_water_three_panel` and `run_potential_full`; entrance refactor Phase 6 / Phase 7a removed CLI dependency on the legacy `md_analysis.main:run_*_analysis` shims)
 - `cli` -> `water`, `electrochemical.potential`, `electrochemical.charge`, `electrochemical.calibration` (for individual analysis functions)
 - `cli` -> `electrochemical.potential.config` (for default constants)
 - `cli` -> `scripts` (for `generate_bader_workdir`, `batch_generate_bader_workdirs`)

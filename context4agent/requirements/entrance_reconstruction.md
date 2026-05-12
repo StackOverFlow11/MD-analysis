@@ -2,6 +2,38 @@
 
 > 当前取向：本轮不维护 legacy agent 层兼容性。`main.py` 应设计为用户脚本、notebook、CLI 都能依赖的**程序化主入口**，但不承载具体业务实现。
 
+> **执行状态（截至 Phase 8 / 2026-05-12）**：
+>
+> | Phase | 状态 | 说明 |
+> |---|---|---|
+> | Phase 0 | ✅ 完成 | 引用面梳理（commit f19d2e9 之前）|
+> | Phase 1 | ✅ 完成 | `workflows/models.py` + `WorkflowResult`（commit 8b3a339）|
+> | Phase 2 | ✅ 完成 | 迁 5 个 leaf workflow + main.py thin shim 兼容（commit 7c5e975 / fix a773461）|
+> | Phase 3 | ✅ 完成 | charge legacy wrapper cleanup（commit 2978a57，原计划包含 5 个 leaf，实际拆为 charge-only 范围；water/potential/run_all 留给 Phase 5B）|
+> | Phase 4.1 | ✅ 完成 | `workflows/calibration.py`（commit f79eb84）|
+> | Phase 4.2 | ✅ 完成 | `workflows/enhanced_sampling.py`（commit 1956061 / fix e54ef5b）|
+> | Phase 4.3 | ✅ 完成 | `workflows/scripts.py`（commit bc5c179 / doc fix 6f4840e）|
+> | Phase 5 Step A | ✅ 完成 | `workflows/composite.py::run_interface_analysis`（commit f19d2e9）|
+> | Phase 5 Step B | ✅ 完成 | 删 water/potential `*_with_report` + 3 个 legacy task；`run_all` 临时退化为 deprecation shim（commit 31f5176 / fix 73ffd67）|
+> | Phase 6 Step A | ✅ 完成 | CLI `WaterThreePanelCmd` / `FullPotentialCmd` 改走 `workflows.*`（commit 2e85577；范围窄于原计划 Phase 6 全量）|
+> | Phase 6 Step B | ⏸ 未执行 | charge / calibration / enhanced_sampling / scripts CLI 改走 `workflows.*` facade —— 清化 CLI 表面，**不是 main.py 瘦身的硬阻塞**，可后置 |
+> | Phase 7a | ✅ 完成 | **BREAKING**：删 main.py 5 个 `run_*_analysis` shim + `run_all`；main.py 退化为 79 行 import-only facade，re-export 22 个 workflows 符号；修 integration test 用新名 + 修正 fixture 到 `data_example/potential/dense/`（commit de053f9）|
+> | Phase 7b | ✅ 完成 | 用户/源码侧文档同步（`docs/` + `src/md_analysis/CLAUDE.md` + `cli/DESIGN.md`，commit 441cc1a）|
+> | Phase 8 | 🚧 进行中 | `context4agent/` 镜像同步（本 commit）|
+>
+> 旧 API → 新 API 对应表（Phase 7a 删除，无 alias）：
+>
+> | 旧名（已删） | 新名 |
+> |---|---|
+> | `run_water_analysis` | `run_water_three_panel` |
+> | `run_potential_analysis` | `run_potential_full` |
+> | `run_charge_analysis` | `run_surface_charge` |
+> | `run_tracked_charge_analysis` | `run_tracked_charge` |
+> | `run_counterion_charge_analysis` | `run_counterion_charge` |
+> | `run_all` | `run_interface_analysis` |
+>
+> 旧返回类型 `dict[str, Path]` → 新返回类型 `WorkflowResult`，调用方需把 `results.items()` 改为 `result.artifacts.items()`。本计划下文的 Phase 任务清单保留**原始规划文字**，包含已删除的旧名作为重构对象描述；不要把它们误读为推荐 API。
+
 ---
 
 ## 问题判断
