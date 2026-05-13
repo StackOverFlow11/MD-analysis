@@ -148,11 +148,12 @@
 
 **目的**：决定是否继续把 CLI 命令统一改走 `md_analysis.workflows`。
 
-执行结论：低风险的 9 个 CLI 命令迁移到 workflows facade；其余因 workflow
-签名 gap 或交互流程复杂保留底层直调。完整对照表与原因详见
+执行结论：本轮迁移 11 个 CLI 命令到 workflows facade（合并 Phase 6 Step A
+的 2 条共 13 条已走 facade）；其余 20 条因 workflow 签名 gap 或交互流程
+复杂保留底层直调，分析命令总数 33。完整对照表与原因详见
 `src/md_analysis/cli/CLAUDE.md` 的 "Workflows facade 迁移状态" 段。
 
-### 本轮已迁移到 workflows（9 条新增 + 2 条 Phase 6 Step A 已迁，共 13 条）
+### 本轮已迁移到 workflows（11 条新增 + 2 条 Phase 6 Step A 已迁，共 13 条）
 
 | CLI 编号 | 命令 | workflow facade |
 |---|---|---|
@@ -193,9 +194,9 @@
 4. 给 `run_ti_batch` 加 `colvar_id`
 5. 给 TI workflow 暴露 discover_only / select-points 流程后再迁 311–313
 
-**Acceptance**：CLI 主要低风险命令统一走 workflows；剩余 12 个命令的保留原因
-在 `cli/CLAUDE.md` 的迁移状态表中显式记录，未来扩展 workflow 时按此 gap 列表
-对照修补。
+**Acceptance**：CLI 主要低风险命令统一走 workflows（13/33 已迁）；剩余 20 个
+命令的保留原因在 `cli/CLAUDE.md` 的迁移状态表中显式记录，未来扩展 workflow
+时按此 gap 列表对照修补。
 
 ---
 
@@ -250,5 +251,6 @@ pip install -e .
 - `PYTHONPATH=src pytest test/integration/test_main.py -q`：**8 passed**
 - `PYTHONPATH=src pytest test/integration -q`：**44 passed**（Phase 1 修复了之前的 11 failed）
 
-剩余待评估的工作只剩 Phase 4（CLI facade 收敛）和 Phase 5（VASP placeholder
-后续扩展记录），均为后置项，按需启动；Phase 0–3 不应再被任何 agent 重新执行。
+Phase 4（CLI facade 收敛）已在 commit `58ce053` 完成；唯一仍开放的工作是
+Phase 5（VASP placeholder 后续扩展记录），作为 backlog 按需启动。
+Phase 0–4 不应再被任何 agent 重新执行。
