@@ -222,9 +222,24 @@ class ConstraintRun:
 
 ### 3.3 派生属性(read-only `@property`)
 
-完整保留 `ColvarMDInfo` 现有 4 个派生项:
+完整保留 `ColvarMDInfo` 现有 4 个派生项,**加 2 个 Phase 5b legacy alias property**
+(Phase 4 实施时引入,Phase 5 业务命名清理时删除):
 
 ```python
+# Phase 5b legacy aliases — let business code (17 sites) using
+# .restart / .lagrange keep working without changes; Phase 5
+# naming cleanup removes these along with the 17 caller sites.
+@property
+def restart(self) -> ConstraintMetadata:
+    """Phase 5b legacy alias for `metadata`."""
+    return self.metadata
+
+@property
+def lagrange(self) -> LambdaSeries:
+    """Phase 5b legacy alias for `lambda_series`."""
+    return self.lambda_series
+
+# Original 4 derived properties:
 @property
 def n_steps(self) -> int: ...
 
@@ -242,6 +257,14 @@ def target_series_au(self, colvar_id: int | None = None) -> np.ndarray:
     # where dt_au = timestep_fs / AU_TIME_TO_FS
 ```
 
+**关于 `from_paths` classmethod**:历史 `ColvarMDInfo.from_paths(restart_path,
+log_path)` classmethod **不**在 ConstraintRun 上重实现。理由:`from_paths` 需要调
+parser + raw→canonical 转换 helper,转换 helper 在 `engines.cp2k`;若在
+`engines.models.ConstraintRun` 上加 classmethod 调 `engines.cp2k.read_constraint_run_from_files`,
+会形成 `engines.models → engines.cp2k` import cycle。**解决方案**:`from_paths`
+作为 standalone facade `engines.cp2k.read_constraint_run_from_files` 提供(见
+§3.4);3 处业务调用切到该 facade。
+
 **关键约束(codex Round 3 §2.3)**:
 
 - 派生 property 公式 **目前**与 `ColvarMDInfo` 完全一致(CP2K SHAKE/RATTLE 口径)
@@ -255,7 +278,7 @@ def target_series_au(self, colvar_id: int | None = None) -> np.ndarray:
 ### 3.4 Facade 签名
 
 ```python
-# engines/cp2k.py
+# engines/cp2k.py — directory-level (the historical facade)
 def read_constraint_run(directory: Path | str) -> ConstraintRun: ...
     """Read a CP2K constraint-MD point as a composite view.
 
@@ -266,6 +289,42 @@ def read_constraint_run(directory: Path | str) -> ConstraintRun: ...
 
     Does NOT extend ConstraintMDParser Protocol; the engine-neutral
     layer simply composes two existing parser calls.
+    """
+
+# engines/cp2k.py — file-level facades (Phase 4 Commit 1 additions)
+def read_constraint_metadata_from_restart(
+    restart_path: Path | str,
+) -> ConstraintMetadata: ...
+    """Read a single CP2K *.restart file -> canonical ConstraintMetadata.
+
+    File-level analogue of read_constraint_metadata(directory). Used by
+    callers that already located the .restart file (e.g. scripts/TIGen
+    and cli/_scripts SG preview).
+    """
+
+def read_lambda_series_from_log(
+    log_path: Path | str,
+) -> LambdaSeries: ...
+    """Read a single CP2K *.LagrangeMultLog file -> canonical LambdaSeries.
+
+    File-level analogue of read_lambda_series(directory).
+    """
+
+def read_constraint_run_from_files(
+    restart_path: Path | str,
+    log_path: Path | str,
+) -> ConstraintRun: ...
+    """Read a CP2K constraint-MD run from explicit (restart, log) paths.
+
+    File-level analogue of read_constraint_run(directory); replaces the
+    historical ColvarMDInfo.from_paths(...) class-method (which is NOT
+    re-implemented on ConstraintRun to avoid an engines.models ->
+    engines.cp2k import cycle; see §3.3).
+
+    Internally:
+      metadata = read_constraint_metadata_from_restart(restart_path)
+      lambda_series = read_lambda_series_from_log(log_path)
+      return ConstraintRun(metadata=metadata, lambda_series=lambda_series)
     """
 ```
 
@@ -742,8 +801,8 @@ canonical 类型 / engines alias,**不** runtime import engines。所有
 
 | 调用点 | 当前 import / 用法 | Phase 4 改造(同 commit 切) |
 |---|---|---|
-| `scripts/TIGen.py:19` | `from ..utils.formats.cp2k.colvar import parse_colvar_restart` + 用 `restart.colvars.primary.target_au` 等 | 切到 `from ..engines.cp2k import read_constraint_metadata`;调用方式从 `parse_colvar_restart(path)` 改为 `read_constraint_metadata(directory)`(canonical) — 或保留 parser 直调 + 通过 `_cp2k_raw_to_constraint_metadata(raw)` 转 canonical 后再访问 `.colvars.primary` |
-| `test/unit/utils/test_slowgrowth_parser.py:11` | `from md_analysis.utils.formats.cp2k.colvar import (ColvarInfo, ColvarMDInfo, ColvarParseError, ColvarRestart, ConstraintInfo, LagrangeMultLog, compute_target_series, parse_colvar_restart, parse_lagrange_mult_log)` | 拆分:`ColvarInfo` / `ColvarMDInfo` / `ColvarRestart` / `ConstraintInfo` / `LagrangeMultLog` 从 `md_analysis.engines.models` import;`ColvarParseError` / `compute_target_series` / `parse_colvar_restart` / `parse_lagrange_mult_log` 保留 utils path |
+| `scripts/TIGen.py:19` | `from ..utils.formats.cp2k.colvar import parse_colvar_restart` + 用 `restart.colvars.primary.target_au` 等 | 切到 `from ..engines.cp2k import read_constraint_metadata_from_restart`;调用方式 `parse_colvar_restart(restart_path)` → `read_constraint_metadata_from_restart(restart_path)`;返 canonical,业务 `.colvars.primary` 等 accessor 不变(5 处 caller:line 19 + 284 / 486 / 567 / 674) |
+| `test/unit/utils/test_slowgrowth_parser.py:11` | `from md_analysis.utils.formats.cp2k.colvar import (ColvarInfo, ColvarMDInfo, ColvarParseError, ColvarRestart, ConstraintInfo, LagrangeMultLog, compute_target_series, parse_colvar_restart, parse_lagrange_mult_log)` | 拆分三组:① `ColvarInfo` / `ColvarMDInfo` / `ColvarRestart` / `ConstraintInfo` / `LagrangeMultLog` 切到 `md_analysis.engines.models`;② `compute_target_series` 切到 `md_analysis.engines.cp2k`(Phase 4 Commit 1 物理迁移);③ `ColvarParseError` / `parse_colvar_restart` / `parse_lagrange_mult_log` 保留 utils path |
 | `test/unit/utils/test_slowgrowth_parser.py:367` | `from md_analysis.utils.formats.cp2k.colvar import _parse_fixed_atoms_list` | 不切(private utils helper) |
 | `test/unit/scripts/test_ti_gen.py:22` | `from md_analysis.utils.formats.cp2k.colvar import (ColvarRestart, ColvarInfo, ConstraintInfo)` | 全部切到 `from md_analysis.engines.models import (...)` |
 | `test/unit/engines/test_facade.py:67` | `from md_analysis.utils.formats.cp2k.colvar import (ColvarRestart, LagrangeMultLog)` | 切到 `from md_analysis.engines.models import (ColvarRestart, LagrangeMultLog)`;`test_facade.py:72-73` 的 `assert ColvarRestart is ConstraintMetadata` 仍成立(canonical alias 物理在 engines.models) |
@@ -751,10 +810,14 @@ canonical 类型 / engines alias,**不** runtime import engines。所有
 | `engines/protocols.py:18` | `from .models import ConstraintMetadata, LambdaSeries` | 不动 |
 | `engines/cp2k.py:33` | `from ..utils.formats.cp2k.colvar import (parse_colvar_restart, parse_lagrange_mult_log)` | 不动 import,但调用方式改:parser 返 raw → 走 `_cp2k_raw_to_constraint_metadata` / `_cp2k_raw_to_lambda_series` 转换 helper |
 | `enhanced_sampling/slowgrowth/SlowGrowth.py:18` | `from ...utils.formats.cp2k.colvar import ColvarMDInfo` | 同 commit 切到 `from ...engines.models import ColvarMDInfo`(`ColvarMDInfo = ConstraintRun` alias 物理在 engines.models) |
-| `enhanced_sampling/slowgrowth/SlowGrowth.py:179` | 同上 | 同上 |
-| `enhanced_sampling/constrained_ti/workflow.py:681` | `from ...utils.formats.cp2k.colvar import ColvarMDInfo` | 同上 |
+| `enhanced_sampling/slowgrowth/SlowGrowth.py:150` | `md_info = ColvarMDInfo.from_paths(restart_path, log_path)` | 切到 `md_info = read_constraint_run_from_files(restart_path, log_path)`;同 commit 加 `from ...engines.cp2k import read_constraint_run_from_files` |
+| `enhanced_sampling/slowgrowth/SlowGrowth.py:179` | 同 `:18`(`from_directory` 内 lazy import) | 同上 |
+| `enhanced_sampling/slowgrowth/SlowGrowth.py:186` | `md_info = ColvarMDInfo(restart=parser_obj.parse_metadata(directory), lagrange=parser_obj.parse_lambda_series(directory))` | kwarg rename:`metadata=parser_obj.parse_metadata(directory), lambda_series=parser_obj.parse_lambda_series(directory)`(ColvarMDInfo alias 不变,只换 canonical kwarg 名) |
+| `enhanced_sampling/constrained_ti/workflow.py:681` | `from ...utils.formats.cp2k.colvar import ColvarMDInfo` | 同 SlowGrowth:18 |
+| `enhanced_sampling/constrained_ti/workflow.py:683` | `md_info = ColvarMDInfo.from_paths(restart_path, log_path)` | 同 SlowGrowth:150 |
 | `cli/_enhanced_sampling.py:44` | `lazy_import("md_analysis.utils.formats.cp2k.colvar", "ColvarMDInfo")` | 同 commit 切到 `lazy_import("md_analysis.engines.models", "ColvarMDInfo")` |
-| `cli/_scripts.py:267` | `lazy_import("md_analysis.utils.formats.cp2k.colvar", "parse_colvar_restart")` | 同 commit 切到 `lazy_import("md_analysis.engines.cp2k", "read_constraint_metadata")`(走 facade 拿 canonical)或保留 utils path(仅消费 raw)— Phase 4 实施时选定后写在 commit message |
+| `cli/_enhanced_sampling.py:47` | `info = ColvarMDInfo.from_paths(restart_path, log_path)` | 改 lazy_import 字符串 `lazy_import("md_analysis.engines.cp2k", "read_constraint_run_from_files")`,调用切到 `info = read_constraint_run_from_files(restart_path, log_path)` |
+| `cli/_scripts.py:267` | `lazy_import("md_analysis.utils.formats.cp2k.colvar", "parse_colvar_restart")` | 同 commit 切到 `lazy_import("md_analysis.engines.cp2k", "read_constraint_metadata_from_restart")`;局部变量同步 rename;业务 `restart.colvars.primary` 等 canonical accessor 不变 |
 | `agent/_tasks_legacy.py:677` | FQN 字符串 `"md_analysis.utils.formats.cp2k.colvar.ColvarParseError"` | **不**切(`ColvarParseError` 是 utils CP2K-specific exception,保留在 utils) |
 
 **Phase 4 测试基线门槛**:同 commit 切完上述站点后,全量 unit 729 / integration 44
