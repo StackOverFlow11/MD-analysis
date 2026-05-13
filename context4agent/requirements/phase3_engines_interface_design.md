@@ -273,17 +273,22 @@ def read_constraint_run(directory: Path | str) -> ConstraintRun: ...
 
 - **不**扩展 `ConstraintMDParser` Protocol(Round 3 §1 已锁:facade 内部组合已有
   parser)
-- `ColvarMDInfo` 在 `utils.formats.cp2k.colvar` 保留为**过渡期 alias**(`ColvarMDInfo
-  = ConstraintRun`),让旧测试不破;Phase 5 业务迁移后再删
 - 现有 `read_constraint_metadata` / `read_lambda_series` 不动
+
+`ColvarMDInfo` 在 Phase 4 Commit 2 物理迁移到 `engines.models`(作为
+`ColvarMDInfo = ConstraintRun` 别名),`utils.formats.cp2k.colvar` 删除定义、**不**
+保留任何 alias re-export(R2 硬约束,见 §6.4 同 commit 切 caller)。
 
 ### 3.6 Phase 4 实施门槛
 
 - ✅ 新增 `engines.models.ConstraintRun`(物理定义)
 - ✅ 新增 `engines.cp2k.read_constraint_run(directory)` facade
 - ✅ 在 `engines/__init__.py` re-export `ConstraintRun`
-- ✅ `utils.formats.cp2k.colvar` 加 `ColvarMDInfo = ConstraintRun` alias(过渡期)
-- ⚠️ Phase 4 **不**改业务 caller(留 Phase 5)
+- ✅ `engines.models` 加 `ColvarMDInfo = ConstraintRun` 别名(物理定义在 engines)
+- ✅ `utils.formats.cp2k.colvar` **删除** `ColvarMDInfo` 定义,**不**做 utils 层
+  re-export(R2 硬约束)
+- ✅ 同 commit 把 §6.4 表中所有 `ColvarMDInfo` import 站点(SG×2 + TI×1 + CLI×1
+  lazy_import + 测试)切到 `engines.models`
 - ⚠️ 与 §6(D10 dataclass 物理迁移)**强耦合**:`ConstraintRun` 字段引用 canonical
   `ConstraintMetadata` / `LambdaSeries`,这两个必须先完成物理迁移到 engines.models
 
@@ -470,9 +475,17 @@ def read_center_potential_scalar_frame(
 
 **facade 内部行为**(纯聚合,不引入新业务公式):
 
+> **注意**:实际 `slab_average_potential_ev` 签名是
+> `(header, values, thickness_ang, *, z_center_ang=None)` — 三个 positional
+> 参数 + 一个 keyword-only 参数(`z_center_ang`,注意是 `z_center_ang` 不是
+> `center_z_ang`)。下面 pseudo-code 严格按实际签名调用。
+
 ```
 phi_center_ev, info = slab_average_potential_ev(
-    frame.header, frame.values, center_z_ang, slab_thickness_ang
+    frame.header,
+    frame.values,
+    slab_thickness_ang,
+    z_center_ang=center_z_ang,
 )
 return CenterPotentialScalarFrame(
     step=frame.step,
@@ -918,7 +931,7 @@ equal
 |---|---|---|
 | **model property 小单测** | 每个新 dataclass 的派生 property:`CellSpec.abc_ang` / `CellSpec.is_orthorhombic` / `ConstraintRun.target_series_au` / `ConstraintRun.times_fs` 等 | 派生值正确,与 utils 旧实现 numerically equal(`np.testing.assert_allclose` atol=1e-12) |
 | **CP2K raw → engines canonical 转换测试** | `_cp2k_raw_to_constraint_metadata` / `_cp2k_raw_to_lambda_series` | 转换前后字段值 byte-equal;字段集完整(用 `dataclasses.fields()` 对照) |
-| **import 边界扫描** | `rg "from .*engines\|^import.*engines" src/md_analysis/utils --type py \| grep -v TYPE_CHECKING` | 仅 `utils/formats/cp2k/colvar.py` 的 ColvarMDInfo re-export 在过渡期合法;其他全空 |
+| **import 边界扫描** | `rg "from .*engines\|^import.*engines" src/md_analysis/utils --type py \| grep -v TYPE_CHECKING` | **全空**(R2 硬约束;过渡期 re-export 已删除,见 §6.3 Step 5 + §6.4 同 commit 切 caller 策略) |
 | **data_example 回归** | `data_example/potential/` + `data_example/bader/` + `data_example/sg/` | integration 全过(44 passed) + CSV 列值 byte-equal(diff fixture 输出) |
 | **业务 caller 不破** | full unit + integration | 729 + 44 基线不变 |
 
@@ -935,13 +948,14 @@ Phase 4 完成后,业务层 import 形态:
 | `water._common._parse_abc_from_md_inp` | 仍直读 `utils.formats.cp2k.cell` | 切到 `engines.cp2k.read_cell(...)` → `CellSpec.abc_ang` |
 | `electrochemical.potential.CenterPotential.parse_md_out_fermi` (line 447) | 仍直读 | 选项 a:切到 `engines.cp2k.read_center_potential_scalar_frame(...)`(同时迁离 dict 接口);选项 b:保留 dict 接口直读,只在新增分支切 facade(Phase 5 拍板) |
 | `electrochemical.charge.Bader.*` (7 处) | 保持 | Phase 4 不动,留待 Phase 8 charge engines facade 落地 |
-| `enhanced_sampling.slowgrowth.SlowGrowth.{from_paths,from_directory}` (2 处) | 仍直读 `ColvarMDInfo`(已是 `ConstraintRun` alias) | 切到 `from engines.models import ConstraintRun` |
+| `enhanced_sampling.slowgrowth.SlowGrowth.{from_paths,from_directory}` (2 处) | **已 import** `from ...engines.models import ColvarMDInfo`(Phase 4 Commit 2 同步切完;`ColvarMDInfo` 是 `ConstraintRun` 别名,物理定义在 engines.models) | **命名清理**:把 `ColvarMDInfo` import 名换成 canonical `ConstraintRun`,删除别名依赖 |
 | `enhanced_sampling.constrained_ti.workflow.standalone_diagnostics` (1 处) | 同上 | 同上 |
 | `enhanced_sampling.constrained_ti.correction._get_electrode_area` (1 处) | 仍直读 `load_bader_atoms` | Phase 5 cleanup:可独立提"从 POSCAR 读 cell"小 helper(charge 仍留 utils);或同 Phase 8 charge facade 一起迁 |
 
 Phase 5 commit 边界初步设想:
 - 1 笔:水/cli cell 迁移(D7 CellSpec 消费方)
-- 1 笔:SG/TI/cli composite 迁移(D8 ConstraintRun 消费方)
+- 1 笔:SG/TI/cli 命名清理(`ColvarMDInfo` → `ConstraintRun`;Phase 4 已完成路径
+  切换,Phase 5 只做 canonical 名字统一)
 - 1 笔:potential Fermi-only / dict 接口迁移(D11 + dict 历史决议同步处理)
 - charge / correction 业务迁移留 Phase 8(VASP 阶段)
 
