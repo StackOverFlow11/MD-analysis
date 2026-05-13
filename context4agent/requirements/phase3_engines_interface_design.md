@@ -446,23 +446,58 @@ class CenterPotentialScalarFrame:
 
 以上仍在 `electrochemical.potential` 业务层。
 
-### 5.4 Facade 签名(草案)
+### 5.4 Facade 签名(Phase 3 敲定)
 
 ```python
 # engines/cp2k.py
 def read_center_potential_scalar_frame(
+    frame: PotentialFrame,
     *,
-    cube_path: Path,
-    md_out_path: Path | None = None,
-    sp_out_path: Path | None = None,
-    center_source: str = "interface",
+    center_z_ang: float,
     slab_thickness_ang: float,
-    ...
+    center_source: str = "manual",
 ) -> CenterPotentialScalarFrame: ...
 ```
 
-具体签名细节(参数取自现有 `slab_average_potential_ev` + `parse_md_out_fermi` /
-`parse_sp_out_fermi` 的输入集合)由 Phase 4 实施时按调用点最小化原则拍板。
+**契约**:
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| `frame` | `PotentialFrame` | 已解析帧;facade 不重新读 cube / md.out。`frame.header` + `frame.values` 提供 cube 数据;`frame.fermi_raw` 提供 Hartree Fermi(facade 内部 `× HA_TO_EV` 得 `fermi_level_ev`);`frame.step` / `frame.time_fs` 直接透传 |
+| `center_z_ang` | `float` | slab 中心 z 坐标(Å);**必须由 caller 提供**,facade **不**做 interface 检测 |
+| `slab_thickness_ang` | `float` | slab 取的厚度(Å) |
+| `center_source` | `str` | 仅作为 metadata 透传到 `CenterPotentialScalarFrame.center_source`;默认 `"manual"`,业务层若先做 interface 检测可传 `"interface"`(`"cell"` 也是合法值,语义见 §5.2) |
+
+**facade 内部行为**(纯聚合,不引入新业务公式):
+
+```
+phi_center_ev, info = slab_average_potential_ev(
+    frame.header, frame.values, center_z_ang, slab_thickness_ang
+)
+return CenterPotentialScalarFrame(
+    step=frame.step,
+    time_fs=frame.time_fs,
+    center_source=center_source,
+    center_z_ang=center_z_ang,
+    slab_thickness_ang=slab_thickness_ang,
+    phi_center_ev=phi_center_ev,
+    fermi_level_ev=(
+        frame.fermi_raw * HA_TO_EV if frame.fermi_raw is not None else None
+    ),
+    phi_z_std_ev=info.get("phi_z_std_ev"),
+    n_slices=info.get("n_slices"),
+)
+```
+
+**红线**(codex Round 5 MEDIUM):
+
+- engines **不**做 interface 检测;业务层先调 `detect_interface_layers(atoms)` →
+  `_extract_interface_geometry(...)` 得到 `center_z_ang`,再传 facade
+- engines **不**读 `md.out` / `sp.out`;Fermi 走 `frame.fermi_raw`(已由
+  `read_continuous_potential_frames` / `read_distributed_potential_frames` 在帧构造
+  时解析)
+- 这把 engines 的责任锁死在"已知 frame + 已知 center + 厚度 → 标量 reduce";业务
+  层 interface 检测 + Fermi 选源都在 frame 构造前完成
 
 ### 5.5 Phase 4 实施门槛(**核心约束**)
 
@@ -495,21 +530,35 @@ def read_center_potential_scalar_frame(
 
 ```
 engines/models.py
+    # ── Nested neutral types (physical definition here) ──
     @dataclass(frozen=True)
-    class ConstraintMetadata:    # physical definition here
+    class ConstraintInfo:        # neutral: collective-variable constraint
+        colvar_id: int
+        target_au: float
+        target_growth_au: float
+        intermolecular: bool
+
+    @dataclass(frozen=True)
+    class ColvarInfo:            # neutral: collection of constraints
+        constraints: tuple[ConstraintInfo, ...]
+        # property primary + __len__ / __getitem__ / __iter__ 保留
+
+    # ── Canonical models (physical definition here) ──
+    @dataclass(frozen=True)
+    class ConstraintMetadata:
         project_name: str
         step_start: int
         time_start_fs: float
         timestep_fs: float
         total_steps: int
-        colvars: ColvarInfo      # NOTE: ColvarInfo / ConstraintInfo
-                                 # are CP2K-specific sub-types — see §6.4
+        colvars: ColvarInfo      # nested type is now neutral, lives in
+                                 # engines.models — see §6.2.1
         lagrange_filename: str | None
         cell_abc_ang: tuple[float, float, float]
         fixed_atom_indices: tuple[int, ...] | None
 
     @dataclass(frozen=True)
-    class LambdaSeries:           # physical definition here
+    class LambdaSeries:
         shake: np.ndarray
         rattle: np.ndarray
         n_steps: int
@@ -517,20 +566,51 @@ engines/models.py
         # property collective_shake / collective_rattle 保留
 
 utils/formats/cp2k/colvar.py
+    # CP2K-specific raw types — field set identical to canonical ones
+    # but flagged distinct so the conversion boundary is explicit.
+    # Parsers return these; engines.cp2k converts them to canonical
+    # engines.models types. NO runtime import of engines (R2).
     @dataclass(frozen=True)
-    class Cp2kConstraintMetadataRaw:   # CP2K-specific raw type
-        # fields equivalent to current ConstraintMetadata
-        ...
+    class Cp2kConstraintInfoRaw:
+        colvar_id: int
+        target_au: float
+        target_growth_au: float
+        intermolecular: bool
+
     @dataclass(frozen=True)
-    class Cp2kLambdaSeriesRaw:         # CP2K-specific raw type
-        ...
+    class Cp2kColvarInfoRaw:
+        constraints: tuple[Cp2kConstraintInfoRaw, ...]
+        # No accessor methods on raw side; engines.cp2k builds the
+        # accessor-bearing canonical ColvarInfo during conversion.
+
+    @dataclass(frozen=True)
+    class Cp2kConstraintMetadataRaw:
+        project_name: str
+        step_start: int
+        time_start_fs: float
+        timestep_fs: float
+        total_steps: int
+        colvars: Cp2kColvarInfoRaw
+        lagrange_filename: str | None
+        cell_abc_ang: tuple[float, float, float]
+        fixed_atom_indices: tuple[int, ...] | None
+
+    @dataclass(frozen=True)
+    class Cp2kLambdaSeriesRaw:
+        shake: np.ndarray
+        rattle: np.ndarray
+        n_steps: int
+        n_constraints: int
+
     def parse_colvar_restart(path) -> Cp2kConstraintMetadataRaw: ...
     def parse_lagrange_mult_log(path) -> Cp2kLambdaSeriesRaw: ...
-    # NO runtime import of engines (R2)
 
 engines/cp2k.py
+    def _cp2k_raw_to_constraint_info(raw) -> ConstraintInfo: ...
+    def _cp2k_raw_to_colvar_info(raw) -> ColvarInfo: ...
     def _cp2k_raw_to_constraint_metadata(raw) -> ConstraintMetadata: ...
     def _cp2k_raw_to_lambda_series(raw) -> LambdaSeries: ...
+
     def read_constraint_metadata(directory) -> ConstraintMetadata:
         raw = parse_colvar_restart(...)
         return _cp2k_raw_to_constraint_metadata(raw)
@@ -538,6 +618,27 @@ engines/cp2k.py
         raw = parse_lagrange_mult_log(...)
         return _cp2k_raw_to_lambda_series(raw)
 ```
+
+#### 6.2.1 嵌套类型也物理迁移(codex Round 5 HIGH 2)
+
+`ConstraintMetadata.colvars: ColvarInfo` 的嵌套类型 `ColvarInfo` / `ConstraintInfo`
+**字段本身已经是 engine-neutral 物理量**(`colvar_id` / `target_au` /
+`target_growth_au` / `intermolecular`),但**物理定义位置**留在
+`utils.formats.cp2k.colvar` 会让 canonical model 携带 CP2K-specific 语义,与 D10
+"canonical model 完全 neutral"目标冲突(TYPE_CHECKING 解决 import 不解决语义泄漏)。
+
+**修订决议**:`ColvarInfo` 与 `ConstraintInfo` **物理迁移到** `engines.models`,
+成为 neutral nested contract;CP2K 端用同字段的 `Cp2kColvarInfoRaw` /
+`Cp2kConstraintInfoRaw` raw 类型(平行结构、不同 import 路径),由 engines.cp2k
+转换函数 `_cp2k_raw_to_colvar_info` / `_cp2k_raw_to_constraint_info` 一对一字段
+映射成 canonical 实例。
+
+VASP 端将来实现时:
+- 用各自的 `VaspConstraintInfoRaw` / `VaspColvarInfoRaw`(字段集可能不同,VASP
+  REPORT 表达若不同则 raw 端各自扩展)
+- 用 `_vasp_raw_to_colvar_info(...)` 转换;**若 VASP 语义无法无损映射到 neutral
+  `ConstraintInfo` 的 4 字段**,**禁止** silent fallback,**必须** raise
+  `NotImplementedError`(与 §3.3 `ConstraintRun` VASP fallback 禁令一致)
 
 **Raw 类型命名(codex Round 4 补充 #3)**:**不**用下划线开头。
 
@@ -551,25 +652,27 @@ engines/cp2k.py
 
 #### Step 1 — 引入 raw 类型(纯新增,不破坏)
 
-- 在 `utils/formats/cp2k/colvar.py` 新增 `Cp2kConstraintMetadataRaw` /
-  `Cp2kLambdaSeriesRaw` 两个 dataclass(字段集与当前 `ConstraintMetadata` /
+- 在 `utils/formats/cp2k/colvar.py` 新增 `Cp2kConstraintInfoRaw` /
+  `Cp2kColvarInfoRaw` / `Cp2kConstraintMetadataRaw` / `Cp2kLambdaSeriesRaw` 四个
+  dataclass(字段集与当前 `ConstraintInfo` / `ColvarInfo` / `ConstraintMetadata` /
   `LambdaSeries` 1:1)
-- 在该文件**保留**现有 `ConstraintMetadata` / `LambdaSeries` 定义(暂时)
+- 在该文件**保留**现有 `ConstraintInfo` / `ColvarInfo` / `ConstraintMetadata` /
+  `LambdaSeries` 定义(暂时)
+- `utils.formats.cp2k.colvar` **不**从 engines import 任何东西(R2)
 
 #### Step 2 — 物理迁移 canonical 定义
 
-- 在 `engines/models.py` 新增 `ConstraintMetadata` / `LambdaSeries` 的**物理定义**
+- 在 `engines/models.py` 新增 `ConstraintInfo` / `ColvarInfo` /
+  `ConstraintMetadata` / `LambdaSeries` 的**物理定义**(含 `ColvarInfo` accessor
+  methods + `LambdaSeries` `collective_shake` / `collective_rattle` property)
 - 移除 `engines.models:41` 的 `from ..utils.formats.cp2k.colvar import ...` re-export
-- 在 `utils/formats/cp2k/colvar.py` 删除现有 `ConstraintMetadata` / `LambdaSeries`
-  类定义
-- `ColvarRestart = ConstraintMetadata` / `LagrangeMultLog = LambdaSeries` 两个
-  Phase 5b 历史 alias **更新**:从 `engines.models` re-export(让旧测试不破)
-  — 这意味着 `utils.formats.cp2k.colvar` **需要**从 engines re-export 来满足
-  alias。**这违反 R2**(utils 不反向 import engines)。
-- **解决方案**:这两个 alias **物理搬到** `engines.models`(`ColvarRestart =
-  ConstraintMetadata; LagrangeMultLog = LambdaSeries`),`utils.formats.cp2k.colvar`
-  不再持有它们。旧测试如果 import `from utils.formats.cp2k.colvar import ColvarRestart`
-  会破——见 §6.4 旧调用点清单
+- 在 `utils/formats/cp2k/colvar.py` **删除**现有 `ConstraintInfo` / `ColvarInfo` /
+  `ConstraintMetadata` / `LambdaSeries` 类定义
+- `ColvarRestart` / `LagrangeMultLog` Phase 5b 历史 alias 也**物理搬到** engines.models
+  (`ColvarRestart = ConstraintMetadata; LagrangeMultLog = LambdaSeries`);
+  `utils.formats.cp2k.colvar` 不持有它们,不 import 它们(R2 保持)
+- 旧 test 调用点 `from utils.formats.cp2k.colvar import ColvarRestart` 等
+  **同 commit 切到** `from engines.models import ColvarRestart`(详见 §6.4)
 
 #### Step 3 — parser 函数签名变更
 
@@ -578,52 +681,80 @@ engines/cp2k.py
 
 #### Step 4 — engines.cp2k 转换函数
 
-- 新增 `_cp2k_raw_to_constraint_metadata(raw) -> ConstraintMetadata`(私有 helper,
-  下划线 OK)
+- 新增 `_cp2k_raw_to_constraint_info(raw) -> ConstraintInfo`
+- 新增 `_cp2k_raw_to_colvar_info(raw) -> ColvarInfo`
+- 新增 `_cp2k_raw_to_constraint_metadata(raw) -> ConstraintMetadata`
 - 新增 `_cp2k_raw_to_lambda_series(raw) -> LambdaSeries`
 - 改造 `read_constraint_metadata` / `read_lambda_series` 的内部:从直接返回 parser
   输出 → 调用 raw → 转换 → 返回 canonical
 
-#### Step 5 — `ColvarMDInfo` 处理
+#### Step 5 — `ColvarMDInfo` 物理迁移 + 同步切调用点(codex Round 5 HIGH 1)
 
-- `ColvarMDInfo` 当前在 `utils/formats/cp2k/colvar.py`,且消费 `ConstraintMetadata`
-  / `LambdaSeries`
-- 选项 A:`ColvarMDInfo` 也搬到 `engines.models`,作为 `ConstraintRun` 的 alias
-  (`ColvarMDInfo = ConstraintRun`)
-- 选项 B:删 `ColvarMDInfo`,业务全切到 `ConstraintRun`
-- **Phase 4 选 A**:保留 alias 让 SG/TI/cli 调用点暂时不破,Phase 5 业务迁移时切
+> 破坏性重构原则,**不**保留 utils 层 alias。utils.formats.cp2k.colvar 在
+> Phase 4 结束时**完全不持有** engines 类型,**不** runtime import engines
+> (R2 全程满足)。
 
-### 6.4 旧调用点迁移清单(**Phase 4 实施时必须保证测试通过**)
+5a. **删除** `utils/formats/cp2k/colvar.py` 中的 `ColvarMDInfo` 定义。
+5b. **不**在 utils 层做 `ColvarMDInfo = ConstraintRun` alias re-export(那会
+    引入 utils → engines runtime import,违反 R2)。
+5c. `ColvarMDInfo` 作为**别名**物理搬到 `engines.models`:`ColvarMDInfo =
+    ConstraintRun`(让短期旧消费者 `from engines.models import ColvarMDInfo` 不破;
+    本身**不**违反 R2,因为 alias 住在 engines)。
+5d. **同 commit 把 §6.4 表中所有 `ColvarMDInfo` import 站点从
+    `utils.formats.cp2k.colvar` 机械切到 `engines.models`**(详见 §6.4 新表):
+    业务 5 处 + 测试 3 处 + CLI 2 处 + scripts 0 处(scripts 用 raw type,不切)。
+    cli 的两处 lazy_import 字符串同步从 `"md_analysis.utils.formats.cp2k.colvar"`
+    改成 `"md_analysis.engines.models"` /
+    `"md_analysis.engines.cp2k"`(parse_colvar_restart 走 engines.cp2k facade)。
+5e. agent 的异常 FQN(`ColvarParseError`)**不**切——它是 utils CP2K-specific
+    exception,Phase 5b 之前的 alias **不**搬到 engines。它的 FQN 字符串保留
+    `"md_analysis.utils.formats.cp2k.colvar.ColvarParseError"`。
 
-| 调用点 | 类型 | Phase 4 改造方式 |
+**预估工作量**:Phase 1 同等规模(机械 import path rename;Phase 1 已成功完成
+17 处)。Step 5d 涉及 10 处源码切 + 全套测试改 import,与 Phase 1 utils 重命名
+同复杂度。
+
+### 6.4 旧调用点迁移清单(**Phase 4 同 commit 机械切,不保留 utils 层 alias**)
+
+破坏性重构原则:Phase 4 结束时 utils.formats.cp2k.colvar **不**持有任何 engines
+canonical 类型 / engines alias,**不** runtime import engines。所有
+`ColvarRestart` / `LagrangeMultLog` / `ColvarMDInfo` / `ColvarInfo` /
+`ConstraintInfo` import 站点必须 **同 commit** 从 utils 路径切到 engines.models 路径。
+
+`parse_colvar_restart` / `parse_lagrange_mult_log` 函数本身留在 utils(只签名换 raw),
+直接调用 parser 的 site **可**保留 utils import,但**只**用 raw type;若它们之前
+用 dataclass 字段访问(`.colvars`、`.shake` 等),需要换到 engines.cp2k facade
+(`read_constraint_metadata` / `read_lambda_series`)拿 canonical 实例。
+
+| 调用点 | 当前 import / 用法 | Phase 4 改造(同 commit 切) |
 |---|---|---|
-| `scripts/TIGen.py:19` | `from ..utils.formats.cp2k.colvar import parse_colvar_restart` + 用 `restart.colvars` | parser 返 `Cp2kConstraintMetadataRaw` 后,`raw.colvars` 字段名需要保持 — 见 Note 1 |
-| `test/unit/utils/test_slowgrowth_parser.py` | `from md_analysis.utils.formats.cp2k.colvar import (ColvarInfo, ColvarMDInfo, ColvarParseError, ColvarRestart, ConstraintInfo, LagrangeMultLog, compute_target_series, parse_colvar_restart, parse_lagrange_mult_log)` | `ColvarRestart` / `LagrangeMultLog` 改为 `from md_analysis.engines.models import (...)` 别名;`ColvarMDInfo` 改为 `from md_analysis.engines.models import ConstraintRun as ColvarMDInfo` |
-| `test/unit/scripts/test_ti_gen.py:22` | 同上 import 模式 | 同上 |
-| `test/unit/engines/test_facade.py:67` | `from md_analysis.utils.formats.cp2k.colvar import ColvarRestart, LagrangeMultLog` | 同上 |
-| `engines/models.py:41`(re-export) | `from ..utils.formats.cp2k.colvar import ConstraintMetadata, LambdaSeries` | 删除该 import;改为本地定义 |
-| `engines/protocols.py:18` | `from .models import ConstraintMetadata, LambdaSeries` | 不动(已经经过 engines.models) |
-| `engines/cp2k.py:33` | `from ..utils.formats.cp2k.colvar import (parse_colvar_restart, parse_lagrange_mult_log)` | 不动 import,但调用方式变(从直接返回到走 raw 转换 helper) |
-| `enhanced_sampling/slowgrowth/SlowGrowth.py:18,179` | `from ...utils.formats.cp2k.colvar import ColvarMDInfo` | Phase 4 保留 alias;Phase 5 切到 `from ...engines.models import ConstraintRun` |
-| `enhanced_sampling/constrained_ti/workflow.py:681` | 同上 | 同上 |
-| `cli/_enhanced_sampling.py:44` | `lazy_import("md_analysis.utils.formats.cp2k.colvar", "ColvarMDInfo")` | Phase 4 保留;Phase 6 入口层迁移再切 |
-| `cli/_scripts.py:267` | `lazy_import("md_analysis.utils.formats.cp2k.colvar", "parse_colvar_restart")` | Phase 4 保留;Phase 6 切 |
-| `agent/_tasks_legacy.py:677` | FQN 字符串 `"md_analysis.utils.formats.cp2k.colvar.ColvarParseError"` | `ColvarParseError` **不**迁(它是 utils CP2K-specific exception),保留 |
+| `scripts/TIGen.py:19` | `from ..utils.formats.cp2k.colvar import parse_colvar_restart` + 用 `restart.colvars.primary.target_au` 等 | 切到 `from ..engines.cp2k import read_constraint_metadata`;调用方式从 `parse_colvar_restart(path)` 改为 `read_constraint_metadata(directory)`(canonical) — 或保留 parser 直调 + 通过 `_cp2k_raw_to_constraint_metadata(raw)` 转 canonical 后再访问 `.colvars.primary` |
+| `test/unit/utils/test_slowgrowth_parser.py:11` | `from md_analysis.utils.formats.cp2k.colvar import (ColvarInfo, ColvarMDInfo, ColvarParseError, ColvarRestart, ConstraintInfo, LagrangeMultLog, compute_target_series, parse_colvar_restart, parse_lagrange_mult_log)` | 拆分:`ColvarInfo` / `ColvarMDInfo` / `ColvarRestart` / `ConstraintInfo` / `LagrangeMultLog` 从 `md_analysis.engines.models` import;`ColvarParseError` / `compute_target_series` / `parse_colvar_restart` / `parse_lagrange_mult_log` 保留 utils path |
+| `test/unit/utils/test_slowgrowth_parser.py:367` | `from md_analysis.utils.formats.cp2k.colvar import _parse_fixed_atoms_list` | 不切(private utils helper) |
+| `test/unit/scripts/test_ti_gen.py:22` | `from md_analysis.utils.formats.cp2k.colvar import (ColvarRestart, ColvarInfo, ConstraintInfo)` | 全部切到 `from md_analysis.engines.models import (...)` |
+| `test/unit/engines/test_facade.py:67` | `from md_analysis.utils.formats.cp2k.colvar import (ColvarRestart, LagrangeMultLog)` | 切到 `from md_analysis.engines.models import (ColvarRestart, LagrangeMultLog)`;`test_facade.py:72-73` 的 `assert ColvarRestart is ConstraintMetadata` 仍成立(canonical alias 物理在 engines.models) |
+| `engines/models.py:41`(re-export) | `from ..utils.formats.cp2k.colvar import ConstraintMetadata, LambdaSeries` | **删除该 re-export**;改为本地物理定义 |
+| `engines/protocols.py:18` | `from .models import ConstraintMetadata, LambdaSeries` | 不动 |
+| `engines/cp2k.py:33` | `from ..utils.formats.cp2k.colvar import (parse_colvar_restart, parse_lagrange_mult_log)` | 不动 import,但调用方式改:parser 返 raw → 走 `_cp2k_raw_to_constraint_metadata` / `_cp2k_raw_to_lambda_series` 转换 helper |
+| `enhanced_sampling/slowgrowth/SlowGrowth.py:18` | `from ...utils.formats.cp2k.colvar import ColvarMDInfo` | 同 commit 切到 `from ...engines.models import ColvarMDInfo`(`ColvarMDInfo = ConstraintRun` alias 物理在 engines.models) |
+| `enhanced_sampling/slowgrowth/SlowGrowth.py:179` | 同上 | 同上 |
+| `enhanced_sampling/constrained_ti/workflow.py:681` | `from ...utils.formats.cp2k.colvar import ColvarMDInfo` | 同上 |
+| `cli/_enhanced_sampling.py:44` | `lazy_import("md_analysis.utils.formats.cp2k.colvar", "ColvarMDInfo")` | 同 commit 切到 `lazy_import("md_analysis.engines.models", "ColvarMDInfo")` |
+| `cli/_scripts.py:267` | `lazy_import("md_analysis.utils.formats.cp2k.colvar", "parse_colvar_restart")` | 同 commit 切到 `lazy_import("md_analysis.engines.cp2k", "read_constraint_metadata")`(走 facade 拿 canonical)或保留 utils path(仅消费 raw)— Phase 4 实施时选定后写在 commit message |
+| `agent/_tasks_legacy.py:677` | FQN 字符串 `"md_analysis.utils.formats.cp2k.colvar.ColvarParseError"` | **不**切(`ColvarParseError` 是 utils CP2K-specific exception,保留在 utils) |
 
-**Note 1**:`ColvarInfo` / `ConstraintInfo` 是 `ConstraintMetadata.colvars` 字段的
-子类型,**Phase 4 决议保留在 `utils.formats.cp2k.colvar` 作为 CP2K-specific 嵌套
-类型**——它们不是 engine-neutral 的(VASP 端的 collective variable 表达可能不同)。
-`ConstraintMetadata.colvars: ColvarInfo` 字段类型注解在 `engines.models` 里走
-TYPE_CHECKING + 字符串引用,运行时不导致 utils → engines 反向 import。
+**Phase 4 测试基线门槛**:同 commit 切完上述站点后,全量 unit 729 / integration 44
+**必须**不变;`rg "engines" src/md_analysis/utils --type py` 仅在 docstring 和
+TYPE_CHECKING 块出现,**无** runtime import。
 
 ### 6.5 风险与缓解
 
 | 风险 | 缓解 |
 |---|---|
 | parser 签名变化破坏测试 | Step 1-5 分阶段;每步跑分层测试;Step 3 之前 raw 与 canonical 并存 |
-| `is ConstraintMetadata` 类型断言破裂 | `test/unit/engines/test_facade.py:72-73` 断言 `ColvarRestart is ConstraintMetadata`,Phase 4 后 `ColvarRestart` 物理搬到 engines.models 仍然成立 |
-| utils 反向 import engines(R2 违反) | parser 函数 **不** import engines;只用 raw 类型;转换在 engines.cp2k 完成 |
-| 业务/CLI/agent 调用点回归 | `ColvarMDInfo` / `ColvarRestart` / `LagrangeMultLog` 保留为 engines.models 别名;Phase 4 业务零改动 |
+| `is ConstraintMetadata` 类型断言破裂 | `test/unit/engines/test_facade.py:72-73` 断言 `ColvarRestart is ConstraintMetadata`;Phase 4 把 `ColvarRestart` 别名物理放在 engines.models(`ColvarRestart = ConstraintMetadata`),test import 同 commit 切到 engines.models,断言仍成立 |
+| **R2 红线**:utils 反向 import engines | **硬约束**(codex Round 5 HIGH 1):utils.formats.cp2k.colvar **不** runtime import engines;不持有 engines alias;raw 类型 + 转换 helper 双重隔离。任何引入 utils → engines 的过渡方案在 Phase 4 实施时都**禁止**采用 |
+| §6.4 表中 11 处调用点迁移工作量 | Phase 1 同等机械 import path rename 规模(Phase 1 实际改了 17 处);commit 拆分后每笔可控;§6.4 表给出每处的精确切换目标 |
 
 ### 6.6 Phase 4 实施门槛
 
@@ -724,30 +855,43 @@ Phase 4 总共 **4 笔 commit**(每笔不超过当前已知最大 commit 规模)
 
 ### Commit 1 — D10 物理迁移(最高风险,先做)
 
-- 引入 `Cp2kConstraintMetadataRaw` / `Cp2kLambdaSeriesRaw`
-- 物理迁移 `ConstraintMetadata` / `LambdaSeries` 到 `engines.models`
-- 物理迁移 `ColvarRestart` / `LagrangeMultLog` alias 到 `engines.models`
-- parser 函数签名变更 + raw → canonical 转换 helper
-- `ColvarMDInfo` 暂留 `utils/formats/cp2k/colvar.py` 等下一 commit
+- 引入 raw 类型(`Cp2kConstraintInfoRaw` / `Cp2kColvarInfoRaw` /
+  `Cp2kConstraintMetadataRaw` / `Cp2kLambdaSeriesRaw`)在 utils.formats.cp2k.colvar
+- 物理迁移 canonical 类型(`ConstraintInfo` / `ColvarInfo` / `ConstraintMetadata` /
+  `LambdaSeries`)到 `engines.models`,**含嵌套 neutral 类型**(codex Round 5
+  HIGH 2)
+- 物理迁移 Phase 5b 历史 alias(`ColvarRestart` / `LagrangeMultLog`)到
+  `engines.models`,utils.formats.cp2k.colvar **不**持有它们
+- parser 函数签名变更(返 raw)+ raw → canonical 转换 helper(嵌套四级)
+- §6.4 表中 `ColvarRestart` / `LagrangeMultLog` / `ColvarInfo` / `ConstraintInfo`
+  import 站点(test/unit/engines/test_facade.py + test/unit/utils/test_slowgrowth_parser.py
+  + test/unit/scripts/test_ti_gen.py)**同 commit 切**到 engines.models
+- `ColvarMDInfo` 留 utils.formats.cp2k.colvar 等下一 commit
+
+**门槛**:utils.formats.cp2k.colvar **无** runtime engines import(R2 全程满足)。
 
 **测试**:全量 unit + integration;`test/unit/engines/test_facade.py:72-73` 类型
-断言专项验证
+断言专项验证(`ColvarRestart is ConstraintMetadata` 仍成立);`rg "engines"
+src/md_analysis/utils --type py | grep -v TYPE_CHECKING | grep -v "^.*:#" |
+grep -v "^.*:\".*\""` 仅在 docstring/注释出现
 
-### Commit 2 — D8 ConstraintRun
+### Commit 2 — D8 ConstraintRun + ColvarMDInfo 同步切
 
 - 新增 `engines.models.ConstraintRun`(纯新增)
 - 新增 `engines.cp2k.read_constraint_run(directory)` facade
-- 把 `ColvarMDInfo` 改为 `engines.models.ColvarMDInfo = ConstraintRun` alias
-- `utils.formats.cp2k.colvar.ColvarMDInfo` 改为 `from engines.models import
-  ConstraintRun as ColvarMDInfo`(过渡期 utils → engines re-export 仅在 alias
-  层,**docstring 必须**显式说明这是 Phase 5 业务迁移完成前的过渡)
+- 物理迁移 `ColvarMDInfo` **别名**到 `engines.models`(`ColvarMDInfo =
+  ConstraintRun`)
+- **删除** `utils/formats/cp2k/colvar.py` 中的 `ColvarMDInfo` 定义;**不**在 utils
+  层做 re-export
+- §6.4 表中 5 处 `ColvarMDInfo` import 站点(SG×2 + TI×1 + CLI×1 lazy_import +
+  agent 是字符串保留)**同 commit 机械切**到 engines.models
+- cli `_scripts.py:267` 的 lazy_import 字符串按 §6.4 选定切换方向
 
-**注意**:Commit 2 在 utils/formats/cp2k/colvar.py 引入 utils → engines runtime
-import。这**短期**违反 R2,但是设计文档接受的过渡期成本。Phase 5 业务迁移结束后
-**必须**把这条 re-export 删除。
+**门槛**:utils.formats.cp2k.colvar **无** runtime engines import(R2 全程满足);
+utils 层**不**持有 engines alias。
 
-**测试**:全量 unit + integration;`ConstraintRun.target_series_au` property 公式
-专项测试
+**测试**:全量 unit + integration(729 + 44 基线);`ConstraintRun.target_series_au`
+property 公式专项测试与 utils 旧 `ColvarMDInfo.target_series_au` numerically equal
 
 ### Commit 3 — D7 CellSpec
 
