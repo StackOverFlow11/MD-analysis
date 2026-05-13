@@ -981,5 +981,6 @@ Phase 6 统一处理。
 
 待办:
 1. user + codex 三次审本文件
-2. 通过后进 Phase 4(实施),按 §9 4 笔 commit 推进
+2. 通过后进 Phase 4(实施),按 §9 3 笔 commit 推进(Round 7 把 D10 + D8 合并为
+   Commit 1 原子提交;Phase 4 总笔数 = 3)
 3. 任何 §6.3 / §9 子步骤回归,先停下找根因再继续;不允许在回归未消失时进下一 commit
