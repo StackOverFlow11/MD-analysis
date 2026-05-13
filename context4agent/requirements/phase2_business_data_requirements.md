@@ -26,10 +26,10 @@
 
 | dataclass / facade | 物理语义 | 当前 CP2K-only 实现 |
 |---|---|---|
-| `ConstraintMetadata` | 约束 MD 元数据：target / growth / timestep / fixed atoms / cell | `cp2k_colvar.parse_colvar_restart` |
-| `LambdaSeries` | λ(t) 时间序列：shake / rattle / n_steps / n_constraints | `cp2k_colvar.parse_lagrange_mult_log` |
-| `PotentialFrame` | 单帧 Hartree 势：step / time_fs / cube_path / header / values / fermi_raw / atoms | `cp2k_*.read_(continuous\|distributed)_potential_frames` |
-| `FermiRecord` | 单条 Fermi 记录：step / time_fs / fermi_raw（+ legacy dict 桥接） | `cp2k_stdout.parse_md_out_fermi` |
+| `ConstraintMetadata` | 约束 MD 元数据：target / growth / timestep / fixed atoms / cell | `utils.formats.cp2k.colvar.parse_colvar_restart` |
+| `LambdaSeries` | λ(t) 时间序列：shake / rattle / n_steps / n_constraints | `utils.formats.cp2k.colvar.parse_lagrange_mult_log` |
+| `PotentialFrame` | 单帧 Hartree 势：step / time_fs / cube_path / header / values / fermi_raw / atoms | `engines.cp2k.read_continuous_potential_frames` / `engines.cp2k.read_distributed_potential_frames` |
+| `FermiRecord` | 单条 Fermi 记录：step / time_fs / fermi_raw（+ legacy dict 桥接） | `utils.formats.cp2k.stdout.parse_md_out_fermi` |
 | `read_constraint_metadata(directory)` | 目录 → ConstraintMetadata | CP2K |
 | `read_lambda_series(directory)` | 目录 → LambdaSeries | CP2K |
 | `read_fermi_series(md_out_path)` | md.out → list[FermiRecord] | CP2K |
@@ -69,7 +69,7 @@ elif md_inp_path is not None:
 ### 1.3 engines 当前覆盖现状
 
 `ConstraintMetadata` 内部其实**已经携带 cell ABC**（`parse_abc_from_restart` 是
-`cp2k_colvar.py` 内部 import），但：
+`utils.formats.cp2k.colvar` 内部 import），但：
 
 - 该 cell 字段只能从 `.restart` 文件获得，不能从 `md.inp` 获得。
 - `engines.cp2k` 没有任何"只读 cell 的"facade；`read_constraint_metadata` 返回的对
@@ -215,14 +215,17 @@ elif md_inp_path is not None:
     3. 保留业务直读：业务自己持有 `BaderTrajectoryData`，engines 不抽象 charge。
        理由：Bader frame 几何严格绑定 VASP POSCAR 索引（IndexMapper 已是业务层的
        工程产物），强行 engine-neutral 化收益小于成本。
-  - Phase 2 不选；Phase 3 设计阶段对照三方案的 vasp_*.py 占位实现进度 +
-    `long_term.md` "多引擎适配策略"再决定。
+  - Phase 2 不选；Phase 3 设计阶段对照三方案的 `utils.formats.vasp.*` 占位实现进
+    度 + `long_term.md` "多引擎适配策略"再决定。
 
 - **横向影响**（不论 Phase 3 选哪条）：
-  - `_frame_utils._extract_step_and_time` + `_sorted_frame_dirs` 是 charge 自己的
-    帧发现，与 `engines.cp2k.read_distributed_potential_frames` 在 `potential_t*_i*`
-    上用的发现器（`utils/io/_frame_discovery.py`）属同一类工具，但当前**没有共享
-    抽象**。Phase 3 若收敛 "engine 帧发现"概念，可顺便统一。
+  - charge 的 frame discovery (`_frame_utils._extract_step_and_time` +
+    `_sorted_frame_dirs`) 与 `engines.cp2k.read_distributed_potential_frames` 在
+    `potential_t*_i*` 上用的发现器**都委托到** `utils/io/_frame_discovery.py` 这
+    个底层 frame-dir helper（step/time 名称解析共享）；缺的是 engines-level 的
+    **charge/potential frame abstraction**——potential 走 `PotentialFrame`，
+    charge 走业务层 `BaderTrajectoryData`，两者之间没有公共"engine frame"模型。
+    Phase 3 若收敛 "engine frame" 概念，可与上面 ENGINE-SCOPE 一起拍板。
 
 ---
 
@@ -451,23 +454,39 @@ Protocol + registry sniffing 工作；`TIPointDefinition.metadata` 是
 4. 最后决定 `EXTEND-MODEL`（potential 轻量帧）——风险是与 `engines/CLAUDE.md`
    "dict 接口有意保留"的历史决策对冲，Phase 4 时再做。
 
-### Phase 5 业务迁移工作量预估（doc-only，不指导实现）
+### Phase 5/6 候选迁移点（doc-only，不指导实现）
 
-按"业务层 → engines facade 单一调用点"为单位：
+按"调用点 → 期望走 engines facade"为单位拆成两张表，业务层（Phase 5 主迁移目标）
+与入口层（Phase 6 迁移对象）口径分开，避免与第 7 节的入口层叙述重复或混淆。
+`utils.formats.common.cube` 这种纯算法工具的业务直读不计入迁移点（按 Phase 1 边
+界本就该住在 utils 层，见 2.4 STAY-AS-IS）。
 
-| 业务节点 | 当前调用点 | 迁移后期望 |
+**Phase 5 — 业务层候选迁移点**
+
+| 业务节点 | 调用点数 | 迁移后期望 |
 |---|---|---|
-| `water.WaterAnalysis._common._parse_abc_from_md_inp` | 1 处 | 走 engines cell facade |
-| `electrochemical.potential.CenterPotential.parse_md_out_fermi` | 1 处 | 走 engines fermi facade（如果 dict 接口同期改造）|
-| `electrochemical.charge.Bader.{BaderData,AtomCharges,SurfaceCharge}.load_bader_atoms` | 7 处 | 视 ENGINE-SCOPE 拍板决定 |
-| `enhanced_sampling.slowgrowth.SlowGrowth.{from_paths,from_directory}` | 2 处（ColvarMDInfo） | 走 engines composite facade |
-| `enhanced_sampling.constrained_ti.workflow.standalone_diagnostics` | 1 处 | 同上 |
-| `enhanced_sampling.constrained_ti.correction._get_electrode_area` | 1 处 | 视 ENGINE-SCOPE 拍板决定；若 charge 留业务层，独立提一个"读 cell from poscar"的 facade |
-| `scripts.TIGen.parse_colvar_restart` | 1 处 | Phase 6 决定是否走 engines |
+| `water.WaterAnalysis._common._parse_abc_from_md_inp` | 1 | 走 engines cell facade（NEW-FACADE） |
+| `electrochemical.potential.CenterPotential` 内 `parse_md_out_fermi` | 1 | 走 engines fermi facade（与 EXTEND-MODEL "轻量帧" 决议耦合） |
+| `electrochemical.charge.Bader.{BaderData, AtomCharges, SurfaceCharge}` 调 `load_bader_atoms` | 3 处 import × 多次调用（共 7 次） | 视 ENGINE-SCOPE 拍板决定 |
+| `enhanced_sampling.slowgrowth.SlowGrowth.{from_paths, from_directory}` 内 `ColvarMDInfo` | 2 | 走 engines composite facade（EXTEND-MODEL） |
+| `enhanced_sampling.constrained_ti.workflow.standalone_diagnostics` 内 `ColvarMDInfo` | 1 | 同上 |
+| `enhanced_sampling.constrained_ti.correction._get_electrode_area` 调 `load_bader_atoms` | 1 | 视 ENGINE-SCOPE 拍板决定；若 charge 留业务层，独立提"从 POSCAR 读 cell"的 facade |
 
-业务层共**14 处**消费 utils.formats 直接 import（不含 cli/agent 入口层与
-utils.formats.common.cube 这种纯算法工具）。Phase 5 迁移 commit 边界初步设想：
-按 `EXTEND-MODEL` / `NEW-FACADE` / `ENGINE-SCOPE` 三组各一笔 commit。
+业务层迁移 commit 边界初步设想：按 `EXTEND-MODEL` / `NEW-FACADE` / `ENGINE-SCOPE`
+三组各一笔 commit。
+
+**Phase 6 — 入口层候选迁移点（与第 7 节同源，不重复统计）**
+
+| 入口层节点 | 调用点数 | 形式 |
+|---|---|---|
+| `cli/_params.py` `CellAbcParam.collect` | 1 | `from ..utils.formats.cp2k.cell import ...` |
+| `cli/_scripts.py` `_print_sg_cv_info` | 1 | `lazy_import("md_analysis.utils.formats.cp2k.colvar", "parse_colvar_restart")` |
+| `cli/_enhanced_sampling.py` `_print_sg_info` | 1 | `lazy_import("md_analysis.utils.formats.cp2k.colvar", "ColvarMDInfo")` |
+| `agent/_tasks_legacy.py` ExceptionMapping FQN | 1 | 异常 FQN 字符串 `md_analysis.utils.formats.cp2k.colvar.ColvarParseError` |
+| `scripts/TIGen.py` `parse_colvar_restart` | 1 | `from ..utils.formats.cp2k.colvar import ...`（generator 写文件流程，非分析） |
+
+入口层迁移**不在 Phase 5 范围**，避免与业务层迁移互相阻塞；Phase 3 设计 facade 时
+需要把这 5 个调用点列为下游消费者一并考虑（见 7.2）。
 
 ### Phase 2 不回答的问题（明确留给 Phase 3）
 
