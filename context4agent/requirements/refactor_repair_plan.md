@@ -144,28 +144,58 @@
 
 ---
 
-## Phase 4：CLI facade 收敛评估
+## Phase 4：CLI facade 收敛评估 ✅ 完成
 
 **目的**：决定是否继续把 CLI 命令统一改走 `md_analysis.workflows`。
 
-这一步不是主重构完成的阻塞项，可以单独安排。
+执行结论：低风险的 9 个 CLI 命令迁移到 workflows facade；其余因 workflow
+签名 gap 或交互流程复杂保留底层直调。完整对照表与原因详见
+`src/md_analysis/cli/CLAUDE.md` 的 "Workflows facade 迁移状态" 段。
 
-- [ ] 列出 CLI 仍直接调用底层业务的命令：
-  - charge
-  - calibration
-  - enhanced_sampling / constrained_ti
-  - scripts
-- [ ] 对每类命令判断：
-  - 是否已有等价 `workflows.run_*`
-  - CLI 是否需要打印 `WorkflowResult.artifacts`
-  - 是否仍需要底层 report 的额外字段
-- [ ] 优先迁移低风险命令：
-  - charge 三个主入口
-  - calibration fit / predict
-  - scripts batch 入口
-- [ ] 对复杂 TI / correction 命令，如果 workflow 入口还不能覆盖 CLI 细节，明确保留底层直调并写入 `cli/CLAUDE.md`
+### 本轮已迁移到 workflows（9 条新增 + 2 条 Phase 6 Step A 已迁，共 13 条）
 
-**Acceptance**：要么 CLI 主要命令统一走 workflows，要么文档明确说明哪些命令因交互细节暂时保留底层直调。
+| CLI 编号 | 命令 | workflow facade |
+|---|---|---|
+| 225 | `TrackedChargeCmd` | `workflows.charge.run_tracked_charge` |
+| 226 | `CounterionChargeCmd` | `workflows.charge.run_counterion_charge` |
+| 301 | `SGQuickPlotCmd` | `workflows.enhanced_sampling.run_slowgrowth_quick_plot` |
+| 302 | `SGPublicationPlotCmd` | `workflows.enhanced_sampling.run_slowgrowth_publication_plot` |
+| 411 | `BaderSingleCmd` | `workflows.scripts.run_bader_single` |
+| 412 | `BaderBatchCmd` | `workflows.scripts.run_bader_batch` |
+| 421 | `TISingleCmd` | `workflows.scripts.run_ti_single` |
+| 431 | `PotentialSingleCmd` | `workflows.scripts.run_potential_single` |
+| 432 | `PotentialBatchCmd` | `workflows.scripts.run_potential_batch` |
+| 441 | `SpGenSingleCmd` | `workflows.scripts.run_sp_single` |
+| 442 | `SpGenBatchCmd` | `workflows.scripts.run_sp_batch` |
+| 105 | `WaterThreePanelCmd` | `workflows.water.run_water_three_panel`（Phase 6 Step A） |
+| 216 | `FullPotentialCmd` | `workflows.potential.run_potential_full`（Phase 6 Step A） |
+
+### 保留底层直调（workflow facade 当前 gap）
+
+| CLI 编号 | 命令 | gap |
+|---|---|---|
+| 101–104 | water 单步 | workflows.water 只 export `run_water_three_panel`（composite），无 density / orientation / adsorbed / theta 单步 facade |
+| 211–215 | potential 单步 | workflows.potential 只 export `run_potential_full`（composite），无 center / fermi / electrode / phi_z / thickness_sensitivity 单步 facade |
+| 221 / 222 / 223 | `SurfaceChargeCmd` | `run_surface_charge` 不接受 `potential_reference` / `potential_pH` / `potential_temperature_K` / `potential_phi_pzc`（底层 `surface_charge_analysis` 已支持） |
+| 224 | `SingleSideChargeCmd` | `run_surface_charge` 不接受 `target_side`（底层支持） |
+| 231 / 232 / 233 | calibration fit / predict | workflow 要求 `calibration_json_path` 必填；CLI 当前允许传 None 走全局默认 `~/.config/md_analysis/calibration.json` |
+| 311 / 312 / 313 | constrained TI | Python-slice 切片 UI、逐点 equilibration override、约束点交互列表等交互流程；workflow `run_ti_full_analysis` / `run_ti_constant_potential_correction` 是端到端单次调用，目前不能完整覆盖 |
+| 422 | `TIBatchCmd` | `generate_ti_batch_with_report`（即 workflow `run_ti_batch`）不接受 `colvar_id`（MVP 限定 primary CV） |
+
+### 后续工作（不在本 Phase 范围）
+
+要继续往 workflows 收敛，前提是先扩展 workflow 签名覆盖以上 gap，
+而不是在 CLI 端 hack 绕过。建议优先级（如未来要做）：
+
+1. `run_surface_charge` 加 `target_side` + 4 个 `potential_*` kwargs → 覆盖 charge 221–224
+2. `run_calibration_fit` / `run_calibration_predict` 允许 `calibration_json_path=None` 时使用 config 默认
+3. 给 `workflows.{water,potential}` 加单步 facade（5 + 4 个 leaf workflow）
+4. 给 `run_ti_batch` 加 `colvar_id`
+5. 给 TI workflow 暴露 discover_only / select-points 流程后再迁 311–313
+
+**Acceptance**：CLI 主要低风险命令统一走 workflows；剩余 12 个命令的保留原因
+在 `cli/CLAUDE.md` 的迁移状态表中显式记录，未来扩展 workflow 时按此 gap 列表
+对照修补。
 
 ---
 

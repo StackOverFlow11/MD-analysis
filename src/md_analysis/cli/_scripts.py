@@ -118,6 +118,23 @@ def _batch_frame_kwargs_from_ctx(ctx: dict) -> dict:
         "time_step_fs": ctx[K.TIME_STEP_FS]
             if ctx[K.FRAME_MODE] == "time" else None,
     }
+
+
+def _single_frame_workflow_kwargs(ctx: dict) -> dict:
+    """Build kwargs for run_*_single workflows from CLI ctx.
+
+    The workflow facades take ``mode`` plus ``frame`` / ``time_fs``
+    rather than the pre-resolved ``atoms`` object the legacy
+    ``generate_*_workdir`` functions used. Frame resolution lives
+    inside the workflow.
+    """
+    mode = ctx[K.FRAME_MODE]
+    kwargs: dict = {"mode": mode}
+    if mode == "index":
+        kwargs["frame"] = ctx[K.FRAME]
+    else:
+        kwargs["time_fs"] = ctx[K.SINGLE_TIME_FS]
+    return kwargs
 from ._prompt import (
     prompt_choice,
     prompt_float,
@@ -187,23 +204,20 @@ class BaderSingleCmd(MenuCommand):
     )
 
     def execute(self, ctx: dict) -> None:
-        generate = lazy_import("md_analysis.scripts", "generate_bader_workdir")
-
-        frame_idx, atoms = _resolve_single_frame_from_ctx(ctx)
-
-        atoms.set_cell(ctx[K.CELL_ABC])
-        atoms.set_pbc(True)
-
-        workdir = generate(
-            atoms,
-            ctx[K.OUTDIR],
-            script_path=ctx[K.SCRIPT_PATH],
-            workdir_name=ctx[K.WORKDIR_NAME],
-            frame=frame_idx,
-            source=ctx[K.XYZ],
-            generate_potcar=ctx[K.GEN_POTCAR],
+        run_bader_single = lazy_import(
+            "md_analysis.workflows.scripts", "run_bader_single",
         )
-
+        single_kwargs = _single_frame_workflow_kwargs(ctx)
+        result = run_bader_single(
+            xyz_path=ctx[K.XYZ],
+            cell_abc=ctx[K.CELL_ABC],
+            output_dir=ctx[K.OUTDIR],
+            workdir_name=ctx[K.WORKDIR_NAME],
+            script_path=ctx[K.SCRIPT_PATH],
+            generate_potcar=ctx[K.GEN_POTCAR],
+            **single_kwargs,
+        )
+        workdir = result.artifacts["workdir"]
         print(f"\n Bader work directory created: {workdir}")
         contents = sorted(p.name for p in workdir.iterdir())
         print(f"  Contents: {', '.join(contents)}")
@@ -222,19 +236,24 @@ class BaderBatchCmd(MenuCommand):
     )
 
     def execute(self, ctx: dict) -> None:
-        batch = lazy_import("md_analysis.scripts", "batch_generate_bader_workdirs")
+        run_bader_batch = lazy_import(
+            "md_analysis.workflows.scripts", "run_bader_batch",
+        )
         kwargs = _batch_frame_kwargs_from_ctx(ctx)
-        dirs = batch(
-            ctx[K.XYZ],
-            ctx[K.CELL_ABC],
-            ctx[K.OUTDIR],
-            **kwargs,
+        result = run_bader_batch(
+            xyz_path=ctx[K.XYZ],
+            cell_abc=ctx[K.CELL_ABC],
+            output_dir=ctx[K.OUTDIR],
             script_path=ctx[K.SCRIPT_PATH],
             generate_potcar=ctx[K.GEN_POTCAR],
             verbose=True,
+            **kwargs,
         )
-        print(f"\n Created {len(dirs)} Bader work directories:")
-        for d in dirs:
+        workdirs = [
+            v for k, v in result.artifacts.items() if k.startswith("workdir_")
+        ]
+        print(f"\n Created {len(workdirs)} Bader work directories:")
+        for d in workdirs:
             print(f"  {d}")
 
 
@@ -297,18 +316,21 @@ class TISingleCmd(MenuCommand):
         return ctx
 
     def execute(self, ctx: dict) -> None:
-        generate = lazy_import("md_analysis.scripts", "generate_ti_workdir")
-        workdir = generate(
-            ctx[K.INP_PATH],
-            ctx[K.XYZ],
-            ctx[K.RESTART_PATH],
-            ctx[K.TARGET_AU],
-            ctx[K.OUTDIR],
+        run_ti_single = lazy_import(
+            "md_analysis.workflows.scripts", "run_ti_single",
+        )
+        result = run_ti_single(
+            inp_path=ctx[K.INP_PATH],
+            xyz_path=ctx[K.XYZ],
+            restart_path=ctx[K.RESTART_PATH],
+            target_au=ctx[K.TARGET_AU],
+            output_dir=ctx[K.OUTDIR],
             steps=ctx[K.STEPS],
             colvar_id=ctx[K.COLVAR_ID],
             workdir_name=ctx[K.WORKDIR_NAME],
             script_path=ctx[K.SCRIPT_PATH],
         )
+        workdir = result.artifacts["workdir"]
         print(f"\n TI work directory created: {workdir}")
         contents = sorted(p.name for p in workdir.iterdir())
         print(f"  Contents: {', '.join(contents)}")
@@ -405,24 +427,20 @@ class PotentialSingleCmd(MenuCommand):
     )
 
     def execute(self, ctx: dict) -> None:
-        generate = lazy_import("md_analysis.scripts", "generate_potential_workdir")
-
-        frame_idx, atoms = _resolve_single_frame_from_ctx(ctx)
-
-        atoms.set_cell(ctx[K.CELL_ABC])
-        atoms.set_pbc(True)
-
-        workdir = generate(
-            atoms,
-            ctx[K.OUTDIR],
-            inp_template_path=ctx[K.INP_TEMPLATE],
-            cell_abc=ctx[K.CELL_ABC],
-            script_path=ctx[K.SCRIPT_PATH],
-            workdir_name=ctx[K.WORKDIR_NAME],
-            frame=frame_idx,
-            source=ctx[K.XYZ],
+        run_potential_single = lazy_import(
+            "md_analysis.workflows.scripts", "run_potential_single",
         )
-
+        single_kwargs = _single_frame_workflow_kwargs(ctx)
+        result = run_potential_single(
+            xyz_path=ctx[K.XYZ],
+            output_dir=ctx[K.OUTDIR],
+            cell_abc=ctx[K.CELL_ABC],
+            inp_template_path=ctx[K.INP_TEMPLATE],
+            workdir_name=ctx[K.WORKDIR_NAME],
+            script_path=ctx[K.SCRIPT_PATH],
+            **single_kwargs,
+        )
+        workdir = result.artifacts["workdir"]
         print(f"\n Potential work directory created: {workdir}")
         contents = sorted(p.name for p in workdir.iterdir())
         print(f"  Contents: {', '.join(contents)}")
@@ -442,19 +460,24 @@ class PotentialBatchCmd(MenuCommand):
     )
 
     def execute(self, ctx: dict) -> None:
-        batch = lazy_import("md_analysis.scripts", "batch_generate_potential_workdirs")
+        run_potential_batch = lazy_import(
+            "md_analysis.workflows.scripts", "run_potential_batch",
+        )
         kwargs = _batch_frame_kwargs_from_ctx(ctx)
-        dirs = batch(
-            ctx[K.XYZ],
-            ctx[K.CELL_ABC],
-            ctx[K.OUTDIR],
+        result = run_potential_batch(
+            xyz_path=ctx[K.XYZ],
+            cell_abc=ctx[K.CELL_ABC],
+            output_dir=ctx[K.OUTDIR],
             inp_template_path=ctx[K.INP_TEMPLATE],
-            **kwargs,
             script_path=ctx[K.SCRIPT_PATH],
             verbose=True,
+            **kwargs,
         )
-        print(f"\n Created {len(dirs)} potential work directories:")
-        for d in dirs:
+        workdirs = [
+            v for k, v in result.artifacts.items() if k.startswith("workdir_")
+        ]
+        print(f"\n Created {len(workdirs)} potential work directories:")
+        for d in workdirs:
             print(f"  {d}")
 
 
@@ -478,24 +501,20 @@ class SpGenSingleCmd(MenuCommand):
     )
 
     def execute(self, ctx: dict) -> None:
-        generate = lazy_import("md_analysis.scripts", "generate_sp_workdir")
-
-        frame_idx, atoms = _resolve_single_frame_from_ctx(ctx)
-
-        atoms.set_cell(ctx[K.CELL_ABC])
-        atoms.set_pbc(True)
-
-        workdir = generate(
-            atoms,
-            ctx[K.OUTDIR],
-            inp_template_path=ctx[K.INP_TEMPLATE],
-            cell_abc=ctx[K.CELL_ABC],
-            script_path=ctx[K.SCRIPT_PATH],
-            workdir_name=ctx[K.WORKDIR_NAME],
-            frame=frame_idx,
-            source=ctx[K.XYZ],
+        run_sp_single = lazy_import(
+            "md_analysis.workflows.scripts", "run_sp_single",
         )
-
+        single_kwargs = _single_frame_workflow_kwargs(ctx)
+        result = run_sp_single(
+            xyz_path=ctx[K.XYZ],
+            cell_abc=ctx[K.CELL_ABC],
+            output_dir=ctx[K.OUTDIR],
+            inp_template_path=ctx[K.INP_TEMPLATE],
+            workdir_name=ctx[K.WORKDIR_NAME],
+            script_path=ctx[K.SCRIPT_PATH],
+            **single_kwargs,
+        )
+        workdir = result.artifacts["workdir"]
         print(f"\n SP work directory for DeePMD training: {workdir}")
         contents = sorted(p.name for p in workdir.iterdir())
         print(f"  Contents: {', '.join(contents)}")
@@ -515,17 +534,23 @@ class SpGenBatchCmd(MenuCommand):
     )
 
     def execute(self, ctx: dict) -> None:
-        batch = lazy_import("md_analysis.scripts", "batch_generate_sp_workdirs")
+        run_sp_batch = lazy_import(
+            "md_analysis.workflows.scripts", "run_sp_batch",
+        )
         kwargs = _batch_frame_kwargs_from_ctx(ctx)
-        dirs = batch(
-            ctx[K.XYZ],
-            ctx[K.CELL_ABC],
-            ctx[K.OUTDIR],
+        result = run_sp_batch(
+            xyz_path=ctx[K.XYZ],
+            cell_abc=ctx[K.CELL_ABC],
+            output_dir=ctx[K.OUTDIR],
             inp_template_path=ctx[K.INP_TEMPLATE],
-            **kwargs,
             script_path=ctx[K.SCRIPT_PATH],
             verbose=True,
+            **kwargs,
         )
+        workdirs = [
+            v for k, v in result.artifacts.items() if k.startswith("workdir_")
+        ]
+        dirs = workdirs  # backward-compat name for the print loop below
         print(f"\n Created {len(dirs)} SP work directories for DeePMD training:")
         for d in dirs:
             print(f"  {d}")

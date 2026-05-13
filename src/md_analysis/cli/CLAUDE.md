@@ -34,6 +34,46 @@ VASPKIT 风格交互式编号菜单。无 argparse，所有输入通过 `input()
 - **numpy 也必须延迟导入**：CLI 模块顶层不得出现 `import numpy`，需要时在函数体内导入
 - 常量（如 `AU_TIME_TO_FS`）同理：从 `utils.constants` 导入时放在使用它的函数体内
 
+### Workflows facade 迁移状态（refactor_repair_plan.md Phase 4）
+
+入口重构后，`md_analysis.workflows.*` 是 canonical 程序化入口。CLI 的 `execute()`
+应优先通过 `lazy_import("md_analysis.workflows.<domain>", "run_*")` 调度，
+读取 `WorkflowResult.artifacts` 拿文件路径，并从 `metadata` / `extra` 取摘要指标；
+不应再回到底层科学模块拼装流程。
+
+**已迁到 workflows facade**：
+
+| CLI | 命令 | workflow facade |
+|---|---|---|
+| 105 | `WaterThreePanelCmd` | `workflows.water.run_water_three_panel` |
+| 216 | `FullPotentialCmd` | `workflows.potential.run_potential_full` |
+| 225 | `TrackedChargeCmd` | `workflows.charge.run_tracked_charge` |
+| 226 | `CounterionChargeCmd` | `workflows.charge.run_counterion_charge` |
+| 301 | `SGQuickPlotCmd` | `workflows.enhanced_sampling.run_slowgrowth_quick_plot` |
+| 302 | `SGPublicationPlotCmd` | `workflows.enhanced_sampling.run_slowgrowth_publication_plot` |
+| 411 | `BaderSingleCmd` | `workflows.scripts.run_bader_single` |
+| 412 | `BaderBatchCmd` | `workflows.scripts.run_bader_batch` |
+| 421 | `TISingleCmd` | `workflows.scripts.run_ti_single` |
+| 431 | `PotentialSingleCmd` | `workflows.scripts.run_potential_single` |
+| 432 | `PotentialBatchCmd` | `workflows.scripts.run_potential_batch` |
+| 441 | `SpGenSingleCmd` | `workflows.scripts.run_sp_single` |
+| 442 | `SpGenBatchCmd` | `workflows.scripts.run_sp_batch` |
+
+**保留底层直调（workflows facade 当前覆盖不全；都已记录原因）**：
+
+| CLI | 命令 | 保留原因 |
+|---|---|---|
+| 101 / 102 / 103 / 104 | water 单步命令 | `workflows.water` 当前只导出 `run_water_three_panel`（composite），没有 density / orientation / adsorbed / theta 的单步 `run_*` |
+| 211 / 212 / 213 / 214 / 215 | potential 单步命令 | `workflows.potential` 当前只导出 `run_potential_full`（composite），没有 center / fermi / electrode / phi_z / thickness_sensitivity 的单步 `run_*` |
+| 221 / 222 / 223 | `SurfaceChargeCmd` | `workflows.charge.run_surface_charge` 不接受 `potential_reference` / `potential_pH` / `potential_temperature_K` / `potential_phi_pzc` 这 4 个底层 `surface_charge_analysis` 已支持的参数；CLI 当前需要它们才能输出 φ 列 |
+| 224 | `SingleSideChargeCmd` | `workflows.charge.run_surface_charge` 不接受 `target_side`；底层 `surface_charge_analysis` 支持 |
+| 231 / 232 / 233 | calibration | `workflows.calibration.run_calibration_fit` / `run_calibration_predict` 要求 `calibration_json_path` 必填，CLI 当前允许传 None 走全局默认（`~/.config/md_analysis/calibration.json`）。让 CLI 显式提前 resolve 默认值不在 Phase 4 范围内 |
+| 311 / 312 / 313 | constrained TI | CLI 有 Python-slice 切片 UI、逐点 equilibration override、约束点交互列表等富交互流程；workflow `run_ti_full_analysis` / `run_ti_constant_potential_correction` 是单次端到端调用，目前不能完整覆盖这套交互细节 |
+| 422 | `TIBatchCmd` | `workflows.scripts.run_ti_batch`（底层 `generate_ti_batch_with_report`）不接受 `colvar_id`（MVP 限定 primary CV）；CLI 仍 expose colvar_id |
+
+任何后续往 workflows 收敛的工作，前提是先扩展 workflow 签名覆盖这些 gap；
+不要在 CLI 端 hack 绕过。当 workflow 覆盖完整后再统一迁这些命令。
+
 ### 参数采集
 - `K` 类：字符串键常量，防止拼写错误（含 `INP_TEMPLATE`、`GEN_POTCAR` 等）
 - `ParamCollector` ABC：`collect(ctx)` 提示用户 + `apply_default(ctx)` 静默填充

@@ -154,20 +154,24 @@ class TrackedChargeCmd(MenuCommand):
     advanced_params = (root_dir, dir_pattern, outdir, frame_slice)
 
     def execute(self, ctx: dict) -> None:
-        analyze = lazy_import(
-            "md_analysis.electrochemical.charge",
-            "tracked_atom_charge_analysis",
+        run_tracked_charge = lazy_import(
+            "md_analysis.workflows.charge", "run_tracked_charge",
         )
-        csv_path = analyze(
-            ctx[K.ROOT_DIR],
+        # OUTDIR_RESOLVED already ends with ``/tracked`` (this command's
+        # output_name); the workflow appends ``/tracked`` again internally,
+        # so we pass the parent to keep the final layout
+        # ``<base>/electrochemical/charge/tracked/`` unchanged.
+        result = run_tracked_charge(
+            output_dir=Path(ctx[K.OUTDIR_RESOLVED]).parent,
+            root_dir=ctx[K.ROOT_DIR],
             atom_indices_xyz=ctx[K.ATOM_INDICES_XYZ],
             dir_pattern=ctx[K.DIR_PATTERN],
-            output_dir=ctx[K.OUTDIR_RESOLVED],
             frame_start=ctx[K.FRAME_START],
             frame_end=ctx[K.FRAME_END],
             frame_step=ctx[K.FRAME_STEP],
             verbose=True,
         )
+        csv_path = result.artifacts["tracked_charge_csv"]
         print(f"\n Analysis complete. Output:\n   tracked_csv: {csv_path}")
 
 
@@ -179,20 +183,25 @@ class CounterionChargeCmd(MenuCommand):
                        layer_tol, outdir, frame_slice)
 
     def execute(self, ctx: dict) -> None:
-        analyze = lazy_import(
-            "md_analysis.electrochemical.charge",
-            "counterion_charge_analysis",
+        run_counterion_charge = lazy_import(
+            "md_analysis.workflows.charge", "run_counterion_charge",
         )
-        csv_path = analyze(
-            ctx[K.ROOT_DIR],
+        # OUTDIR_RESOLVED already ends with ``/counterion_tracking``
+        # (this command's output_name); the workflow appends the same
+        # segment again internally — pass the parent to keep the final
+        # layout ``<base>/electrochemical/charge/counterion_tracking/``
+        # unchanged.
+        result = run_counterion_charge(
+            output_dir=Path(ctx[K.OUTDIR_RESOLVED]).parent,
+            root_dir=ctx[K.ROOT_DIR],
             metal_symbols=ctx[K.METAL_ELEMENTS],
             normal=ctx[K.NORMAL],
             layer_tol_A=ctx[K.LAYER_TOL],
             dir_pattern=ctx[K.DIR_PATTERN],
-            output_dir=ctx[K.OUTDIR_RESOLVED],
             frame_start=ctx[K.FRAME_START],
             frame_end=ctx[K.FRAME_END],
             frame_step=ctx[K.FRAME_STEP],
             verbose=True,
         )
+        csv_path = result.artifacts["counterion_charge_csv"]
         print(f"\n Analysis complete. Output:\n   counterion_csv: {csv_path}")

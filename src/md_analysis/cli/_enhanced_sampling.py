@@ -81,7 +81,11 @@ def _print_sg_info(restart_path: str, log_path: str) -> None:
 class _SlowgrowthPlotCmd(MenuCommand):
     """Base for slow-growth plot commands."""
 
-    _plot_style: str = "both"
+    # Workflow name to look up on md_analysis.workflows.enhanced_sampling.
+    # Subclasses override; the base value matches the historical
+    # ``plot_style="both"`` semantics by combining the two plot styles
+    # but is never instantiated directly.
+    _workflow_name: str = ""
 
     def _collect_all_params(self) -> dict:
         print()
@@ -122,25 +126,27 @@ class _SlowgrowthPlotCmd(MenuCommand):
         return ctx
 
     def execute(self, ctx: dict) -> None:
-        slowgrowth_analysis = lazy_import(
-            "md_analysis.enhanced_sampling.slowgrowth.SlowGrowthPlot",
-            "slowgrowth_analysis",
+        if not self._workflow_name:
+            raise RuntimeError(
+                f"{type(self).__name__} must set _workflow_name"
+            )
+        run_sg = lazy_import(
+            "md_analysis.workflows.enhanced_sampling",
+            self._workflow_name,
         )
-        outdir = ctx[K.OUTDIR_RESOLVED]
-        slowgrowth_analysis(
-            ctx[K.RESTART_PATH],
-            ctx[K.LOG_PATH],
+        run_sg(
+            restart_path=ctx[K.RESTART_PATH],
+            log_path=ctx[K.LOG_PATH],
+            output_dir=ctx[K.OUTDIR_RESOLVED],
             initial_step=ctx[K.INITIAL_STEP],
             final_step=ctx[K.FINAL_STEP],
-            output_dir=outdir,
-            plot_style=self._plot_style,
             colvar_id=ctx[K.COLVAR_ID],
         )
 
 
 class SGQuickPlotCmd(_SlowgrowthPlotCmd):
-    _plot_style = "quick"
+    _workflow_name = "run_slowgrowth_quick_plot"
 
 
 class SGPublicationPlotCmd(_SlowgrowthPlotCmd):
-    _plot_style = "publication"
+    _workflow_name = "run_slowgrowth_publication_plot"
