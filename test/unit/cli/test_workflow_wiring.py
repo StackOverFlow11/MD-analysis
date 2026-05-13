@@ -1,5 +1,5 @@
 """Monkey-patched wiring tests for the CLI commands migrated to
-``md_analysis.workflows`` in refactor_repair_plan Phase 4.
+``md_analysis.workflows`` during the entrance refactor.
 
 These tests confirm three properties at the CLI execute() boundary
 without exercising any scientific code:

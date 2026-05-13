@@ -2,9 +2,9 @@
 
 > 对应代码：`src/md_analysis/agent/`
 
-> ⚠️ **重构主体已完成，剩余收尾见 `context4agent/requirements/refactor_repair_plan.md`。**
-> 当前文档描述的是完成后的 contract-backed agent 实现；后续若继续统一 CLI /
-> workflow 表面，应同步更新本文档。
+> ⚠️ **入口重构主体已完成。** 当前文档描述完成后的 contract-backed agent 实现。
+> 后续大规模破坏性重构按 `context4agent/requirements/overall_reconstruction_plan.md`
+> 推进，迁移到新架构后需同步更新本文档。
 
 ## 1. 职责边界
 

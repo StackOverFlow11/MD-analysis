@@ -2,10 +2,9 @@
 ``electrochemical.charge.Bader.AtomCharges``.
 
 These cover the per-module wrappers that survive the entrance
-refactor (see ``context4agent/requirements/refactor_repair_plan.md``)
-and are independent of the ``md_analysis.main`` agent-facing
-wrappers — which were removed in the Phase 3 charge legacy
-cleanup.  They will continue to be exercised until
+refactor and are independent of the ``md_analysis.main``
+agent-facing wrappers — which were removed in the Phase 3 charge
+legacy cleanup.  They will continue to be exercised until
 ``workflows/charge.py`` fully subsumes them and the underlying
 ``*_with_report`` API is retired in a later phase.
 """

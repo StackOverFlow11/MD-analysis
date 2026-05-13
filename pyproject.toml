@@ -28,3 +28,8 @@ md-analysis = "md_analysis.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["md_analysis*"]
+
+[tool.pytest.ini_options]
+testpaths = ["test"]
+norecursedirs = ["_tmp_preview", "build", "dist", "*.egg-info"]
+addopts = ["--import-mode=importlib"]

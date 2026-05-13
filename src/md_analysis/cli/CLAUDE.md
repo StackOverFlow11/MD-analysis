@@ -34,7 +34,7 @@ VASPKIT 风格交互式编号菜单。无 argparse，所有输入通过 `input()
 - **numpy 也必须延迟导入**：CLI 模块顶层不得出现 `import numpy`，需要时在函数体内导入
 - 常量（如 `AU_TIME_TO_FS`）同理：从 `utils.constants` 导入时放在使用它的函数体内
 
-### Workflows facade 迁移状态（refactor_repair_plan.md Phase 4）
+### Workflows facade 迁移状态（入口重构）
 
 入口重构后，`md_analysis.workflows.*` 是 canonical 程序化入口。CLI 的 `execute()`
 应优先通过 `lazy_import("md_analysis.workflows.<domain>", "run_*")` 调度，

@@ -4,9 +4,9 @@
 >
 > 本文档定义 `md_analysis.agent` 的符号级公开接口与暴露边界。
 
-> ⚠️ **重构主体已完成，剩余收尾见 `context4agent/requirements/refactor_repair_plan.md`。**
-> 当前 `agent` 层保留 contract-backed 任务集合；若后续继续统一 CLI / workflow
-> 表面，请以修补计划中的验收项为准。
+> ⚠️ **入口重构主体已完成。** 当前 `agent` 层保留 contract-backed 任务集合。
+> 后续大规模破坏性重构按 `context4agent/requirements/overall_reconstruction_plan.md`
+> 推进；本文件仅描述入口重构完成时的状态。
 
 ## 1. 接口角色定义
 
