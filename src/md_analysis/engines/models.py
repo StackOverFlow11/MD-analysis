@@ -5,40 +5,33 @@ Frozen dataclasses returned by engine adapter modules
 (``electrochemical``, ``enhanced_sampling``, ``water``) depend on these
 neutral types rather than engine-specific parser output.
 
-Status (Phase 7b1)
-------------------
-- ``PotentialFrame``      — moved here from ``electrochemical.potential
-                             ._frame_source``; field set unchanged
-- ``ConstraintMetadata``  — canonical name, renamed from
-                             ``ColvarRestart`` in Phase 5b; field set
-                             unchanged
-- ``LambdaSeries``        — canonical name, renamed from
-                             ``LagrangeMultLog`` in Phase 5b; field set
-                             unchanged
-- ``FermiRecord``         — new typed record for one ``(step, time_fs,
-                             fermi_raw)`` triple, mirroring the legacy
-                             dict shape so existing callers (e.g.
-                             ``CenterPotential``) keep working unchanged
-
-The legacy ``ColvarRestart`` / ``LagrangeMultLog`` names are kept as
-module-level aliases in ``utils.formats.cp2k.colvar`` so existing tests
-keep working during the transition. They will be removed in a later
-cleanup phase.
-
-Additional neutral types (``ConstraintPoint``, ``ConstraintSet``,
-``ConstraintRun``) listed in the refactor plan are deferred until
-concrete consumers exist.
+Phase 4 Commit 1 status (D10 + D8)
+----------------------------------
+- ``ConstraintInfo`` / ``ColvarInfo``    — neutral nested types,
+  physical home moved here from ``utils.formats.cp2k.colvar``.
+- ``ConstraintMetadata`` / ``LambdaSeries`` — canonical types,
+  physical home moved here from ``utils.formats.cp2k.colvar``.
+- ``ConstraintRun``           — D8 composite (metadata + lambda_series
+  + derived target/time series + Phase 5b ``.restart`` / ``.lagrange``
+  legacy alias properties).
+- ``ColvarRestart`` / ``LagrangeMultLog`` / ``ColvarMDInfo`` — class
+  aliases physically defined here (Phase 5b compatibility).
+- ``PotentialFrame``          — moved here from ``electrochemical.potential
+  ._frame_source``; field set unchanged.
+- ``FermiRecord``             — typed record mirroring the legacy
+  ``parse_md_out_fermi`` dict shape.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Iterator
 
 import numpy as np
 
+from ..utils.constants import AU_TIME_TO_FS
 from ..utils.formats.common.cube import CubeHeader
-from ..utils.formats.cp2k.colvar import ConstraintMetadata, LambdaSeries
 
 try:
     from ase import Atoms
@@ -46,16 +39,208 @@ except ImportError:  # pragma: no cover
     Atoms = object  # type: ignore[misc]
 
 
+# ---------------------------------------------------------------------------
+# Neutral nested types (Phase 4 Commit 1 — D10 nested-type migration)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ConstraintInfo:
+    """COLLECTIVE constraint parameters (engine-neutral).
+
+    ``target_growth_au`` is the rate of change per atomic unit of time
+    (CP2K convention).  Multiply by the timestep in a.u. to obtain the
+    per-step increment.
+    """
+
+    colvar_id: int
+    target_au: float
+    target_growth_au: float
+    intermolecular: bool
+
+
+@dataclass(frozen=True)
+class ColvarInfo:
+    """Collection of collective variable constraints (engine-neutral)."""
+
+    constraints: tuple[ConstraintInfo, ...]
+
+    def __len__(self) -> int:
+        return len(self.constraints)
+
+    def __getitem__(self, colvar_id: int) -> ConstraintInfo:
+        for c in self.constraints:
+            if c.colvar_id == colvar_id:
+                return c
+        raise KeyError(f"No constraint with colvar_id={colvar_id}")
+
+    def __iter__(self) -> Iterator[ConstraintInfo]:
+        return iter(self.constraints)
+
+    @property
+    def primary(self) -> ConstraintInfo:
+        """Return the first constraint (primary CV)."""
+        return self.constraints[0]
+
+
+# ---------------------------------------------------------------------------
+# Canonical top-level dataclasses (Phase 4 Commit 1 — D10 physical migration)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ConstraintMetadata:
+    """Metadata parsed from a constraint-MD restart file (engine-neutral).
+
+    Engine-neutral payload returned by ``ConstraintMDParser.parse_metadata``.
+    """
+
+    project_name: str
+    step_start: int
+    time_start_fs: float
+    timestep_fs: float
+    total_steps: int
+    colvars: ColvarInfo
+    lagrange_filename: str | None
+    cell_abc_ang: tuple[float, float, float]
+    fixed_atom_indices: tuple[int, ...] | None
+
+
+@dataclass(frozen=True)
+class LambdaSeries:
+    """Lagrange multiplier (constraint force) time series (engine-neutral).
+
+    Engine-neutral payload returned by ``ConstraintMDParser.parse_lambda_series``.
+    The ``LagrangeMultLog`` file suffix (``*.LagrangeMultLog``) is a CP2K
+    output filename and is NOT a type name.
+    """
+
+    shake: np.ndarray
+    rattle: np.ndarray
+    n_steps: int
+    n_constraints: int
+
+    @property
+    def collective_shake(self) -> np.ndarray:
+        """Shake multiplier for the CV constraint, shape ``(n_steps,)``."""
+        return self.shake if self.n_constraints == 1 else self.shake[:, 0]
+
+    @property
+    def collective_rattle(self) -> np.ndarray:
+        """Rattle multiplier for the CV constraint, shape ``(n_steps,)``."""
+        return self.rattle if self.n_constraints == 1 else self.rattle[:, 0]
+
+
+# ---------------------------------------------------------------------------
+# Composite view (Phase 4 Commit 1 — D8 ConstraintRun)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ConstraintRun:
+    """Engine-neutral composite view of a constraint-MD run.
+
+    Combines metadata (restart-time inputs) with the resulting
+    Lagrange-multiplier time series.  Derived series are computed via
+    ``@property`` (not stored as fields) to keep this object an
+    "inputs-only" snapshot.
+
+    Phase 5b legacy aliases:
+      ``.restart``  -> alias for ``.metadata``
+      ``.lagrange`` -> alias for ``.lambda_series``
+    These let 17 business sites using ``md_info.restart`` /
+    ``md_info.lagrange`` keep working through Phase 4; Phase 5
+    naming-cleanup removes both the aliases and those caller sites.
+
+    The historical ``ColvarMDInfo.from_paths(restart_path, log_path)``
+    classmethod is NOT re-implemented here (it would create an
+    ``engines.models -> engines.cp2k`` import cycle).  Use
+    :func:`md_analysis.engines.cp2k.read_constraint_run_from_files`
+    instead.
+
+    Derived ``target_series_au`` follows the CP2K SHAKE/RATTLE
+    convention (formula:
+    ``xi(k) = target_au + (k - step_start) * target_growth_au * dt_au``,
+    where ``dt_au = timestep_fs / AU_TIME_TO_FS``).  Other engines must
+    only construct this object when their semantics map losslessly onto
+    the same formula; otherwise the adapter MUST raise
+    :class:`NotImplementedError` rather than silently producing a
+    half-valid object.
+    """
+
+    metadata: ConstraintMetadata
+    lambda_series: LambdaSeries
+
+    # ------------------------------------------------------------------
+    # Phase 5b legacy aliases (Phase 4 Commit 1 — D13 v3)
+    # ------------------------------------------------------------------
+
+    @property
+    def restart(self) -> ConstraintMetadata:
+        """Phase 5b legacy alias for :attr:`metadata`."""
+        return self.metadata
+
+    @property
+    def lagrange(self) -> LambdaSeries:
+        """Phase 5b legacy alias for :attr:`lambda_series`."""
+        return self.lambda_series
+
+    # ------------------------------------------------------------------
+    # Derived properties (engine-neutral)
+    # ------------------------------------------------------------------
+
+    @property
+    def n_steps(self) -> int:
+        """Number of MD steps (from Lagrange multiplier log)."""
+        return self.lambda_series.n_steps
+
+    @property
+    def steps(self) -> np.ndarray:
+        """Absolute step numbers, shape ``(n_steps,)``: ``[0, 1, ..., n_steps-1]``."""
+        return np.arange(self.n_steps)
+
+    @property
+    def times_fs(self) -> np.ndarray:
+        """Absolute times in fs, shape ``(n_steps,)``."""
+        return self.steps * self.metadata.timestep_fs
+
+    def target_series_au(self, colvar_id: int | None = None) -> np.ndarray:
+        """Target CV series in atomic units, shape ``(n_steps,)``.
+
+        ``xi(k) = target_au + (k - step_start) * target_growth_au * dt_au``
+
+        where *k* are absolute step numbers ``[0, 1, ..., n_steps-1]``
+        and *dt_au* is the MD timestep in atomic time units.
+        """
+        c = (
+            self.metadata.colvars[colvar_id]
+            if colvar_id is not None
+            else self.metadata.colvars.primary
+        )
+        dt_au = self.metadata.timestep_fs / AU_TIME_TO_FS
+        return c.target_au + (self.steps - self.metadata.step_start) * c.target_growth_au * dt_au
+
+
+# ---------------------------------------------------------------------------
+# Phase 5b class aliases (physically owned by engines.models)
+# ---------------------------------------------------------------------------
+
+# Historical names retained for transitional consumers (tests, agents,
+# any business caller still using the old name).  Phase 5 cleanup will
+# rename callers to the canonical names and drop these aliases.
+ColvarRestart = ConstraintMetadata
+LagrangeMultLog = LambdaSeries
+ColvarMDInfo = ConstraintRun
+
+
+# ---------------------------------------------------------------------------
+# Potential frame + Fermi record (pre-existing, unchanged)
+# ---------------------------------------------------------------------------
+
+
 @dataclass(frozen=True)
 class PotentialFrame:
-    """One frame of potential analysis data (immutable, engine-neutral).
-
-    Produced by ``engines.cp2k`` when discovering cube/SP frames; consumed
-    by ``electrochemical.potential`` analysis routines.
-
-    Field set is intentionally unchanged from the Phase 4 definition
-    that previously lived in ``electrochemical.potential._frame_source``.
-    """
+    """One frame of potential analysis data (immutable, engine-neutral)."""
 
     step: int
     time_fs: float | None
@@ -72,10 +257,6 @@ class FermiRecord:
 
     Engine-neutral typed counterpart to the legacy dict-of-records shape
     returned by :func:`md_analysis.utils.formats.cp2k.stdout.parse_md_out_fermi`.
-    The fields mirror that dict exactly so legacy callers can keep
-    using their dict-style access without change while new callers
-    consume the typed model via the
-    :func:`md_analysis.engines.cp2k.read_fermi_series` facade.
 
     ``fermi_raw`` is in Hartree.
     """
@@ -86,12 +267,7 @@ class FermiRecord:
 
     @classmethod
     def from_legacy_dict(cls, d: dict) -> "FermiRecord":
-        """Bridge a legacy ``parse_md_out_fermi`` dict into a typed record.
-
-        Strictly a one-way converter from the legacy dict shape; the
-        parser function itself still returns ``list[dict]`` and is NOT
-        modified.
-        """
+        """Bridge a legacy ``parse_md_out_fermi`` dict into a typed record."""
         return cls(
             step=int(d["step"]),
             time_fs=d["time_fs"],
@@ -100,8 +276,19 @@ class FermiRecord:
 
 
 __all__ = [
-    "PotentialFrame",
+    # Neutral nested types
+    "ConstraintInfo",
+    "ColvarInfo",
+    # Canonical top-level types
     "ConstraintMetadata",
     "LambdaSeries",
+    # Composite
+    "ConstraintRun",
+    # Phase 5b aliases
+    "ColvarRestart",
+    "LagrangeMultLog",
+    "ColvarMDInfo",
+    # Potential layer
+    "PotentialFrame",
     "FermiRecord",
 ]

@@ -29,8 +29,12 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from ..utils.constants import BOHR_TO_ANG, TRANSITION_METAL_SYMBOLS
+from ..utils.constants import AU_TIME_TO_FS, BOHR_TO_ANG, TRANSITION_METAL_SYMBOLS
 from ..utils.formats.cp2k.colvar import (
+    Cp2kColvarInfoRaw,
+    Cp2kConstraintInfoRaw,
+    Cp2kConstraintMetadataRaw,
+    Cp2kLambdaSeriesRaw,
     parse_colvar_restart,
     parse_lagrange_mult_log,
 )
@@ -44,11 +48,16 @@ from ..utils.formats.common.cube import (
 )
 from ..utils.io._frame_discovery import extract_step_time_from_dirname
 from .models import (
+    ColvarInfo,
+    ConstraintInfo,
     ConstraintMetadata,
+    ConstraintRun,
     FermiRecord,
     LambdaSeries,
     PotentialFrame,
 )
+
+import numpy as np
 
 try:
     from ase import Atoms
@@ -78,10 +87,12 @@ class CP2KParser:
         return True
 
     def parse_metadata(self, directory: Path) -> ConstraintMetadata:
-        return parse_colvar_restart(self._find_restart(directory))
+        raw = parse_colvar_restart(self._find_restart(directory))
+        return _cp2k_raw_to_constraint_metadata(raw)
 
     def parse_lambda_series(self, directory: Path) -> LambdaSeries:
-        return parse_lagrange_mult_log(self._find_log(directory))
+        raw = parse_lagrange_mult_log(self._find_log(directory))
+        return _cp2k_raw_to_lambda_series(raw)
 
     # ------------------------------------------------------------------
     # File discovery (private)
@@ -110,7 +121,58 @@ class CP2KParser:
 
 
 # ---------------------------------------------------------------------------
-# Module-level facade (Phase 7b1)
+# Raw -> canonical conversion helpers (Phase 4 Commit 1 — D10)
+# ---------------------------------------------------------------------------
+
+
+def _cp2k_raw_to_constraint_info(raw: Cp2kConstraintInfoRaw) -> ConstraintInfo:
+    """Convert a CP2K raw constraint to canonical :class:`ConstraintInfo`."""
+    return ConstraintInfo(
+        colvar_id=raw.colvar_id,
+        target_au=raw.target_au,
+        target_growth_au=raw.target_growth_au,
+        intermolecular=raw.intermolecular,
+    )
+
+
+def _cp2k_raw_to_colvar_info(raw: Cp2kColvarInfoRaw) -> ColvarInfo:
+    """Convert a CP2K raw ColvarInfo to canonical :class:`ColvarInfo`."""
+    return ColvarInfo(
+        constraints=tuple(
+            _cp2k_raw_to_constraint_info(c) for c in raw.constraints
+        ),
+    )
+
+
+def _cp2k_raw_to_constraint_metadata(
+    raw: Cp2kConstraintMetadataRaw,
+) -> ConstraintMetadata:
+    """Convert raw CP2K metadata to canonical :class:`ConstraintMetadata`."""
+    return ConstraintMetadata(
+        project_name=raw.project_name,
+        step_start=raw.step_start,
+        time_start_fs=raw.time_start_fs,
+        timestep_fs=raw.timestep_fs,
+        total_steps=raw.total_steps,
+        colvars=_cp2k_raw_to_colvar_info(raw.colvars),
+        lagrange_filename=raw.lagrange_filename,
+        cell_abc_ang=raw.cell_abc_ang,
+        fixed_atom_indices=raw.fixed_atom_indices,
+    )
+
+
+def _cp2k_raw_to_lambda_series(raw: Cp2kLambdaSeriesRaw) -> LambdaSeries:
+    """Convert raw CP2K LambdaSeries to canonical :class:`LambdaSeries`."""
+    return LambdaSeries(
+        shake=raw.shake,
+        rattle=raw.rattle,
+        n_steps=raw.n_steps,
+        n_constraints=raw.n_constraints,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Module-level facade (Phase 7b1 + Phase 4 Commit 1 file-level additions)
 # ---------------------------------------------------------------------------
 
 
@@ -119,8 +181,7 @@ def read_constraint_metadata(
 ) -> ConstraintMetadata:
     """Read constraint-MD metadata from a CP2K point directory.
 
-    Thin path-friendly wrapper around :meth:`CP2KParser.parse_metadata`;
-    accepts ``str`` or ``Path`` and uses a fresh ``CP2KParser`` instance.
+    Internally: parser -> raw -> _cp2k_raw_to_constraint_metadata -> canonical.
     """
     return CP2KParser().parse_metadata(Path(directory))
 
@@ -130,11 +191,93 @@ def read_lambda_series(
 ) -> LambdaSeries:
     """Read the Lagrange-multiplier (λ(t)) series from a CP2K point directory.
 
-    Thin path-friendly wrapper around
-    :meth:`CP2KParser.parse_lambda_series`; accepts ``str`` or ``Path``
-    and uses a fresh ``CP2KParser`` instance.
+    Internally: parser -> raw -> _cp2k_raw_to_lambda_series -> canonical.
     """
     return CP2KParser().parse_lambda_series(Path(directory))
+
+
+def read_constraint_metadata_from_restart(
+    restart_path: str | Path,
+) -> ConstraintMetadata:
+    """Read a single CP2K *.restart file into canonical ConstraintMetadata.
+
+    File-level analogue of :func:`read_constraint_metadata`. Used by
+    callers that already located the .restart file (e.g.
+    ``scripts/TIGen`` and the cli SG preview).
+    """
+    raw = parse_colvar_restart(restart_path)
+    return _cp2k_raw_to_constraint_metadata(raw)
+
+
+def read_lambda_series_from_log(
+    log_path: str | Path,
+) -> LambdaSeries:
+    """Read a single CP2K *.LagrangeMultLog file into canonical LambdaSeries.
+
+    File-level analogue of :func:`read_lambda_series`.
+    """
+    raw = parse_lagrange_mult_log(log_path)
+    return _cp2k_raw_to_lambda_series(raw)
+
+
+def read_constraint_run(directory: str | Path) -> ConstraintRun:
+    """Read a CP2K constraint-MD point as a composite view.
+
+    Internally composes :func:`read_constraint_metadata` and
+    :func:`read_lambda_series` on the same directory. Does NOT extend
+    ``ConstraintMDParser`` Protocol.
+    """
+    return ConstraintRun(
+        metadata=read_constraint_metadata(directory),
+        lambda_series=read_lambda_series(directory),
+    )
+
+
+def read_constraint_run_from_files(
+    restart_path: str | Path,
+    log_path: str | Path,
+) -> ConstraintRun:
+    """Read a CP2K constraint-MD run from explicit (restart, log) paths.
+
+    File-level analogue of :func:`read_constraint_run`. Replaces the
+    historical ``ColvarMDInfo.from_paths(...)`` classmethod (which is
+    NOT re-implemented on ConstraintRun to avoid an
+    ``engines.models -> engines.cp2k`` import cycle).
+    """
+    return ConstraintRun(
+        metadata=read_constraint_metadata_from_restart(restart_path),
+        lambda_series=read_lambda_series_from_log(log_path),
+    )
+
+
+def compute_target_series(
+    metadata: ConstraintMetadata,
+    n_steps: int,
+    *,
+    colvar_id: int | None = None,
+) -> np.ndarray:
+    """Reconstruct the target CV series in atomic units.
+
+    ``xi(k) = target_au + (k - step_start) * target_growth_au * dt_au``
+    where *k* = 0, 1, ..., *n_steps* - 1 (absolute step numbers)
+    and *dt_au* is the MD timestep in atomic time units.
+
+    Phase 4 Commit 1 (Step 5e): physically migrated from
+    ``utils.formats.cp2k.colvar`` to ``engines.cp2k``. Signature and
+    formula are byte-for-byte the same as the historical
+    ``utils.compute_target_series``; the parameter name changed from
+    ``restart`` to ``metadata`` to match the canonical model name.
+    """
+    if colvar_id is not None:
+        constraint = metadata.colvars[colvar_id]
+    else:
+        constraint = metadata.colvars.primary
+    k = np.arange(n_steps)
+    dt_au = metadata.timestep_fs / AU_TIME_TO_FS
+    return (
+        constraint.target_au
+        + (k - metadata.step_start) * constraint.target_growth_au * dt_au
+    )
 
 
 def read_fermi_series(
@@ -407,8 +550,17 @@ def read_distributed_potential_frames(
 
 __all__ = [
     "CP2KParser",
+    # Directory facades
     "read_constraint_metadata",
     "read_lambda_series",
+    "read_constraint_run",
+    # File-level facades (Phase 4 Commit 1)
+    "read_constraint_metadata_from_restart",
+    "read_lambda_series_from_log",
+    "read_constraint_run_from_files",
+    # Engine-neutral utility (Phase 4 Commit 1 — migrated from utils)
+    "compute_target_series",
+    # Misc readers
     "read_fermi_series",
     "read_continuous_potential_frames",
     "read_distributed_potential_frames",

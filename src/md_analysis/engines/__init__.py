@@ -33,15 +33,26 @@ from __future__ import annotations
 
 from .cp2k import (
     CP2KParser,
+    compute_target_series,
     read_constraint_metadata,
+    read_constraint_metadata_from_restart,
+    read_constraint_run,
+    read_constraint_run_from_files,
     read_continuous_potential_frames,
     read_distributed_potential_frames,
     read_fermi_series,
     read_lambda_series,
+    read_lambda_series_from_log,
 )
 from .models import (
+    ColvarInfo,
+    ColvarMDInfo,
+    ColvarRestart,
+    ConstraintInfo,
     ConstraintMetadata,
+    ConstraintRun,
     FermiRecord,
+    LagrangeMultLog,
     LambdaSeries,
     PotentialFrame,
 )
@@ -64,16 +75,31 @@ __all__ = [
     "ConstraintMDParser",
     "ParserInferenceError",
     "CP2KParser",
+    # Engine-neutral models
+    "ConstraintInfo",
+    "ColvarInfo",
     "ConstraintMetadata",
     "LambdaSeries",
+    "ConstraintRun",
     "FermiRecord",
     "PotentialFrame",
+    # Phase 5b aliases
+    "ColvarRestart",
+    "LagrangeMultLog",
+    "ColvarMDInfo",
+    # Registry / Protocol
     "register_parser",
     "get_parser",
     "infer_parser",
     "resolve_parser",
+    # CP2K facades
     "read_constraint_metadata",
     "read_lambda_series",
+    "read_constraint_run",
+    "read_constraint_metadata_from_restart",
+    "read_lambda_series_from_log",
+    "read_constraint_run_from_files",
+    "compute_target_series",
     "read_fermi_series",
     "read_continuous_potential_frames",
     "read_distributed_potential_frames",

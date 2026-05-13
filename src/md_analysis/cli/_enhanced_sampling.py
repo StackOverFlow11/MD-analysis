@@ -40,11 +40,11 @@ def _print_sg_info(restart_path: str, log_path: str) -> None:
 
     from ..utils.constants import AU_TIME_TO_FS
 
-    ColvarMDInfo = lazy_import(
-        "md_analysis.utils.formats.cp2k.colvar", "ColvarMDInfo",
+    read_constraint_run_from_files = lazy_import(
+        "md_analysis.engines.cp2k", "read_constraint_run_from_files",
     )
     try:
-        info = ColvarMDInfo.from_paths(restart_path, log_path)
+        info = read_constraint_run_from_files(restart_path, log_path)
     except Exception as exc:
         print(f"  (Could not parse metadata: {exc})")
         return

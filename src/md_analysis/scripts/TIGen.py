@@ -16,7 +16,7 @@ from ..config import KEY_CP2K_SCRIPT_PATH, get_config
 from ..engines.models import ConstraintMetadata
 from ..exceptions import MDAnalysisError
 from ..utils.constants import AU_TIME_TO_FS
-from ..utils.formats.cp2k.colvar import parse_colvar_restart
+from ..engines.cp2k import read_constraint_metadata_from_restart
 
 logger = logging.getLogger(__name__)
 
@@ -281,7 +281,7 @@ def _plan_ti_targets(
             "Must specify either targets_au or time_range."
         )
 
-    restart = parse_colvar_restart(restart_path)
+    restart = read_constraint_metadata_from_restart(restart_path)
     frames = _load_trajectory_cv(xyz_path, restart, colvar_id=None)
 
     if time_mode:
@@ -483,7 +483,7 @@ def generate_ti_batch_with_report(
         )
 
     # Pre-load restart / inp / frames once for efficiency.
-    restart = parse_colvar_restart(restart_path)
+    restart = read_constraint_metadata_from_restart(restart_path)
     inp_text = Path(inp_path).read_text(encoding="utf-8")
     frames = _load_trajectory_cv(xyz_path, restart, colvar_id=None)
 
@@ -564,7 +564,7 @@ def generate_ti_workdir(
     Path
         The created work directory.
     """
-    restart = _restart or parse_colvar_restart(restart_path)
+    restart = _restart or read_constraint_metadata_from_restart(restart_path)
     inp_text = _inp_text or Path(inp_path).read_text(encoding="utf-8")
     frames = _preloaded or _load_trajectory_cv(xyz_path, restart, colvar_id)
 
@@ -671,7 +671,7 @@ def batch_generate_ti_workdirs(
             "(time_initial_fs, time_final_fs, n_points)."
         )
 
-    restart = parse_colvar_restart(restart_path)
+    restart = read_constraint_metadata_from_restart(restart_path)
     inp_text = Path(inp_path).read_text(encoding="utf-8")
     frames = _load_trajectory_cv(xyz_path, restart, colvar_id)
 

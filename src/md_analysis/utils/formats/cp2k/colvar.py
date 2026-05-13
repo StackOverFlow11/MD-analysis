@@ -1,17 +1,29 @@
-"""Parse CP2K COLVAR restart files and LagrangeMultLog files."""
+"""Parse CP2K COLVAR restart files and LagrangeMultLog files.
+
+Phase 4 Commit 1 status
+-----------------------
+Parsers now return **CP2K-specific raw dataclasses** (``Cp2kConstraintInfoRaw`` /
+``Cp2kColvarInfoRaw`` / ``Cp2kConstraintMetadataRaw`` / ``Cp2kLambdaSeriesRaw``).
+The engine-neutral canonical types (``ConstraintInfo`` / ``ColvarInfo`` /
+``ConstraintMetadata`` / ``LambdaSeries`` / ``ConstraintRun``) and their
+aliases (``ColvarRestart`` / ``LagrangeMultLog`` / ``ColvarMDInfo``) now live
+in :mod:`md_analysis.engines.models`.  Conversion from raw to canonical is
+performed by ``engines.cp2k._cp2k_raw_to_*`` helpers.
+
+Module-level invariant: this file does NOT runtime-import
+``md_analysis.engines`` (R2).  Verified by ``tools/check_r2_imports.py``.
+"""
 
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator
 
 import numpy as np
 
 from .cell import parse_abc_from_restart
 
-from ...constants import AU_TIME_TO_FS
 from ....exceptions import MDAnalysisError
 
 
@@ -20,16 +32,22 @@ class ColvarParseError(MDAnalysisError):
 
 
 # ---------------------------------------------------------------------------
-# Dataclasses
+# CP2K-specific raw dataclasses
+#
+# Field set is 1:1 with the canonical ConstraintInfo / ColvarInfo /
+# ConstraintMetadata / LambdaSeries types in engines.models.  The raw types
+# are intentionally accessor-free (no .primary / __getitem__ / accessor
+# methods): they are the *parser output*, and engines.cp2k._cp2k_raw_to_*
+# conversion helpers build the accessor-bearing canonical models.
 # ---------------------------------------------------------------------------
 
+
 @dataclass(frozen=True)
-class ConstraintInfo:
-    """COLLECTIVE constraint parameters.
+class Cp2kConstraintInfoRaw:
+    """CP2K-specific raw view of one COLLECTIVE constraint block.
 
     ``target_growth_au`` is the rate of change per atomic unit of time
-    (as stored in CP2K restart files).  Multiply by the timestep in
-    a.u. to obtain the per-step increment.
+    (as stored in CP2K restart files).
     """
 
     colvar_id: int
@@ -39,141 +57,35 @@ class ConstraintInfo:
 
 
 @dataclass(frozen=True)
-class ColvarInfo:
-    """Collection of collective variable constraints."""
+class Cp2kColvarInfoRaw:
+    """CP2K-specific raw view of the collection of COLLECTIVE constraints."""
 
-    constraints: tuple[ConstraintInfo, ...]
-
-    def __len__(self) -> int:
-        return len(self.constraints)
-
-    def __getitem__(self, colvar_id: int) -> ConstraintInfo:
-        for c in self.constraints:
-            if c.colvar_id == colvar_id:
-                return c
-        raise KeyError(f"No constraint with colvar_id={colvar_id}")
-
-    def __iter__(self) -> Iterator[ConstraintInfo]:
-        return iter(self.constraints)
-
-    @property
-    def primary(self) -> ConstraintInfo:
-        """Return the first constraint (primary CV)."""
-        return self.constraints[0]
+    constraints: tuple[Cp2kConstraintInfoRaw, ...]
 
 
 @dataclass(frozen=True)
-class ConstraintMetadata:
-    """Metadata parsed from a constraint-MD restart file.
-
-    Engine-neutral payload returned by ``ConstraintMDParser.parse_metadata``.
-    Field set is the historical ``ColvarRestart`` shape (renamed in
-    Phase 5b of the utils/engines refactor); see the module-level
-    ``ColvarRestart`` alias below for backwards-compatible references
-    that will be dropped in a later phase.
-    """
+class Cp2kConstraintMetadataRaw:
+    """CP2K-specific raw view of constraint-MD restart metadata."""
 
     project_name: str
     step_start: int
     time_start_fs: float
     timestep_fs: float
     total_steps: int
-    colvars: ColvarInfo
+    colvars: Cp2kColvarInfoRaw
     lagrange_filename: str | None
     cell_abc_ang: tuple[float, float, float]
     fixed_atom_indices: tuple[int, ...] | None
 
 
 @dataclass(frozen=True)
-class LambdaSeries:
-    """Lagrange multiplier (constraint force) time series.
-
-    Engine-neutral payload returned by ``ConstraintMDParser.parse_lambda_series``.
-    Field set is the historical ``LagrangeMultLog`` shape (renamed in
-    Phase 5b); see the module-level ``LagrangeMultLog`` alias below.
-    The ``LagrangeMultLog`` *file suffix* (``*.LagrangeMultLog``) is a
-    CP2K output filename and is NOT renamed.
-    """
+class Cp2kLambdaSeriesRaw:
+    """CP2K-specific raw view of a LagrangeMultLog file."""
 
     shake: np.ndarray
     rattle: np.ndarray
     n_steps: int
     n_constraints: int
-
-    @property
-    def collective_shake(self) -> np.ndarray:
-        """Shake multiplier for the CV constraint, shape ``(n_steps,)``."""
-        return self.shake if self.n_constraints == 1 else self.shake[:, 0]
-
-    @property
-    def collective_rattle(self) -> np.ndarray:
-        """Rattle multiplier for the CV constraint, shape ``(n_steps,)``."""
-        return self.rattle if self.n_constraints == 1 else self.rattle[:, 0]
-
-
-# Phase 5b backwards-compatible aliases. The canonical names are
-# ``ConstraintMetadata`` / ``LambdaSeries``; the old names are kept so
-# transitional consumers (tests, the ``enhanced_sampling/_parsers.py``
-# shim, etc.) keep importing without churn. Plan to drop these in the
-# phase that finishes the engines/ migration.
-ColvarRestart = ConstraintMetadata
-LagrangeMultLog = LambdaSeries
-
-
-@dataclass(frozen=True)
-class ColvarMDInfo:
-    """Complete slow-growth MD session: restart config + Lagrange multiplier data.
-
-    Combines :class:`ConstraintMetadata` (input configuration) with
-    :class:`LambdaSeries` (output multiplier data) and provides
-    correctly aligned step/time/target arrays.
-    """
-
-    restart: ConstraintMetadata
-    lagrange: LambdaSeries
-
-    @property
-    def n_steps(self) -> int:
-        """Number of MD steps (from Lagrange multiplier log)."""
-        return self.lagrange.n_steps
-
-    @property
-    def steps(self) -> np.ndarray:
-        """Absolute step numbers, shape ``(n_steps,)``: ``[0, 1, ..., n_steps-1]``."""
-        return np.arange(self.n_steps)
-
-    @property
-    def times_fs(self) -> np.ndarray:
-        """Absolute times in fs, shape ``(n_steps,)``."""
-        return self.steps * self.restart.timestep_fs
-
-    def target_series_au(self, colvar_id: int | None = None) -> np.ndarray:
-        """Target CV series in atomic units, shape ``(n_steps,)``.
-
-        ``xi(k) = target_au + (k - step_start) * target_growth_au * dt_au``
-
-        where *k* are absolute step numbers ``[0, 1, ..., n_steps-1]``
-        and *dt_au* is the MD timestep in atomic time units.
-        """
-        c = (
-            self.restart.colvars[colvar_id]
-            if colvar_id is not None
-            else self.restart.colvars.primary
-        )
-        dt_au = self.restart.timestep_fs / AU_TIME_TO_FS
-        return c.target_au + (self.steps - self.restart.step_start) * c.target_growth_au * dt_au
-
-    @classmethod
-    def from_paths(
-        cls,
-        restart_path: str | Path,
-        log_path: str | Path,
-    ) -> ColvarMDInfo:
-        """Parse restart and LagrangeMultLog files into a single object."""
-        return cls(
-            restart=parse_colvar_restart(restart_path),
-            lagrange=parse_lagrange_mult_log(log_path),
-        )
 
 
 # ---------------------------------------------------------------------------
@@ -221,13 +133,13 @@ def _parse_md_block(text: str) -> dict:
     }
 
 
-def _parse_single_collective_block(block: str) -> ConstraintInfo:
+def _parse_single_collective_block(block: str) -> Cp2kConstraintInfoRaw:
     inter_val = _extract_scalar(block, "INTERMOLECULAR")
     intermolecular = False
     if inter_val is not None:
         intermolecular = inter_val.upper().strip(".") in ("T", "TRUE", "YES")
 
-    return ConstraintInfo(
+    return Cp2kConstraintInfoRaw(
         colvar_id=int(_require_scalar(block, "COLVAR", "&COLLECTIVE")),
         target_au=float(_require_scalar(block, "TARGET", "&COLLECTIVE")),
         target_growth_au=float(
@@ -237,7 +149,7 @@ def _parse_single_collective_block(block: str) -> ConstraintInfo:
     )
 
 
-def _parse_all_collective_blocks(text: str) -> ColvarInfo:
+def _parse_all_collective_blocks(text: str) -> Cp2kColvarInfoRaw:
     constraint_match = _CONSTRAINT_BLOCK_RE.search(text)
     if not constraint_match:
         raise ColvarParseError("No &CONSTRAINT block found")
@@ -250,7 +162,7 @@ def _parse_all_collective_blocks(text: str) -> ColvarInfo:
     constraints = tuple(
         _parse_single_collective_block(m.group(1)) for m in matches
     )
-    return ColvarInfo(constraints=constraints)
+    return Cp2kColvarInfoRaw(constraints=constraints)
 
 
 def _parse_lagrange_filename(text: str) -> str | None:
@@ -391,15 +303,19 @@ def _parse_multi_constraint_log(
 
 
 # ---------------------------------------------------------------------------
-# Public API
+# Public API — parsers return RAW types (Phase 4 Commit 1)
 # ---------------------------------------------------------------------------
 
 
-def parse_colvar_restart(restart_path: str | Path) -> ConstraintMetadata:
-    """Parse COLVAR metadata from a CP2K restart file.
+def parse_colvar_restart(restart_path: str | Path) -> Cp2kConstraintMetadataRaw:
+    """Parse COLVAR metadata from a CP2K restart file into a raw type.
 
-    Reuses :func:`~md_analysis.utils.formats.cp2k.cell.parse_abc_from_restart` for
-    cell parameters.
+    Returns a CP2K-specific raw dataclass; conversion to the canonical
+    :class:`md_analysis.engines.models.ConstraintMetadata` is performed by
+    ``md_analysis.engines.cp2k._cp2k_raw_to_constraint_metadata``.
+
+    Reuses :func:`~md_analysis.utils.formats.cp2k.cell.parse_abc_from_restart`
+    for cell parameters.
     """
     path = Path(restart_path)
     text = path.read_text(encoding="utf-8")
@@ -416,7 +332,7 @@ def parse_colvar_restart(restart_path: str | Path) -> ConstraintMetadata:
     cell_abc_ang = parse_abc_from_restart(restart_path)
     fixed_atoms = _parse_fixed_atoms_list(text)
 
-    return ConstraintMetadata(
+    return Cp2kConstraintMetadataRaw(
         project_name=proj_match.group(1),
         step_start=md["step_start"],
         time_start_fs=md["time_start_fs"],
@@ -429,8 +345,15 @@ def parse_colvar_restart(restart_path: str | Path) -> ConstraintMetadata:
     )
 
 
-def parse_lagrange_mult_log(log_path: str | Path) -> LambdaSeries:
-    """Parse a LagrangeMultLog file. Auto-detects single/multi constraint."""
+def parse_lagrange_mult_log(log_path: str | Path) -> Cp2kLambdaSeriesRaw:
+    """Parse a LagrangeMultLog file into a raw type.
+
+    Returns a CP2K-specific raw dataclass; conversion to the canonical
+    :class:`md_analysis.engines.models.LambdaSeries` is performed by
+    ``md_analysis.engines.cp2k._cp2k_raw_to_lambda_series``.
+
+    Auto-detects single/multi constraint log format.
+    """
     path = Path(log_path)
     lines = path.read_text(encoding="utf-8").splitlines()
     if not lines:
@@ -440,46 +363,11 @@ def parse_lagrange_mult_log(log_path: str | Path) -> LambdaSeries:
 
     if fmt == "single":
         shake, rattle, n_steps = _parse_single_constraint_log(lines)
-        return LambdaSeries(
+        return Cp2kLambdaSeriesRaw(
             shake=shake, rattle=rattle, n_steps=n_steps, n_constraints=1,
         )
 
     shake, rattle, n_steps, n_constraints = _parse_multi_constraint_log(lines)
-    return LambdaSeries(
+    return Cp2kLambdaSeriesRaw(
         shake=shake, rattle=rattle, n_steps=n_steps, n_constraints=n_constraints,
-    )
-
-
-def compute_target_series(
-    restart: ConstraintMetadata,
-    n_steps: int,
-    *,
-    colvar_id: int | None = None,
-) -> np.ndarray:
-    """Reconstruct the target CV series in atomic units.
-
-    ``xi(k) = target_au + (k - step_start) * target_growth_au * dt_au``
-    where *k* = 0, 1, ..., *n_steps* - 1 (absolute step numbers)
-    and *dt_au* is the MD timestep in atomic time units.
-
-    Parameters
-    ----------
-    restart : ConstraintMetadata
-        Parsed restart metadata.  ``target_au`` is the target value
-        **at** ``step_start`` (the restart snapshot), not the initial value.
-    n_steps : int
-        Number of steps to generate.
-    colvar_id : int, optional
-        If given, use the constraint with this ``colvar_id``.
-        Defaults to the primary (first) constraint.
-    """
-    if colvar_id is not None:
-        constraint = restart.colvars[colvar_id]
-    else:
-        constraint = restart.colvars.primary
-    k = np.arange(n_steps)
-    dt_au = restart.timestep_fs / AU_TIME_TO_FS
-    return (
-        constraint.target_au
-        + (k - restart.step_start) * constraint.target_growth_au * dt_au
     )

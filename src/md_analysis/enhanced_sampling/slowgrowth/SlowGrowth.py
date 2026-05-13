@@ -15,7 +15,8 @@ from pathlib import Path
 import numpy as np
 
 from ...utils.constants import AU_TIME_TO_FS
-from ...utils.formats.cp2k.colvar import ColvarMDInfo
+from ...engines.models import ColvarMDInfo
+from ...engines.cp2k import read_constraint_run_from_files
 
 
 # ---------------------------------------------------------------------------
@@ -147,7 +148,7 @@ class SlowgrowthFull(Slowgrowth):
         colvar_id: int | None = None,
     ) -> SlowgrowthFull:
         """Parse files and build in one step (CP2K-only path)."""
-        md_info = ColvarMDInfo.from_paths(restart_path, log_path)
+        md_info = read_constraint_run_from_files(restart_path, log_path)
         return cls.from_md_info(md_info, colvar_id=colvar_id)
 
     @classmethod
@@ -176,7 +177,6 @@ class SlowgrowthFull(Slowgrowth):
             infer_parser,
             resolve_parser,
         )
-        from ...utils.formats.cp2k.colvar import ColvarMDInfo
 
         directory = Path(directory)
         if parser == "auto":
@@ -184,8 +184,8 @@ class SlowgrowthFull(Slowgrowth):
         else:
             parser_obj = resolve_parser(parser)
         md_info = ColvarMDInfo(
-            restart=parser_obj.parse_metadata(directory),
-            lagrange=parser_obj.parse_lambda_series(directory),
+            metadata=parser_obj.parse_metadata(directory),
+            lambda_series=parser_obj.parse_lambda_series(directory),
         )
         return cls.from_md_info(md_info, colvar_id=colvar_id)
 

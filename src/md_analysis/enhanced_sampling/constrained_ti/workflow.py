@@ -678,9 +678,9 @@ def standalone_diagnostics(
     -------
     dict with keys "report", "diagnostics_png", "csv".
     """
-    from ...utils.formats.cp2k.colvar import ColvarMDInfo
+    from ...engines.cp2k import read_constraint_run_from_files
 
-    md_info = ColvarMDInfo.from_paths(restart_path, log_path)
+    md_info = read_constraint_run_from_files(restart_path, log_path)
     lambda_series = md_info.lagrange.collective_shake
 
     constraint = (

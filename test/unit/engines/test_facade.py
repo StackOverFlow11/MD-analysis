@@ -64,7 +64,7 @@ def test_legacy_dataclass_aliases_resolve_to_renamed_types() -> None:
     must point at the renamed engines-neutral types so existing imports
     transparently see the same class (single source of truth)."""
     from md_analysis.engines import ConstraintMetadata, LambdaSeries
-    from md_analysis.utils.formats.cp2k.colvar import (
+    from md_analysis.engines.models import (
         ColvarRestart,
         LagrangeMultLog,
     )
@@ -402,3 +402,217 @@ def test_vasp_format_modules_not_imported_during_auto_discovery(
 
     with pytest.raises(ParserInferenceError):
         infer_parser(tmp_path)
+
+
+# =========================================================================
+# Phase 4 Commit 1 — D10 raw -> canonical conversion + D8 ConstraintRun
+# =========================================================================
+
+
+def test_raw_to_constraint_info_field_equality() -> None:
+    """_cp2k_raw_to_constraint_info preserves field values 1:1."""
+    import numpy as np
+
+    from md_analysis.engines.cp2k import _cp2k_raw_to_constraint_info
+    from md_analysis.engines.models import ConstraintInfo
+    from md_analysis.utils.formats.cp2k.colvar import Cp2kConstraintInfoRaw
+
+    raw = Cp2kConstraintInfoRaw(
+        colvar_id=7,
+        target_au=1.5,
+        target_growth_au=3.14e-6,
+        intermolecular=True,
+    )
+    canon = _cp2k_raw_to_constraint_info(raw)
+    assert isinstance(canon, ConstraintInfo)
+    assert canon.colvar_id == 7
+    assert canon.target_au == 1.5
+    assert canon.target_growth_au == 3.14e-6
+    assert canon.intermolecular is True
+
+
+def test_raw_to_colvar_info_field_equality_and_nested() -> None:
+    """_cp2k_raw_to_colvar_info preserves nested ConstraintInfo conversions."""
+    from md_analysis.engines.cp2k import _cp2k_raw_to_colvar_info
+    from md_analysis.engines.models import ColvarInfo, ConstraintInfo
+    from md_analysis.utils.formats.cp2k.colvar import (
+        Cp2kColvarInfoRaw,
+        Cp2kConstraintInfoRaw,
+    )
+
+    raw = Cp2kColvarInfoRaw(
+        constraints=(
+            Cp2kConstraintInfoRaw(
+                colvar_id=1, target_au=2.0,
+                target_growth_au=1e-5, intermolecular=False,
+            ),
+            Cp2kConstraintInfoRaw(
+                colvar_id=2, target_au=3.0,
+                target_growth_au=-2e-5, intermolecular=True,
+            ),
+        ),
+    )
+    canon = _cp2k_raw_to_colvar_info(raw)
+    assert isinstance(canon, ColvarInfo)
+    assert len(canon) == 2
+    assert all(isinstance(c, ConstraintInfo) for c in canon)
+    assert canon.primary.colvar_id == 1
+    assert canon[2].colvar_id == 2
+    assert canon[2].intermolecular is True
+
+
+def test_raw_to_constraint_metadata_field_equality() -> None:
+    """_cp2k_raw_to_constraint_metadata preserves all 9 fields."""
+    from md_analysis.engines.cp2k import _cp2k_raw_to_constraint_metadata
+    from md_analysis.engines.models import ConstraintMetadata
+    from md_analysis.utils.formats.cp2k.colvar import (
+        Cp2kColvarInfoRaw,
+        Cp2kConstraintInfoRaw,
+        Cp2kConstraintMetadataRaw,
+    )
+
+    raw = Cp2kConstraintMetadataRaw(
+        project_name="phase4_test",
+        step_start=100,
+        time_start_fs=50.0,
+        timestep_fs=0.5,
+        total_steps=200,
+        colvars=Cp2kColvarInfoRaw(constraints=(
+            Cp2kConstraintInfoRaw(
+                colvar_id=1, target_au=1.5,
+                target_growth_au=1e-5, intermolecular=True,
+            ),
+        )),
+        lagrange_filename="cf.dat",
+        cell_abc_ang=(10.0, 10.0, 30.0),
+        fixed_atom_indices=(1, 2, 3),
+    )
+    canon = _cp2k_raw_to_constraint_metadata(raw)
+    assert isinstance(canon, ConstraintMetadata)
+    assert canon.project_name == "phase4_test"
+    assert canon.step_start == 100
+    assert canon.time_start_fs == 50.0
+    assert canon.timestep_fs == 0.5
+    assert canon.total_steps == 200
+    assert canon.lagrange_filename == "cf.dat"
+    assert canon.cell_abc_ang == (10.0, 10.0, 30.0)
+    assert canon.fixed_atom_indices == (1, 2, 3)
+    assert canon.colvars.primary.colvar_id == 1
+    assert canon.colvars.primary.target_au == 1.5
+
+
+def test_raw_to_lambda_series_field_equality() -> None:
+    """_cp2k_raw_to_lambda_series preserves shake/rattle arrays + counts."""
+    import numpy as np
+
+    from md_analysis.engines.cp2k import _cp2k_raw_to_lambda_series
+    from md_analysis.engines.models import LambdaSeries
+    from md_analysis.utils.formats.cp2k.colvar import Cp2kLambdaSeriesRaw
+
+    shake = np.array([1.0, 2.0, 3.0])
+    rattle = np.array([0.1, 0.2, 0.3])
+    raw = Cp2kLambdaSeriesRaw(
+        shake=shake, rattle=rattle, n_steps=3, n_constraints=1,
+    )
+    canon = _cp2k_raw_to_lambda_series(raw)
+    assert isinstance(canon, LambdaSeries)
+    assert canon.n_steps == 3
+    assert canon.n_constraints == 1
+    np.testing.assert_array_equal(canon.shake, shake)
+    np.testing.assert_array_equal(canon.rattle, rattle)
+    # canonical accessor (LambdaSeries property) works
+    np.testing.assert_array_equal(canon.collective_shake, shake)
+
+
+def test_constraint_run_restart_lagrange_legacy_aliases() -> None:
+    """ConstraintRun.restart / .lagrange must alias .metadata / .lambda_series.
+
+    Phase 5b compatibility — Phase 5 naming cleanup will delete both
+    the alias properties and the 17 caller sites that use them.
+    """
+    import numpy as np
+
+    from md_analysis.engines.models import (
+        ColvarInfo,
+        ConstraintInfo,
+        ConstraintMetadata,
+        ConstraintRun,
+        LambdaSeries,
+    )
+
+    meta = ConstraintMetadata(
+        project_name="alias_test",
+        step_start=0,
+        time_start_fs=0.0,
+        timestep_fs=1.0,
+        total_steps=10,
+        colvars=ColvarInfo(constraints=(
+            ConstraintInfo(
+                colvar_id=1, target_au=1.0,
+                target_growth_au=0.0, intermolecular=False,
+            ),
+        )),
+        lagrange_filename=None,
+        cell_abc_ang=(10.0, 10.0, 30.0),
+        fixed_atom_indices=None,
+    )
+    ls = LambdaSeries(
+        shake=np.zeros(10), rattle=np.zeros(10),
+        n_steps=10, n_constraints=1,
+    )
+    run = ConstraintRun(metadata=meta, lambda_series=ls)
+
+    assert run.restart is meta
+    assert run.lagrange is ls
+
+
+def test_constraint_run_target_series_au_literal_formula() -> None:
+    """ConstraintRun.target_series_au matches the literal documented formula.
+
+    Self-contained (no dependency on the old ColvarMDInfo implementation):
+    references the formula
+        xi(k) = target_au + (k - step_start) * target_growth_au * dt_au
+    with dt_au = timestep_fs / AU_TIME_TO_FS,
+    using AU_TIME_TO_FS = 0.02418884326585 (CODATA).
+    """
+    import numpy as np
+
+    from md_analysis.engines.models import (
+        ColvarInfo,
+        ConstraintInfo,
+        ConstraintMetadata,
+        ConstraintRun,
+        LambdaSeries,
+    )
+
+    meta = ConstraintMetadata(
+        project_name="formula_test",
+        step_start=100,
+        time_start_fs=50.0,
+        timestep_fs=0.5,
+        total_steps=10,
+        colvars=ColvarInfo(constraints=(
+            ConstraintInfo(
+                colvar_id=1, target_au=2.0,
+                target_growth_au=1e-5, intermolecular=True,
+            ),
+        )),
+        lagrange_filename=None,
+        cell_abc_ang=(10.0, 10.0, 30.0),
+        fixed_atom_indices=None,
+    )
+    ls = LambdaSeries(
+        shake=np.zeros(10), rattle=np.zeros(10),
+        n_steps=10, n_constraints=1,
+    )
+    run = ConstraintRun(metadata=meta, lambda_series=ls)
+
+    # Literal-formula reference (CODATA AU_TIME_TO_FS)
+    AU_TIME_TO_FS = 0.02418884326585
+    dt_au = 0.5 / AU_TIME_TO_FS
+    k = np.arange(10)
+    expected = 2.0 + (k - 100) * 1e-5 * dt_au
+
+    np.testing.assert_allclose(
+        run.target_series_au(), expected, atol=1e-12,
+    )
