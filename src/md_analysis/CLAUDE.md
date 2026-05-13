@@ -66,4 +66,4 @@ exceptions
 约束：
 - `engines/` 只允许 import `utils/`、`exceptions` 和自身内部；**不允许**反向 import `electrochemical` / `water` / `enhanced_sampling` / `cli` / `scripts` / `agent`
 - `utils/` 运行时**不**依赖 `engines/`（只允许 `TYPE_CHECKING` 块下的字符串注解）
-- 业务工作流 import `engines.cp2k.read_*` facade，而不是直接走 `utils.formats.cp2k_*`
+- 业务工作流 import `engines.cp2k.read_*` facade，而不是直接走 `utils.formats.cp2k.*`
