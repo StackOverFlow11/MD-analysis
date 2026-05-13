@@ -21,7 +21,7 @@ Status (Phase 7b1)
                              ``CenterPotential``) keep working unchanged
 
 The legacy ``ColvarRestart`` / ``LagrangeMultLog`` names are kept as
-module-level aliases in ``utils.formats.cp2k_colvar`` so existing tests
+module-level aliases in ``utils.formats.cp2k.colvar`` so existing tests
 keep working during the transition. They will be removed in a later
 cleanup phase.
 
@@ -37,8 +37,8 @@ from pathlib import Path
 
 import numpy as np
 
-from ..utils.formats.cube import CubeHeader
-from ..utils.formats.cp2k_colvar import ConstraintMetadata, LambdaSeries
+from ..utils.formats.common.cube import CubeHeader
+from ..utils.formats.cp2k.colvar import ConstraintMetadata, LambdaSeries
 
 try:
     from ase import Atoms
@@ -71,7 +71,7 @@ class FermiRecord:
     """One ``(step, time_fs, fermi_raw)`` row from a CP2K stdout log.
 
     Engine-neutral typed counterpart to the legacy dict-of-records shape
-    returned by :func:`md_analysis.utils.formats.cp2k_stdout.parse_md_out_fermi`.
+    returned by :func:`md_analysis.utils.formats.cp2k.stdout.parse_md_out_fermi`.
     The fields mirror that dict exactly so legacy callers can keep
     using their dict-style access without change while new callers
     consume the typed model via the

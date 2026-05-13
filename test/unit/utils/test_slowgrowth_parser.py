@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 
 from md_analysis.utils.constants import AU_TIME_TO_FS
-from md_analysis.utils.formats.cp2k_colvar import (
+from md_analysis.utils.formats.cp2k.colvar import (
     ColvarInfo,
     ColvarMDInfo,
     ColvarParseError,
@@ -364,7 +364,7 @@ class TestEdgeCases:
 
     def test_fixed_atoms_range_expansion(self, tmp_path):
         """Verify that N..M range syntax is expanded correctly."""
-        from md_analysis.utils.formats.cp2k_colvar import (
+        from md_analysis.utils.formats.cp2k.colvar import (
             _parse_fixed_atoms_list,
         )
         text = (

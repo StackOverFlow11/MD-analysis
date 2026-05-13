@@ -60,11 +60,11 @@ def test_public_symbols_importable_from_package_root() -> None:
 
 
 def test_legacy_dataclass_aliases_resolve_to_renamed_types() -> None:
-    """``ColvarRestart`` / ``LagrangeMultLog`` aliases in ``cp2k_colvar``
+    """``ColvarRestart`` / ``LagrangeMultLog`` aliases in ``cp2k.colvar``
     must point at the renamed engines-neutral types so existing imports
     transparently see the same class (single source of truth)."""
     from md_analysis.engines import ConstraintMetadata, LambdaSeries
-    from md_analysis.utils.formats.cp2k_colvar import (
+    from md_analysis.utils.formats.cp2k.colvar import (
         ColvarRestart,
         LagrangeMultLog,
     )
@@ -191,7 +191,7 @@ def test_read_fermi_series_returns_typed_records() -> None:
     """``read_fermi_series`` must yield ``FermiRecord`` instances with the
     same data as the legacy dict-based parser."""
     from md_analysis.engines import FermiRecord, read_fermi_series
-    from md_analysis.utils.formats.cp2k_stdout import parse_md_out_fermi
+    from md_analysis.utils.formats.cp2k.stdout import parse_md_out_fermi
 
     typed = read_fermi_series(MD_OUT)
     legacy = parse_md_out_fermi(MD_OUT)
@@ -210,7 +210,7 @@ def test_parse_md_out_fermi_still_returns_dict() -> None:
     """The underlying legacy parser MUST keep returning ``list[dict]``;
     Phase 7b1 intentionally does not migrate ``CenterPotential`` away
     from dict-style access, so the dict shape must be preserved."""
-    from md_analysis.utils.formats.cp2k_stdout import parse_md_out_fermi
+    from md_analysis.utils.formats.cp2k.stdout import parse_md_out_fermi
 
     if not MD_OUT.exists():
         pytest.skip("md.out fixture missing")
@@ -343,7 +343,7 @@ def test_read_distributed_potential_frames_raises_on_empty_root(
 def test_vasp_report_module_raises_not_implemented(tmp_path) -> None:
     """``vasp_report`` placeholders must hard-error rather than return a
     silently-empty default."""
-    from md_analysis.utils.formats.vasp_report import (
+    from md_analysis.utils.formats.vasp.report import (
         parse_vasp_report_lambda_series,
         parse_vasp_report_metadata,
     )
@@ -359,7 +359,7 @@ def test_vasp_report_module_raises_not_implemented(tmp_path) -> None:
 
 def test_vasp_outcar_module_raises_not_implemented(tmp_path) -> None:
     """``vasp_outcar.parse_outcar_fermi`` must hard-error."""
-    from md_analysis.utils.formats.vasp_outcar import parse_outcar_fermi
+    from md_analysis.utils.formats.vasp.outcar import parse_outcar_fermi
 
     fake_outcar = tmp_path / "OUTCAR"
 
@@ -369,7 +369,7 @@ def test_vasp_outcar_module_raises_not_implemented(tmp_path) -> None:
 
 def test_vasp_locpot_module_raises_not_implemented(tmp_path) -> None:
     """``vasp_locpot`` placeholders must hard-error."""
-    from md_analysis.utils.formats.vasp_locpot import (
+    from md_analysis.utils.formats.vasp.locpot import (
         read_locpot,
         read_locpot_plane_avg,
     )

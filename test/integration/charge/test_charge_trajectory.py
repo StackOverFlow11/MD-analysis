@@ -15,7 +15,7 @@ from md_analysis.electrochemical.charge.Bader.SurfaceCharge import (
     surface_charge_analysis,
     trajectory_surface_charge,
 )
-from md_analysis.utils.formats.bader import load_bader_atoms
+from md_analysis.utils.formats.bader.acf import load_bader_atoms
 
 DATA_DIR = Path(__file__).resolve().parents[3] / "data_example" / "bader" / "single_frame"
 

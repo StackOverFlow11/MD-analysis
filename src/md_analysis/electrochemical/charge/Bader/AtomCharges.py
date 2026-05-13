@@ -12,7 +12,7 @@ from ase import Atoms
 
 from ....scripts.utils.IndexMapper import read_index_map_from_poscar, remap_array
 from ....utils.io._io_helpers import _cumulative_average, _write_csv
-from ....utils.formats.bader import load_bader_atoms
+from ....utils.formats.bader.acf import load_bader_atoms
 from ....utils.constants import (
     AREA_VECTOR_INDICES,
     AXIS_MAP,

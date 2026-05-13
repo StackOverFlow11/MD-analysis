@@ -1,10 +1,10 @@
-"""Tests for md_analysis.utils.formats.cp2k_cell."""
+"""Tests for md_analysis.utils.formats.cp2k.cell."""
 
 from __future__ import annotations
 
 import pytest
 
-from md_analysis.utils.formats.cp2k_cell import CellParseError, parse_abc_from_md_inp, parse_abc_from_restart
+from md_analysis.utils.formats.cp2k.cell import CellParseError, parse_abc_from_md_inp, parse_abc_from_restart
 
 
 _VALID_RESTART = """\

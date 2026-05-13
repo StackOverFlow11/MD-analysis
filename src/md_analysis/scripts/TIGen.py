@@ -16,7 +16,7 @@ from ..config import KEY_CP2K_SCRIPT_PATH, get_config
 from ..engines.models import ConstraintMetadata
 from ..exceptions import MDAnalysisError
 from ..utils.constants import AU_TIME_TO_FS
-from ..utils.formats.cp2k_colvar import parse_colvar_restart
+from ..utils.formats.cp2k.colvar import parse_colvar_restart
 
 logger = logging.getLogger(__name__)
 

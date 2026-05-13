@@ -40,7 +40,7 @@ U = -E_Fermi + φ_center + ΔΨ_a(H₃O⁺/w) - μ(H⁺,g⁰) - ΔE_ZP
 
 `PotentialFrame` 字段：`step, time_fs, cube_path, header, values, fermi_raw, atoms`（Phase 4 以来未变）。
 
-Fermi 能解析：连续模式 → `engines.cp2k.read_fermi_series(md_out_path)` 返回 `list[FermiRecord]`；分布式模式 → `utils.formats.cp2k_stdout.parse_sp_out_fermi(sp_out_path)`（单点不附 step 元数据，step 由目录名提供）。
+Fermi 能解析：连续模式 → `engines.cp2k.read_fermi_series(md_out_path)` 返回 `list[FermiRecord]`；分布式模式 → `utils.formats.cp2k.stdout.parse_sp_out_fermi(sp_out_path)`（单点不附 step 元数据，step 由目录名提供）。
 
 两种模式都返回 `list[PotentialFrame]`，下游分析逻辑（`CenterPotential.py` / `PhiZProfile.py`）无差异。
 

@@ -2,7 +2,7 @@
 
 The VASP ``LOCPOT`` file is the locally averaged electrostatic potential
 written on a regular grid. It is the VASP counterpart of the CP2K
-Hartree-potential ``.cube`` file parsed by ``utils.formats.cube``.
+Hartree-potential ``.cube`` file parsed by ``utils.formats.common.cube``.
 
 Phase 8 status
 --------------
@@ -43,7 +43,7 @@ def read_locpot_plane_avg(locpot_path: str | Path, *, axis: str = "c") -> tuple:
     file along the requested cell axis.
 
     Engine-neutral counterpart of
-    :func:`md_analysis.utils.formats.cube.plane_avg_phi_z_ev`.
+    :func:`md_analysis.utils.formats.common.cube.plane_avg_phi_z_ev`.
     """
     raise NotImplementedError(_NOT_IMPLEMENTED_MSG)
 

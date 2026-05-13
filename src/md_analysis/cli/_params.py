@@ -312,7 +312,7 @@ class CellAbcParam(ParamCollector):
     """Cell parameter acquisition with .restart/md.inp selection + retry."""
 
     def collect(self, ctx: dict) -> None:
-        from ..utils.formats.cp2k_cell import (
+        from ..utils.formats.cp2k.cell import (
             CellParseError,
             parse_abc_from_md_inp,
             parse_abc_from_restart,

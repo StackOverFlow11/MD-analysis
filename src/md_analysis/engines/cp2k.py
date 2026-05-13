@@ -12,7 +12,7 @@ Phase 7b2 status
   Path-friendly facade over ``CP2KParser`` that accepts ``str | Path``
   and constructs the parser internally.
 - ``read_fermi_series``     — Reads ``md.out`` Fermi entries via
-  ``utils.formats.cp2k_stdout.parse_md_out_fermi`` and converts each
+  ``utils.formats.cp2k.stdout.parse_md_out_fermi`` and converts each
   legacy dict into a typed ``FermiRecord``. The underlying parser
   function still returns ``list[dict]`` for the existing
   dict-based callers (see ``electrochemical.potential.CenterPotential``).
@@ -30,13 +30,13 @@ import logging
 from pathlib import Path
 
 from ..utils.constants import BOHR_TO_ANG, TRANSITION_METAL_SYMBOLS
-from ..utils.formats.cp2k_colvar import (
+from ..utils.formats.cp2k.colvar import (
     parse_colvar_restart,
     parse_lagrange_mult_log,
 )
-from ..utils.formats.cp2k_stdout import parse_md_out_fermi, parse_sp_out_fermi
-from ..utils.formats.cp2k_xyz import read_xyz_atoms_for_steps
-from ..utils.formats.cube import (
+from ..utils.formats.cp2k.stdout import parse_md_out_fermi, parse_sp_out_fermi
+from ..utils.formats.cp2k.xyz import read_xyz_atoms_for_steps
+from ..utils.formats.common.cube import (
     discover_cube_files,
     extract_step_from_cube_filename,
     read_cube_atoms,
@@ -144,7 +144,7 @@ def read_fermi_series(
 
     Returns a list of engine-neutral :class:`FermiRecord` rows
     (``step``, ``time_fs``, ``fermi_raw`` in Hartree). The underlying
-    parser (:func:`utils.formats.cp2k_stdout.parse_md_out_fermi`) still
+    parser (:func:`utils.formats.cp2k.stdout.parse_md_out_fermi`) still
     returns the legacy ``list[dict]`` shape and is unchanged.
     """
     legacy = parse_md_out_fermi(Path(md_out_path))

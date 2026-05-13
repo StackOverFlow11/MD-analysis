@@ -18,7 +18,7 @@ _ABC_RE = re.compile(
 )
 
 
-from ...exceptions import MDAnalysisError
+from ....exceptions import MDAnalysisError
 
 
 class CellParseError(MDAnalysisError):

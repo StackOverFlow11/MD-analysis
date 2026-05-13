@@ -31,7 +31,7 @@ from ...utils.constants import (
     TRANSITION_METAL_SYMBOLS,
 )
 from ...utils.io._io_helpers import _cumulative_average, _write_csv
-from ...utils.formats.cube import (
+from ...utils.formats.common.cube import (
     _float,
     discover_cube_files,
     extract_step_from_cube_filename,
@@ -444,7 +444,7 @@ def fermi_energy_analysis(
     if not md_out_path.exists():
         raise FileNotFoundError(f"md.out not found: {md_out_path}")
 
-    from ...utils.formats.cp2k_stdout import parse_md_out_fermi
+    from ...utils.formats.cp2k.stdout import parse_md_out_fermi
 
     fermi_records = parse_md_out_fermi(md_out_path)
     if not fermi_records:

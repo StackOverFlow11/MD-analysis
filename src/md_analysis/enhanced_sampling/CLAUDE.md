@@ -40,7 +40,7 @@ from md_analysis.engines import (
 - dξ/dt TARGET_GROWTH（仅 SG 需要；TI 应为 0）
 
 这些通过 `ConstraintMDParser.parse_metadata(directory) → ConstraintMetadata` 和
-`parse_lambda_series(directory) → LambdaSeries` 两个方法返回（dataclass 在 `engines.models`；Phase 5b 之前的旧名 `ColvarRestart` / `LagrangeMultLog` 仍作为 alias 在 `utils.formats.cp2k_colvar` 暴露，运行时是同一个类）。
+`parse_lambda_series(directory) → LambdaSeries` 两个方法返回（dataclass 在 `engines.models`；Phase 5b 之前的旧名 `ColvarRestart` / `LagrangeMultLog` 仍作为 alias 在 `utils.formats.cp2k.colvar` 暴露，运行时是同一个类）。
 
 ## 慢增长 (SG) → 热力学积分 (TI) 工作流
 

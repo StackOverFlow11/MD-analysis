@@ -3,7 +3,7 @@
 The VASP ``OUTCAR`` file is the canonical run log, containing per-step
 Fermi level, total energy, force statistics, and SCF history. It is the
 VASP counterpart of the CP2K ``md.out`` / ``sp.out`` files parsed by
-``utils.formats.cp2k_stdout``.
+``utils.formats.cp2k.stdout``.
 
 Phase 8 status
 --------------
@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     # ``utils/formats``); the TYPE_CHECKING guard keeps the annotations
     # useful for static analysis without creating a runtime
     # ``utils/formats`` -> ``engines`` edge.
-    from ...engines.models import FermiRecord
+    from ....engines.models import FermiRecord
 
 _NOT_IMPLEMENTED_MSG = (
     "VASP OUTCAR parsing is not implemented yet. See "

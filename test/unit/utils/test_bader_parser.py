@@ -5,12 +5,12 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from md_analysis.utils.formats.bader import (
+from md_analysis.utils.formats.bader.acf import (
     BaderParseError,
     _read_acf,
-    _read_potcar_zval,
     load_bader_atoms,
 )
+from md_analysis.utils.formats.bader.potcar import _read_potcar_zval
 
 DATA_DIR = Path(__file__).resolve().parents[3] / "data_example" / "bader" / "single_frame"
 

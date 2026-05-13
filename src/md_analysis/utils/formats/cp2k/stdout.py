@@ -19,9 +19,9 @@ import re
 from pathlib import Path
 from typing import Optional
 
-from .cube import _float
+from ..common.cube import _float
 
-# Re-usable line-level regex; centralised here so cp2k_xyz / future
+# Re-usable line-level regex; centralised here so cp2k.xyz / future
 # engines/cp2k facade share the exact same patterns rather than redefining
 # them per call site.
 FERMI_RE = re.compile(

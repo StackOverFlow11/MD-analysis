@@ -37,7 +37,7 @@ if TYPE_CHECKING:
     # (``engines`` -> ``utils/formats``); the TYPE_CHECKING guard keeps
     # the annotations meaningful for static analysis without creating a
     # runtime ``utils/formats`` -> ``engines`` edge.
-    from ...engines.models import ConstraintMetadata, LambdaSeries
+    from ....engines.models import ConstraintMetadata, LambdaSeries
 
 _NOT_IMPLEMENTED_MSG = (
     "VASP REPORT parsing is not implemented yet. See "

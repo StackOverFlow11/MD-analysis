@@ -21,7 +21,7 @@ compatibility.
 The CP2K stdout / xyz parser primitives (``FERMI_RE`` /
 ``parse_md_out_fermi`` / ``read_xyz_atoms_for_steps`` etc.) are no
 longer re-exported from this module; consumers should import them from
-``md_analysis.utils.formats.cp2k_stdout`` / ``cp2k_xyz`` directly.
+``md_analysis.utils.formats.cp2k.stdout`` / ``cp2k.xyz`` directly.
 """
 
 from __future__ import annotations

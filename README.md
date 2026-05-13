@@ -189,24 +189,29 @@ src/md_analysis/
 │   └── _settings.py        #   settings sub-menu (901-909)
 ├── utils/                  # single-frame low-level tools (split into 3 layers)
 │   ├── constants.py        #   physical constants, unit conversions, cSHE parameters, defaults
-│   ├── formats/            #   single-file parsers
-│   │   ├── cube.py         #     cube file I/O, plane-averaged φ(z), slab-averaged potential
-│   │   ├── bader.py        #     VASP Bader charge parsing (ACF.dat + POTCAR)
-│   │   ├── cp2k_cell.py    #     cell parameter parsing (.restart + md.inp)
-│   │   ├── cp2k_colvar.py  #     COLVAR restart + LagrangeMultLog parsing (ConstraintMetadata / LambdaSeries)
-│   │   ├── cp2k_stdout.py  #     md.out / sp.out Fermi-level + step/time parsing
-│   │   ├── cp2k_xyz.py     #     CP2K xyz step-comment parser + per-step Atoms streaming
-│   │   ├── vasp_report.py  #     VASP REPORT placeholder (NotImplementedError)
-│   │   ├── vasp_outcar.py  #     VASP OUTCAR placeholder
-│   │   └── vasp_locpot.py  #     VASP LOCPOT placeholder
+│   ├── formats/            #   single-file parsers, grouped by engine family
+│   │   ├── common/         #     engine-neutral formats
+│   │   │   └── cube.py     #       cube file I/O, plane-averaged φ(z), slab-averaged potential
+│   │   ├── cp2k/           #     CP2K single-file parsers
+│   │   │   ├── cell.py     #       cell parameter parsing (.restart + md.inp)
+│   │   │   ├── colvar.py   #       COLVAR restart + LagrangeMultLog (ConstraintMetadata / LambdaSeries)
+│   │   │   ├── stdout.py   #       md.out / sp.out Fermi-level + step/time parsing
+│   │   │   └── xyz.py      #       xyz step-comment parser + per-step Atoms streaming
+│   │   ├── vasp/           #     VASP placeholders (NotImplementedError, NOT auto-registered)
+│   │   │   ├── report.py   #       VASP REPORT (constraint MD)
+│   │   │   ├── outcar.py   #       VASP OUTCAR (Fermi series)
+│   │   │   └── locpot.py   #       VASP LOCPOT (planar-averaged potential)
+│   │   └── bader/          #     Bader code outputs
+│   │       ├── _errors.py  #       BaderParseError (shared)
+│   │       ├── acf.py      #       ACF.dat parsing + load_bader_atoms
+│   │       └── potcar.py   #       POTCAR ZVAL extraction
 │   ├── structure/          #   geometric / chemical-semantics helpers
 │   │   ├── cluster.py      #     1D periodic clustering + gap detection
 │   │   ├── layer.py        #     metal layer detection, interface identification
 │   │   └── water.py        #     water topology, density/orientation/angle profiles
-│   └── io/                 #   path discovery + IO dispatch
+│   └── io/                 #   generic I/O scaffolding (engine-neutral only)
 │       ├── _frame_discovery.py  # private: frame directory discovery (bader_t*_i* / potential_t*_i*)
-│       ├── _io_helpers.py       # private shared I/O helpers (_cumulative_average, _write_csv)
-│       └── cell_resolver.py     # non-interactive cell_abc resolution
+│       └── _io_helpers.py       # private shared I/O helpers (_cumulative_average, _write_csv)
 ├── engines/                # CP2K / VASP engine facade + neutral dataclasses
 │   ├── __init__.py         #   public facade (Protocol, registry, models, CP2K read_*)
 │   ├── protocols.py        #   ConstraintMDParser Protocol + parser registry
