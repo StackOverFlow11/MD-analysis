@@ -234,6 +234,64 @@ ColvarMDInfo = ConstraintRun
 
 
 # ---------------------------------------------------------------------------
+# Cell descriptor (Phase 4 Commit 2 — D7 Layer 1)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class CellSpec:
+    """Engine-neutral cell descriptor.
+
+    Holds a 3x3 lattice matrix in row-vector convention (one lattice
+    vector per row, matching ``ase.Atoms.cell.array`` and CP2K's
+    ``&CELL A/B/C`` row order).
+
+    Phase 4 status: the only engine adapter (CP2K's
+    :func:`md_analysis.engines.cp2k.read_cell`) currently produces
+    orthorhombic matrices only -- both ``parse_abc_from_md_inp`` and
+    ``parse_abc_from_restart`` reject non-orthogonal cells.  The
+    dataclass shape is intentionally general so future engine adapters
+    (or a future non-orthogonal restart parser) can populate
+    ``cell_matrix_ang`` without a model rev.
+    """
+
+    cell_matrix_ang: np.ndarray  # shape (3, 3), row-vector convention
+    pbc: tuple[bool, bool, bool] = (True, True, True)
+
+    @property
+    def abc_ang(self) -> tuple[float, float, float]:
+        """Norms of the three lattice vectors, in Angstrom.
+
+        WARNING: For non-orthorhombic cells this is NOT the box-edge
+        length.  Callers that rely on ``(a, b, c)`` as orthogonal-box
+        semantics MUST first check :attr:`is_orthorhombic`; otherwise
+        they must consume the full ``cell_matrix_ang`` (e.g. via
+        ``ase.Atoms.cell``).
+        """
+        m = self.cell_matrix_ang
+        return (
+            float(np.linalg.norm(m[0])),
+            float(np.linalg.norm(m[1])),
+            float(np.linalg.norm(m[2])),
+        )
+
+    @property
+    def is_orthorhombic(self) -> bool:
+        """True iff off-diagonal elements of ``cell_matrix_ang`` are
+        zero within a fixed tolerance of 1e-6 Angstrom (matching
+        :func:`md_analysis.utils.formats.cp2k.cell.parse_abc_from_restart`'s
+        orthogonality check)."""
+        m = self.cell_matrix_ang
+        tol = 1e-6
+        off = (
+            abs(m[0, 1]), abs(m[0, 2]),
+            abs(m[1, 0]), abs(m[1, 2]),
+            abs(m[2, 0]), abs(m[2, 1]),
+        )
+        return all(v <= tol for v in off)
+
+
+# ---------------------------------------------------------------------------
 # Potential frame + Fermi record (pre-existing, unchanged)
 # ---------------------------------------------------------------------------
 
@@ -288,6 +346,8 @@ __all__ = [
     "ColvarRestart",
     "LagrangeMultLog",
     "ColvarMDInfo",
+    # Cell layer
+    "CellSpec",
     # Potential layer
     "PotentialFrame",
     "FermiRecord",

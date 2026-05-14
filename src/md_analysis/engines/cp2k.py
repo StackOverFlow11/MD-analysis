@@ -30,6 +30,10 @@ import logging
 from pathlib import Path
 
 from ..utils.constants import AU_TIME_TO_FS, BOHR_TO_ANG, TRANSITION_METAL_SYMBOLS
+from ..utils.formats.cp2k.cell import (
+    parse_abc_from_md_inp,
+    parse_abc_from_restart,
+)
 from ..utils.formats.cp2k.colvar import (
     Cp2kColvarInfoRaw,
     Cp2kConstraintInfoRaw,
@@ -48,6 +52,7 @@ from ..utils.formats.common.cube import (
 )
 from ..utils.io._frame_discovery import extract_step_time_from_dirname
 from .models import (
+    CellSpec,
     ColvarInfo,
     ConstraintInfo,
     ConstraintMetadata,
@@ -292,6 +297,53 @@ def read_fermi_series(
     """
     legacy = parse_md_out_fermi(Path(md_out_path))
     return [FermiRecord.from_legacy_dict(d) for d in legacy]
+
+
+# ---------------------------------------------------------------------------
+# Cell facade (Phase 4 Commit 2 — D7)
+# ---------------------------------------------------------------------------
+
+
+def read_cell(path: str | Path) -> CellSpec:
+    """Read a cell descriptor from a CP2K input or restart file.
+
+    Auto-detects the file type by suffix:
+
+      - ``.restart`` (including bak variants such as ``.restart.bak-1``)
+        is dispatched to
+        :func:`md_analysis.utils.formats.cp2k.cell.parse_abc_from_restart`.
+      - Any other suffix (e.g. ``md.inp``, ``.inp``) is dispatched to
+        :func:`md_analysis.utils.formats.cp2k.cell.parse_abc_from_md_inp`.
+
+    Both underlying parsers currently return only orthorhombic
+    ``(a, b, c)`` tuples; this facade wraps the tuple as
+    ``np.diag([a, b, c])`` so the resulting :class:`CellSpec` always
+    exposes the 3x3 matrix form.  Non-orthogonal CP2K restart cells
+    are still rejected by ``parse_abc_from_restart`` with
+    ``CellParseError`` and that error is propagated unchanged
+    (Phase 4 R1: no science behavior change).
+
+    Parameters
+    ----------
+    path : str or Path
+        Path to a CP2K input file (``md.inp`` / ``*.inp``) or restart
+        file (``*.restart`` / ``*.restart.bak-*``).
+
+    Returns
+    -------
+    CellSpec
+        Engine-neutral cell descriptor with ``cell_matrix_ang`` of
+        shape ``(3, 3)``.
+    """
+    path = Path(path)
+    # ".restart" appears in path.suffixes for both bare *.restart and
+    # bak variants like *.restart.bak-1 (Path.suffixes splits on all dots).
+    if ".restart" in path.suffixes:
+        a, b, c = parse_abc_from_restart(path)
+    else:
+        a, b, c = parse_abc_from_md_inp(path)
+    matrix = np.diag([a, b, c]).astype(np.float64)
+    return CellSpec(cell_matrix_ang=matrix)
 
 
 # ---------------------------------------------------------------------------

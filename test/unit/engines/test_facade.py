@@ -17,46 +17,51 @@ MD_OUT = DENSE_DIR / "md.out"
 DISTRIBUTED_DIR = REPO_ROOT / "data_example" / "potential" / "distributed"
 
 
-def test_public_symbols_importable_from_package_root() -> None:
-    """All names listed in ``engines.__all__`` resolve at the package root."""
-    from md_analysis.engines import (
-        CP2KParser,
-        ConstraintMDParser,
-        ConstraintMetadata,
-        FermiRecord,
-        LambdaSeries,
-        ParserInferenceError,
-        PotentialFrame,
-        get_parser,
-        infer_parser,
-        read_constraint_metadata,
-        read_continuous_potential_frames,
-        read_distributed_potential_frames,
-        read_fermi_series,
-        read_lambda_series,
-        register_parser,
-        resolve_parser,
-    )
+def test_public_symbols_exported_via_dunder_all() -> None:
+    """All names in ``engines.__all__`` resolve at the package root.
 
-    # Every symbol is non-None so e.g. typos in the __init__ re-export
-    # would surface here even if the import line itself succeeded
-    # (which it would for a stale alias).
-    assert ConstraintMDParser is not None
-    assert ParserInferenceError is not None
-    assert CP2KParser is not None
-    assert PotentialFrame is not None
-    assert ConstraintMetadata is not None
-    assert LambdaSeries is not None
-    assert FermiRecord is not None
-    assert callable(register_parser)
-    assert callable(get_parser)
-    assert callable(infer_parser)
-    assert callable(resolve_parser)
-    assert callable(read_constraint_metadata)
-    assert callable(read_lambda_series)
-    assert callable(read_fermi_series)
-    assert callable(read_continuous_potential_frames)
-    assert callable(read_distributed_potential_frames)
+    Iterates ``engines.__all__`` and asserts ``hasattr`` + ``is not None``
+    for every entry, then spot-checks callability on the known
+    function/class surface.  This way the test cannot drift away from
+    ``__all__``: any new addition is covered automatically.
+    """
+    import md_analysis.engines as engines_pkg
+
+    assert engines_pkg.__all__, "engines.__all__ must be non-empty"
+
+    for name in engines_pkg.__all__:
+        assert hasattr(engines_pkg, name), (
+            f"engines.__all__ lists {name!r} but the package has no "
+            f"such attribute (stale re-export?)"
+        )
+        attr = getattr(engines_pkg, name)
+        assert attr is not None, f"engines.{name} resolved to None"
+
+    # Sanity: the well-known function surface is callable. This is a
+    # cheap additional check on top of the __all__ scan; new names added
+    # in future commits are covered by the loop above without needing
+    # to update this list.
+    callable_names = (
+        "register_parser",
+        "get_parser",
+        "infer_parser",
+        "resolve_parser",
+        "read_constraint_metadata",
+        "read_lambda_series",
+        "read_constraint_run",
+        "read_constraint_metadata_from_restart",
+        "read_lambda_series_from_log",
+        "read_constraint_run_from_files",
+        "compute_target_series",
+        "read_fermi_series",
+        "read_cell",
+        "read_continuous_potential_frames",
+        "read_distributed_potential_frames",
+    )
+    for fn_name in callable_names:
+        assert callable(getattr(engines_pkg, fn_name)), (
+            f"engines.{fn_name} is not callable"
+        )
 
 
 def test_legacy_dataclass_aliases_resolve_to_renamed_types() -> None:

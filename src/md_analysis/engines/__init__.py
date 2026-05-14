@@ -34,6 +34,7 @@ from __future__ import annotations
 from .cp2k import (
     CP2KParser,
     compute_target_series,
+    read_cell,
     read_constraint_metadata,
     read_constraint_metadata_from_restart,
     read_constraint_run,
@@ -45,6 +46,7 @@ from .cp2k import (
     read_lambda_series_from_log,
 )
 from .models import (
+    CellSpec,
     ColvarInfo,
     ColvarMDInfo,
     ColvarRestart,
@@ -83,6 +85,7 @@ __all__ = [
     "ConstraintRun",
     "FermiRecord",
     "PotentialFrame",
+    "CellSpec",
     # Phase 5b aliases
     "ColvarRestart",
     "LagrangeMultLog",
@@ -101,6 +104,7 @@ __all__ = [
     "read_constraint_run_from_files",
     "compute_target_series",
     "read_fermi_series",
+    "read_cell",
     "read_continuous_potential_frames",
     "read_distributed_potential_frames",
 ]

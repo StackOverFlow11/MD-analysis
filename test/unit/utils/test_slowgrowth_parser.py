@@ -513,3 +513,54 @@ class TestColvarMDInfo:
         xi_method = info.target_series_au()
         xi_func = compute_target_series(info.restart, info.n_steps)
         np.testing.assert_array_equal(xi_method, xi_func)
+
+
+# =========================================================================
+# Raw parser contract (Phase 4 Commit 2 — codex Commit 1 LOW 1 fold)
+# =========================================================================
+
+
+class TestRawParserContract:
+    """Direct raw-parser contract: parse_colvar_restart and
+    parse_lagrange_mult_log return ``Cp2k*Raw`` types, not canonical.
+
+    The canonical facade (``read_constraint_metadata_from_restart`` /
+    ``read_lambda_series_from_log``) is covered by ``TestParseColvarRestart``
+    and ``TestParseLagrangeMultLog`` above; this class pins the raw layer
+    so any future refactor that accidentally re-introduces canonical
+    types into ``utils.formats.cp2k.colvar`` fails loudly.
+    """
+
+    def test_parse_colvar_restart_returns_raw_metadata(self):
+        from md_analysis.utils.formats.cp2k.colvar import (
+            Cp2kColvarInfoRaw,
+            Cp2kConstraintInfoRaw,
+            Cp2kConstraintMetadataRaw,
+        )
+
+        raw = parse_colvar_restart(DATA / "angle" / "slowgrowth-1.restart")
+
+        assert isinstance(raw, Cp2kConstraintMetadataRaw)
+        assert isinstance(raw.colvars, Cp2kColvarInfoRaw)
+        assert raw.colvars.constraints  # non-empty tuple
+        assert isinstance(raw.colvars.constraints[0], Cp2kConstraintInfoRaw)
+
+        # Raw field access (no canonical @property indirection).
+        assert raw.project_name == "slowgrowth"
+        assert raw.step_start == 5100
+        assert raw.colvars.constraints[0].colvar_id == 1
+        assert raw.colvars.constraints[0].intermolecular is True
+
+    def test_parse_lagrange_mult_log_returns_raw_series(self):
+        from md_analysis.utils.formats.cp2k.colvar import Cp2kLambdaSeriesRaw
+
+        # Real CP2K filename: <project>-<lagrange_filename>-1.LagrangeMultLog
+        log = parse_lagrange_mult_log(
+            DATA / "angle" / "slowgrowth-constraint_force.dat-1.LagrangeMultLog"
+        )
+
+        assert isinstance(log, Cp2kLambdaSeriesRaw)
+        assert log.n_steps > 0
+        assert log.n_constraints >= 1
+        assert log.shake.shape[0] == log.n_steps
+        assert log.rattle.shape[0] == log.n_steps
