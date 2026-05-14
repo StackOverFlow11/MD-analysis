@@ -312,11 +312,10 @@ class CellAbcParam(ParamCollector):
     """Cell parameter acquisition with .restart/md.inp selection + retry."""
 
     def collect(self, ctx: dict) -> None:
-        from ..utils.formats.cp2k.cell import (
-            CellParseError,
-            parse_abc_from_md_inp,
-            parse_abc_from_restart,
-        )
+        from pathlib import Path
+
+        from ..engines.cp2k import read_cell
+        from ..utils.formats.cp2k.cell import CellParseError  # kept for except clause
 
         for attempt in range(2):
             source = prompt_choice("Cell source", [".restart", "md.inp"],
@@ -324,10 +323,26 @@ class CellAbcParam(ParamCollector):
             try:
                 if source == ".restart":
                     path = prompt_str_required("CP2K .restart file")
-                    abc = parse_abc_from_restart(path)
-                else:
+                    # Phase 5 Commit 1: keep source-vs-suffix consistency
+                    # that the historical two-parser flow enforced implicitly.
+                    # read_cell dispatches by suffix; if the user selected
+                    # ".restart" but provided a path without that suffix,
+                    # the facade would silently fall through to the md.inp
+                    # parser and mask the source selection.  Raise explicitly
+                    # so the source prompt stays meaningful.
+                    if ".restart" not in Path(path).suffixes:
+                        raise CellParseError(
+                            f"Selected source '.restart' but path '{path}' "
+                            "has no .restart suffix"
+                        )
+                else:  # source == "md.inp"
                     path = prompt_str_required("CP2K input file (e.g. md.inp)")
-                    abc = parse_abc_from_md_inp(path)
+                    if ".restart" in Path(path).suffixes:
+                        raise CellParseError(
+                            f"Selected source 'md.inp' but path '{path}' "
+                            "is a .restart file"
+                        )
+                abc = read_cell(path).abc_ang
             except (CellParseError, FileNotFoundError) as exc:
                 print(f"\n  Error: {exc}")
                 if attempt == 0:

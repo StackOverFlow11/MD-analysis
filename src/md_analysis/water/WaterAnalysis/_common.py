@@ -41,7 +41,26 @@ from ...utils.structure.water import (
     detect_water_molecule_indices,
     get_water_oxygen_indices_array,
 )
-from ...utils.formats.cp2k.cell import parse_abc_from_md_inp as _parse_abc_from_md_inp
+from ...engines.cp2k import read_cell
+
+
+def _parse_abc_from_md_inp(md_inp_path):
+    """Phase 5 Commit 1: thin wrapper that delegates to
+    :func:`md_analysis.engines.cp2k.read_cell` so the water analysis
+    suite consumes the engine-neutral cell facade.
+
+    The returned ``(a, b, c)`` tuple is byte-equal to the historical
+    ``utils.formats.cp2k.cell.parse_abc_from_md_inp`` output for the
+    orthorhombic input the water workflows produce: ``read_cell``
+    wraps ``(a, b, c)`` as ``np.diag([a, b, c])`` and
+    ``CellSpec.abc_ang`` is the row-norm tuple, which equals
+    ``(a, b, c)`` for the diagonal matrix.
+
+    The alias name is retained so WaterDensity / AdWaterOrientation
+    callers need no changes; the alias may be renamed in a later
+    naming-cleanup pass.
+    """
+    return read_cell(md_inp_path).abc_ang
 from ...utils.constants import (
     DEFAULT_LAYER_TOL_A,
     DEFAULT_Z_BIN_WIDTH_A,
