@@ -5,21 +5,30 @@ Frozen dataclasses returned by engine adapter modules
 (``electrochemical``, ``enhanced_sampling``, ``water``) depend on these
 neutral types rather than engine-specific parser output.
 
-Phase 4 Commit 1 status (D10 + D8)
-----------------------------------
-- ``ConstraintInfo`` / ``ColvarInfo``    — neutral nested types,
-  physical home moved here from ``utils.formats.cp2k.colvar``.
-- ``ConstraintMetadata`` / ``LambdaSeries`` — canonical types,
-  physical home moved here from ``utils.formats.cp2k.colvar``.
-- ``ConstraintRun``           — D8 composite (metadata + lambda_series
-  + derived target/time series + Phase 5b ``.restart`` / ``.lagrange``
-  legacy alias properties).
-- ``ColvarRestart`` / ``LagrangeMultLog`` / ``ColvarMDInfo`` — class
-  aliases physically defined here (Phase 5b compatibility).
-- ``PotentialFrame``          — moved here from ``electrochemical.potential
-  ._frame_source``; field set unchanged.
-- ``FermiRecord``             — typed record mirroring the legacy
+Constraint-MD types
+-------------------
+- ``ConstraintInfo`` / ``ColvarInfo``       — neutral nested types
+  describing a single CV constraint and a collection thereof.
+- ``ConstraintMetadata`` / ``LambdaSeries`` — canonical top-level
+  payloads of a constraint-MD point (restart-side inputs and the
+  Lagrange-multiplier time series).
+- ``ConstraintRun``                         — composite view of a
+  constraint-MD run (``metadata`` + ``lambda_series`` + derived
+  target/time series).
+
+Potential / Fermi types
+-----------------------
+- ``PotentialFrame``                — one frame of potential analysis
+  data (cube header + values + Fermi-raw payload).
+- ``CenterPotentialScalarFrame``    — scalar-level reduction of a
+  ``PotentialFrame`` plus slab geometry.
+- ``FermiRecord``                   — typed record mirroring the legacy
   ``parse_md_out_fermi`` dict shape.
+
+Cell type
+---------
+- ``CellSpec`` — engine-neutral cell descriptor (3x3 matrix + pbc
+  + derived ``abc_ang`` / ``is_orthorhombic`` properties).
 """
 
 from __future__ import annotations
@@ -132,7 +141,7 @@ class LambdaSeries:
 
 
 # ---------------------------------------------------------------------------
-# Composite view (Phase 4 Commit 1 — D8 ConstraintRun)
+# Composite view (D8 ConstraintRun)
 # ---------------------------------------------------------------------------
 
 
@@ -145,18 +154,12 @@ class ConstraintRun:
     ``@property`` (not stored as fields) to keep this object an
     "inputs-only" snapshot.
 
-    Phase 5b legacy aliases:
-      ``.restart``  -> alias for ``.metadata``
-      ``.lagrange`` -> alias for ``.lambda_series``
-    These let 17 business sites using ``md_info.restart`` /
-    ``md_info.lagrange`` keep working through Phase 4; Phase 5
-    naming-cleanup removes both the aliases and those caller sites.
-
-    The historical ``ColvarMDInfo.from_paths(restart_path, log_path)``
-    classmethod is NOT re-implemented here (it would create an
-    ``engines.models -> engines.cp2k`` import cycle).  Use
+    Construction: the standard entry point is
     :func:`md_analysis.engines.cp2k.read_constraint_run_from_files`
-    instead.
+    (file-level facade over a ``(restart_path, log_path)`` pair).  A
+    ``from_paths`` classmethod is intentionally NOT provided on this
+    class because it would force ``engines.models`` to import
+    ``engines.cp2k`` and create a circular import.
 
     Derived ``target_series_au`` follows the CP2K SHAKE/RATTLE
     convention (formula:
@@ -170,20 +173,6 @@ class ConstraintRun:
 
     metadata: ConstraintMetadata
     lambda_series: LambdaSeries
-
-    # ------------------------------------------------------------------
-    # Phase 5b legacy aliases (Phase 4 Commit 1 — D13 v3)
-    # ------------------------------------------------------------------
-
-    @property
-    def restart(self) -> ConstraintMetadata:
-        """Phase 5b legacy alias for :attr:`metadata`."""
-        return self.metadata
-
-    @property
-    def lagrange(self) -> LambdaSeries:
-        """Phase 5b legacy alias for :attr:`lambda_series`."""
-        return self.lambda_series
 
     # ------------------------------------------------------------------
     # Derived properties (engine-neutral)
@@ -222,19 +211,7 @@ class ConstraintRun:
 
 
 # ---------------------------------------------------------------------------
-# Phase 5b class aliases (physically owned by engines.models)
-# ---------------------------------------------------------------------------
-
-# Historical names retained for transitional consumers (tests, agents,
-# any business caller still using the old name).  Phase 5 cleanup will
-# rename callers to the canonical names and drop these aliases.
-ColvarRestart = ConstraintMetadata
-LagrangeMultLog = LambdaSeries
-ColvarMDInfo = ConstraintRun
-
-
-# ---------------------------------------------------------------------------
-# Cell descriptor (Phase 4 Commit 2 — D7 Layer 1)
+# Cell descriptor (D7 Layer 1)
 # ---------------------------------------------------------------------------
 
 
@@ -375,10 +352,6 @@ __all__ = [
     "LambdaSeries",
     # Composite
     "ConstraintRun",
-    # Phase 5b aliases
-    "ColvarRestart",
-    "LagrangeMultLog",
-    "ColvarMDInfo",
     # Cell layer
     "CellSpec",
     # Potential layer

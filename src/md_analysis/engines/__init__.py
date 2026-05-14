@@ -50,13 +50,10 @@ from .models import (
     CellSpec,
     CenterPotentialScalarFrame,
     ColvarInfo,
-    ColvarMDInfo,
-    ColvarRestart,
     ConstraintInfo,
     ConstraintMetadata,
     ConstraintRun,
     FermiRecord,
-    LagrangeMultLog,
     LambdaSeries,
     PotentialFrame,
 )
@@ -89,10 +86,6 @@ __all__ = [
     "PotentialFrame",
     "CenterPotentialScalarFrame",
     "CellSpec",
-    # Phase 5b aliases
-    "ColvarRestart",
-    "LagrangeMultLog",
-    "ColvarMDInfo",
     # Registry / Protocol
     "register_parser",
     "get_parser",

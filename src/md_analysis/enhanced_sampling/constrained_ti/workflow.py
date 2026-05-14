@@ -681,17 +681,17 @@ def standalone_diagnostics(
     from ...engines.cp2k import read_constraint_run_from_files
 
     md_info = read_constraint_run_from_files(restart_path, log_path)
-    lambda_series = md_info.lagrange.collective_shake
+    lambda_series = md_info.lambda_series.collective_shake
 
     constraint = (
-        md_info.restart.colvars[colvar_id]
+        md_info.metadata.colvars[colvar_id]
         if colvar_id is not None
-        else md_info.restart.colvars.primary
+        else md_info.metadata.colvars.primary
     )
     xi = float(constraint.target_au)
-    dt = float(md_info.restart.timestep_fs)
+    dt = float(md_info.metadata.timestep_fs)
 
-    t0 = float(md_info.restart.time_start_fs)
+    t0 = float(md_info.metadata.time_start_fs)
     report = analyze_standalone(
         lambda_series,
         dt=dt,

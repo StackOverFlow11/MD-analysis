@@ -246,10 +246,11 @@ def read_constraint_run_from_files(
 ) -> ConstraintRun:
     """Read a CP2K constraint-MD run from explicit (restart, log) paths.
 
-    File-level analogue of :func:`read_constraint_run`. Replaces the
-    historical ``ColvarMDInfo.from_paths(...)`` classmethod (which is
-    NOT re-implemented on ConstraintRun to avoid an
-    ``engines.models -> engines.cp2k`` import cycle).
+    File-level analogue of :func:`read_constraint_run`.  Composes
+    :func:`read_constraint_metadata_from_restart` and
+    :func:`read_lambda_series_from_log`; the equivalent classmethod is
+    deliberately NOT provided on :class:`ConstraintRun` so that
+    ``engines.models`` does not have to import ``engines.cp2k``.
     """
     return ConstraintRun(
         metadata=read_constraint_metadata_from_restart(restart_path),

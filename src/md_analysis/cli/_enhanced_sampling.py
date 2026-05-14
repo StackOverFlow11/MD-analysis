@@ -49,12 +49,12 @@ def _print_sg_info(restart_path: str, log_path: str) -> None:
         print(f"  (Could not parse metadata: {exc})")
         return
 
-    cv = info.restart.colvars.primary
-    dt_au = info.restart.timestep_fs / AU_TIME_TO_FS
+    cv = info.metadata.colvars.primary
+    dt_au = info.metadata.timestep_fs / AU_TIME_TO_FS
     growth_per_step = cv.target_growth_au * dt_au
     print(f"\n  Trajectory info:")
     print(f"    Steps:        {info.n_steps}")
-    print(f"    Timestep:     {info.restart.timestep_fs} fs")
+    print(f"    Timestep:     {info.metadata.timestep_fs} fs")
     print(f"    CV target:    {cv.target_au:.6f} a.u.")
     print(f"    CV growth:    {growth_per_step:.6e} a.u./step")
     xi = info.target_series_au()
@@ -62,7 +62,7 @@ def _print_sg_info(restart_path: str, log_path: str) -> None:
     print(f"    Valid index:   0 .. {info.n_steps - 1}")
 
     # Warn about overflow (nan) steps
-    nan_mask = np.isnan(info.lagrange.collective_shake)
+    nan_mask = np.isnan(info.lambda_series.collective_shake)
     n_nan = int(np.sum(nan_mask))
     if n_nan > 0:
         nan_indices = np.where(nan_mask)[0]

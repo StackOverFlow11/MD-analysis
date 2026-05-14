@@ -15,7 +15,7 @@ from pathlib import Path
 import numpy as np
 
 from ...utils.constants import AU_TIME_TO_FS
-from ...engines.models import ColvarMDInfo
+from ...engines.models import ConstraintRun
 from ...engines.cp2k import read_constraint_run_from_files
 
 
@@ -90,41 +90,41 @@ class Slowgrowth:
 class SlowgrowthFull(Slowgrowth):
     """Complete slow-growth trajectory parsed from restart + Lagrange log.
 
-    Retains a reference to the original :class:`ColvarMDInfo` for access
+    Retains a reference to the original :class:`ConstraintRun` for access
     to full metadata (cell parameters, fixed atoms, etc.).
     """
 
-    md_info: ColvarMDInfo = None  # type: ignore[assignment]
+    md_info: ConstraintRun = None  # type: ignore[assignment]
 
     @classmethod
     def from_md_info(
         cls,
-        md_info: ColvarMDInfo,
+        md_info: ConstraintRun,
         *,
         colvar_id: int | None = None,
     ) -> SlowgrowthFull:
-        """Build from a :class:`ColvarMDInfo` instance.
+        """Build from a :class:`ConstraintRun` instance.
 
         Parameters
         ----------
-        md_info : ColvarMDInfo
+        md_info : ConstraintRun
             Parsed restart + Lagrange multiplier data.
         colvar_id : int, optional
             Which collective variable to use.  Defaults to the primary CV.
         """
         constraint = (
-            md_info.restart.colvars[colvar_id]
+            md_info.metadata.colvars[colvar_id]
             if colvar_id is not None
-            else md_info.restart.colvars.primary
+            else md_info.metadata.colvars.primary
         )
         # Convert growth rate from per-a.u.-time to per-step (dξ/step)
-        dt_au = md_info.restart.timestep_fs / AU_TIME_TO_FS
+        dt_au = md_info.metadata.timestep_fs / AU_TIME_TO_FS
         target_growth_per_step = constraint.target_growth_au * dt_au
 
         steps = md_info.steps
         times_fs = md_info.times_fs
         target_au = md_info.target_series_au(colvar_id)
-        lagrange_shake = md_info.lagrange.collective_shake
+        lagrange_shake = md_info.lambda_series.collective_shake
 
         free_energy_au = _integrate_midpoint(lagrange_shake, target_growth_per_step)
 
@@ -134,7 +134,7 @@ class SlowgrowthFull(Slowgrowth):
             target_au=target_au,
             lagrange_shake=lagrange_shake,
             free_energy_au=free_energy_au,
-            timestep_fs=md_info.restart.timestep_fs,
+            timestep_fs=md_info.metadata.timestep_fs,
             target_growth_au=target_growth_per_step,
             md_info=md_info,
         )
@@ -183,7 +183,7 @@ class SlowgrowthFull(Slowgrowth):
             parser_obj: ConstraintMDParser = infer_parser(directory)
         else:
             parser_obj = resolve_parser(parser)
-        md_info = ColvarMDInfo(
+        md_info = ConstraintRun(
             metadata=parser_obj.parse_metadata(directory),
             lambda_series=parser_obj.parse_lambda_series(directory),
         )

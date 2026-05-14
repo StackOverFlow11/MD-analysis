@@ -1,13 +1,12 @@
 """Parse CP2K COLVAR restart files and LagrangeMultLog files.
 
-Phase 4 Commit 1 status
------------------------
-Parsers now return **CP2K-specific raw dataclasses** (``Cp2kConstraintInfoRaw`` /
+Output contract
+---------------
+Parsers return **CP2K-specific raw dataclasses** (``Cp2kConstraintInfoRaw`` /
 ``Cp2kColvarInfoRaw`` / ``Cp2kConstraintMetadataRaw`` / ``Cp2kLambdaSeriesRaw``).
 The engine-neutral canonical types (``ConstraintInfo`` / ``ColvarInfo`` /
-``ConstraintMetadata`` / ``LambdaSeries`` / ``ConstraintRun``) and their
-aliases (``ColvarRestart`` / ``LagrangeMultLog`` / ``ColvarMDInfo``) now live
-in :mod:`md_analysis.engines.models`.  Conversion from raw to canonical is
+``ConstraintMetadata`` / ``LambdaSeries`` / ``ConstraintRun``) live in
+:mod:`md_analysis.engines.models`.  Conversion from raw to canonical is
 performed by ``engines.cp2k._cp2k_raw_to_*`` helpers.
 
 Module-level invariant: this file does NOT runtime-import

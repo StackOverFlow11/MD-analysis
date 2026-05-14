@@ -13,8 +13,8 @@ required. None of the workflows submit jobs; that is enforced by
 the underlying ``scripts.*`` API and is documented at the workflow
 boundary.
 
-For TI we synthesise a minimal SG-style restart + ColvarMDInfo
-indirectly by reusing the bundled SG fixture under
+For TI we synthesise a minimal SG-style restart + constraint-run
+metadata indirectly by reusing the bundled SG fixture under
 ``data_example/sg/distance``. When the bundled fixture is missing
 the TI tests skip.
 """

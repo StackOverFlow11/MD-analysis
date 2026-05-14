@@ -1,4 +1,4 @@
-"""Tests for ColvarParser — restart + LagrangeMultLog parsing."""
+"""Tests for CP2K colvar parsers — restart + LagrangeMultLog parsing."""
 
 from __future__ import annotations
 
@@ -10,10 +10,10 @@ import pytest
 from md_analysis.utils.constants import AU_TIME_TO_FS
 from md_analysis.engines.models import (
     ColvarInfo,
-    ColvarMDInfo,
-    ColvarRestart,
     ConstraintInfo,
-    LagrangeMultLog,
+    ConstraintMetadata,
+    ConstraintRun,
+    LambdaSeries,
 )
 from md_analysis.engines.cp2k import (
     compute_target_series,
@@ -386,11 +386,11 @@ class TestEdgeCases:
 
 
 # =========================================================================
-# ColvarMDInfo
+# ConstraintRun
 # =========================================================================
 
-class TestColvarMDInfo:
-    """Test ColvarMDInfo — combined restart + log session object."""
+class TestConstraintRun:
+    """Test ConstraintRun — combined restart + log session object."""
 
     def _restart_path(self, scenario: str) -> Path:
         mapping = {
@@ -411,9 +411,9 @@ class TestColvarMDInfo:
         info = read_constraint_run_from_files(
             self._restart_path("angle"), self._log_path("angle"),
         )
-        assert isinstance(info.restart, ColvarRestart)
-        assert isinstance(info.lagrange, LagrangeMultLog)
-        assert info.n_steps == info.lagrange.n_steps
+        assert isinstance(info.metadata, ConstraintMetadata)
+        assert isinstance(info.lambda_series, LambdaSeries)
+        assert info.n_steps == info.lambda_series.n_steps
 
     def test_steps_start_from_zero(self):
         info = read_constraint_run_from_files(
@@ -428,7 +428,7 @@ class TestColvarMDInfo:
         info = read_constraint_run_from_files(
             self._restart_path("angle"), self._log_path("angle"),
         )
-        dt = info.restart.timestep_fs
+        dt = info.metadata.timestep_fs
         times = info.times_fs
         assert times[0] == pytest.approx(0.0)
         assert times[1] == pytest.approx(dt)
@@ -439,11 +439,11 @@ class TestColvarMDInfo:
         info = read_constraint_run_from_files(
             self._restart_path("angle"), self._log_path("angle"),
         )
-        s0 = info.restart.step_start
+        s0 = info.metadata.step_start
         if s0 < info.n_steps:
             xi = info.target_series_au()
             assert xi[s0] == pytest.approx(
-                info.restart.colvars.primary.target_au, rel=1e-10,
+                info.metadata.colvars.primary.target_au, rel=1e-10,
             )
 
     def test_target_linear_growth(self):
@@ -453,8 +453,8 @@ class TestColvarMDInfo:
         )
         xi = info.target_series_au()
         diffs = np.diff(xi)
-        dt_au = info.restart.timestep_fs / AU_TIME_TO_FS
-        expected_step = info.restart.colvars.primary.target_growth_au * dt_au
+        dt_au = info.metadata.timestep_fs / AU_TIME_TO_FS
+        expected_step = info.metadata.colvars.primary.target_growth_au * dt_au
         np.testing.assert_allclose(diffs, expected_step, rtol=1e-10)
 
     def test_target_with_colvar_id(self, tmp_path):
@@ -495,7 +495,7 @@ class TestColvarMDInfo:
             "Rattle Lagrangian Multipliers: 0.6\n"
         )
         info = read_constraint_run_from_files(restart, log_file)
-        dt_au = info.restart.timestep_fs / AU_TIME_TO_FS
+        dt_au = info.metadata.timestep_fs / AU_TIME_TO_FS
         # step_start=0, so xi[0] = target_au
         xi1 = info.target_series_au()
         assert xi1[0] == pytest.approx(1.0)
@@ -506,12 +506,12 @@ class TestColvarMDInfo:
         assert xi2[1] == pytest.approx(5.0 + (-0.05) * dt_au)
 
     def test_consistent_with_compute_target_series(self):
-        """ColvarMDInfo.target_series_au matches standalone compute_target_series."""
+        """ConstraintRun.target_series_au matches standalone compute_target_series."""
         info = read_constraint_run_from_files(
             self._restart_path("angle"), self._log_path("angle"),
         )
         xi_method = info.target_series_au()
-        xi_func = compute_target_series(info.restart, info.n_steps)
+        xi_func = compute_target_series(info.metadata, info.n_steps)
         np.testing.assert_array_equal(xi_method, xi_func)
 
 

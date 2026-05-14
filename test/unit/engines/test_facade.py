@@ -86,20 +86,6 @@ def test_cp2k_submodule_dunder_all_exports_are_live() -> None:
         assert attr is not None, f"engines.cp2k.{name} resolved to None"
 
 
-def test_legacy_dataclass_aliases_resolve_to_renamed_types() -> None:
-    """``ColvarRestart`` / ``LagrangeMultLog`` aliases in ``cp2k.colvar``
-    must point at the renamed engines-neutral types so existing imports
-    transparently see the same class (single source of truth)."""
-    from md_analysis.engines import ConstraintMetadata, LambdaSeries
-    from md_analysis.engines.models import (
-        ColvarRestart,
-        LagrangeMultLog,
-    )
-
-    assert ColvarRestart is ConstraintMetadata
-    assert LagrangeMultLog is LambdaSeries
-
-
 def test_default_registration_makes_cp2k_resolvable() -> None:
     """Importing the package must auto-register the CP2K parser."""
     from md_analysis.engines import CP2KParser, get_parser
@@ -551,52 +537,10 @@ def test_raw_to_lambda_series_field_equality() -> None:
     np.testing.assert_array_equal(canon.collective_shake, shake)
 
 
-def test_constraint_run_restart_lagrange_legacy_aliases() -> None:
-    """ConstraintRun.restart / .lagrange must alias .metadata / .lambda_series.
-
-    Phase 5b compatibility — Phase 5 naming cleanup will delete both
-    the alias properties and the 17 caller sites that use them.
-    """
-    import numpy as np
-
-    from md_analysis.engines.models import (
-        ColvarInfo,
-        ConstraintInfo,
-        ConstraintMetadata,
-        ConstraintRun,
-        LambdaSeries,
-    )
-
-    meta = ConstraintMetadata(
-        project_name="alias_test",
-        step_start=0,
-        time_start_fs=0.0,
-        timestep_fs=1.0,
-        total_steps=10,
-        colvars=ColvarInfo(constraints=(
-            ConstraintInfo(
-                colvar_id=1, target_au=1.0,
-                target_growth_au=0.0, intermolecular=False,
-            ),
-        )),
-        lagrange_filename=None,
-        cell_abc_ang=(10.0, 10.0, 30.0),
-        fixed_atom_indices=None,
-    )
-    ls = LambdaSeries(
-        shake=np.zeros(10), rattle=np.zeros(10),
-        n_steps=10, n_constraints=1,
-    )
-    run = ConstraintRun(metadata=meta, lambda_series=ls)
-
-    assert run.restart is meta
-    assert run.lagrange is ls
-
-
 def test_constraint_run_target_series_au_literal_formula() -> None:
     """ConstraintRun.target_series_au matches the literal documented formula.
 
-    Self-contained (no dependency on the old ColvarMDInfo implementation):
+    Self-contained literal-formula reference:
     references the formula
         xi(k) = target_au + (k - step_start) * target_growth_au * dt_au
     with dt_au = timestep_fs / AU_TIME_TO_FS,

@@ -51,12 +51,13 @@ rg "from\s+\.\.+\.?(electrochemical|water|enhanced_sampling|cli|scripts|agent)" 
 
 ## 关键设计决策
 
-### dataclass 名（Phase 5b rename）
+### dataclass canonical 名
 
-- `ColvarRestart` → `ConstraintMetadata`
-- `LagrangeMultLog` → `LambdaSeries`
+- 约束元数据：`ConstraintMetadata`
+- λ(t) 时间序列：`LambdaSeries`
+- 单点 composite：`ConstraintRun`
 
-旧名作为 module-level alias 保留在 `utils/formats/cp2k/colvar.py`，让旧测试不报错；canonical 名只通过 `engines.models` 暴露。
+物理位置全部在 `engines.models`；早期重构期一度保留的 CP2K-名兼容 alias 已在命名清理时移除，业务方直接使用 canonical 名。
 
 ### Registry 注册时机
 
@@ -73,7 +74,7 @@ VASP 占位文件（`utils/formats/vasp_{report,outcar}.py`）需要 `Constraint
 ## Phase 7-8 历史脉络
 
 - Phase 5a：建 `engines/` 骨架，把 `enhanced_sampling/_parsers.py` 的 Protocol + CP2KParser 搬过来；`PotentialFrame` 从 `electrochemical/potential/_frame_source.py` 搬到 `engines/models.py`；VASP placeholder 加好。
-- Phase 5b：dataclass rename。
+- 重构期 dataclass rename：CP2K 风格 colvar/lagrange 命名统一改为 engine-neutral canonical 名（`ConstraintMetadata` / `LambdaSeries` / `ConstraintRun`，物理位置 `engines.models`）；过渡期保留的 CP2K-名兼容 alias 已在命名清理时移除。
 - Phase 6：删 `enhanced_sampling/_parsers.py` shim，业务代码改从 `engines` import。
 - Phase 7a：抽 `utils/formats/cp2k/stdout.py` 和 `utils/formats/cp2k/xyz.py`（CP2K stdout / xyz 解析；Phase 1 后路径从平铺 `cp2k_*` 迁到 `cp2k/` 子包）。
 - Phase 7b1：加 `read_constraint_metadata` / `read_lambda_series` / `read_fermi_series` 薄 facade；引入 `FermiRecord`。

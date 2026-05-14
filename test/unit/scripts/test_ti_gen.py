@@ -20,7 +20,7 @@ from md_analysis.scripts.TIGen import (
     generate_ti_workdir,
 )
 from md_analysis.engines.models import (
-    ColvarRestart,
+    ConstraintMetadata,
     ColvarInfo,
     ConstraintInfo,
 )
@@ -133,9 +133,9 @@ def _make_restart(
     timestep_fs: float = 1.0,
     step_start: int = 0,
     total_steps: int = 8000,
-) -> ColvarRestart:
-    """Create a synthetic ColvarRestart for testing."""
-    return ColvarRestart(
+) -> ConstraintMetadata:
+    """Create a synthetic ConstraintMetadata for testing."""
+    return ConstraintMetadata(
         project_name="slowgrowth",
         step_start=step_start,
         time_start_fs=0.0,
@@ -178,7 +178,7 @@ def _write_test_xyz(path: Path, n_frames: int = 10, step_interval: int = 5) -> N
     path.write_text("\n".join(lines) + "\n")
 
 
-def _write_restart_file(path: Path, restart: ColvarRestart) -> None:
+def _write_restart_file(path: Path, restart: ConstraintMetadata) -> None:
     """Write a minimal .restart file that ColvarParser can parse."""
     c = restart.colvars.primary
     inter = ".TRUE." if c.intermolecular else ".FALSE."
