@@ -35,7 +35,13 @@ from .scripts import (
     run_ti_batch,
     run_ti_single,
 )
-from .water import run_water_three_panel
+from .water import (
+    run_ad_water_orientation,
+    run_ad_water_theta,
+    run_water_density,
+    run_water_orientation,
+    run_water_three_panel,
+)
 
 __all__ = [
     # Models
@@ -44,6 +50,10 @@ __all__ = [
     "require_artifacts_exist",
     # Leaf workflows (Phase 2)
     "run_water_three_panel",
+    "run_water_density",
+    "run_water_orientation",
+    "run_ad_water_orientation",
+    "run_ad_water_theta",
     "run_potential_full",
     "run_surface_charge",
     "run_tracked_charge",

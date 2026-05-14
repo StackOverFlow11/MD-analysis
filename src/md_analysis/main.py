@@ -21,6 +21,8 @@ from __future__ import annotations
 
 from .workflows import (
     WorkflowResult,
+    run_ad_water_orientation,
+    run_ad_water_theta,
     run_bader_batch,
     run_bader_single,
     run_calibration_fit,
@@ -41,13 +43,19 @@ from .workflows import (
     run_ti_single,
     run_ti_single_diagnostics,
     run_tracked_charge,
+    run_water_density,
+    run_water_orientation,
     run_water_three_panel,
 )
 
 __all__ = [
     "WorkflowResult",
-    # Water (1)
+    # Water (5)
     "run_water_three_panel",
+    "run_water_density",
+    "run_water_orientation",
+    "run_ad_water_orientation",
+    "run_ad_water_theta",
     # Potential (1)
     "run_potential_full",
     # Charge (3)

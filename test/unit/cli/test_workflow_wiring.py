@@ -30,7 +30,7 @@ from typing import Any
 
 import pytest
 
-from md_analysis.cli import _charge, _enhanced_sampling, _scripts
+from md_analysis.cli import _charge, _enhanced_sampling, _scripts, _water
 from md_analysis.cli._params import K
 from md_analysis.workflows import WorkflowResult
 
@@ -434,3 +434,165 @@ class TestTISingleCmd:
         assert call["target_au"] == 0.5
         assert call["steps"] == 10000
         assert call["colvar_id"] == 2
+
+
+# ---------------------------------------------------------------------------
+# _water.py: 4 single-step workflows (Phase 6.1)
+# ---------------------------------------------------------------------------
+
+
+def _water_ctx(tmp_path: Path) -> dict[str, Any]:
+    """Build a ctx dict shared by the 4 water single-step wiring tests."""
+    return {
+        K.XYZ: str(tmp_path / "md-pos-1.xyz"),
+        K.CELL_ABC: (10.0, 10.0, 30.0),
+        K.OUTDIR_RESOLVED: str(tmp_path / "water"),
+        K.DZ_A: 0.1,
+        K.LAYER_TOL: 0.5,
+        K.FRAME_START: None,
+        K.FRAME_END: None,
+        K.FRAME_STEP: None,
+    }
+
+
+def _assert_water_ctx_forwarded(call: dict[str, Any], tmp_path: Path) -> None:
+    """All 4 single-step CLI commands forward the same ctx fields verbatim."""
+    assert call["xyz_path"] == Path(tmp_path / "md-pos-1.xyz")
+    assert call["cell_abc"] == (10.0, 10.0, 30.0)
+    assert call["output_dir"] == str(tmp_path / "water")
+    assert call["dz_A"] == 0.1
+    assert call["layer_tol_A"] == 0.5
+    assert call["frame_start"] is None
+    assert call["frame_end"] is None
+    assert call["frame_step"] is None
+
+
+class TestWaterDensityCmd:
+    """CLI 101 forwards ctx straight to workflows.water.run_water_density."""
+
+    def test_lookup_and_kwargs_and_artifact_keys(
+        self, monkeypatch, tmp_path: Path
+    ) -> None:
+        water_dir = tmp_path / "water"
+        water_dir.mkdir()
+        expected_csv = water_dir / "water_mass_density.csv"
+        expected_csv.write_text("")
+
+        def fake_workflow(**kwargs: Any) -> WorkflowResult:
+            return _make_workflow_result(
+                name="water_density",
+                output_dir=water_dir,
+                artifacts={"density_csv": expected_csv},
+            )
+
+        stub = _LazyImportStub(fake_workflow)
+        monkeypatch.setattr(_water, "lazy_import", stub)
+
+        cmd = _water.WaterDensityCmd("101", "Water Density")
+        cmd.execute(_water_ctx(tmp_path))
+
+        assert stub.lookups == [
+            ("md_analysis.workflows.water", "run_water_density"),
+        ]
+        assert len(stub.calls) == 1
+        _assert_water_ctx_forwarded(stub.calls[0], tmp_path)
+
+
+class TestWaterOrientationCmd:
+    """CLI 102 -> workflows.water.run_water_orientation."""
+
+    def test_lookup_and_kwargs_and_artifact_keys(
+        self, monkeypatch, tmp_path: Path
+    ) -> None:
+        water_dir = tmp_path / "water"
+        water_dir.mkdir()
+        expected_csv = water_dir / "water_orientation.csv"
+        expected_csv.write_text("")
+
+        def fake_workflow(**kwargs: Any) -> WorkflowResult:
+            return _make_workflow_result(
+                name="water_orientation",
+                output_dir=water_dir,
+                artifacts={"orientation_csv": expected_csv},
+            )
+
+        stub = _LazyImportStub(fake_workflow)
+        monkeypatch.setattr(_water, "lazy_import", stub)
+
+        cmd = _water.WaterOrientationCmd("102", "Water Orientation")
+        cmd.execute(_water_ctx(tmp_path))
+
+        assert stub.lookups == [
+            ("md_analysis.workflows.water", "run_water_orientation"),
+        ]
+        _assert_water_ctx_forwarded(stub.calls[0], tmp_path)
+
+
+class TestAdWaterOrientationCmd:
+    """CLI 103 -> workflows.water.run_ad_water_orientation
+    (artifact contract: adsorbed_profile_csv + adsorbed_range_txt)."""
+
+    def test_lookup_and_kwargs_and_artifact_keys(
+        self, monkeypatch, tmp_path: Path
+    ) -> None:
+        water_dir = tmp_path / "water"
+        water_dir.mkdir()
+        profile_csv = water_dir / "ad_water_profile.csv"
+        range_txt = water_dir / "ad_water_range.txt"
+        profile_csv.write_text("")
+        range_txt.write_text("")
+
+        def fake_workflow(**kwargs: Any) -> WorkflowResult:
+            return _make_workflow_result(
+                name="ad_water_orientation",
+                output_dir=water_dir,
+                artifacts={
+                    "adsorbed_profile_csv": profile_csv,
+                    "adsorbed_range_txt": range_txt,
+                },
+            )
+
+        stub = _LazyImportStub(fake_workflow)
+        monkeypatch.setattr(_water, "lazy_import", stub)
+
+        cmd = _water.AdWaterOrientationCmd("103", "Adsorbed Water Orientation")
+        cmd.execute(_water_ctx(tmp_path))
+
+        assert stub.lookups == [
+            ("md_analysis.workflows.water", "run_ad_water_orientation"),
+        ]
+        _assert_water_ctx_forwarded(stub.calls[0], tmp_path)
+
+
+class TestAdWaterThetaCmd:
+    """CLI 104 -> workflows.water.run_ad_water_theta
+    (artifact contract: theta_csv; verbose=True forwarded)."""
+
+    def test_lookup_and_kwargs_and_artifact_keys(
+        self, monkeypatch, tmp_path: Path
+    ) -> None:
+        water_dir = tmp_path / "water"
+        water_dir.mkdir()
+        theta_csv = water_dir / "ad_water_theta.csv"
+        theta_csv.write_text("")
+
+        def fake_workflow(**kwargs: Any) -> WorkflowResult:
+            return _make_workflow_result(
+                name="ad_water_theta",
+                output_dir=water_dir,
+                artifacts={"theta_csv": theta_csv},
+            )
+
+        stub = _LazyImportStub(fake_workflow)
+        monkeypatch.setattr(_water, "lazy_import", stub)
+
+        cmd = _water.AdWaterThetaCmd("104", "Adsorbed Water Theta")
+        cmd.execute(_water_ctx(tmp_path))
+
+        assert stub.lookups == [
+            ("md_analysis.workflows.water", "run_ad_water_theta"),
+        ]
+        call = stub.calls[0]
+        _assert_water_ctx_forwarded(call, tmp_path)
+        # CLI 104 forwards verbose=True (matches legacy behaviour)
+        assert call["verbose"] is True

@@ -7,14 +7,14 @@
 是同一批名字的薄 re-export facade（79 行 import-only）；CLI / notebook / agent
 handler 都通过本包调用业务流程，业务模块本身不持有 workflow 编排逻辑。
 
-当前共 21 个 `run_*` + `WorkflowResult`，分 8 个子模块。
+当前共 25 个 `run_*` + `WorkflowResult`，分 8 个子模块。
 
 ## 模块布局
 
 | 文件 | 内容 |
 |---|---|
 | `models.py` | `WorkflowResult` frozen dataclass、`MissingArtifactError`、`require_artifacts_exist(result)` 校验 helper |
-| `water.py` | `run_water_three_panel` |
+| `water.py` | `run_water_three_panel` / `run_water_density` / `run_water_orientation` / `run_ad_water_orientation` / `run_ad_water_theta` |
 | `potential.py` | `run_potential_full` |
 | `charge.py` | `run_surface_charge` / `run_tracked_charge` / `run_counterion_charge` |
 | `calibration.py` | `run_calibration_fit` / `run_calibration_predict` |
