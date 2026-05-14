@@ -1,6 +1,31 @@
 # Phase 3 — engines 数据接口设计
 
-> 用途：作为 Phase 4(实施 engines)的**单一输入合约**。本文件 doc-only，不动代码。
+> ## 实施状态(2026-05-14 更新)
+>
+> 本文件为 **Phase 4 实施前的设计快照**;Phase 4 实施过程中部分设计步骤
+> (如 CP2K-名兼容 alias 的引入)是过渡态,不代表当前代码状态。
+>
+> | Phase / Commit | 状态 | 落地 commit |
+> |---|---|---|
+> | Phase 4 Commit 1(D10 + D8 constraint models migration) | ✅ 完成 | `63c4021` |
+> | Phase 4 Commit 2(D7 CellSpec + read_cell) | ✅ 完成 | `e9f7e01`(+ `a84145f` doc-only) |
+> | Phase 4 Commit 3(D11 CenterPotentialScalarFrame) | ✅ 完成 | `f4f4f77` |
+> | Phase 5 Commit 1(water/cli cell 消费 → read_cell) | ✅ 完成 | `37107a5` |
+> | Phase 5 Commit 2(SG/TI/cli 命名清理 + 删 CP2K-名兼容 alias) | ✅ 完成 | `3397a32` |
+> | Phase 5 Commit 3(potential Fermi / dict 接口迁移) | ⬜ 未开 | — |
+>
+> **过渡态描述(已不再现存)**,继续读时请注意这些不是当前代码:
+> - §3.3 ConstraintRun 的 `.restart` / `.lagrange` legacy alias property
+>   段(L229-243):Phase 5 Commit 2 移除
+> - §6.1 / §6.3 / §6.4 / §7 / §9 commit-1 步骤里提及的 `ColvarRestart` /
+>   `LagrangeMultLog` / `ColvarMDInfo` 兼容 alias(L341 / L748-787 / L809-823 /
+>   L954-958 / L970-971):Phase 5 Commit 2 移除
+> - §11 Phase 5 表 + commit 边界设想已落地到上表
+>
+> 之后做 Phase 5 Commit 3 计划时,以**代码现状 + 本 status banner** 为准,
+> §3-§9 的设计契约文字保留为历史快照。
+>
+> 用途:作为 Phase 4 实施的**单一输入合约**;本文件 doc-only。
 > 输入链路:
 > - Phase 2 业务层数据需求 catalog(`phase2_business_data_requirements.md`)
 > - Round 1/2/3 局部计划讨论(归档在 `temp/engines_design.md` /
@@ -1021,23 +1046,22 @@ equal
 
 ## 11. Phase 5 业务迁移影响面(基于 Phase 2 catalog 重算)
 
-Phase 4 完成后,业务层 import 形态:
-
-| 业务节点 | Phase 4 后状态 | Phase 5 任务 |
+| 业务节点 | 当前状态(2026-05-14) | Phase 5 任务 |
 |---|---|---|
-| `water._common._parse_abc_from_md_inp` | 仍直读 `utils.formats.cp2k.cell` | 切到 `engines.cp2k.read_cell(...)` → `CellSpec.abc_ang` |
-| `electrochemical.potential.CenterPotential.parse_md_out_fermi` (line 447) | 仍直读 | 选项 a:切到 `engines.cp2k.read_center_potential_scalar_frame(...)`(同时迁离 dict 接口);选项 b:保留 dict 接口直读,只在新增分支切 facade(Phase 5 拍板) |
+| `water._common._parse_abc_from_md_inp` | ✅ 已切到 `engines.cp2k.read_cell(...).abc_ang`(Phase 5 Commit 1) | 完成 |
+| `electrochemical.potential.CenterPotential.parse_md_out_fermi` (line 447) | 仍直读 | **Phase 5 Commit 3 待开**:选项 a:切到 `engines.cp2k.read_center_potential_scalar_frame(...)`(同时迁离 dict 接口);选项 b:保留 dict 接口直读,只在新增分支切 facade(Commit 3 拍板) |
 | `electrochemical.charge.Bader.*` (7 处) | 保持 | Phase 4 不动,留待 Phase 8 charge engines facade 落地 |
-| `enhanced_sampling.slowgrowth.SlowGrowth.{from_paths,from_directory}` (2 处) | **已 import** `from ...engines.models import ColvarMDInfo`(Phase 4 Commit 1 constraint models migration 同步切完;`ColvarMDInfo` 是 `ConstraintRun` 别名,物理定义在 engines.models) | **命名清理**:把 `ColvarMDInfo` import 名换成 canonical `ConstraintRun`,删除别名依赖 |
-| `enhanced_sampling.constrained_ti.workflow.standalone_diagnostics` (1 处) | 同上 | 同上 |
+| `enhanced_sampling.slowgrowth.SlowGrowth.{from_paths,from_directory}` (2 处) | ✅ canonical `ConstraintRun`(Phase 5 Commit 2 命名清理完成,兼容 alias 已删) | 完成 |
+| `enhanced_sampling.constrained_ti.workflow.standalone_diagnostics` (1 处) | ✅ 同上 | 完成 |
 | `enhanced_sampling.constrained_ti.correction._get_electrode_area` (1 处) | 仍直读 `load_bader_atoms` | Phase 5 cleanup:可独立提"从 POSCAR 读 cell"小 helper(charge 仍留 utils);或同 Phase 8 charge facade 一起迁 |
+| `cli/_params.py` `CellAbcParam.collect` | ✅ 已切到 `engines.cp2k.read_cell(...)` + source-vs-suffix gate(Phase 5 Commit 1)| 完成 |
 
-Phase 5 commit 边界初步设想:
-- 1 笔:水/cli cell 迁移(D7 CellSpec 消费方)
-- 1 笔:SG/TI/cli 命名清理(`ColvarMDInfo` → `ConstraintRun`;Phase 4 已完成路径
-  切换,Phase 5 只做 canonical 名字统一)
-- 1 笔:potential Fermi-only / dict 接口迁移(D11 + dict 历史决议同步处理)
-- charge / correction 业务迁移留 Phase 8(VASP 阶段)
+Phase 5 commit 状态:
+- ✅ **Commit 1**(`37107a5`):水/cli cell 迁移(D7 CellSpec 消费方激活)
+- ✅ **Commit 2**(`3397a32`):SG/TI/cli 命名清理(`ColvarMDInfo` → `ConstraintRun`,
+  删 CP2K-名兼容 alias 及 `.restart`/`.lagrange` legacy property)
+- ⬜ **Commit 3**(未开):potential Fermi-only / dict 接口迁移(D11 + dict 历史决议同步处理)
+- ⬜ charge / correction 业务迁移留 Phase 8(VASP 阶段)
 
 入口层(cli / agent / scripts)迁移**不在 Phase 5**;按 `overall_reconstruction_plan.md`
 Phase 6 统一处理。
@@ -1046,8 +1070,8 @@ Phase 6 统一处理。
 
 ## 设计文档完结
 
-待办:
-1. user + codex 三次审本文件
-2. 通过后进 Phase 4(实施),按 §9 3 笔 commit 推进(Round 7 把 D10 + D8 合并为
-   Commit 1 原子提交;Phase 4 总笔数 = 3)
-3. 任何 §6.3 / §9 子步骤回归,先停下找根因再继续;不允许在回归未消失时进下一 commit
+已落地状态见**文件顶部 status banner**;后续 Phase 5 Commit 3 起步时,以
+status banner + 代码现状为准。
+
+注:本节末尾原"待办"流程已完成(本文件经过 codex Round 4-11 全部审阅 +
+Phase 4 全 commit 实施 + Phase 5 Commit 1+2 实施)。
