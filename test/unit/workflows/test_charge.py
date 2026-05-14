@@ -139,6 +139,42 @@ class TestRunSurfaceChargeSingleSide:
         assert result.metadata["method"] == method
 
 
+class TestRunSurfaceChargeInvalidSide:
+    """Invalid target_side rejected BEFORE any filesystem side-effect.
+
+    Phase 6.3 follow-up: the facade composes
+    ``<output_dir>/<method>_<side>/`` and calls ``mkdir`` before
+    delegating to the business layer, where target_side is actually
+    validated.  Without an early check, a bogus value (e.g.
+    ``target_side="bad"``) leaves an empty ``<method>_bad/`` directory
+    on disk before the ValueError surfaces.  These tests pin that the
+    facade rejects invalid sides up-front and emits the same wording
+    as the business layer.
+    """
+
+    def test_invalid_target_side_raises_before_mkdir(
+        self, tmp_path: Path
+    ) -> None:
+        base = tmp_path / "charge"
+        with pytest.raises(ValueError) as exc:
+            run_surface_charge(
+                output_dir=base,
+                root_dir=tmp_path / "data",
+                method="counterion",
+                target_side="bad",
+            )
+        # byte-equal error wording — pins the contract that facade and
+        # business layer raise identical messages
+        assert str(exc.value) == (
+            "target_side must be 'aligned', 'opposed', or None, got 'bad'"
+        )
+        # No <method>_bad/ subdir leaked
+        assert not (base / "counterion_bad").exists()
+        # base_dir itself shouldn't be created either: mkdir runs only
+        # after validation passes
+        assert not base.exists()
+
+
 class TestRunSurfaceChargePotentialKwargs:
     """The 4 potential_* kwargs are forwarded verbatim to the underlying
     surface_charge_analysis call."""

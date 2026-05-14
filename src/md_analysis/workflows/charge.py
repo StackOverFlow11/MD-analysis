@@ -72,6 +72,17 @@ def run_surface_charge(
     from ..electrochemical.charge import surface_charge_analysis
     from ..electrochemical.charge.config import DEFAULT_SURFACE_CHARGE_PNG_NAME
 
+    # Validate target_side BEFORE any filesystem side-effect so an
+    # invalid value cannot leak an empty <method>_<bad>/ directory.
+    # Wording is byte-equal to the business-layer check in
+    # surface_charge_analysis (electrochemical/charge/Bader/
+    # SurfaceCharge.py) so callers see one consistent ValueError
+    # regardless of which layer rejects the input.
+    if target_side is not None and target_side not in ("aligned", "opposed"):
+        raise ValueError(
+            f"target_side must be 'aligned', 'opposed', or None, got {target_side!r}"
+        )
+
     root_p = Path(root_dir)
     base_dir = Path(output_dir)
     subdir_name = method if target_side is None else f"{method}_{target_side}"
