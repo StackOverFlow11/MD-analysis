@@ -10,7 +10,7 @@
   - 水分析（`water/`）：从选定界面到两界面中点的系综平均（A 口径）、吸附层自动识别、吸附层角度分布、三联图输出
   - 电势分析（`electrochemical/potential/`）：center slab potential、Fermi energy、electrode potential U vs SHE、φ(z) overlay、thickness sensitivity
   - 增强抽样（`enhanced_sampling/`）：慢增长自由能绘图（quick / publication）+ CSV 导出 + 约束 TI 收敛诊断与自由能积分 + CLI 集成
-  - 集成入口：CLI（`md-analysis` 命令）、编程入口（`md_analysis.workflows`，21 个 `run_*` 函数返回 `WorkflowResult`；`main.py` 是同名薄 re-export facade）、Agent 入口（`agent/`：dispatch + JSON Schema + TaskResult + Tools-layer `TaskContract`；入口重构 Phase 3 / 5B 删了 6 个 legacy task，**剩余 8 个任务全部带完整 contract**）
+  - 集成入口：CLI（`md-analysis` 命令）、编程入口（`md_analysis.workflows`，30 个 `run_*` 函数返回 `WorkflowResult`；`main.py` 是同名薄 re-export facade）、Agent 入口（`agent/`：dispatch + JSON Schema + TaskResult + Tools-layer `TaskContract`；入口重构 Phase 3 / 5B 删了 6 个 legacy task，**剩余 8 个任务全部带完整 contract**）
 - Bader 电荷解析（`utils/formats/bader.py`）：从 VASP Bader 输出（ACF.dat + POTCAR）读取原始电子数与净电荷，附加到 ASE Atoms
   - Bader 电荷下游分析（`electrochemical/charge/Bader/`）：
     - 核心数据结构 `BaderTrajectoryData` + `load_bader_trajectory()` — 加载轨迹并通过 IndexMap remap 回 XYZ 原子序
@@ -39,8 +39,8 @@
   - 42x：TI 工作目录生成（421 单帧 / 422 批量）
   - 9xx：Settings（配置管理）
 - **编程入口**（canonical 模块：`md_analysis.workflows`；同名 re-export 在 `md_analysis.main`；旧 `run_*_analysis` / `run_all` 已在入口重构 Phase 7a 移除）：
-  - 水：`run_water_three_panel(xyz_path, md_inp_path, ...) -> WorkflowResult`
-  - 电势：`run_potential_full(output_dir, cube_pattern, md_out_path=..., ...) -> WorkflowResult`
+  - 水：`run_water_three_panel`（composite）+ `run_water_density` / `run_water_orientation` / `run_ad_water_orientation` / `run_ad_water_theta` 4 个单步入口
+  - 电势：`run_potential_full`（composite）+ `run_center_potential` / `run_fermi_energy` / `run_electrode_potential` / `run_phi_z_profile` / `run_thickness_sensitivity` 5 个单步入口
   - 表面电荷：`run_surface_charge(output_dir, root_dir, method=..., ...) -> WorkflowResult`
   - 追踪原子电荷：`run_tracked_charge(output_dir, root_dir, atom_indices_xyz, ...) -> WorkflowResult`
   - 反离子电荷：`run_counterion_charge(output_dir, root_dir, ...) -> WorkflowResult`
@@ -48,7 +48,7 @@
   - 标定：`run_calibration_fit(...)` / `run_calibration_predict(...)`
   - 增强采样：`run_slowgrowth_quick_plot` / `run_slowgrowth_publication_plot` / `run_ti_single_diagnostics` / `run_ti_full_analysis` / `run_ti_constant_potential_correction`
   - 脚本生成：`run_bader_single/batch` / `run_ti_single/batch` / `run_potential_single/batch` / `run_sp_single/batch`
-  - 共计 21 个 `run_*` + `WorkflowResult`，详见 `src/md_analysis/workflows/__init__.py`
+  - 共计 30 个 `run_*` + `WorkflowResult`，详见 `src/md_analysis/workflows/__init__.py`
 - **Agent 入口**（`md_analysis.agent`，非交互式，面向 AI agent / MCP Server）：
   - `dispatch(task, params)` → 统一任务执行，返回 `TaskResult`
   - `list_tasks()` → 枚举已注册任务
