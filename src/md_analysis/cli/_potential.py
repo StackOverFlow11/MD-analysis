@@ -50,8 +50,9 @@ class CenterPotentialCmd(MenuCommand):
     advanced_params = (outdir, frame_slice)
 
     def execute(self, ctx: dict) -> None:
-        analyze = lazy_import("md_analysis.electrochemical.potential",
-                              "center_slab_potential_analysis")
+        analyze = lazy_import(
+            "md_analysis.workflows.potential", "run_center_potential",
+        )
         kwargs: dict = {
             "output_dir": ctx[K.OUTDIR_RESOLVED],
             "thickness_ang": ctx[K.THICKNESS],
@@ -67,8 +68,10 @@ class CenterPotentialCmd(MenuCommand):
         if not _is_distributed(ctx):
             kwargs["cube_pattern"] = ctx[K.CUBE_PATTERN]
             kwargs["xyz_path"] = Path(ctx[K.XYZ])
-        csv = analyze(**kwargs)
-        print(f"\n Analysis complete. Output:\n   center_csv: {csv}")
+        result = analyze(**kwargs)
+        print("\n Analysis complete. Outputs:")
+        for name, path in result.artifacts.items():
+            print(f"   {name}: {path}")
 
 
 class FermiEnergyCmd(MenuCommand):
@@ -78,8 +81,9 @@ class FermiEnergyCmd(MenuCommand):
     advanced_params = (outdir, frame_slice)
 
     def execute(self, ctx: dict) -> None:
-        analyze = lazy_import("md_analysis.electrochemical.potential",
-                              "fermi_energy_analysis")
+        analyze = lazy_import(
+            "md_analysis.workflows.potential", "run_fermi_energy",
+        )
         kwargs: dict = {
             "output_dir": ctx[K.OUTDIR_RESOLVED],
             "fermi_unit": ctx[K.FERMI_UNIT],
@@ -90,8 +94,10 @@ class FermiEnergyCmd(MenuCommand):
         }
         if not _is_distributed(ctx):
             kwargs["md_out_path"] = Path(ctx[K.MD_OUT])
-        csv = analyze(**kwargs)
-        print(f"\n Analysis complete. Output:\n   fermi_csv: {csv}")
+        result = analyze(**kwargs)
+        print("\n Analysis complete. Outputs:")
+        for name, path in result.artifacts.items():
+            print(f"   {name}: {path}")
 
 
 class ElectrodePotentialCmd(MenuCommand):
@@ -102,8 +108,9 @@ class ElectrodePotentialCmd(MenuCommand):
     advanced_params = (outdir, frame_slice)
 
     def execute(self, ctx: dict) -> None:
-        analyze = lazy_import("md_analysis.electrochemical.potential",
-                              "electrode_potential_analysis")
+        analyze = lazy_import(
+            "md_analysis.workflows.potential", "run_electrode_potential",
+        )
         kwargs: dict = {
             "output_dir": ctx[K.OUTDIR_RESOLVED],
             "thickness_ang": ctx[K.THICKNESS],
@@ -121,8 +128,10 @@ class ElectrodePotentialCmd(MenuCommand):
             kwargs["cube_pattern"] = ctx[K.CUBE_PATTERN]
             kwargs["md_out_path"] = Path(ctx[K.MD_OUT])
             kwargs["xyz_path"] = Path(ctx[K.XYZ])
-        csv = analyze(**kwargs)
-        print(f"\n Analysis complete. Output:\n   electrode_csv: {csv}")
+        result = analyze(**kwargs)
+        print("\n Analysis complete. Outputs:")
+        for name, path in result.artifacts.items():
+            print(f"   {name}: {path}")
 
 
 class PhiZProfileCmd(MenuCommand):
@@ -132,8 +141,9 @@ class PhiZProfileCmd(MenuCommand):
     advanced_params = (outdir, frame_slice)
 
     def execute(self, ctx: dict) -> None:
-        analyze = lazy_import("md_analysis.electrochemical.potential",
-                              "phi_z_planeavg_analysis")
+        analyze = lazy_import(
+            "md_analysis.workflows.potential", "run_phi_z_profile",
+        )
         kwargs: dict = {
             "output_dir": ctx[K.OUTDIR_RESOLVED],
             "max_curves": ctx[K.MAX_CURVES],
@@ -145,8 +155,10 @@ class PhiZProfileCmd(MenuCommand):
         }
         if not _is_distributed(ctx):
             kwargs["cube_pattern"] = ctx[K.CUBE_PATTERN]
-        png = analyze(**kwargs)
-        print(f"\n Analysis complete. Output:\n   phi_z_png: {png}")
+        result = analyze(**kwargs)
+        print("\n Analysis complete. Outputs:")
+        for name, path in result.artifacts.items():
+            print(f"   {name}: {path}")
 
 
 class ThicknessSensitivityCmd(MenuCommand):
@@ -158,8 +170,9 @@ class ThicknessSensitivityCmd(MenuCommand):
     advanced_params = (outdir, frame_slice)
 
     def execute(self, ctx: dict) -> None:
-        analyze = lazy_import("md_analysis.electrochemical.potential",
-                              "thickness_sensitivity_analysis")
+        analyze = lazy_import(
+            "md_analysis.workflows.potential", "run_thickness_sensitivity",
+        )
         kwargs: dict = {
             "output_dir": ctx[K.OUTDIR_RESOLVED],
             "thickness_end": ctx[K.THICKNESS_END],
@@ -177,8 +190,10 @@ class ThicknessSensitivityCmd(MenuCommand):
             kwargs["cube_pattern"] = ctx[K.CUBE_PATTERN]
             kwargs["md_out_path"] = Path(ctx[K.MD_OUT])
             kwargs["xyz_path"] = Path(ctx[K.XYZ])
-        csv = analyze(**kwargs)
-        print(f"\n Analysis complete. Output:\n   thickness_sensitivity_csv: {csv}")
+        result = analyze(**kwargs)
+        print("\n Analysis complete. Outputs:")
+        for name, path in result.artifacts.items():
+            print(f"   {name}: {path}")
 
 
 class FullPotentialCmd(MenuCommand):

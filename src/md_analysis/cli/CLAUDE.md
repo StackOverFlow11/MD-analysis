@@ -45,7 +45,16 @@ VASPKIT 风格交互式编号菜单。无 argparse，所有输入通过 `input()
 
 | CLI | 命令 | workflow facade |
 |---|---|---|
+| 101 | `WaterDensityCmd` | `workflows.water.run_water_density` |
+| 102 | `WaterOrientationCmd` | `workflows.water.run_water_orientation` |
+| 103 | `AdWaterOrientationCmd` | `workflows.water.run_ad_water_orientation` |
+| 104 | `AdWaterThetaCmd` | `workflows.water.run_ad_water_theta` |
 | 105 | `WaterThreePanelCmd` | `workflows.water.run_water_three_panel` |
+| 211 | `CenterPotentialCmd` | `workflows.potential.run_center_potential` |
+| 212 | `FermiEnergyCmd` | `workflows.potential.run_fermi_energy` |
+| 213 | `ElectrodePotentialCmd` | `workflows.potential.run_electrode_potential` |
+| 214 | `PhiZProfileCmd` | `workflows.potential.run_phi_z_profile` |
+| 215 | `ThicknessSensitivityCmd` | `workflows.potential.run_thickness_sensitivity` |
 | 216 | `FullPotentialCmd` | `workflows.potential.run_potential_full` |
 | 225 | `TrackedChargeCmd` | `workflows.charge.run_tracked_charge` |
 | 226 | `CounterionChargeCmd` | `workflows.charge.run_counterion_charge` |
@@ -63,8 +72,6 @@ VASPKIT 风格交互式编号菜单。无 argparse，所有输入通过 `input()
 
 | CLI | 命令 | 保留原因 |
 |---|---|---|
-| 101 / 102 / 103 / 104 | water 单步命令 | `workflows.water` 当前只导出 `run_water_three_panel`（composite），没有 density / orientation / adsorbed / theta 的单步 `run_*` |
-| 211 / 212 / 213 / 214 / 215 | potential 单步命令 | `workflows.potential` 当前只导出 `run_potential_full`（composite），没有 center / fermi / electrode / phi_z / thickness_sensitivity 的单步 `run_*` |
 | 221 / 222 / 223 | `SurfaceChargeCmd` | `workflows.charge.run_surface_charge` 不接受 `potential_reference` / `potential_pH` / `potential_temperature_K` / `potential_phi_pzc` 这 4 个底层 `surface_charge_analysis` 已支持的参数；CLI 当前需要它们才能输出 φ 列 |
 | 224 | `SingleSideChargeCmd` | `workflows.charge.run_surface_charge` 不接受 `target_side`；底层 `surface_charge_analysis` 支持 |
 | 231 / 232 / 233 | calibration | `workflows.calibration.run_calibration_fit` / `run_calibration_predict` 要求 `calibration_json_path` 必填，CLI 当前允许传 None 走全局默认（`~/.config/md_analysis/calibration.json`）。让 CLI 显式提前 resolve 默认值不在 Phase 4 范围内 |

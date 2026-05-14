@@ -24,7 +24,14 @@ from .enhanced_sampling import (
     run_ti_single_diagnostics,
 )
 from .models import MissingArtifactError, WorkflowResult, require_artifacts_exist
-from .potential import run_potential_full
+from .potential import (
+    run_center_potential,
+    run_electrode_potential,
+    run_fermi_energy,
+    run_phi_z_profile,
+    run_potential_full,
+    run_thickness_sensitivity,
+)
 from .scripts import (
     run_bader_batch,
     run_bader_single,
@@ -55,6 +62,11 @@ __all__ = [
     "run_ad_water_orientation",
     "run_ad_water_theta",
     "run_potential_full",
+    "run_center_potential",
+    "run_fermi_energy",
+    "run_electrode_potential",
+    "run_phi_z_profile",
+    "run_thickness_sensitivity",
     "run_surface_charge",
     "run_tracked_charge",
     "run_counterion_charge",

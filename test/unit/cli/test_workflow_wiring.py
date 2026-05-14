@@ -30,7 +30,13 @@ from typing import Any
 
 import pytest
 
-from md_analysis.cli import _charge, _enhanced_sampling, _scripts, _water
+from md_analysis.cli import (
+    _charge,
+    _enhanced_sampling,
+    _potential,
+    _scripts,
+    _water,
+)
 from md_analysis.cli._params import K
 from md_analysis.workflows import WorkflowResult
 
@@ -596,3 +602,337 @@ class TestAdWaterThetaCmd:
         _assert_water_ctx_forwarded(call, tmp_path)
         # CLI 104 forwards verbose=True (matches legacy behaviour)
         assert call["verbose"] is True
+
+
+# ---------------------------------------------------------------------------
+# _potential.py: 5 single-step workflows (Phase 6.2)
+# ---------------------------------------------------------------------------
+
+
+_CONTINUOUS_ONLY_KEYS = ("cube_pattern", "xyz_path", "md_out_path")
+
+
+def _potential_continuous_ctx(tmp_path: Path) -> dict[str, Any]:
+    """Continuous-mode ctx used by CLI 211-215 wiring tests."""
+    return {
+        K.INPUT_MODE: "continuous",
+        K.SP_ROOT_DIR: None,
+        K.SP_DIR_PATTERN: "potential_t*_i*",
+        K.SP_CUBE_FILENAME: "sp_potential-v_hartree-1_0.cube",
+        K.SP_OUT_FILENAME: "sp.out",
+        K.CUBE_PATTERN: "md-POTENTIAL-v_hartree-1_*.cube",
+        K.XYZ: str(tmp_path / "md-pos-1.xyz"),
+        K.MD_OUT: str(tmp_path / "md.out"),
+        K.OUTDIR_RESOLVED: str(tmp_path / "out"),
+        K.THICKNESS: 7.0,
+        K.THICKNESS_END: 15.0,
+        K.CENTER_MODE: "interface",
+        K.METAL_ELEMENTS: {"Cu"},
+        K.LAYER_TOL: 0.5,
+        K.FERMI_UNIT: "au",
+        K.MAX_CURVES: 0,
+        K.FRAME_START: None,
+        K.FRAME_END: None,
+        K.FRAME_STEP: None,
+    }
+
+
+def _potential_distributed_ctx(tmp_path: Path) -> dict[str, Any]:
+    """Distributed-mode ctx; the CLI routing branch should drop the
+    continuous-only keys (cube_pattern / xyz_path / md_out_path)
+    before calling the workflow facade."""
+    ctx = _potential_continuous_ctx(tmp_path)
+    ctx[K.INPUT_MODE] = "distributed"
+    ctx[K.SP_ROOT_DIR] = str(tmp_path / "sp_dirs")
+    # CUBE_PATTERN / XYZ / MD_OUT are still in ctx for completeness, but
+    # the CLI routing branch must not forward them in distributed mode.
+    return ctx
+
+
+def _stub_workflow(
+    name: str, output_dir: Path, *, artifact_key: str, artifact_path: Path
+) -> Any:
+    """Build a fake workflow callable returning a WorkflowResult."""
+
+    def _fake(**kwargs: Any) -> WorkflowResult:
+        return _make_workflow_result(
+            name=name,
+            output_dir=output_dir,
+            artifacts={artifact_key: artifact_path},
+        )
+
+    return _fake
+
+
+def _assert_continuous_routing(
+    call: dict[str, Any], *, expects_cube: bool, expects_xyz: bool, expects_md_out: bool
+) -> None:
+    """In continuous mode the CLI routing branch forwards the
+    continuous-only keys when relevant for the command."""
+    if expects_cube:
+        assert "cube_pattern" in call
+    if expects_xyz:
+        assert "xyz_path" in call
+    if expects_md_out:
+        assert "md_out_path" in call
+    assert call["input_mode"] == "continuous"
+
+
+def _assert_distributed_routing(call: dict[str, Any]) -> None:
+    """In distributed mode the CLI routing branch must NOT forward
+    any continuous-only keys, and input_mode + sp_* must be present."""
+    for key in _CONTINUOUS_ONLY_KEYS:
+        assert key not in call, (
+            f"{key!r} was forwarded in distributed mode; "
+            f"the CLI routing branch must not pass it"
+        )
+    assert call["input_mode"] == "distributed"
+    assert "sp_root_dir" in call
+    assert "sp_dir_pattern" in call
+    assert "sp_cube_filename" in call
+    assert "sp_out_filename" in call
+
+
+class TestCenterPotentialCmd:
+    """CLI 211 -> workflows.potential.run_center_potential.
+    Forwards cube_pattern + xyz_path in continuous mode; drops both
+    in distributed mode."""
+
+    def test_continuous_routing(self, monkeypatch, tmp_path: Path) -> None:
+        out_dir = tmp_path / "out"
+        out_dir.mkdir()
+        artifact = out_dir / "center.csv"
+        artifact.write_text("")
+        stub = _LazyImportStub(
+            _stub_workflow(
+                "center_potential", out_dir,
+                artifact_key="center_csv", artifact_path=artifact,
+            )
+        )
+        monkeypatch.setattr(_potential, "lazy_import", stub)
+
+        cmd = _potential.CenterPotentialCmd("211", "Center Potential")
+        cmd.execute(_potential_continuous_ctx(tmp_path))
+
+        assert stub.lookups == [
+            ("md_analysis.workflows.potential", "run_center_potential"),
+        ]
+        call = stub.calls[0]
+        _assert_continuous_routing(
+            call, expects_cube=True, expects_xyz=True, expects_md_out=False,
+        )
+        assert call["thickness_ang"] == 7.0
+
+    def test_distributed_routing(self, monkeypatch, tmp_path: Path) -> None:
+        out_dir = tmp_path / "out"
+        out_dir.mkdir()
+        artifact = out_dir / "center.csv"
+        artifact.write_text("")
+        stub = _LazyImportStub(
+            _stub_workflow(
+                "center_potential", out_dir,
+                artifact_key="center_csv", artifact_path=artifact,
+            )
+        )
+        monkeypatch.setattr(_potential, "lazy_import", stub)
+
+        cmd = _potential.CenterPotentialCmd("211", "Center Potential")
+        cmd.execute(_potential_distributed_ctx(tmp_path))
+
+        assert stub.lookups == [
+            ("md_analysis.workflows.potential", "run_center_potential"),
+        ]
+        _assert_distributed_routing(stub.calls[0])
+
+
+class TestFermiEnergyCmd:
+    """CLI 212 -> workflows.potential.run_fermi_energy.
+    Forwards md_out_path in continuous mode; drops it in distributed."""
+
+    def test_continuous_routing(self, monkeypatch, tmp_path: Path) -> None:
+        out_dir = tmp_path / "out"
+        out_dir.mkdir()
+        artifact = out_dir / "fermi.csv"
+        artifact.write_text("")
+        stub = _LazyImportStub(
+            _stub_workflow(
+                "fermi_energy", out_dir,
+                artifact_key="fermi_csv", artifact_path=artifact,
+            )
+        )
+        monkeypatch.setattr(_potential, "lazy_import", stub)
+
+        cmd = _potential.FermiEnergyCmd("212", "Fermi Energy")
+        cmd.execute(_potential_continuous_ctx(tmp_path))
+
+        assert stub.lookups == [
+            ("md_analysis.workflows.potential", "run_fermi_energy"),
+        ]
+        _assert_continuous_routing(
+            stub.calls[0],
+            expects_cube=False, expects_xyz=False, expects_md_out=True,
+        )
+
+    def test_distributed_routing(self, monkeypatch, tmp_path: Path) -> None:
+        out_dir = tmp_path / "out"
+        out_dir.mkdir()
+        artifact = out_dir / "fermi.csv"
+        artifact.write_text("")
+        stub = _LazyImportStub(
+            _stub_workflow(
+                "fermi_energy", out_dir,
+                artifact_key="fermi_csv", artifact_path=artifact,
+            )
+        )
+        monkeypatch.setattr(_potential, "lazy_import", stub)
+
+        cmd = _potential.FermiEnergyCmd("212", "Fermi Energy")
+        cmd.execute(_potential_distributed_ctx(tmp_path))
+
+        _assert_distributed_routing(stub.calls[0])
+
+
+class TestElectrodePotentialCmd:
+    """CLI 213 -> workflows.potential.run_electrode_potential.
+    Forwards cube_pattern + md_out_path + xyz_path in continuous; drops
+    all three in distributed."""
+
+    def test_continuous_routing(self, monkeypatch, tmp_path: Path) -> None:
+        out_dir = tmp_path / "out"
+        out_dir.mkdir()
+        artifact = out_dir / "electrode.csv"
+        artifact.write_text("")
+        stub = _LazyImportStub(
+            _stub_workflow(
+                "electrode_potential", out_dir,
+                artifact_key="electrode_csv", artifact_path=artifact,
+            )
+        )
+        monkeypatch.setattr(_potential, "lazy_import", stub)
+
+        cmd = _potential.ElectrodePotentialCmd("213", "Electrode Potential")
+        cmd.execute(_potential_continuous_ctx(tmp_path))
+
+        assert stub.lookups == [
+            ("md_analysis.workflows.potential", "run_electrode_potential"),
+        ]
+        _assert_continuous_routing(
+            stub.calls[0],
+            expects_cube=True, expects_xyz=True, expects_md_out=True,
+        )
+
+    def test_distributed_routing(self, monkeypatch, tmp_path: Path) -> None:
+        out_dir = tmp_path / "out"
+        out_dir.mkdir()
+        artifact = out_dir / "electrode.csv"
+        artifact.write_text("")
+        stub = _LazyImportStub(
+            _stub_workflow(
+                "electrode_potential", out_dir,
+                artifact_key="electrode_csv", artifact_path=artifact,
+            )
+        )
+        monkeypatch.setattr(_potential, "lazy_import", stub)
+
+        cmd = _potential.ElectrodePotentialCmd("213", "Electrode Potential")
+        cmd.execute(_potential_distributed_ctx(tmp_path))
+
+        _assert_distributed_routing(stub.calls[0])
+
+
+class TestPhiZProfileCmd:
+    """CLI 214 -> workflows.potential.run_phi_z_profile.
+    Forwards cube_pattern in continuous (no xyz / md_out for PhiZ).
+    Drops cube_pattern in distributed."""
+
+    def test_continuous_routing(self, monkeypatch, tmp_path: Path) -> None:
+        out_dir = tmp_path / "out"
+        out_dir.mkdir()
+        artifact = out_dir / "phi_z.png"
+        artifact.write_text("")
+        stub = _LazyImportStub(
+            _stub_workflow(
+                "phi_z_profile", out_dir,
+                artifact_key="phi_z_png", artifact_path=artifact,
+            )
+        )
+        monkeypatch.setattr(_potential, "lazy_import", stub)
+
+        cmd = _potential.PhiZProfileCmd("214", "PhiZ Profile")
+        cmd.execute(_potential_continuous_ctx(tmp_path))
+
+        assert stub.lookups == [
+            ("md_analysis.workflows.potential", "run_phi_z_profile"),
+        ]
+        # PhiZ only forwards cube_pattern in continuous (no xyz/md_out)
+        call = stub.calls[0]
+        assert "cube_pattern" in call
+        assert "xyz_path" not in call
+        assert "md_out_path" not in call
+        assert call["input_mode"] == "continuous"
+
+    def test_distributed_routing(self, monkeypatch, tmp_path: Path) -> None:
+        out_dir = tmp_path / "out"
+        out_dir.mkdir()
+        artifact = out_dir / "phi_z.png"
+        artifact.write_text("")
+        stub = _LazyImportStub(
+            _stub_workflow(
+                "phi_z_profile", out_dir,
+                artifact_key="phi_z_png", artifact_path=artifact,
+            )
+        )
+        monkeypatch.setattr(_potential, "lazy_import", stub)
+
+        cmd = _potential.PhiZProfileCmd("214", "PhiZ Profile")
+        cmd.execute(_potential_distributed_ctx(tmp_path))
+
+        _assert_distributed_routing(stub.calls[0])
+
+
+class TestThicknessSensitivityCmd:
+    """CLI 215 -> workflows.potential.run_thickness_sensitivity.
+    Same routing surface as 213 (cube + md_out + xyz)."""
+
+    def test_continuous_routing(self, monkeypatch, tmp_path: Path) -> None:
+        out_dir = tmp_path / "out"
+        out_dir.mkdir()
+        artifact = out_dir / "ts.csv"
+        artifact.write_text("")
+        stub = _LazyImportStub(
+            _stub_workflow(
+                "thickness_sensitivity", out_dir,
+                artifact_key="thickness_sensitivity_csv", artifact_path=artifact,
+            )
+        )
+        monkeypatch.setattr(_potential, "lazy_import", stub)
+
+        cmd = _potential.ThicknessSensitivityCmd("215", "Thickness Sensitivity")
+        cmd.execute(_potential_continuous_ctx(tmp_path))
+
+        assert stub.lookups == [
+            ("md_analysis.workflows.potential", "run_thickness_sensitivity"),
+        ]
+        _assert_continuous_routing(
+            stub.calls[0],
+            expects_cube=True, expects_xyz=True, expects_md_out=True,
+        )
+        assert stub.calls[0]["thickness_end"] == 15.0
+
+    def test_distributed_routing(self, monkeypatch, tmp_path: Path) -> None:
+        out_dir = tmp_path / "out"
+        out_dir.mkdir()
+        artifact = out_dir / "ts.csv"
+        artifact.write_text("")
+        stub = _LazyImportStub(
+            _stub_workflow(
+                "thickness_sensitivity", out_dir,
+                artifact_key="thickness_sensitivity_csv", artifact_path=artifact,
+            )
+        )
+        monkeypatch.setattr(_potential, "lazy_import", stub)
+
+        cmd = _potential.ThicknessSensitivityCmd("215", "Thickness Sensitivity")
+        cmd.execute(_potential_distributed_ctx(tmp_path))
+
+        _assert_distributed_routing(stub.calls[0])
