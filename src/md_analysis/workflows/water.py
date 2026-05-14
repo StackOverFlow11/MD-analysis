@@ -21,7 +21,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from ..utils.constants import DEFAULT_LAYER_TOL_A
+from ..utils.constants import DEFAULT_LAYER_TOL_A, DEFAULT_Z_BIN_WIDTH_A
 from .models import WorkflowResult
 
 logger = logging.getLogger(__name__)
@@ -139,7 +139,7 @@ def run_water_density(
     *,
     cell_abc: tuple[float, float, float] | None = None,
     output_dir: Path | str,
-    dz_A: float | None = None,
+    dz_A: float = DEFAULT_Z_BIN_WIDTH_A,
     layer_tol_A: float = DEFAULT_LAYER_TOL_A,
     frame_start: int | None = None,
     frame_end: int | None = None,
@@ -178,8 +178,7 @@ def run_water_density(
         "frame_end": frame_end,
         "frame_step": frame_step,
     }
-    if dz_A is not None:
-        call_kwargs["dz_A"] = dz_A
+    call_kwargs["dz_A"] = dz_A
     call_kwargs.update(kwargs)
 
     csv_path = water_mass_density_z_distribution_analysis(**call_kwargs)
@@ -205,7 +204,7 @@ def run_water_orientation(
     *,
     cell_abc: tuple[float, float, float] | None = None,
     output_dir: Path | str,
-    dz_A: float | None = None,
+    dz_A: float = DEFAULT_Z_BIN_WIDTH_A,
     layer_tol_A: float = DEFAULT_LAYER_TOL_A,
     frame_start: int | None = None,
     frame_end: int | None = None,
@@ -240,8 +239,7 @@ def run_water_orientation(
         "frame_end": frame_end,
         "frame_step": frame_step,
     }
-    if dz_A is not None:
-        call_kwargs["dz_A"] = dz_A
+    call_kwargs["dz_A"] = dz_A
     call_kwargs.update(kwargs)
 
     csv_path = water_orientation_weighted_density_z_distribution_analysis(**call_kwargs)
@@ -267,7 +265,7 @@ def run_ad_water_orientation(
     *,
     cell_abc: tuple[float, float, float] | None = None,
     output_dir: Path | str,
-    dz_A: float | None = None,
+    dz_A: float = DEFAULT_Z_BIN_WIDTH_A,
     layer_tol_A: float = DEFAULT_LAYER_TOL_A,
     frame_start: int | None = None,
     frame_end: int | None = None,
@@ -303,8 +301,7 @@ def run_ad_water_orientation(
         "frame_end": frame_end,
         "frame_step": frame_step,
     }
-    if dz_A is not None:
-        call_kwargs["dz_A"] = dz_A
+    call_kwargs["dz_A"] = dz_A
     call_kwargs.update(kwargs)
 
     profile_csv, range_txt = ad_water_orientation_analysis(**call_kwargs)
@@ -333,7 +330,7 @@ def run_ad_water_theta(
     *,
     cell_abc: tuple[float, float, float] | None = None,
     output_dir: Path | str,
-    dz_A: float | None = None,
+    dz_A: float = DEFAULT_Z_BIN_WIDTH_A,
     layer_tol_A: float = DEFAULT_LAYER_TOL_A,
     frame_start: int | None = None,
     frame_end: int | None = None,
@@ -373,8 +370,7 @@ def run_ad_water_theta(
         "frame_step": frame_step,
         "verbose": verbose,
     }
-    if dz_A is not None:
-        call_kwargs["dz_A"] = dz_A
+    call_kwargs["dz_A"] = dz_A
     call_kwargs.update(kwargs)
 
     _, _, csv_path = compute_adsorbed_water_theta_distribution(**call_kwargs)
