@@ -62,6 +62,9 @@ VASPKIT 风格交互式编号菜单。无 argparse，所有输入通过 `input()
 | 224 | `SingleSideChargeCmd` | `workflows.charge.run_surface_charge` (`target_side`) |
 | 225 | `TrackedChargeCmd` | `workflows.charge.run_tracked_charge` |
 | 226 | `CounterionChargeCmd` | `workflows.charge.run_counterion_charge` |
+| 231 | `CalibrateFromCSVCmd` | `workflows.calibration.run_calibration_fit` |
+| 232 | `CalibrateManualCmd` | `workflows.calibration.run_calibration_fit` |
+| 233 | `PredictPotentialCmd` | `workflows.calibration.run_calibration_predict` |
 | 301 | `SGQuickPlotCmd` | `workflows.enhanced_sampling.run_slowgrowth_quick_plot` |
 | 302 | `SGPublicationPlotCmd` | `workflows.enhanced_sampling.run_slowgrowth_publication_plot` |
 | 411 | `BaderSingleCmd` | `workflows.scripts.run_bader_single` |
@@ -76,7 +79,6 @@ VASPKIT 风格交互式编号菜单。无 argparse，所有输入通过 `input()
 
 | CLI | 命令 | 保留原因 |
 |---|---|---|
-| 231 / 232 / 233 | calibration | `workflows.calibration.run_calibration_fit` / `run_calibration_predict` 要求 `calibration_json_path` 必填，CLI 当前允许传 None 走全局默认（`~/.config/md_analysis/calibration.json`）。让 CLI 显式提前 resolve 默认值不在 Phase 4 范围内 |
 | 311 / 312 / 313 | constrained TI | CLI 有 Python-slice 切片 UI、逐点 equilibration override、约束点交互列表等富交互流程；workflow `run_ti_full_analysis` / `run_ti_constant_potential_correction` 是单次端到端调用，目前不能完整覆盖这套交互细节 |
 | 422 | `TIBatchCmd` | `workflows.scripts.run_ti_batch`（底层 `generate_ti_batch_with_report`）不接受 `colvar_id`（MVP 限定 primary CV）；CLI 仍 expose colvar_id |
 

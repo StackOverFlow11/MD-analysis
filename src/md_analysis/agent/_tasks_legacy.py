@@ -239,18 +239,25 @@ _CALIBRATION_FIT_CONTRACT = TaskContract(
 
 
 def _handle_calibration_fit_csv(params: dict[str, Any]) -> TaskResult:
-    """Dedicated handler — route artifacts + metrics from the report."""
-    from ..electrochemical.calibration.CalibrationWorkflow import (
-        calibrate_with_report,
-    )
+    """Dedicated handler — route artifacts + metrics from the WorkflowResult.
 
-    report = calibrate_with_report(**params)
+    Phase 6.4: dispatches through ``workflows.calibration.run_calibration_fit``
+    instead of the business layer directly.  The TaskResult contract
+    (outputs / summary) is byte-equal to the pre-migration baseline so
+    agent callers cannot observe the routing change.
+    """
+    from ..workflows.calibration import run_calibration_fit
 
-    outputs: dict[str, str] = {"calibration_json": str(report.calibration_json)}
-    if report.calibration_csv is not None:
-        outputs["calibration_csv"] = str(report.calibration_csv)
-    if report.calibration_png is not None:
-        outputs["calibration_png"] = str(report.calibration_png)
+    result = run_calibration_fit(**params)
+    report = result.extra  # CalibrationFitReport
+
+    outputs: dict[str, str] = {
+        "calibration_json": str(result.artifacts["calibration_json"]),
+    }
+    if "calibration_csv" in result.artifacts:
+        outputs["calibration_csv"] = str(result.artifacts["calibration_csv"])
+    if "calibration_png" in result.artifacts:
+        outputs["calibration_png"] = str(result.artifacts["calibration_png"])
 
     summary: dict[str, Any] = {
         "n_points": int(report.n_points),
@@ -280,10 +287,7 @@ register(TaskDef(
         "input is also supported."
     ),
     handler=_handle_calibration_fit_csv,
-    target_fn=(
-        "md_analysis.electrochemical.calibration.CalibrationWorkflow"
-        ":calibrate_with_report"
-    ),
+    target_fn="md_analysis.workflows.calibration:run_calibration_fit",
     cli_codes=("231",),
     contract=_CALIBRATION_FIT_CONTRACT,
 ))
@@ -478,12 +482,18 @@ _CALIBRATION_PREDICT_CONTRACT = TaskContract(
 
 
 def _handle_calibration_predict(params: dict[str, Any]) -> TaskResult:
-    """Dedicated handler — route JSON-serializable metrics from the report."""
-    from ..electrochemical.calibration.CalibrationWorkflow import (
-        predict_potential_with_report,
-    )
+    """Dedicated handler — route JSON-serializable metrics from the WorkflowResult.
 
-    report = predict_potential_with_report(**params)
+    Phase 6.4: dispatches through ``workflows.calibration.run_calibration_predict``
+    instead of the business layer directly.  ``sigma`` is forwarded via
+    ``**params`` because the workflow signature is positional-or-keyword
+    on that argument; this preserves the existing splat style and avoids
+    mutating the caller's params dict.
+    """
+    from ..workflows.calibration import run_calibration_predict
+
+    result = run_calibration_predict(**params)
+    report = result.extra  # CalibrationPredictionReport
 
     summary: dict[str, Any] = {
         "sigma_uC_cm2": [float(x) for x in report.sigma_uC_cm2],
@@ -516,10 +526,7 @@ register(TaskDef(
         "conversion to SHE / RHE / PZC."
     ),
     handler=_handle_calibration_predict,
-    target_fn=(
-        "md_analysis.electrochemical.calibration.CalibrationWorkflow"
-        ":predict_potential_with_report"
-    ),
+    target_fn="md_analysis.workflows.calibration:run_calibration_predict",
     cli_codes=("233",),
     contract=_CALIBRATION_PREDICT_CONTRACT,
 ))

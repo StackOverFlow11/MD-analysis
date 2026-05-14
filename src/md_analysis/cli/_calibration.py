@@ -1,4 +1,11 @@
-"""Calibration command classes (231-233)."""
+"""Calibration command classes (231-233).
+
+Phase 6.4: routed through ``workflows.calibration.run_*`` facades.
+The workflow keeps ``calibration_json_path`` as a required argument
+(agent-safe semantics); the CLI resolves the global default
+``~/.config/md_analysis/calibration.json`` here so the pre-migration
+UX is preserved.
+"""
 
 from __future__ import annotations
 
@@ -29,21 +36,26 @@ class CalibrateFromCSVCmd(MenuCommand):
     advanced_params = (poly_degree, outdir)
 
     def execute(self, ctx: dict) -> None:
-        calibrate_fn = lazy_import(
-            "md_analysis.electrochemical.calibration", "calibrate",
+        run_fit = lazy_import(
+            "md_analysis.workflows.calibration", "run_calibration_fit",
+        )
+        default_json = lazy_import(
+            "md_analysis.electrochemical.calibration.config",
+            "DEFAULT_CALIBRATION_FILE",
         )
         print("\n  CSV format: column 1 = potential φ (V vs SHE)")
         print("              column 2 = surface charge density σ (μC/cm²)")
         print("  Header row is optional (auto-detected).\n")
 
-        json_path = calibrate_fn(
+        result = run_fit(
             csv_path=ctx[K.CALIBRATION_CSV],
             method=ctx[K.FITTING_METHOD],
             poly_degree=ctx.get(K.POLY_DEGREE, 2),
             output_dir=ctx.get(K.OUTDIR_RESOLVED),
+            calibration_json_path=default_json,
         )
         print(f"\n Calibration complete.")
-        print(f"   JSON saved: {json_path}")
+        print(f"   JSON saved: {result.artifacts['calibration_json']}")
 
 
 class CalibrateManualCmd(MenuCommand):
@@ -54,8 +66,12 @@ class CalibrateManualCmd(MenuCommand):
     advanced_params = (poly_degree, outdir)
 
     def execute(self, ctx: dict) -> None:
-        calibrate_fn = lazy_import(
-            "md_analysis.electrochemical.calibration", "calibrate",
+        run_fit = lazy_import(
+            "md_analysis.workflows.calibration", "run_calibration_fit",
+        )
+        default_json = lazy_import(
+            "md_analysis.electrochemical.calibration.config",
+            "DEFAULT_CALIBRATION_FILE",
         )
         print("\n  Enter calibration data points.")
         print("  φ in V vs SHE, σ in μC/cm².")
@@ -80,14 +96,15 @@ class CalibrateManualCmd(MenuCommand):
             print(f"    → recorded ({phi}, {sigma})")
             i += 1
 
-        json_path = calibrate_fn(
+        result = run_fit(
             data_points=points,
             method=ctx[K.FITTING_METHOD],
             poly_degree=ctx.get(K.POLY_DEGREE, 2),
             output_dir=ctx.get(K.OUTDIR_RESOLVED),
+            calibration_json_path=default_json,
         )
         print(f"\n Calibration complete ({len(points)} points).")
-        print(f"   JSON saved: {json_path}")
+        print(f"   JSON saved: {result.artifacts['calibration_json']}")
 
 
 class PredictPotentialCmd(MenuCommand):
@@ -99,18 +116,23 @@ class PredictPotentialCmd(MenuCommand):
                        temperature_k, ph_value, phi_pzc)
 
     def execute(self, ctx: dict) -> None:
-        predict_fn = lazy_import(
-            "md_analysis.electrochemical.calibration", "predict_potential",
+        run_predict = lazy_import(
+            "md_analysis.workflows.calibration", "run_calibration_predict",
         )
-        json_path = ctx.get(K.CALIBRATION_JSON)
-        result = predict_fn(
+        default_json = lazy_import(
+            "md_analysis.electrochemical.calibration.config",
+            "DEFAULT_CALIBRATION_FILE",
+        )
+        json_path = ctx.get(K.CALIBRATION_JSON) or default_json
+        result = run_predict(
             ctx[K.SIGMA_VALUE],
-            calibration_json_path=Path(json_path) if json_path else None,
+            calibration_json_path=Path(json_path),
             target_reference=ctx.get(K.POTENTIAL_REFERENCE, "SHE"),
             temperature_K=ctx.get(K.TEMPERATURE_K, 298.15),
             pH=ctx.get(K.PH, 0.0),
             phi_pzc=ctx.get(K.PHI_PZC),
         )
-        ref = ctx.get(K.POTENTIAL_REFERENCE, "SHE")
+        phi_val = float(result.extra.potential_V[0])
+        ref = result.metadata["target_reference"]
         print(f"\n  σ = {ctx[K.SIGMA_VALUE]:.4f} μC/cm²")
-        print(f"  φ = {float(result):.6f} V vs {ref}")
+        print(f"  φ = {phi_val:.6f} V vs {ref}")

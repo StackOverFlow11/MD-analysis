@@ -267,6 +267,13 @@ class TestCalibrationFitCsvSchema:
         from md_analysis.agent._core import _TASK_REGISTRY
         assert _TASK_REGISTRY["calibration_fit_csv"].contract is not None
 
+    def test_target_fn_routes_through_workflows_facade(self):
+        # Phase 6.4: handler dispatches via workflows.calibration.
+        from md_analysis.agent._core import get_task
+        assert get_task("calibration_fit_csv").target_fn == (
+            "md_analysis.workflows.calibration:run_calibration_fit"
+        )
+
 
 class TestCalibrationFitCsvDispatch:
     def test_csv_success_returns_all_artifacts(self, fit_env):
@@ -382,6 +389,13 @@ class TestCalibrationPredictSchema:
     def test_is_contract_backed(self):
         from md_analysis.agent._core import _TASK_REGISTRY
         assert _TASK_REGISTRY["calibration_predict"].contract is not None
+
+    def test_target_fn_routes_through_workflows_facade(self):
+        # Phase 6.4: handler dispatches via workflows.calibration.
+        from md_analysis.agent._core import get_task
+        assert get_task("calibration_predict").target_fn == (
+            "md_analysis.workflows.calibration:run_calibration_predict"
+        )
 
 
 class TestCalibrationPredictDispatch:

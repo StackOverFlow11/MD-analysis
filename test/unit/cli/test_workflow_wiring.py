@@ -31,6 +31,7 @@ from typing import Any
 import pytest
 
 from md_analysis.cli import (
+    _calibration,
     _charge,
     _enhanced_sampling,
     _potential,
@@ -1174,3 +1175,356 @@ class TestSingleSideChargeCmd:
         # phi branch
         assert "phi:" in out
         assert "V vs SHE (cum. avg)" in out
+
+
+# ---------------------------------------------------------------------------
+# _calibration.py: CLI 231/232/233 wiring + DEFAULT_CALIBRATION_FILE fallback
+# ---------------------------------------------------------------------------
+#
+# These tests follow the same monkeypatched-lazy_import pattern as the
+# other CLI wiring tests, but the calibration CLI also looks up a
+# *value* (the DEFAULT_CALIBRATION_FILE Path constant) via lazy_import.
+# A dedicated stub routes by (module, name): workflow targets return
+# a kwargs-capturing wrapper, the constant target returns a plain Path,
+# and any legacy electrochemical.calibration target raises so a missed
+# migration would be caught here, not in production.
+
+
+class _CalibrationLazyImportStub:
+    """Replaces ``lazy_import`` inside ``_calibration.py``.
+
+    Routes by ``(module, name)``:
+      - the workflow facade target returns a kwargs-capturing wrapper
+        whose body calls the supplied stub callable;
+      - the ``DEFAULT_CALIBRATION_FILE`` constant target returns the
+        injected Path verbatim;
+      - any ``md_analysis.electrochemical.calibration`` lookup raises
+        ``AssertionError`` so a regressed migration cannot silently
+        fall back to the legacy business entry point.
+    """
+
+    _WORKFLOW_MODULE = "md_analysis.workflows.calibration"
+    _CONFIG_MODULE = "md_analysis.electrochemical.calibration.config"
+    _CONFIG_ATTR = "DEFAULT_CALIBRATION_FILE"
+    _LEGACY_PREFIX = "md_analysis.electrochemical.calibration"
+
+    def __init__(
+        self,
+        workflow_stub: Any,
+        default_json: Path,
+    ) -> None:
+        self.lookups: list[tuple[str, str]] = []
+        self.calls: list[dict[str, Any]] = []
+        self._workflow_stub = workflow_stub
+        self._default_json = default_json
+
+    def __call__(self, module_path: str, name: str) -> Any:
+        self.lookups.append((module_path, name))
+
+        if module_path == self._WORKFLOW_MODULE:
+            # ``run_calibration_predict`` is invoked with ``sigma`` as a
+            # positional argument by the CLI, so accept *args too and
+            # surface them by name in the captured call dict.
+            workflow_name = name
+
+            def _wrapped(*args: Any, **kwargs: Any) -> Any:
+                merged = dict(kwargs)
+                if workflow_name == "run_calibration_predict" and args:
+                    merged.setdefault("sigma", args[0])
+                self.calls.append(merged)
+                return self._workflow_stub(*args, **kwargs)
+            return _wrapped
+
+        if (module_path, name) == (self._CONFIG_MODULE, self._CONFIG_ATTR):
+            return self._default_json
+
+        if module_path.startswith(self._LEGACY_PREFIX):
+            raise AssertionError(
+                "Legacy calibration target should not be looked up by "
+                f"_calibration.py after the workflows migration: "
+                f"({module_path!r}, {name!r})"
+            )
+        raise AssertionError(
+            f"Unexpected lazy_import target in calibration CLI: "
+            f"({module_path!r}, {name!r})"
+        )
+
+
+def _make_calibration_fit_result(
+    *,
+    json_path: Path,
+    csv_path: Path | None = None,
+    png_path: Path | None = None,
+) -> WorkflowResult:
+    """Hand-crafted WorkflowResult matching run_calibration_fit's contract.
+
+    ``extra`` carries a minimal stand-in for ``CalibrationFitReport`` so
+    handler / CLI code that reads ``result.extra.*`` works without
+    instantiating the real frozen dataclass.
+    """
+
+    class _FakeFitReport:
+        n_points = 4
+        reference = "SHE"
+        method = "linear"
+        r_squared = 0.999
+        rmse = 0.01
+        equation = "phi = a*sigma + b"
+        fit_params = {"slope": 1.0, "intercept": 0.0}
+
+    artifacts: dict[str, Path] = {"calibration_json": json_path}
+    if csv_path is not None:
+        artifacts["calibration_csv"] = csv_path
+    if png_path is not None:
+        artifacts["calibration_png"] = png_path
+    return WorkflowResult(
+        name="calibration_fit",
+        output_dir=json_path.parent,
+        artifacts=artifacts,
+        metadata={"reference": "SHE", "method": "linear"},
+        extra=_FakeFitReport(),
+    )
+
+
+def _make_calibration_predict_result(
+    *,
+    json_path: Path,
+    sigma_input: float,
+    target_reference: str = "SHE",
+) -> WorkflowResult:
+    """Hand-crafted WorkflowResult matching run_calibration_predict's
+    contract.
+
+    The CLI reads ``result.extra.potential_V[0]`` for the scalar print
+    line and ``result.metadata["target_reference"]`` for the label.
+    """
+
+    class _FakePredictReport:
+        sigma_uC_cm2 = (sigma_input,)
+        potential_V = (-0.4321,)
+        n_values = 1
+        is_scalar_input = True
+        stored_reference = "SHE"
+
+    report = _FakePredictReport()
+    report.target_reference = target_reference  # type: ignore[attr-defined]
+    report.temperature_K = 298.15  # type: ignore[attr-defined]
+    report.pH = 0.0  # type: ignore[attr-defined]
+    report.phi_pzc = None  # type: ignore[attr-defined]
+
+    return WorkflowResult(
+        name="calibration_predict",
+        output_dir=json_path.parent,
+        artifacts={},
+        metadata={"target_reference": target_reference},
+        extra=report,
+    )
+
+
+class TestCalibrateFromCSVCmd:
+    """CLI 231: routes through run_calibration_fit and the CLI resolves
+    DEFAULT_CALIBRATION_FILE before dispatch so the workflow's required
+    calibration_json_path is always populated."""
+
+    def test_dispatches_to_run_calibration_fit_with_default_json(
+        self, monkeypatch, tmp_path: Path, capsys,
+    ) -> None:
+        json_default = tmp_path / "config" / "calibration.json"
+        csv_input = tmp_path / "input.csv"
+        outdir = tmp_path / "out"
+        outdir.mkdir(parents=True)
+
+        def fake_workflow(**kwargs: Any) -> WorkflowResult:
+            return _make_calibration_fit_result(
+                json_path=kwargs["calibration_json_path"],
+            )
+
+        stub = _CalibrationLazyImportStub(fake_workflow, json_default)
+        monkeypatch.setattr(_calibration, "lazy_import", stub)
+
+        ctx = {
+            K.CALIBRATION_CSV: csv_input,
+            K.FITTING_METHOD: "linear",
+            K.POLY_DEGREE: 2,
+            K.OUTDIR_RESOLVED: outdir,
+        }
+        cmd = _calibration.CalibrateFromCSVCmd(
+            "231", "Calibrate from CSV File",
+        )
+        cmd.execute(ctx)
+
+        assert (
+            "md_analysis.workflows.calibration",
+            "run_calibration_fit",
+        ) in stub.lookups
+        assert (
+            "md_analysis.electrochemical.calibration.config",
+            "DEFAULT_CALIBRATION_FILE",
+        ) in stub.lookups
+        assert len(stub.calls) == 1
+        call = stub.calls[0]
+        assert call["csv_path"] == csv_input
+        assert call["method"] == "linear"
+        assert call["poly_degree"] == 2
+        assert call["output_dir"] == outdir
+        assert call["calibration_json_path"] == json_default
+        assert "data_points" not in call
+
+        out = capsys.readouterr().out
+        assert "\n Calibration complete.\n" in out
+        assert f"   JSON saved: {json_default}\n" in out
+
+
+class TestCalibrateManualCmd:
+    """CLI 232: data_points branch.  Uses the prompt module's
+    ``set_input_source`` hook to script the manual-entry loop instead of
+    relying on real stdin."""
+
+    def test_dispatches_to_run_calibration_fit_with_data_points(
+        self, monkeypatch, tmp_path: Path, capsys,
+    ) -> None:
+        from md_analysis.cli import _prompt
+
+        json_default = tmp_path / "config" / "calibration.json"
+        outdir = tmp_path / "out"
+        outdir.mkdir(parents=True)
+
+        def fake_workflow(**kwargs: Any) -> WorkflowResult:
+            return _make_calibration_fit_result(
+                json_path=kwargs["calibration_json_path"],
+            )
+
+        stub = _CalibrationLazyImportStub(fake_workflow, json_default)
+        monkeypatch.setattr(_calibration, "lazy_import", stub)
+
+        # Scripted manual entry: (phi=-0.5, sigma=-3.0) (phi=0.3, sigma=2.0) done.
+        # Use monkeypatch.setattr on the module-level _input_fn so pytest
+        # auto-restores it after the test — set_input_source would leak
+        # across tests if a future case used real prompts.
+        scripted = iter(["-0.5", "-3.0", "0.3", "2.0", "done"])
+        monkeypatch.setattr(
+            _prompt, "_input_fn", lambda _prompt_text: next(scripted),
+        )
+
+        ctx = {
+            K.FITTING_METHOD: "linear",
+            K.POLY_DEGREE: 2,
+            K.OUTDIR_RESOLVED: outdir,
+        }
+        cmd = _calibration.CalibrateManualCmd(
+            "232", "Calibrate from Manual Input",
+        )
+        cmd.execute(ctx)
+
+        assert len(stub.calls) == 1
+        call = stub.calls[0]
+        assert call["data_points"] == [(-0.5, -3.0), (0.3, 2.0)]
+        assert call["method"] == "linear"
+        assert call["output_dir"] == outdir
+        assert call["calibration_json_path"] == json_default
+        assert "csv_path" not in call
+
+        out = capsys.readouterr().out
+        assert "\n Calibration complete (2 points).\n" in out
+        assert f"   JSON saved: {json_default}\n" in out
+
+
+class TestPredictPotentialCmdDefaultJson:
+    """CLI 233: when the user does not provide a calibration_json
+    advanced override, the CLI resolves DEFAULT_CALIBRATION_FILE."""
+
+    def test_default_json_fallback_and_summary(
+        self, monkeypatch, tmp_path: Path, capsys,
+    ) -> None:
+        json_default = tmp_path / "config" / "calibration.json"
+        outdir = tmp_path / "out" / "predict"
+        outdir.mkdir(parents=True)
+
+        def fake_workflow(*args: Any, **kwargs: Any) -> WorkflowResult:
+            sigma = args[0] if args else kwargs["sigma"]
+            return _make_calibration_predict_result(
+                json_path=kwargs["calibration_json_path"],
+                sigma_input=float(sigma),
+                target_reference=kwargs["target_reference"],
+            )
+
+        stub = _CalibrationLazyImportStub(fake_workflow, json_default)
+        monkeypatch.setattr(_calibration, "lazy_import", stub)
+
+        ctx = {
+            K.SIGMA_VALUE: 1.25,
+            K.OUTDIR_RESOLVED: outdir,
+            # advanced left unset — falls through ctx.get() defaults
+        }
+        cmd = _calibration.PredictPotentialCmd(
+            "233", "Predict Potential from Charge",
+        )
+        cmd.execute(ctx)
+
+        assert len(stub.calls) == 1
+        call = stub.calls[0]
+        assert call["sigma"] == 1.25
+        assert call["calibration_json_path"] == json_default
+        assert call["target_reference"] == "SHE"
+        assert call["temperature_K"] == 298.15
+        assert call["pH"] == 0.0
+        assert call["phi_pzc"] is None
+
+        out = capsys.readouterr().out
+        assert "σ = 1.2500 μC/cm²" in out
+        assert "φ = -0.432100 V vs SHE" in out
+
+
+class TestPredictPotentialCmdExplicitJson:
+    """CLI 233: when the user supplies the calibration_json advanced
+    override, the CLI forwards that path verbatim — DEFAULT_CALIBRATION_FILE
+    must NOT win."""
+
+    def test_explicit_json_override_takes_precedence(
+        self, monkeypatch, tmp_path: Path, capsys,
+    ) -> None:
+        json_default = tmp_path / "config" / "calibration.json"
+        json_explicit = tmp_path / "custom" / "my_cal.json"
+        json_explicit.parent.mkdir(parents=True)
+        outdir = tmp_path / "out" / "predict"
+        outdir.mkdir(parents=True)
+
+        def fake_workflow(*args: Any, **kwargs: Any) -> WorkflowResult:
+            sigma = args[0] if args else kwargs["sigma"]
+            return _make_calibration_predict_result(
+                json_path=kwargs["calibration_json_path"],
+                sigma_input=float(sigma),
+                target_reference=kwargs["target_reference"],
+            )
+
+        stub = _CalibrationLazyImportStub(fake_workflow, json_default)
+        monkeypatch.setattr(_calibration, "lazy_import", stub)
+
+        ctx = {
+            K.SIGMA_VALUE: -2.0,
+            K.OUTDIR_RESOLVED: outdir,
+            K.CALIBRATION_JSON: str(json_explicit),
+            K.POTENTIAL_REFERENCE: "RHE",
+            K.TEMPERATURE_K: 310.15,
+            K.PH: 2.5,
+            K.PHI_PZC: -0.4,
+        }
+        cmd = _calibration.PredictPotentialCmd(
+            "233", "Predict Potential from Charge",
+        )
+        cmd.execute(ctx)
+
+        assert len(stub.calls) == 1
+        call = stub.calls[0]
+        # explicit JSON path wins; verify by content rather than identity
+        # because the CLI calls Path(json_path) — round-trip is safe.
+        assert call["calibration_json_path"] == Path(str(json_explicit))
+        assert call["sigma"] == -2.0
+        assert call["target_reference"] == "RHE"
+        assert call["temperature_K"] == 310.15
+        assert call["pH"] == 2.5
+        assert call["phi_pzc"] == -0.4
+
+        out = capsys.readouterr().out
+        assert "σ = -2.0000 μC/cm²" in out
+        assert "φ = -0.432100 V vs RHE" in out
