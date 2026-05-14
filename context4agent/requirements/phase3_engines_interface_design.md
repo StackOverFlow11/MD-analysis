@@ -1078,8 +1078,8 @@ Phase 6 统一处理。
 
 ## 设计文档完结
 
-已落地状态见**文件顶部 status banner**;后续 Phase 5 Commit 3 起步时,以
+已落地状态见**文件顶部 status banner**;后续 Phase 6 入口层迁移起步时,以
 status banner + 代码现状为准。
 
 注:本节末尾原"待办"流程已完成(本文件经过 codex Round 4-11 全部审阅 +
-Phase 4 全 commit 实施 + Phase 5 Commit 1+2 实施)。
+Phase 4 全 commit 实施 + Phase 5 Commit 1/2/3 实施)。
