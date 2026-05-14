@@ -15,12 +15,11 @@
 > | Phase 5 Commit 3(potential Fermi / dict 接口迁移) | ⬜ 未开 | — |
 >
 > **过渡态描述(已不再现存)**,继续读时请注意这些不是当前代码:
-> - §3.3 ConstraintRun 的 `.restart` / `.lagrange` legacy alias property
->   段(L229-243):Phase 5 Commit 2 移除
+> - §3.3 ConstraintRun 中 `.restart` / `.lagrange` legacy alias property 段:
+>   Phase 5 Commit 2 移除
 > - §6.1 / §6.3 / §6.4 / §7 / §9 commit-1 步骤里提及的 `ColvarRestart` /
->   `LagrangeMultLog` / `ColvarMDInfo` 兼容 alias(L341 / L748-787 / L809-823 /
->   L954-958 / L970-971):Phase 5 Commit 2 移除
-> - §11 Phase 5 表 + commit 边界设想已落地到上表
+>   `LagrangeMultLog` / `ColvarMDInfo` 兼容 alias:Phase 5 Commit 2 移除
+> - §11 Phase 5 表 + commit 边界设想已落地到下表
 >
 > 之后做 Phase 5 Commit 3 计划时,以**代码现状 + 本 status banner** 为准,
 > §3-§9 的设计契约文字保留为历史快照。
