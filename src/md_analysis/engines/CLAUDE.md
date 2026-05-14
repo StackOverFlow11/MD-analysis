@@ -24,8 +24,8 @@ rg "from\s+\.\.+\.?(electrochemical|water|enhanced_sampling|cli|scripts|agent)" 
 |---|---|
 | `__init__.py` | 包级 facade：re-export Protocol + registry + 公共 dataclass + CP2K 门面函数；触发默认 CP2K parser 注册 |
 | `protocols.py` | `ConstraintMDParser` Protocol、`ParserInferenceError`、registry（`register_parser` / `get_parser` / `infer_parser` / `resolve_parser` / 私有 `_REGISTRY`） |
-| `models.py` | engine-neutral frozen dataclass：`ConstraintMetadata`、`LambdaSeries`、`PotentialFrame`、`FermiRecord` |
-| `cp2k.py` | `CP2KParser`（Protocol 实现）+ 5 个模块级 facade：`read_constraint_metadata` / `read_lambda_series` / `read_fermi_series` / `read_continuous_potential_frames` / `read_distributed_potential_frames` |
+| `models.py` | engine-neutral frozen dataclass：`ConstraintInfo` / `ColvarInfo` / `ConstraintMetadata` / `LambdaSeries` / `ConstraintRun`（约束 MD 族）；`PotentialFrame` / `CenterPotentialScalarFrame` / `FermiRecord`（potential 族）；`CellSpec`（cell 族） |
+| `cp2k.py` | `CP2KParser`（Protocol 实现）+ 12 个模块级 facade：约束 MD 目录级 (`read_constraint_metadata` / `read_lambda_series` / `read_constraint_run`) + 约束 MD 文件级 (`read_constraint_metadata_from_restart` / `read_lambda_series_from_log` / `read_constraint_run_from_files`) + 约束 MD 派生 (`compute_target_series`) + Fermi 文件 (`read_fermi_series`) + Cell 文件 (`read_cell`) + Potential 帧 (`read_continuous_potential_frames` / `read_distributed_potential_frames`) + Potential 标量 (`read_center_potential_scalar_frame`) |
 | `vasp.py` | `VASPParser` 占位类，三个 Protocol 方法都 raise NotImplementedError。**不自动注册**到 `_REGISTRY`，避免 `infer_parser` 误派发到 stub |
 
 ## 公共 API（`from md_analysis.engines import …`）
@@ -35,9 +35,14 @@ rg "from\s+\.\.+\.?(electrochemical|water|enhanced_sampling|cli|scripts|agent)" 
 | `ConstraintMDParser` | Protocol | 约束 MD parser 协议（三方法：`is_constraint_directory` / `parse_metadata` / `parse_lambda_series`）|
 | `ParserInferenceError` | Exception | `infer_parser` 找不到匹配 parser 时抛出 |
 | `CP2KParser` | class | CP2K 实现；可直接构造也可走 registry |
-| `ConstraintMetadata` | dataclass | 约束 MD 元数据（target / growth / timestep / fixed atoms / cell）|
-| `LambdaSeries` | dataclass | λ(t) 时间序列（shake / rattle / n_steps / n_constraints） |
+| `ConstraintInfo` | dataclass | 单个 CV constraint 参数（colvar_id / target_au / target_growth_au / intermolecular）|
+| `ColvarInfo` | dataclass | CV constraints 集合（`primary` / `__len__` / `__getitem__`）|
+| `ConstraintMetadata` | dataclass | 约束 MD 元数据（project_name / step_start / time_start_fs / timestep_fs / total_steps / colvars / lagrange_filename / cell_abc_ang / fixed_atom_indices）|
+| `LambdaSeries` | dataclass | λ(t) 时间序列（shake / rattle / n_steps / n_constraints；`collective_shake` / `collective_rattle` 派生）|
+| `ConstraintRun` | dataclass | 约束 MD 单点 composite（`metadata` + `lambda_series` + 派生 `n_steps` / `steps` / `times_fs` / `target_series_au()`）|
+| `CellSpec` | dataclass | 引擎中立 cell 描述（`cell_matrix_ang` (3,3) 行向量 + `pbc`；`abc_ang` / `is_orthorhombic` 派生）|
 | `PotentialFrame` | dataclass | 单帧势数据（step / time_fs / cube_path / header / values / fermi_raw / atoms） |
+| `CenterPotentialScalarFrame` | dataclass | 标量级 slab-averaged potential（step / time_fs / center_source / center_z_ang / slab_thickness_ang / phi_center_ev / fermi_level_ev / phi_z_std_ev / n_slices） |
 | `FermiRecord` | dataclass | 单条 Fermi 记录（step / time_fs / fermi_raw），含 `from_legacy_dict` 桥接 |
 | `register_parser(name, factory)` | fn | 注册新引擎适配器 |
 | `get_parser(name)` | fn | 按名查 parser（case-insensitive）|
@@ -45,9 +50,16 @@ rg "from\s+\.\.+\.?(electrochemical|water|enhanced_sampling|cli|scripts|agent)" 
 | `resolve_parser(parser \| str)` | fn | 把字符串名或实例都规范化成 parser 实例（`"auto"` 是 caller 责任，本函数会拒绝）|
 | `read_constraint_metadata(directory)` | fn | CP2K 约束 MD 目录 → `ConstraintMetadata` |
 | `read_lambda_series(directory)` | fn | CP2K 约束 MD 目录 → `LambdaSeries` |
+| `read_constraint_run(directory)` | fn | CP2K 约束 MD 目录 → `ConstraintRun` |
+| `read_constraint_metadata_from_restart(path)` | fn | CP2K `*.restart` 文件 → `ConstraintMetadata` |
+| `read_lambda_series_from_log(path)` | fn | CP2K `*.LagrangeMultLog` 文件 → `LambdaSeries` |
+| `read_constraint_run_from_files(restart, log)` | fn | `(restart, log)` 文件对 → `ConstraintRun` |
+| `compute_target_series(metadata, n_steps, *, colvar_id=None)` | fn | 重建 ξ(t) 目标序列（CP2K SHAKE/RATTLE 公式）|
 | `read_fermi_series(md_out_path)` | fn | CP2K `md.out` → `list[FermiRecord]` |
+| `read_cell(path)` | fn | CP2K `*.restart` 或 `md.inp` → `CellSpec`（suffix 嗅探）|
 | `read_continuous_potential_frames(...)` | fn | 连续 MD cube 序列 → `list[PotentialFrame]`（mode A）|
 | `read_distributed_potential_frames(...)` | fn | 分布式 SP 子目录 → `list[PotentialFrame]`（mode B）|
+| `read_center_potential_scalar_frame(frame, *, center_z_ang, slab_thickness_ang, ...)` | fn | `PotentialFrame` + slab geometry → `CenterPotentialScalarFrame`（标量级 reduce；显式拒绝 `center_z_ang=None`）|
 
 ## 关键设计决策
 
@@ -63,9 +75,11 @@ rg "from\s+\.\.+\.?(electrochemical|water|enhanced_sampling|cli|scripts|agent)" 
 
 `engines/__init__.py` 在包级 import 时调用 `register_parser("cp2k", CP2KParser)`。**VASP 不在这里注册**——VASP placeholder 还没有实现，`infer_parser` 在 VASP 标记目录上必须抛 `ParserInferenceError`，而不是返回 stub。
 
-### `parse_md_out_fermi` 返回 dict 不动
+### `parse_md_out_fermi` 是 utils 解析器输出形态(dict)
 
-`engines.cp2k.read_fermi_series` 通过 `FermiRecord.from_legacy_dict` 把 `parse_md_out_fermi` 的 `list[dict]` 转 typed model；但 `parse_md_out_fermi` 本身仍返回 `list[dict]`。理由：`electrochemical.potential.CenterPotential.py` 还用 dict-style 访问（`r["step"]` 等），强迫迁移会牵涉 caller，Phase 9 范围只到 engines 接口，CenterPotential 迁移留给后续 entrance refactor。
+`utils.formats.cp2k.stdout.parse_md_out_fermi` 仍返回 `list[dict]` —— 它是底层 parser，dict 是 parser contract 输出形态（仅供 engines facade 内部使用 + 测试 pin parser 形态）。`engines.cp2k.read_fermi_series` 是 typed facade：内部调 parser → `FermiRecord.from_legacy_dict` 把每行转 `list[FermiRecord]`。
+
+业务层（`electrochemical.potential.CenterPotential.fermi_energy_analysis`）已直接消费 `read_fermi_series` 的 typed 输出（业务首次连业务消费完成）。
 
 ### 与 utils/formats 的方向
 

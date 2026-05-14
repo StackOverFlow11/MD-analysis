@@ -444,17 +444,17 @@ def fermi_energy_analysis(
     if not md_out_path.exists():
         raise FileNotFoundError(f"md.out not found: {md_out_path}")
 
-    from ...utils.formats.cp2k.stdout import parse_md_out_fermi
+    from ...engines.cp2k import read_fermi_series
 
-    fermi_records = parse_md_out_fermi(md_out_path)
+    fermi_records = read_fermi_series(md_out_path)
     if not fermi_records:
         raise RuntimeError(f"No (step, Fermi energy) records parsed from: {md_out_path}")
     fermi_records = fermi_records[frame_start:frame_end:frame_step]
     logger.info("Fermi energy: %d records from %s", len(fermi_records), md_out_path)
 
-    f_steps = np.array([r["step"] for r in fermi_records], dtype=int)
-    f_time = np.array([r["time_fs"] if r["time_fs"] is not None else math.nan for r in fermi_records], dtype=float)
-    f_raw = np.array([r["fermi_raw"] for r in fermi_records], dtype=float)
+    f_steps = np.array([r.step for r in fermi_records], dtype=int)
+    f_time = np.array([r.time_fs if r.time_fs is not None else math.nan for r in fermi_records], dtype=float)
+    f_raw = np.array([r.fermi_raw for r in fermi_records], dtype=float)
     f_vals = f_raw * HA_TO_EV if fermi_unit == "au" else f_raw
     f_cum = _cumulative_average(f_vals)
 

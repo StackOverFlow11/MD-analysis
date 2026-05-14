@@ -80,15 +80,58 @@ class TestCenterSlabPotentialAnalysis:
 class TestFermiEnergyAnalysis:
 
     def test_basic(self, tmp_path: Path) -> None:
+        """End-to-end Fermi-energy analysis.
+
+        Phase 5 Commit 3 pins CSV numeric equivalence with the typed
+        ``engines.cp2k.read_fermi_series`` facade output (+ ``HA_TO_EV``):
+        ``step`` / ``time_fs`` / ``fermi_raw`` / ``fermi_ev`` must agree
+        byte-for-byte with the in-memory ``FermiRecord`` stream that
+        ``read_fermi_series`` produces from the same ``md.out``.
+
+        PNG output is checked for existence only (byte-equality is too
+        brittle to enforce).
+        """
+        from md_analysis.engines.cp2k import read_fermi_series
+        from md_analysis.utils.constants import HA_TO_EV
+
         csv_path = fermi_energy_analysis(
             _DATA_DIR / "md.out",
             output_dir=tmp_path,
             fermi_unit="au",
         )
         assert csv_path.exists()
-        data = np.genfromtxt(csv_path, delimiter=",", names=True, dtype=None, encoding="utf-8")
+        png_path = csv_path.with_suffix(".png")
+        assert png_path.exists(), f"expected PNG at {png_path}"
+
+        data = np.genfromtxt(
+            csv_path, delimiter=",", names=True,
+            dtype=None, encoding="utf-8",
+        )
         assert data.size > 0
-        assert "fermi_ev" in data.dtype.names
+        for col in ("step", "time_fs", "fermi_raw", "fermi_ev"):
+            assert col in data.dtype.names, f"missing column {col}"
+
+        expected = read_fermi_series(_DATA_DIR / "md.out")
+        assert len(expected) == data.size, (
+            f"row count mismatch: CSV={data.size} vs facade={len(expected)}"
+        )
+
+        for i, rec in enumerate(expected):
+            assert int(data["step"][i]) == rec.step
+            # CP2K md.out fixture provides time_fs for every row; the
+            # ``time_fs is None`` branch is exercised by unit tests
+            # (FermiRecord.from_legacy_dict).
+            csv_time = float(data["time_fs"][i])
+            if rec.time_fs is None:
+                assert np.isnan(csv_time)
+            else:
+                assert csv_time == pytest.approx(rec.time_fs, abs=1e-12)
+            assert float(data["fermi_raw"][i]) == pytest.approx(
+                rec.fermi_raw, abs=1e-12,
+            )
+            assert float(data["fermi_ev"][i]) == pytest.approx(
+                rec.fermi_raw * HA_TO_EV, abs=1e-12,
+            )
 
 
 class TestElectrodePotentialAnalysis:

@@ -220,9 +220,11 @@ def test_read_fermi_series_returns_typed_records() -> None:
 
 
 def test_parse_md_out_fermi_still_returns_dict() -> None:
-    """The underlying legacy parser MUST keep returning ``list[dict]``;
-    Phase 7b1 intentionally does not migrate ``CenterPotential`` away
-    from dict-style access, so the dict shape must be preserved."""
+    """The parser contract remains dict-shaped: ``parse_md_out_fermi``
+    is the utils-layer output format that the ``engines.cp2k`` facades
+    convert to typed records.  Business now consumes the typed facade
+    (``read_fermi_series``); this test pins the parser contract so a
+    future utils-layer refactor cannot silently change the shape."""
     from md_analysis.utils.formats.cp2k.stdout import parse_md_out_fermi
 
     if not MD_OUT.exists():
