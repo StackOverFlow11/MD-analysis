@@ -37,8 +37,7 @@ class SurfaceChargeCmd(MenuCommand):
 
     def execute(self, ctx: dict) -> None:
         analyze = lazy_import(
-            "md_analysis.electrochemical.charge",
-            "surface_charge_analysis",
+            "md_analysis.workflows.charge", "run_surface_charge",
         )
         from ..config import (
             KEY_POTENTIAL_PH,
@@ -48,28 +47,26 @@ class SurfaceChargeCmd(MenuCommand):
             get_config,
         )
 
-        # Static method (221/222): framework resolved via output_name
-        # Dynamic method (223): append method to avoid overwriting
-        if K.OUTDIR_RESOLVED in ctx:
-            out = Path(ctx[K.OUTDIR_RESOLVED])
+        method = ctx[K.METHOD]
+        # OUTDIR_RESOLVED layout depends on whether self.output_name was set:
+        #   static (221/222): OUTDIR_RESOLVED ends in /<method>,
+        #                      so .parent rewinds for the workflow's append.
+        #   dynamic (223):   OUTDIR_RESOLVED ends in /charge/, no rewind.
+        resolved = Path(ctx[K.OUTDIR_RESOLVED])
+        if self.output_name:
+            out = resolved.parent
         else:
-            out = (Path(ctx.get(K.OUTDIR, "analysis"))
-                   / self.output_subdir)
-
-        if not self.output_name:
-            out = out / ctx[K.METHOD]
-
-        out.mkdir(parents=True, exist_ok=True)
+            out = resolved
 
         result = analyze(
-            ctx[K.ROOT_DIR],
+            output_dir=out,
+            root_dir=ctx[K.ROOT_DIR],
             metal_symbols=ctx[K.METAL_ELEMENTS],
             normal=ctx[K.NORMAL],
-            method=ctx[K.METHOD],
+            method=method,
             layer_tol_A=ctx[K.LAYER_TOL],
             n_surface_layers=ctx[K.N_SURFACE_LAYERS],
             dir_pattern=ctx[K.DIR_PATTERN],
-            output_dir=out,
             frame_start=ctx[K.FRAME_START],
             frame_end=ctx[K.FRAME_END],
             frame_step=ctx[K.FRAME_STEP],
@@ -79,12 +76,14 @@ class SurfaceChargeCmd(MenuCommand):
             potential_temperature_K=get_config(KEY_POTENTIAL_TEMPERATURE_K, 298.15),
             potential_phi_pzc=get_config(KEY_POTENTIAL_PHI_PZC),
         )
-        print(f"\n Analysis complete. Output:\n   charge_csv: {result.csv_path}")
-        print(f"\n Ensemble average ({result.n_frames} frames):")
-        print(f"   sigma_aligned: {result.sigma_aligned_mean:8.4f} "
-              f"+/- {result.sigma_aligned_std:.4f} uC/cm^2")
-        print(f"   sigma_opposed: {result.sigma_opposed_mean:8.4f} "
-              f"+/- {result.sigma_opposed_std:.4f} uC/cm^2")
+        md = result.metadata
+        csv_path = result.artifacts["charge_csv"]
+        print(f"\n Analysis complete. Output:\n   charge_csv: {csv_path}")
+        print(f"\n Ensemble average ({md['n_frames']} frames):")
+        print(f"   sigma_aligned: {md['sigma_aligned_mean']:8.4f} "
+              f"+/- {md['sigma_aligned_std']:.4f} uC/cm^2")
+        print(f"   sigma_opposed: {md['sigma_opposed_mean']:8.4f} "
+              f"+/- {md['sigma_opposed_std']:.4f} uC/cm^2")
 
 
 class SingleSideChargeCmd(MenuCommand):
@@ -96,8 +95,7 @@ class SingleSideChargeCmd(MenuCommand):
 
     def execute(self, ctx: dict) -> None:
         analyze = lazy_import(
-            "md_analysis.electrochemical.charge",
-            "surface_charge_analysis",
+            "md_analysis.workflows.charge", "run_surface_charge",
         )
         from ..config import (
             KEY_POTENTIAL_PH,
@@ -109,20 +107,18 @@ class SingleSideChargeCmd(MenuCommand):
 
         method = ctx[K.METHOD]
         side = ctx[K.TARGET_SIDE]
-        out = Path(ctx.get(K.OUTDIR, "analysis")) / self.output_subdir / f"{method}_{side}"
-        if K.OUTDIR_RESOLVED in ctx:
-            out = Path(ctx[K.OUTDIR_RESOLVED]) / f"{method}_{side}"
-        out.mkdir(parents=True, exist_ok=True)
+        # output_name="" so OUTDIR_RESOLVED already ends in /charge/.
+        out = Path(ctx[K.OUTDIR_RESOLVED])
 
         result = analyze(
-            ctx[K.ROOT_DIR],
+            output_dir=out,
+            root_dir=ctx[K.ROOT_DIR],
             metal_symbols=ctx[K.METAL_ELEMENTS],
             normal=ctx[K.NORMAL],
             method=method,
             layer_tol_A=ctx[K.LAYER_TOL],
             n_surface_layers=ctx[K.N_SURFACE_LAYERS],
             dir_pattern=ctx[K.DIR_PATTERN],
-            output_dir=out,
             frame_start=ctx[K.FRAME_START],
             frame_end=ctx[K.FRAME_END],
             frame_step=ctx[K.FRAME_STEP],
@@ -133,17 +129,19 @@ class SingleSideChargeCmd(MenuCommand):
             potential_phi_pzc=get_config(KEY_POTENTIAL_PHI_PZC),
             target_side=side,
         )
-        print(f"\n Analysis complete ({side} side). Output:\n   charge_csv: {result.csv_path}")
+        md = result.metadata
+        csv_path = result.artifacts["charge_csv"]
+        print(f"\n Analysis complete ({side} side). Output:\n   charge_csv: {csv_path}")
 
         if side == "aligned":
-            s_mean, s_std = result.sigma_aligned_mean, result.sigma_aligned_std
+            s_mean, s_std = md["sigma_aligned_mean"], md["sigma_aligned_std"]
         else:
-            s_mean, s_std = result.sigma_opposed_mean, result.sigma_opposed_std
-        print(f"\n Ensemble average ({result.n_frames} frames, {side} side):")
+            s_mean, s_std = md["sigma_opposed_mean"], md["sigma_opposed_std"]
+        print(f"\n Ensemble average ({md['n_frames']} frames, {side} side):")
         print(f"   sigma: {s_mean:8.4f} +/- {s_std:.4f} uC/cm^2")
-        if result.phi_cumavg_last is not None:
-            print(f"   phi:   {result.phi_cumavg_last:8.4f} V vs "
-                  f"{result.phi_reference} (cum. avg)")
+        if md["phi_cumavg_last"] is not None:
+            print(f"   phi:   {md['phi_cumavg_last']:8.4f} V vs "
+                  f"{md['phi_reference']} (cum. avg)")
 
 
 class TrackedChargeCmd(MenuCommand):

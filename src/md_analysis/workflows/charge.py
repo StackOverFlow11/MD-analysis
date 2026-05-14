@@ -37,25 +37,52 @@ def run_surface_charge(
     frame_end: int | None = None,
     frame_step: int | None = None,
     verbose: bool = False,
+    potential_reference: str = "SHE",
+    potential_pH: float = 0.0,
+    potential_temperature_K: float = 298.15,
+    potential_phi_pzc: float | None = None,
+    target_side: str | None = None,
 ) -> WorkflowResult:
     """Run surface charge density analysis (sigma vs t, CSV + PNG).
 
-    Outputs are written into ``output_dir/<method>/``. The method
-    sub-directory is mandatory so ``counterion`` and ``layer`` runs
-    do not collide. Sigma statistics and any phi-axis metadata are
-    surfaced through ``WorkflowResult.metadata``.
+    Output layout:
+      - ``target_side=None`` (default, two-sided)
+            ``output_dir/<method>/``
+      - ``target_side="aligned"`` or ``"opposed"`` (single side)
+            ``output_dir/<method>_<side>/``
+
+    The method (or method_side) sub-directory is appended by this
+    facade so the canonical layout is preserved when callers stop
+    one level above (e.g. ``<base>/electrochemical/charge``).
+
+    Phase 6.3 additions:
+
+    - ``potential_*`` 4-tuple is forwarded verbatim to the underlying
+      ``surface_charge_analysis``; when a calibration JSON sits
+      alongside ``root_dir`` it controls sigma -> phi(reference)
+      extrapolation. No-op without a calibration file.
+    - ``target_side`` toggles the single-side analysis path on the
+      business function and the corresponding ``<method>_<side>``
+      output sub-directory used here.
+
+    Sigma statistics and any phi-axis metadata are surfaced through
+    ``WorkflowResult.metadata``; the new ``target_side`` key reflects
+    whichever side was requested (or ``None`` for two-sided runs).
     """
     from ..electrochemical.charge import surface_charge_analysis
     from ..electrochemical.charge.config import DEFAULT_SURFACE_CHARGE_PNG_NAME
 
     root_p = Path(root_dir)
     base_dir = Path(output_dir)
-    charge_dir = base_dir / method
+    subdir_name = method if target_side is None else f"{method}_{target_side}"
+    charge_dir = base_dir / subdir_name
     charge_dir.mkdir(parents=True, exist_ok=True)
 
     logger.info(
-        "Starting surface charge analysis: method=%s, output_dir=%s",
+        "Starting surface charge analysis: method=%s, target_side=%s, "
+        "output_dir=%s",
         method,
+        target_side,
         charge_dir,
     )
 
@@ -72,6 +99,11 @@ def run_surface_charge(
         frame_end=frame_end,
         frame_step=frame_step,
         verbose=verbose,
+        potential_reference=potential_reference,
+        potential_pH=potential_pH,
+        potential_temperature_K=potential_temperature_K,
+        potential_phi_pzc=potential_phi_pzc,
+        target_side=target_side,
     )
 
     csv_path = Path(result.csv_path)
@@ -81,6 +113,7 @@ def run_surface_charge(
     }
     metadata: dict[str, Any] = {
         "method": method,
+        "target_side": target_side,
         "normal": normal,
         "n_frames": result.n_frames,
         "sigma_aligned_mean": result.sigma_aligned_mean,

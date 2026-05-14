@@ -41,7 +41,7 @@
 - **编程入口**（canonical 模块：`md_analysis.workflows`；同名 re-export 在 `md_analysis.main`；旧 `run_*_analysis` / `run_all` 已在入口重构 Phase 7a 移除）：
   - 水：`run_water_three_panel`（composite）+ `run_water_density` / `run_water_orientation` / `run_ad_water_orientation` / `run_ad_water_theta` 4 个单步入口
   - 电势：`run_potential_full`（composite）+ `run_center_potential` / `run_fermi_energy` / `run_electrode_potential` / `run_phi_z_profile` / `run_thickness_sensitivity` 5 个单步入口
-  - 表面电荷：`run_surface_charge(output_dir, root_dir, method=..., ...) -> WorkflowResult`
+  - 表面电荷：`run_surface_charge(output_dir, root_dir, method=..., potential_reference="SHE", potential_pH=0.0, potential_temperature_K=298.15, potential_phi_pzc=None, target_side=None, ...) -> WorkflowResult`（`target_side=None` 双侧 → `<method>/`；`target_side="aligned"`/`"opposed"` 单侧 → `<method>_<side>/`；`potential_*` 4 参数透传给底层做 σ→φ 外推）
   - 追踪原子电荷：`run_tracked_charge(output_dir, root_dir, atom_indices_xyz, ...) -> WorkflowResult`
   - 反离子电荷：`run_counterion_charge(output_dir, root_dir, ...) -> WorkflowResult`
   - composite 水+电势：`run_interface_analysis(xyz_path, md_inp_path, output_dir, ...) -> WorkflowResult`

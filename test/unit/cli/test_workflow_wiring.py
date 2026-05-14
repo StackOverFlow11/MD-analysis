@@ -936,3 +936,241 @@ class TestThicknessSensitivityCmd:
         cmd.execute(_potential_distributed_ctx(tmp_path))
 
         _assert_distributed_routing(stub.calls[0])
+
+
+# ---------------------------------------------------------------------------
+# _charge.py: SurfaceChargeCmd 221/222/223 + SingleSideChargeCmd 224
+# (Phase 6.3)
+# ---------------------------------------------------------------------------
+
+
+def _surface_charge_ctx(
+    tmp_path: Path,
+    *,
+    method: str,
+    output_dir: Path,
+) -> dict[str, Any]:
+    """Shared ctx for SurfaceChargeCmd (221/222/223)."""
+    return {
+        K.METHOD: method,
+        K.ROOT_DIR: str(tmp_path / "bader_root"),
+        K.METAL_ELEMENTS: None,
+        K.NORMAL: "c",
+        K.LAYER_TOL: 0.5,
+        K.N_SURFACE_LAYERS: 1,
+        K.DIR_PATTERN: "bader_t*_i*",
+        K.OUTDIR_RESOLVED: str(output_dir),
+        K.FRAME_START: None,
+        K.FRAME_END: None,
+        K.FRAME_STEP: None,
+    }
+
+
+def _surface_charge_metadata(
+    method: str, target_side: str | None = None
+) -> dict[str, Any]:
+    """Default metadata stub for surface-charge workflow results."""
+    return {
+        "method": method,
+        "target_side": target_side,
+        "normal": "c",
+        "n_frames": 12,
+        "sigma_aligned_mean": -1.25,
+        "sigma_aligned_std": 0.05,
+        "sigma_opposed_mean": 1.30,
+        "sigma_opposed_std": 0.06,
+        "phi_cumavg_last": None,
+        "phi_reference": None,
+    }
+
+
+def _make_charge_workflow_result(
+    *,
+    method: str,
+    output_dir: Path,
+    artifact: Path,
+    target_side: str | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> WorkflowResult:
+    return WorkflowResult(
+        name="surface_charge",
+        output_dir=output_dir,
+        artifacts={"charge_csv": artifact, "charge_png": output_dir / "p.png"},
+        metadata=metadata or _surface_charge_metadata(method, target_side),
+    )
+
+
+class TestSurfaceChargeStaticCmd:
+    """CLI 221/222: SurfaceChargeCmd(method=...) has output_name=method,
+    so OUTDIR_RESOLVED ends in /<method>/ and the CLI must pass
+    .parent (rewind one level) so the workflow's internal /<method>
+    append produces the original layout."""
+
+    @pytest.mark.parametrize(
+        "method, code",
+        [("counterion", "221"), ("layer", "222")],
+    )
+    def test_path_routing_and_summary(
+        self, monkeypatch, tmp_path: Path, capsys, method: str, code: str
+    ) -> None:
+        # Static method: OUTDIR_RESOLVED already ends with /<method>/
+        resolved = tmp_path / "out" / "electrochemical" / "charge" / method
+        resolved.mkdir(parents=True)
+        artifact = resolved / "surface_charge.csv"
+        artifact.write_text("")
+
+        def fake(**kwargs: Any) -> WorkflowResult:
+            return _make_charge_workflow_result(
+                method=method, output_dir=resolved, artifact=artifact,
+            )
+
+        stub = _LazyImportStub(fake)
+        monkeypatch.setattr(_charge, "lazy_import", stub)
+
+        cmd = _charge.SurfaceChargeCmd(code, f"Static {method}", method=method)
+        cmd.execute(_surface_charge_ctx(
+            tmp_path, method=method, output_dir=resolved,
+        ))
+
+        # workflow facade resolved
+        assert stub.lookups == [
+            ("md_analysis.workflows.charge", "run_surface_charge"),
+        ]
+
+        # Path routing: static path forwards .parent so workflow's
+        # internal /<method> append produces the original layout.
+        call = stub.calls[0]
+        assert call["output_dir"] == resolved.parent
+        assert call["method"] == method
+        assert "target_side" not in call  # two-sided path
+
+        # Final layout = (cli_output_dir / method) byte-equal pre-migration
+        composed = Path(call["output_dir"]) / call["method"]
+        assert composed == resolved
+
+        # capsys: CLI summary text must remain byte-equal
+        out = capsys.readouterr().out
+        assert "Analysis complete. Output:" in out
+        assert "charge_csv:" in out
+        assert "Ensemble average (12 frames):" in out
+        assert "sigma_aligned: " in out
+        assert "+/- 0.0500 uC/cm^2" in out
+        assert "sigma_opposed:" in out
+
+
+class TestSurfaceChargeDynamicCmd:
+    """CLI 223: SurfaceChargeCmd() (no method) has output_name="",
+    so OUTDIR_RESOLVED ends in /charge/ and the CLI passes it
+    directly; the workflow's /<method> append produces the layout."""
+
+    @pytest.mark.parametrize("method", ["counterion", "layer"])
+    def test_path_routing_and_summary(
+        self, monkeypatch, tmp_path: Path, capsys, method: str
+    ) -> None:
+        resolved = tmp_path / "out" / "electrochemical" / "charge"
+        resolved.mkdir(parents=True)
+        final_dir = resolved / method
+        final_dir.mkdir()
+        artifact = final_dir / "surface_charge.csv"
+        artifact.write_text("")
+
+        def fake(**kwargs: Any) -> WorkflowResult:
+            return _make_charge_workflow_result(
+                method=method, output_dir=final_dir, artifact=artifact,
+            )
+
+        stub = _LazyImportStub(fake)
+        monkeypatch.setattr(_charge, "lazy_import", stub)
+
+        cmd = _charge.SurfaceChargeCmd("223", "Dynamic")  # method=None
+        cmd.execute(_surface_charge_ctx(
+            tmp_path, method=method, output_dir=resolved,
+        ))
+
+        assert stub.lookups == [
+            ("md_analysis.workflows.charge", "run_surface_charge"),
+        ]
+        call = stub.calls[0]
+        assert call["output_dir"] == resolved
+        assert call["method"] == method
+        assert "target_side" not in call
+
+        # Final layout = (cli_output_dir / method)
+        composed = Path(call["output_dir"]) / call["method"]
+        assert composed == final_dir
+
+        out = capsys.readouterr().out
+        assert "Analysis complete. Output:" in out
+        assert "Ensemble average (12 frames):" in out
+        assert "sigma_aligned: " in out
+        assert "sigma_opposed:" in out
+
+
+class TestSingleSideChargeCmd:
+    """CLI 224: SingleSideChargeCmd has output_name="", so
+    OUTDIR_RESOLVED ends in /charge/.  The CLI passes it directly +
+    target_side; the workflow appends /<method>_<side>."""
+
+    @pytest.mark.parametrize("method", ["counterion", "layer"])
+    @pytest.mark.parametrize("side", ["aligned", "opposed"])
+    def test_path_routing_and_summary(
+        self,
+        monkeypatch,
+        tmp_path: Path,
+        capsys,
+        method: str,
+        side: str,
+    ) -> None:
+        resolved = tmp_path / "out" / "electrochemical" / "charge"
+        resolved.mkdir(parents=True)
+        final_dir = resolved / f"{method}_{side}"
+        final_dir.mkdir()
+        artifact = final_dir / "surface_charge.csv"
+        artifact.write_text("")
+
+        # phi populated to exercise the V-vs-reference print branch
+        metadata = _surface_charge_metadata(method, target_side=side)
+        metadata["phi_cumavg_last"] = -0.123
+        metadata["phi_reference"] = "SHE"
+
+        def fake(**kwargs: Any) -> WorkflowResult:
+            return _make_charge_workflow_result(
+                method=method, output_dir=final_dir, artifact=artifact,
+                target_side=side, metadata=metadata,
+            )
+
+        stub = _LazyImportStub(fake)
+        monkeypatch.setattr(_charge, "lazy_import", stub)
+
+        ctx = _surface_charge_ctx(
+            tmp_path, method=method, output_dir=resolved,
+        )
+        ctx[K.TARGET_SIDE] = side
+
+        cmd = _charge.SingleSideChargeCmd("224", "Single-side")
+        cmd.execute(ctx)
+
+        assert stub.lookups == [
+            ("md_analysis.workflows.charge", "run_surface_charge"),
+        ]
+        call = stub.calls[0]
+        # 224 passes OUTDIR_RESOLVED directly + target_side
+        assert call["output_dir"] == resolved
+        assert call["method"] == method
+        assert call["target_side"] == side
+
+        # Final layout = output_dir / f"{method}_{side}"
+        composed = Path(call["output_dir"]) / f"{call['method']}_{call['target_side']}"
+        assert composed == final_dir
+
+        # capsys: single-side summary + phi line
+        out = capsys.readouterr().out
+        assert f"Analysis complete ({side} side). Output:" in out
+        assert "charge_csv:" in out
+        assert f"Ensemble average (12 frames, {side} side):" in out
+        assert "sigma: " in out
+        assert "+/-" in out
+        assert "uC/cm^2" in out
+        # phi branch
+        assert "phi:" in out
+        assert "V vs SHE (cum. avg)" in out
