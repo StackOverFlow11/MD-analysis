@@ -111,7 +111,11 @@ vector 的范数**,不代表正交盒子长度;**只有 `is_orthorhombic=True` �
 def read_cell(path: Path | str) -> CellSpec: ...
     """Read cell from a CP2K *.restart or md.inp file.
 
-    Auto-detects file type by extension and content sniffing.
+    Suffix-based dispatch (no content sniffing): any path whose
+    ``Path.suffixes`` contains ``.restart`` (including bak variants
+    such as ``*.restart.bak-1``) is sent to ``parse_abc_from_restart``;
+    every other suffix (``md.inp`` / ``*.inp`` / etc.) is sent to
+    ``parse_abc_from_md_inp``.
     Always returns CellSpec with cell_matrix_ang shape (3, 3); for
     md.inp's ABC-only format, the matrix is constructed as
     diag(a, b, c) and is_orthorhombic is True.
