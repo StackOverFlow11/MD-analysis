@@ -310,6 +310,39 @@ class PotentialFrame:
 
 
 @dataclass(frozen=True)
+class CenterPotentialScalarFrame:
+    """Engine-neutral scalar-level frame for slab-averaged potential analysis.
+
+    Distinct from :class:`PotentialFrame`: this carries scalar aggregates
+    (slab-centered Hartree potential, Fermi level, slab geometry)
+    instead of the heavy ``(cube_path, values, header)`` raw payload.
+    Built by
+    :func:`md_analysis.engines.cp2k.read_center_potential_scalar_frame`
+    from an already-parsed :class:`PotentialFrame` plus slab geometry.
+
+    Unit suffix convention (codex Round 3 §2.5): both ``phi_center_ev``
+    and ``fermi_level_ev`` are in eV so business-layer cSHE formulas
+    ``U = -E_Fermi + phi_center + ...`` consume them directly without
+    re-scaling.
+
+    Phase 4 R3: this frame intentionally does NOT carry cSHE reference
+    quantities (DELTA_PSI_A_H3O_W_EV / MU_HPLUS_G0_EV / DELTA_E_ZP_EV)
+    nor any U_vs_<reference> value -- those remain in
+    ``electrochemical.potential``.
+    """
+
+    step: int
+    time_fs: float | None
+    center_source: str  # "interface" / "cell" / "manual"
+    center_z_ang: float | None  # slab center z (A); None reserved for non-facade producers
+    slab_thickness_ang: float
+    phi_center_ev: float
+    fermi_level_ev: float | None
+    phi_z_std_ev: float | None = None
+    n_slices: int | None = None
+
+
+@dataclass(frozen=True)
 class FermiRecord:
     """One ``(step, time_fs, fermi_raw)`` row from a CP2K stdout log.
 
@@ -350,5 +383,6 @@ __all__ = [
     "CellSpec",
     # Potential layer
     "PotentialFrame",
+    "CenterPotentialScalarFrame",
     "FermiRecord",
 ]

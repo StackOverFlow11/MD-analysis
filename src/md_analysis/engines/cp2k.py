@@ -29,7 +29,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from ..utils.constants import AU_TIME_TO_FS, BOHR_TO_ANG, TRANSITION_METAL_SYMBOLS
+from ..utils.constants import AU_TIME_TO_FS, BOHR_TO_ANG, HA_TO_EV, TRANSITION_METAL_SYMBOLS
 from ..utils.formats.cp2k.cell import (
     parse_abc_from_md_inp,
     parse_abc_from_restart,
@@ -49,10 +49,12 @@ from ..utils.formats.common.cube import (
     extract_step_from_cube_filename,
     read_cube_atoms,
     read_cube_header_and_values,
+    slab_average_potential_ev,
 )
 from ..utils.io._frame_discovery import extract_step_time_from_dirname
 from .models import (
     CellSpec,
+    CenterPotentialScalarFrame,
     ColvarInfo,
     ConstraintInfo,
     ConstraintMetadata,
@@ -347,6 +349,100 @@ def read_cell(path: str | Path) -> CellSpec:
 
 
 # ---------------------------------------------------------------------------
+# Center-potential scalar facade (Phase 4 Commit 3 — D11)
+# ---------------------------------------------------------------------------
+
+
+def read_center_potential_scalar_frame(
+    frame: PotentialFrame,
+    *,
+    center_z_ang: float,
+    slab_thickness_ang: float,
+    center_source: str = "manual",
+) -> CenterPotentialScalarFrame:
+    """Build a scalar-level potential frame from a parsed ``PotentialFrame``.
+
+    Pure aggregation -- this facade does NOT re-read cube / md.out / sp.out,
+    does NOT detect interfaces, and does NOT compute U_vs_SHE or any
+    reference-scale conversion (those remain in the
+    ``electrochemical.potential`` business layer).
+
+    Parameters
+    ----------
+    frame : PotentialFrame
+        Already-parsed frame (from
+        :func:`read_continuous_potential_frames` or
+        :func:`read_distributed_potential_frames`).  Provides
+        ``header`` + ``values`` for slab averaging and ``fermi_raw``
+        (Hartree) for the Fermi level.
+    center_z_ang : float
+        Slab center z (Angstrom).  MUST be provided by the caller
+        (cannot be ``None``); the facade does not infer it from
+        atoms / interface detection and does not fall back to the
+        geometric cell center.
+
+        Phase 3 §5.4 lock: facade contract is
+        "known center + thickness -> scalar reduce".  The underlying
+        :func:`slab_average_potential_ev` accepts ``z_center_ang=None``
+        and would silently fall back to the cell center; the facade
+        explicitly rejects this so callers cannot accidentally pick
+        up cell-center semantics through this entry point.
+    slab_thickness_ang : float
+        Slab averaging thickness (Angstrom).
+    center_source : str, optional
+        Metadata-only string ("manual" / "interface" / "cell").
+        Stored on the returned frame; the facade does NOT validate
+        the value at runtime.
+
+    Raises
+    ------
+    TypeError
+        If ``center_z_ang`` is ``None`` (see Phase 3 §5.4 lock above).
+
+    Returns
+    -------
+    CenterPotentialScalarFrame
+        Engine-neutral scalar aggregates with ``phi_center_ev`` and
+        ``fermi_level_ev`` both in eV.
+
+    Phase 4 R1: numerical results are bit-for-bit those of
+    :func:`md_analysis.utils.formats.common.cube.slab_average_potential_ev`
+    (which already returns ``phi_center_ev`` in eV).  Fermi level is
+    converted from ``frame.fermi_raw`` (Hartree) via the module
+    constant ``HA_TO_EV``.
+    """
+    if center_z_ang is None:
+        raise TypeError(
+            "read_center_potential_scalar_frame requires an explicit "
+            "center_z_ang (Phase 3 §5.4: facade contract is "
+            "'known center + thickness -> scalar reduce'; the underlying "
+            "slab_average_potential_ev's cell-center fallback is "
+            "deliberately not exposed through this entry point)."
+        )
+
+    phi_center_ev, info = slab_average_potential_ev(
+        frame.header,
+        frame.values,
+        slab_thickness_ang,
+        z_center_ang=center_z_ang,
+    )
+    fermi_level_ev = (
+        frame.fermi_raw * HA_TO_EV if frame.fermi_raw is not None else None
+    )
+    return CenterPotentialScalarFrame(
+        step=frame.step,
+        time_fs=frame.time_fs,
+        center_source=center_source,
+        center_z_ang=center_z_ang,
+        slab_thickness_ang=slab_thickness_ang,
+        phi_center_ev=phi_center_ev,
+        fermi_level_ev=fermi_level_ev,
+        phi_z_std_ev=info["phi_z_std_ev"],
+        n_slices=info["n_slices"],
+    )
+
+
+# ---------------------------------------------------------------------------
 # Potential-frame facade (Phase 7b2)
 # ---------------------------------------------------------------------------
 
@@ -612,6 +708,10 @@ __all__ = [
     "read_constraint_run_from_files",
     # Engine-neutral utility (Phase 4 Commit 1 — migrated from utils)
     "compute_target_series",
+    # Cell facade (Phase 4 Commit 2)
+    "read_cell",
+    # Center-potential scalar facade (Phase 4 Commit 3)
+    "read_center_potential_scalar_frame",
     # Misc readers
     "read_fermi_series",
     "read_continuous_potential_frames",

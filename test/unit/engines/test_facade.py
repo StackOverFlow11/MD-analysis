@@ -64,6 +64,28 @@ def test_public_symbols_exported_via_dunder_all() -> None:
         )
 
 
+def test_cp2k_submodule_dunder_all_exports_are_live() -> None:
+    """All names in ``engines.cp2k.__all__`` resolve at the submodule.
+
+    Prevents future drift where a new facade is added to
+    ``engines/cp2k.py`` but not added to its ``__all__`` list
+    (Phase 4 Commit 2 added ``read_cell`` without updating
+    ``cp2k.__all__`` -- caught by codex Commit 3 v1 MEDIUM and folded
+    into Commit 3).
+    """
+    import md_analysis.engines.cp2k as cp2k_mod
+
+    assert cp2k_mod.__all__, "engines.cp2k.__all__ must be non-empty"
+
+    for name in cp2k_mod.__all__:
+        assert hasattr(cp2k_mod, name), (
+            f"engines.cp2k.__all__ lists {name!r} but the module "
+            f"has no such attribute"
+        )
+        attr = getattr(cp2k_mod, name)
+        assert attr is not None, f"engines.cp2k.{name} resolved to None"
+
+
 def test_legacy_dataclass_aliases_resolve_to_renamed_types() -> None:
     """``ColvarRestart`` / ``LagrangeMultLog`` aliases in ``cp2k.colvar``
     must point at the renamed engines-neutral types so existing imports

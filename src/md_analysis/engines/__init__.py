@@ -35,6 +35,7 @@ from .cp2k import (
     CP2KParser,
     compute_target_series,
     read_cell,
+    read_center_potential_scalar_frame,
     read_constraint_metadata,
     read_constraint_metadata_from_restart,
     read_constraint_run,
@@ -47,6 +48,7 @@ from .cp2k import (
 )
 from .models import (
     CellSpec,
+    CenterPotentialScalarFrame,
     ColvarInfo,
     ColvarMDInfo,
     ColvarRestart,
@@ -85,6 +87,7 @@ __all__ = [
     "ConstraintRun",
     "FermiRecord",
     "PotentialFrame",
+    "CenterPotentialScalarFrame",
     "CellSpec",
     # Phase 5b aliases
     "ColvarRestart",
@@ -105,6 +108,7 @@ __all__ = [
     "compute_target_series",
     "read_fermi_series",
     "read_cell",
+    "read_center_potential_scalar_frame",
     "read_continuous_potential_frames",
     "read_distributed_potential_frames",
 ]
