@@ -54,7 +54,7 @@
   - `list_tasks()` → 枚举已注册任务
   - `get_task_schema(task)` → 有 contract 时从 `TaskContract.to_agent_schema()` 生成（权威），否则从 `target_fn` 签名推导（legacy 路径）。返回形状始终为 OpenAI function-calling 兼容的 `{name, description, parameters}`
   - Tools-layer 契约（`_contracts.py`）：`TaskContract`（`inputs` + 三分法 `outputs_artifacts/metrics/raw_model` + `preconditions` + `side_effects` + `exceptions`）、`FieldSpec`（`json_schema` 权威，`unit`/`shape`/`path_kind`/`category` 领域标注）、`ExceptionMapping`（FQN + `error_type` 重写 dispatch 分类，有序先具体后父类）
-  - 入口重构 Phase 3 / 5B 删除了 6 个 legacy task（water_three_panel, potential_full, charge_surface, charge_tracked, charge_counterion, run_all）—— 对应业务直接通过 `md_analysis.workflows.run_*` 调用；剩余 **8 个任务全部带完整 contract**：calibration_fit_csv, calibration_predict, slowgrowth_quick, ti_full_analysis（Phase 6.5 起 target_fn 改走 `workflows.enhanced_sampling.run_ti_full_analysis`，contract 暴露 `strict`（默认 True，agent 失败语义不变）, bader_gen_batch, ti_gen_batch, sp_gen_batch, config_show（read-only）
+  - 入口重构 Phase 3 / 5B 删除了 6 个 legacy task（water_three_panel, potential_full, charge_surface, charge_tracked, charge_counterion, run_all）—— 对应业务直接通过 `md_analysis.workflows.run_*` 调用；剩余 **8 个任务全部带完整 contract**：calibration_fit_csv, calibration_predict, slowgrowth_quick, ti_full_analysis（Phase 6.5 起 target_fn 改走 `workflows.enhanced_sampling.run_ti_full_analysis`，contract 暴露 `strict`（默认 True，agent 失败语义不变）, bader_gen_batch, ti_gen_batch（Phase 6.6 起 target_fn 改走 `workflows.scripts.run_ti_batch`，contract 暴露 `colvar_id`（默认 None=primary）/`overwrite`（默认 False，保留 collision guard），verbose 不暴露；agent 失败语义不变）, sp_gen_batch, config_show（read-only）
 - **水分析**：
   - `plot_water_three_panel_analysis(xyz_path, md_inp_path, ...)`
     - 输出：密度/取向 CSV、吸附层 profile CSV、吸附层 range TXT、吸附层角度分布 CSV、三联图 PNG

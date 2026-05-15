@@ -325,13 +325,23 @@ def run_ti_batch(
     time_range: dict[str, float | int] | None = None,
     steps: int = 10000,
     script_path: Path | str | None = None,
+    colvar_id: int | None = None,
+    overwrite: bool = False,
+    verbose: bool = False,
 ) -> WorkflowResult:
     """Batch-generate CP2K constrained-MD work directories for TI.
 
     Exactly one of ``targets_au`` / ``time_range`` must be provided
-    (the underlying generator enforces this). The wrapper performs
-    a pre-write collision check and refuses to overwrite existing
-    target directories under ``output_dir``.
+    (the underlying generator enforces this).
+
+    ``colvar_id`` selects which constraint the CV target is read from
+    (``None`` = primary; default). ``overwrite`` (default False)
+    controls the pre-write collision guard: when False a planned
+    directory that already exists raises ``ValueError``; when True the
+    guard is skipped and each target directory is regenerated in place
+    (per-file overwrite via ``mkdir(exist_ok=True)`` — no directory
+    wipe). ``verbose`` toggles a tqdm progress bar (UI-only; not
+    recorded in metadata).
     """
     from ..scripts.TIGen import generate_ti_batch_with_report
 
@@ -350,6 +360,9 @@ def run_ti_batch(
         time_range=time_range,
         steps=steps,
         script_path=script_p,
+        colvar_id=colvar_id,
+        overwrite=overwrite,
+        verbose=verbose,
     )
 
     workdirs = [Path(w) for w in report.workdirs]
@@ -360,6 +373,8 @@ def run_ti_batch(
             "snapped_targets_au": list(report.snapped_targets_au),
             "snap_deltas_au": list(report.snap_deltas_au),
             "steps": report.steps,
+            "colvar_id": colvar_id,
+            "overwrite": overwrite,
             "input_source": "targets_au" if targets_au is not None else "time_range",
             "source_inp": str(inp_p),
             "source_xyz": str(xyz_p),

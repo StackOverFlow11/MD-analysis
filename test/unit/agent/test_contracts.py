@@ -60,6 +60,35 @@ class TestSchemaPublicShape:
         assert required == {"inp_path", "xyz_path", "restart_path", "output_dir"}
 
 
+class TestTiGenBatchPhase66:
+    """Phase 6.6: ti_gen_batch reroute + colvar_id/overwrite contract."""
+
+    def test_target_fn_routes_through_workflows(self):
+        from md_analysis.agent._core import get_task
+
+        assert get_task("ti_gen_batch").target_fn == (
+            "md_analysis.workflows.scripts:run_ti_batch"
+        )
+
+    def test_schema_exposes_colvar_id_and_overwrite_not_verbose(self):
+        s = get_task_schema("ti_gen_batch")
+        props = s["parameters"]["properties"]
+        assert "colvar_id" in props
+        assert "overwrite" in props
+        # verbose is UI-only — must NOT leak into the agent contract
+        assert "verbose" not in props
+
+    def test_colvar_id_and_overwrite_defaults(self):
+        s = get_task_schema("ti_gen_batch")
+        props = s["parameters"]["properties"]
+        assert props["colvar_id"].get("default") is None
+        assert props["overwrite"].get("default") is False
+        # both optional — not in required
+        required = set(s["parameters"].get("required", []))
+        assert "colvar_id" not in required
+        assert "overwrite" not in required
+
+
 class TestListTasksIncludesTiGenBatch:
     def test_ti_gen_batch_registered(self):
         names = [t["name"] for t in list_tasks()]

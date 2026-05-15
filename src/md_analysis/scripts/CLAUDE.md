@@ -34,6 +34,20 @@
 - Frame snapping：目标 CV → 找轨迹中 CV 最近的帧 → 用该帧的实际 CV 作为 TARGET
 - 批量两种模式：numeric（直接给 a.u. 值）/ time（linspace 时间范围 → 映射到 CV）
 - 不支持自定义单位（避免配位数等复杂 CV 的量纲转换问题）
+- **`generate_ti_batch_with_report`（agent/workflow 后端，Phase 6.6）**：
+  - `colvar_id: int | None = None`（None=primary）已 threading 进
+    `_plan_ti_targets` + 两次 `_load_trajectory_cv` + per-target
+    `generate_ti_workdir`。**纯 threading**：snapping / `ti_target_<cv>`
+    dirname / inp 修改规则均不变
+  - `overwrite: bool = False`（默认 = pre-write collision guard，撞已存在
+    `ti_target_*` 抛 `ValueError`）。`overwrite=True` **仅跳过该 guard**，
+    后续仍走 `generate_ti_workdir`（`mkdir(exist_ok=True)` 逐文件覆盖
+    `cMD.inp`/`init.xyz`/`script.sh`）—— **绝不 `rmtree`/清目录**，撞目录
+    内其他文件保留
+  - `verbose: bool = False`：tqdm 进度（与 legacy `batch_generate_ti_workdirs`
+    同款）。CLI 422 传 `True`；agent contract **不暴露** verbose
+  - 旧 `batch_generate_ti_workdirs`（legacy，无 collision guard、无 preflight）
+    迁移后 CLI 不再调用；保留待 Phase 7 清理
 
 ## 陷阱与历史 Bug
 
@@ -60,7 +74,7 @@
 - 复用 `_inp_utils.py` 的 cell/topology 修改逻辑，和 PotentialGen 共享
 - CLI 菜单：441（单帧）、442（批量），独立 MenuGroup "44 DeePMD SP Preparation"
 - Settings 菜单：914 `SetDpSpInpTemplateCmd`
-- **Agent 任务**：`sp_gen_batch` 注册到 agent 模块（`_handlers.py`），通过 `batch_generate_sp_workdirs` 直通。PotentialGen 仍是 CLI-only；BaderGen / TIGen 已各自暴露为带完整 contract 的 agent 任务（`bader_gen_batch` / `ti_gen_batch`），通过各自的 `*_with_report` wrapper 直通
+- **Agent 任务**：`sp_gen_batch` 注册到 agent 模块（`_handlers.py`），通过 `batch_generate_sp_workdirs` 直通。PotentialGen 仍是 CLI-only；BaderGen / TIGen 已各自暴露为带完整 contract 的 agent 任务（`bader_gen_batch` / `ti_gen_batch`）。`bader_gen_batch` 经 `generate_bader_batch_with_report` wrapper 直通；`ti_gen_batch`（Phase 6.6 起）handler 改走 `workflows.scripts.run_ti_batch`（target_fn 已 repoint），由 facade 内部调 `generate_ti_batch_with_report`，outputs 从 `WorkflowResult.artifacts` 显式构建、summary 从 `result.extra` 取
 - 后端链路：SP 算完 → `dpdata` 或 `cp2kdata` 插件转训练集 → DeePMD-kit 训练
 
 ### 共享 helper：`_inp_utils.py`

@@ -297,6 +297,83 @@ class TestRunTiBatch:
         assert len(meta["requested_targets_au"]) == 2
         assert isinstance(result.extra, TIGenBatchReport)
 
+    def test_forwards_colvar_id_overwrite_verbose(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
+        """Phase 6.6: run_ti_batch threads colvar_id / overwrite /
+        verbose to generate_ti_batch_with_report; metadata records
+        colvar_id + overwrite but NOT verbose (UI-only)."""
+        from md_analysis.scripts import TIGen
+
+        captured: dict = {}
+
+        def fake_report(*args, **kwargs):
+            captured.update(kwargs)
+            return TIGenBatchReport(
+                workdirs=(tmp_path / "ti_target_0.000000",),
+                requested_targets_au=(0.0,),
+                snapped_targets_au=(0.0,),
+                snap_deltas_au=(0.0,),
+                steps=kwargs.get("steps", 10000),
+            )
+
+        monkeypatch.setattr(
+            TIGen, "generate_ti_batch_with_report", fake_report
+        )
+        (tmp_path / "ti_target_0.000000").mkdir()
+
+        result = run_ti_batch(
+            inp_path=SG_INP,
+            xyz_path=tmp_path / "sg.xyz",
+            restart_path=SG_RESTART,
+            output_dir=tmp_path / "out",
+            targets_au=[0.0],
+            colvar_id=3,
+            overwrite=True,
+            verbose=True,
+        )
+        assert captured["colvar_id"] == 3
+        assert captured["overwrite"] is True
+        assert captured["verbose"] is True
+        assert result.metadata["colvar_id"] == 3
+        assert result.metadata["overwrite"] is True
+        assert "verbose" not in result.metadata
+
+    def test_defaults_colvar_id_none_overwrite_false_verbose_false(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
+        from md_analysis.scripts import TIGen
+
+        captured: dict = {}
+
+        def fake_report(*args, **kwargs):
+            captured.update(kwargs)
+            return TIGenBatchReport(
+                workdirs=(tmp_path / "ti_target_0.000000",),
+                requested_targets_au=(0.0,),
+                snapped_targets_au=(0.0,),
+                snap_deltas_au=(0.0,),
+                steps=10000,
+            )
+
+        monkeypatch.setattr(
+            TIGen, "generate_ti_batch_with_report", fake_report
+        )
+        (tmp_path / "ti_target_0.000000").mkdir()
+
+        result = run_ti_batch(
+            inp_path=SG_INP,
+            xyz_path=tmp_path / "sg.xyz",
+            restart_path=SG_RESTART,
+            output_dir=tmp_path / "out",
+            targets_au=[0.0],
+        )
+        assert captured["colvar_id"] is None
+        assert captured["overwrite"] is False
+        assert captured["verbose"] is False
+        assert result.metadata["colvar_id"] is None
+        assert result.metadata["overwrite"] is False
+
 
 # ---------------------------------------------------------------------------
 # Potential single / batch (no upstream *_with_report)

@@ -57,6 +57,16 @@ handler 都通过本包调用业务流程，业务模块本身不持有 workflow
   metadata 一律包含 `n_successful` / `n_skipped` / `n_failed` 三计数
   + `workdir_paths` 列表；当前底层 succeed-all-or-raise，所以
   `n_skipped == n_failed == 0`，但 key 占位以保未来扩展。
+- **TI batch `colvar_id`/`overwrite`/`verbose` 契约**（Phase 6.6）：
+  `run_ti_batch` 的 `colvar_id: int | None = None`(默认 primary CV)、
+  `overwrite: bool = False`、`verbose: bool = False` 默认值均为
+  **agent-facing** 语义。CLI 422 显式传 `overwrite=True`(保留旧式逐文件
+  覆盖,**不清目录**)+`verbose=True`(tqdm 进度)。`colvar_id`/`overwrite`
+  进 metadata;`verbose` 是 UI-only,**不**进 metadata。agent
+  `ti_gen_batch` contract 暴露 `colvar_id`/`overwrite`(均 optional,默认
+  None/False),**不**暴露 `verbose`;agent handler 走 `run_ti_batch`,
+  outputs 显式从 `result.artifacts` 构建(WorkflowResult 无 `.workdirs`,
+  不能用 `_normalize_outputs`),summary 从 `result.extra` 取。
 - **TI `strict` 契约**（Phase 6.5）：`run_ti_full_analysis` /
   `run_ti_constant_potential_correction` 的 `strict: bool = True`
   默认值是 **agent-facing** 语义——损坏的约束点目录抛

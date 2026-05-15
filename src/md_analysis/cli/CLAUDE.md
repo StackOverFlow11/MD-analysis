@@ -77,15 +77,10 @@ VASPKIT 风格交互式编号菜单。无 argparse，所有输入通过 `input()
 | 432 | `PotentialBatchCmd` | `workflows.scripts.run_potential_batch` |
 | 441 | `SpGenSingleCmd` | `workflows.scripts.run_sp_single` |
 | 442 | `SpGenBatchCmd` | `workflows.scripts.run_sp_batch` |
+| 422 | `TIBatchCmd` | `workflows.scripts.run_ti_batch`（`colvar_id` / `overwrite` / `verbose` 已 Phase 6.6 扩入；CLI 传 `overwrite=True`+`verbose=True` 保留旧覆盖+进度行为） |
 
-**保留底层直调（workflows facade 当前覆盖不全；都已记录原因）**：
-
-| CLI | 命令 | 保留原因 |
-|---|---|---|
-| 422 | `TIBatchCmd` | `workflows.scripts.run_ti_batch`（底层 `generate_ti_batch_with_report`）不接受 `colvar_id`（MVP 限定 primary CV）；CLI 仍 expose colvar_id |
-
-任何后续往 workflows 收敛的工作，前提是先扩展 workflow 签名覆盖这些 gap；
-不要在 CLI 端 hack 绕过。当 workflow 覆盖完整后再统一迁这些命令。
+**保留底层直调**：无（Phase 6.6 后所有菜单命令均已迁 workflows facade；
+入口收敛完成）。后续若新增命令，优先直接走 workflows facade。
 
 ### 参数采集
 - `K` 类：字符串键常量，防止拼写错误（含 `INP_TEMPLATE`、`GEN_POTCAR` 等）

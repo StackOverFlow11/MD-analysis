@@ -388,23 +388,37 @@ class TIBatchCmd(MenuCommand):
         return ctx
 
     def execute(self, ctx: dict) -> None:
-        batch = lazy_import("md_analysis.scripts", "batch_generate_ti_workdirs")
-        dirs = batch(
-            ctx[K.INP_PATH],
-            ctx[K.XYZ],
-            ctx[K.RESTART_PATH],
-            ctx[K.OUTDIR],
-            targets_au=ctx[K.TARGETS_AU],
-            time_initial_fs=ctx[K.TIME_INITIAL_FS],
-            time_final_fs=ctx[K.TIME_FINAL_FS],
-            n_points=ctx[K.N_POINTS],
-            steps=ctx[K.STEPS],
-            colvar_id=ctx[K.COLVAR_ID],
-            script_path=ctx[K.SCRIPT_PATH],
-            verbose=True,
+        run_ti_batch = lazy_import(
+            "md_analysis.workflows.scripts", "run_ti_batch",
         )
-        print(f"\n Created {len(dirs)} TI work directories:")
-        for d in dirs:
+        # values mode → targets_au; time mode → time_range dict
+        # (the workflow / wrapper takes the object form, not 3 args).
+        if ctx[K.TARGETS_AU] is not None:
+            targets_au = ctx[K.TARGETS_AU]
+            time_range = None
+        else:
+            targets_au = None
+            time_range = {
+                "time_initial_fs": ctx[K.TIME_INITIAL_FS],
+                "time_final_fs": ctx[K.TIME_FINAL_FS],
+                "n_points": ctx[K.N_POINTS],
+            }
+        result = run_ti_batch(
+            inp_path=ctx[K.INP_PATH],
+            xyz_path=ctx[K.XYZ],
+            restart_path=ctx[K.RESTART_PATH],
+            output_dir=ctx[K.OUTDIR],
+            targets_au=targets_au,
+            time_range=time_range,
+            steps=ctx[K.STEPS],
+            script_path=ctx[K.SCRIPT_PATH],
+            colvar_id=ctx[K.COLVAR_ID],
+            overwrite=True,   # preserve CLI 422 historical overwrite behavior
+            verbose=True,     # keep the tqdm progress bar
+        )
+        workdirs = result.artifacts
+        print(f"\n Created {len(workdirs)} TI work directories:")
+        for d in workdirs.values():
             print(f"  {d}")
 
 

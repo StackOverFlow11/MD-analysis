@@ -803,6 +803,109 @@ class TestGenerateTIBatchWithReport:
         for dn in unique_dirnames:
             assert dn in msg
 
+    def test_overwrite_true_skips_collision_guard(self, tmp_path):
+        """Phase 6.6: overwrite=True skips the pre-write collision guard
+        and regenerates the colliding directory in place."""
+        from md_analysis.scripts.TIGen import (
+            _plan_ti_targets, generate_ti_batch_with_report,
+        )
+
+        inp, xyz, restart = self._setup_files(tmp_path)
+        planned = _plan_ti_targets(inp, xyz, restart, targets_au=[10.05])
+        out = tmp_path / "out"
+        collision_dir = out / planned[0].dirname
+        collision_dir.mkdir(parents=True)
+        (collision_dir / "cMD.inp").write_text("STALE_CONTENT")
+
+        # overwrite=True → no ValueError, cMD.inp regenerated
+        report = generate_ti_batch_with_report(
+            inp, xyz, restart, out,
+            targets_au=[10.05],
+            overwrite=True,
+        )
+        assert len(report.workdirs) == 1
+        regenerated = (collision_dir / "cMD.inp").read_text()
+        assert regenerated != "STALE_CONTENT"
+        assert "PROJECT cMD" in regenerated or "PROJECT  cMD" in regenerated
+
+    def test_overwrite_true_is_per_file_not_directory_wipe(self, tmp_path):
+        """overwrite=True must NOT rmtree/wipe the directory: an
+        unrelated pre-existing file in a colliding ti_target_* dir
+        survives regeneration (per-file overwrite only)."""
+        from md_analysis.scripts.TIGen import (
+            _plan_ti_targets, generate_ti_batch_with_report,
+        )
+
+        inp, xyz, restart = self._setup_files(tmp_path)
+        planned = _plan_ti_targets(inp, xyz, restart, targets_au=[10.05])
+        out = tmp_path / "out"
+        collision_dir = out / planned[0].dirname
+        collision_dir.mkdir(parents=True)
+        keep = collision_dir / "USER_NOTES.txt"
+        keep.write_text("do not delete me")
+
+        generate_ti_batch_with_report(
+            inp, xyz, restart, out,
+            targets_au=[10.05],
+            overwrite=True,
+        )
+        # Unrelated file untouched → proves no directory wipe
+        assert keep.is_file()
+        assert keep.read_text() == "do not delete me"
+        # Generated files present
+        assert (collision_dir / "cMD.inp").is_file()
+        assert (collision_dir / "init.xyz").is_file()
+
+    def test_colvar_id_threaded_to_cv_loaders(self, tmp_path, monkeypatch):
+        """Phase 6.6 D1 (pure threading): colvar_id reaches
+        _load_trajectory_cv unchanged. A real >=2-CV SG restart fixture
+        is heavy; assert the threading contract with a sentinel spy that
+        captures colvar_id then short-circuits (D1 explicitly does NOT
+        change snapping logic, so this proves the only thing 6.6 added)."""
+        from md_analysis.scripts import TIGen
+
+        inp, xyz, restart = self._setup_files(tmp_path)
+        seen: list = []
+
+        class _Sentinel(Exception):
+            pass
+
+        def spy_load(xyz_path, restart_obj, colvar_id):
+            seen.append(colvar_id)
+            raise _Sentinel
+
+        monkeypatch.setattr(TIGen, "_load_trajectory_cv", spy_load)
+
+        with pytest.raises(_Sentinel):
+            TIGen.generate_ti_batch_with_report(
+                inp, xyz, restart, tmp_path / "out",
+                targets_au=[10.05],
+                colvar_id=2,
+            )
+        # First _load_trajectory_cv call (inside _plan_ti_targets) got 2
+        assert seen == [2], seen
+
+    def test_colvar_id_default_none_unchanged(self, tmp_path, monkeypatch):
+        """Default colvar_id=None preserved (agent/workflow byte-equal)."""
+        from md_analysis.scripts import TIGen
+
+        inp, xyz, restart = self._setup_files(tmp_path)
+        seen: list = []
+
+        class _Sentinel(Exception):
+            pass
+
+        def spy_load(xyz_path, restart_obj, colvar_id):
+            seen.append(colvar_id)
+            raise _Sentinel
+
+        monkeypatch.setattr(TIGen, "_load_trajectory_cv", spy_load)
+        with pytest.raises(_Sentinel):
+            TIGen.generate_ti_batch_with_report(
+                inp, xyz, restart, tmp_path / "out", targets_au=[10.05],
+            )
+        assert seen == [None], seen
+
     def test_report_to_dict_is_json_serializable(self, tmp_path):
         """``TIGenBatchReport.to_dict()`` must be directly JSON-dumpable
         (no numpy scalars, no Path objects leaking through)."""
@@ -1001,3 +1104,48 @@ class TestAgentTIGenBatchDispatch:
         })
         assert not result.success
         assert result.error_type == "validation"
+
+    def test_dispatch_outputs_built_from_artifacts(self, tmp_path):
+        """Phase 6.6 regression (codex HIGH): the rerouted handler now
+        gets a WorkflowResult (no .workdirs attr). outputs MUST be built
+        from result.artifacts, NOT _normalize_outputs (which would fall
+        through to an empty dict). Pin keys + count + existence."""
+        from md_analysis.agent import dispatch
+
+        inp, xyz, restart = self._setup_files(tmp_path)
+        result = dispatch("ti_gen_batch", {
+            "inp_path": str(inp),
+            "xyz_path": str(xyz),
+            "restart_path": str(restart),
+            "output_dir": str(tmp_path / "out"),
+            "targets_au": [10.05, 10.30],
+        })
+        assert result.success, result.errors
+        assert len(result.outputs) == 2
+        assert set(result.outputs) == {"workdir_0", "workdir_1"}
+        for v in result.outputs.values():
+            assert Path(v).is_dir()
+        # summary still sourced from result.extra (TIGenBatchReport)
+        assert result.summary["n_targets"] == 2
+        assert list(result.summary["requested_targets_au"]) == [10.05, 10.30]
+
+    def test_dispatch_overwrite_true_skips_collision(self, tmp_path):
+        """overwrite=True via dispatch → collision guard skipped, success."""
+        from md_analysis.agent import dispatch
+        from md_analysis.scripts.TIGen import _plan_ti_targets
+
+        inp, xyz, restart = self._setup_files(tmp_path)
+        planned = _plan_ti_targets(inp, xyz, restart, targets_au=[10.05])
+        out = tmp_path / "out"
+        (out / planned[0].dirname).mkdir(parents=True)
+
+        result = dispatch("ti_gen_batch", {
+            "inp_path": str(inp),
+            "xyz_path": str(xyz),
+            "restart_path": str(restart),
+            "output_dir": str(out),
+            "targets_au": [10.05],
+            "overwrite": True,
+        })
+        assert result.success, result.errors
+        assert len(result.outputs) == 1

@@ -362,6 +362,30 @@ _TI_GEN_BATCH_CONTRACT = TaskContract(
             type="Path | None", path_kind="file",
             required=False, default=None,
         ),
+        "colvar_id": FieldSpec(
+            description=(
+                "Constraint colvar_id the CV target is read from. "
+                "null (default) = primary / first colvar."
+            ),
+            json_schema={"type": ["integer", "null"]},
+            type="int | None",
+            required=False, default=None,
+        ),
+        "overwrite": FieldSpec(
+            description=(
+                "If True, skip the pre-write collision guard and "
+                "regenerate each ti_target_<cv>/ directory in place, "
+                "overwriting an existing cMD.inp / init.xyz / script.sh "
+                "(per-file overwrite via mkdir(exist_ok=True) — NOT a "
+                "directory wipe; other files in a colliding directory are "
+                "left untouched). Default False keeps the collision guard "
+                "(a planned directory that already exists raises a "
+                "validation error). CLI 422 passes True."
+            ),
+            json_schema={"type": "boolean"},
+            type="bool",
+            required=False, default=False,
+        ),
     },
     outputs_artifacts={
         "workdirs": FieldSpec(
@@ -403,15 +427,19 @@ _TI_GEN_BATCH_CONTRACT = TaskContract(
         "restart_path is a .restart file (not a _N.restart checkpoint)",
         "Exactly one of targets_au / time_range is provided",
         "If time_range: time_initial_fs <= time_final_fs AND n_points >= 2",
-        "output_dir does not already contain ti_target_<cv>/ dirs matching "
-        "any of the planned (snapped) targets",
+        "Unless overwrite=True: output_dir does not already contain "
+        "ti_target_<cv>/ dirs matching any of the planned (snapped) targets",
     ),
     side_effects=(
         "Creates output_dir if missing",
         "Creates one ti_target_<cv>/ subdir per snapped target, containing "
         "init.xyz + cMD.inp [+ script.sh if script_path]",
-        "Raises ValueError BEFORE any filesystem write if a planned target "
-        "dirname collides with an existing ti_target_<cv>/ directory",
+        "If overwrite=False: raises ValueError BEFORE any filesystem write "
+        "when a planned target dirname collides with an existing "
+        "ti_target_<cv>/ directory",
+        "If overwrite=True: skips the collision guard and rewrites "
+        "cMD.inp / init.xyz / script.sh in a colliding directory in place "
+        "(per-file overwrite; no directory removal/wipe)",
         "Does NOT mutate the input SG directory",
     ),
     exceptions=(
@@ -437,7 +465,7 @@ _TI_GEN_BATCH_CONTRACT = TaskContract(
             exception_fqn="builtins.ValueError",
             triggered_by=(
                 "Collision: a planned target dirname already exists under "
-                "output_dir (no writes performed)"
+                "output_dir and overwrite=False (no writes performed)"
             ),
             error_type="validation",
         ),
@@ -453,17 +481,26 @@ _TI_GEN_BATCH_CONTRACT = TaskContract(
 
 
 def _make_ti_gen_batch_handler() -> Callable[[dict[str, Any]], TaskResult]:
-    """Dedicated handler so we can plug in the summary extractor cleanly."""
+    """Dedicated handler so we can plug in the summary extractor cleanly.
+
+    Phase 6.6: dispatches through workflows.scripts.run_ti_batch. The
+    returned WorkflowResult has NO ``.workdirs`` attribute, so
+    ``_normalize_outputs`` would fall through to its empty-dict branch —
+    outputs are built explicitly from ``result.artifacts`` instead
+    (``_flatten_workdirs_to_artifacts`` produces ``workdir_0/1/...``
+    keys, byte-equal to the pre-migration ``_normalize_outputs``
+    shape). Summary is read from ``result.extra`` (the TIGenBatchReport).
+    """
 
     def handler(params: dict[str, Any]) -> TaskResult:
-        from ..scripts.TIGen import generate_ti_batch_with_report
+        from ..workflows.scripts import run_ti_batch
 
-        result = generate_ti_batch_with_report(**params)
+        result = run_ti_batch(**params)
         return TaskResult(
             success=True,
             task="ti_gen_batch",
-            outputs=_normalize_outputs(result),
-            summary=_ti_gen_batch_summary(result, params),
+            outputs={k: str(v) for k, v in result.artifacts.items()},
+            summary=_ti_gen_batch_summary(result.extra, params),
         )
 
     return handler
@@ -476,11 +513,12 @@ register(TaskDef(
         "Batch-generate CP2K constrained-MD work directories for TI "
         "sampling points. Two target modes: numeric (explicit CV list in "
         "atomic units) or time (time_range object). Each target snaps to "
-        "the nearest SG trajectory frame. Raises a validation error if "
-        "any planned target directory already exists."
+        "the nearest SG trajectory frame. colvar_id selects the "
+        "constraint (None = primary). Raises a validation error if any "
+        "planned target directory already exists, unless overwrite=True."
     ),
     handler=_make_ti_gen_batch_handler(),
-    target_fn="md_analysis.scripts.TIGen:generate_ti_batch_with_report",
+    target_fn="md_analysis.workflows.scripts:run_ti_batch",
     cli_codes=("422",),
     contract=_TI_GEN_BATCH_CONTRACT,
 ))

@@ -400,9 +400,9 @@ class TestBaderBatchCmd:
 
 
 class TestTISingleCmd:
-    """CLI 421 forwards colvar_id (TI workflow accepts it; the batch
-    workflow does NOT, which is why CLI 422 was left on the legacy
-    backend in Phase 4)."""
+    """CLI 421 forwards colvar_id to run_ti_single. (CLI 422 was
+    migrated to run_ti_batch with colvar_id/overwrite/verbose support
+    in Phase 6.6 — see TestTIBatchCmd.)"""
 
     def test_dispatches_to_run_ti_single_with_colvar_id(
         self, monkeypatch, tmp_path: Path
@@ -441,6 +441,99 @@ class TestTISingleCmd:
         assert call["target_au"] == 0.5
         assert call["steps"] == 10000
         assert call["colvar_id"] == 2
+
+
+class TestTIBatchCmd:
+    """CLI 422 → run_ti_batch (Phase 6.6). values + time mode;
+    colvar_id + overwrite=True + verbose=True forwarded; the legacy
+    batch_generate_ti_workdirs target must never be looked up."""
+
+    def _fake(self, tmp_path: Path):
+        wd0 = tmp_path / "out" / "ti_target_0.000000"
+        wd1 = tmp_path / "out" / "ti_target_0.001000"
+        wd0.mkdir(parents=True)
+        wd1.mkdir(parents=True)
+
+        def fake_workflow(**kwargs: Any) -> WorkflowResult:
+            return _make_workflow_result(
+                name="ti_batch",
+                output_dir=tmp_path / "out",
+                artifacts={"workdir_0": wd0, "workdir_1": wd1},
+            )
+
+        return fake_workflow, (wd0, wd1)
+
+    def test_values_mode_forwards_colvar_overwrite_verbose(
+        self, monkeypatch, tmp_path: Path, capsys
+    ) -> None:
+        fake_workflow, (wd0, wd1) = self._fake(tmp_path)
+        stub = _LazyImportStub(fake_workflow)
+        monkeypatch.setattr(_scripts, "lazy_import", stub)
+
+        ctx = {
+            K.INP_PATH: "sg.inp",
+            K.XYZ: "sg.xyz",
+            K.RESTART_PATH: "sg.restart",
+            K.OUTDIR: str(tmp_path / "out"),
+            K.TARGETS_AU: [0.0, 0.001],
+            K.TIME_INITIAL_FS: None,
+            K.TIME_FINAL_FS: None,
+            K.N_POINTS: None,
+            K.STEPS: 8000,
+            K.COLVAR_ID: 2,
+            K.SCRIPT_PATH: None,
+        }
+        cmd = _scripts.TIBatchCmd("422", "TI Batch")
+        cmd.execute(ctx)
+
+        assert stub.lookups == [
+            ("md_analysis.workflows.scripts", "run_ti_batch"),
+        ]
+        call = stub.calls[0]
+        assert call["targets_au"] == [0.0, 0.001]
+        assert call["time_range"] is None
+        assert call["steps"] == 8000
+        assert call["colvar_id"] == 2
+        assert call["overwrite"] is True
+        assert call["verbose"] is True
+
+        out = capsys.readouterr().out
+        assert "Created 2 TI work directories:" in out
+        assert str(wd0) in out and str(wd1) in out
+
+    def test_time_mode_builds_time_range_dict(
+        self, monkeypatch, tmp_path: Path
+    ) -> None:
+        fake_workflow, _ = self._fake(tmp_path)
+        stub = _LazyImportStub(fake_workflow)
+        monkeypatch.setattr(_scripts, "lazy_import", stub)
+
+        ctx = {
+            K.INP_PATH: "sg.inp",
+            K.XYZ: "sg.xyz",
+            K.RESTART_PATH: "sg.restart",
+            K.OUTDIR: str(tmp_path / "out"),
+            K.TARGETS_AU: None,
+            K.TIME_INITIAL_FS: 10.0,
+            K.TIME_FINAL_FS: 40.0,
+            K.N_POINTS: 5,
+            K.STEPS: 10000,
+            K.COLVAR_ID: None,
+            K.SCRIPT_PATH: None,
+        }
+        cmd = _scripts.TIBatchCmd("422", "TI Batch")
+        cmd.execute(ctx)
+
+        call = stub.calls[0]
+        assert call["targets_au"] is None
+        assert call["time_range"] == {
+            "time_initial_fs": 10.0,
+            "time_final_fs": 40.0,
+            "n_points": 5,
+        }
+        assert call["colvar_id"] is None
+        assert call["overwrite"] is True
+        assert call["verbose"] is True
 
 
 # ---------------------------------------------------------------------------
