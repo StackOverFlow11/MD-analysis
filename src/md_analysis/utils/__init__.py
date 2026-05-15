@@ -4,8 +4,8 @@ This package intentionally does NOT re-export symbols. Consumers should
 import directly from the relevant submodule:
 
 - physical constants        -> ``md_analysis.utils.constants``
-- structure / layer parsers -> ``md_analysis.utils.StructureParser.*``
-- cube / bader / restart    -> ``md_analysis.utils.CubeParser`` / ``.BaderParser`` / ``.RestartParser``
+- structure / layer parsers -> ``md_analysis.utils.structure.{layer,water,cluster}``
+- file format parsers       -> ``md_analysis.utils.formats.{common,cp2k,vasp,bader}.<file>``
 
 Rationale: a centralised re-export hub must be kept in sync with every
 submodule change and offers no additional information over a direct

@@ -12,11 +12,11 @@ from ase.io import iread
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
-from md_analysis.utils.StructureParser.WaterParser import _compute_water_mass_density_z_distribution as compute_water_mass_density_z_distribution
-from md_analysis.utils.StructureParser.WaterParser import _compute_water_orientation_theta_pdf_in_c_fraction_window as compute_water_orientation_theta_pdf_in_c_fraction_window
-from md_analysis.utils.StructureParser.WaterParser import _compute_water_orientation_weighted_density_z_distribution as compute_water_orientation_weighted_density_z_distribution
-from md_analysis.utils.StructureParser.WaterParser import detect_water_molecule_indices
-from md_analysis.utils.StructureParser.WaterParser import get_water_oxygen_indices_array
+from md_analysis.utils.structure.water import _compute_water_mass_density_z_distribution as compute_water_mass_density_z_distribution
+from md_analysis.utils.structure.water import _compute_water_orientation_theta_pdf_in_c_fraction_window as compute_water_orientation_theta_pdf_in_c_fraction_window
+from md_analysis.utils.structure.water import _compute_water_orientation_weighted_density_z_distribution as compute_water_orientation_weighted_density_z_distribution
+from md_analysis.utils.structure.water import detect_water_molecule_indices
+from md_analysis.utils.structure.water import get_water_oxygen_indices_array
 from md_analysis.utils.constants import DEFAULT_THETA_BIN_DEG
 from md_analysis.utils.constants import DEFAULT_Z_BIN_WIDTH_A
 
@@ -135,8 +135,8 @@ def main() -> None:
     if (args.c_start is None) != (args.c_end is None):
         raise ValueError("Please provide both --c-start and --c-end, or provide neither")
 
-    xyz_path = REPO_ROOT / "data_example" / "potential" / "md-pos-1.xyz"
-    md_inp_path = REPO_ROOT / "data_example" / "potential" / "md.inp"
+    xyz_path = REPO_ROOT / "data_example" / "potential" / "dense" / "md-pos-1.xyz"
+    md_inp_path = REPO_ROOT / "data_example" / "potential" / "dense" / "md.inp"
     out_dir = REPO_ROOT / "test" / "_tmp_preview"
     out_dir.mkdir(parents=True, exist_ok=True)
 

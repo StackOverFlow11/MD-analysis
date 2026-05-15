@@ -34,6 +34,54 @@ VASPKIT 风格交互式编号菜单。无 argparse，所有输入通过 `input()
 - **numpy 也必须延迟导入**：CLI 模块顶层不得出现 `import numpy`，需要时在函数体内导入
 - 常量（如 `AU_TIME_TO_FS`）同理：从 `utils.constants` 导入时放在使用它的函数体内
 
+### Workflows facade 迁移状态（入口重构）
+
+入口重构后，`md_analysis.workflows.*` 是 canonical 程序化入口。CLI 的 `execute()`
+应优先通过 `lazy_import("md_analysis.workflows.<domain>", "run_*")` 调度，
+读取 `WorkflowResult.artifacts` 拿文件路径，并从 `metadata` / `extra` 取摘要指标；
+不应再回到底层科学模块拼装流程。
+
+**已迁到 workflows facade**：
+
+| CLI | 命令 | workflow facade |
+|---|---|---|
+| 101 | `WaterDensityCmd` | `workflows.water.run_water_density` |
+| 102 | `WaterOrientationCmd` | `workflows.water.run_water_orientation` |
+| 103 | `AdWaterOrientationCmd` | `workflows.water.run_ad_water_orientation` |
+| 104 | `AdWaterThetaCmd` | `workflows.water.run_ad_water_theta` |
+| 105 | `WaterThreePanelCmd` | `workflows.water.run_water_three_panel` |
+| 211 | `CenterPotentialCmd` | `workflows.potential.run_center_potential` |
+| 212 | `FermiEnergyCmd` | `workflows.potential.run_fermi_energy` |
+| 213 | `ElectrodePotentialCmd` | `workflows.potential.run_electrode_potential` |
+| 214 | `PhiZProfileCmd` | `workflows.potential.run_phi_z_profile` |
+| 215 | `ThicknessSensitivityCmd` | `workflows.potential.run_thickness_sensitivity` |
+| 216 | `FullPotentialCmd` | `workflows.potential.run_potential_full` |
+| 221 | `SurfaceChargeCmd(method="counterion")` | `workflows.charge.run_surface_charge` |
+| 222 | `SurfaceChargeCmd(method="layer")` | `workflows.charge.run_surface_charge` |
+| 223 | `SurfaceChargeCmd()` (dynamic method prompt) | `workflows.charge.run_surface_charge` |
+| 224 | `SingleSideChargeCmd` | `workflows.charge.run_surface_charge` (`target_side`) |
+| 225 | `TrackedChargeCmd` | `workflows.charge.run_tracked_charge` |
+| 226 | `CounterionChargeCmd` | `workflows.charge.run_counterion_charge` |
+| 231 | `CalibrateFromCSVCmd` | `workflows.calibration.run_calibration_fit` |
+| 232 | `CalibrateManualCmd` | `workflows.calibration.run_calibration_fit` |
+| 233 | `PredictPotentialCmd` | `workflows.calibration.run_calibration_predict` |
+| 301 | `SGQuickPlotCmd` | `workflows.enhanced_sampling.run_slowgrowth_quick_plot` |
+| 302 | `SGPublicationPlotCmd` | `workflows.enhanced_sampling.run_slowgrowth_publication_plot` |
+| 311 | `TISingleDiagCmd` | `workflows.enhanced_sampling.run_ti_single_diagnostics` |
+| 312 | `TIFullAnalysisCmd` | `workflows.enhanced_sampling.run_ti_full_analysis` |
+| 313 | `TIConstPotCorrectionCmd` | `workflows.enhanced_sampling.run_ti_constant_potential_correction` |
+| 411 | `BaderSingleCmd` | `workflows.scripts.run_bader_single` |
+| 412 | `BaderBatchCmd` | `workflows.scripts.run_bader_batch` |
+| 421 | `TISingleCmd` | `workflows.scripts.run_ti_single` |
+| 431 | `PotentialSingleCmd` | `workflows.scripts.run_potential_single` |
+| 432 | `PotentialBatchCmd` | `workflows.scripts.run_potential_batch` |
+| 441 | `SpGenSingleCmd` | `workflows.scripts.run_sp_single` |
+| 442 | `SpGenBatchCmd` | `workflows.scripts.run_sp_batch` |
+| 422 | `TIBatchCmd` | `workflows.scripts.run_ti_batch`（`colvar_id` / `overwrite` / `verbose` 已 Phase 6.6 扩入；CLI 传 `overwrite=True`+`verbose=True` 保留旧覆盖+进度行为） |
+
+**保留底层直调**：无（Phase 6.6 后所有菜单命令均已迁 workflows facade；
+入口收敛完成）。后续若新增命令，优先直接走 workflows facade。
+
 ### 参数采集
 - `K` 类：字符串键常量，防止拼写错误（含 `INP_TEMPLATE`、`GEN_POTCAR` 等）
 - `ParamCollector` ABC：`collect(ctx)` 提示用户 + `apply_default(ctx)` 静默填充
@@ -69,12 +117,34 @@ VASPKIT 风格交互式编号菜单。无 argparse，所有输入通过 `input()
 
 CLI 不再 prompt directory pattern：discover_ti_points 默认 `parser="auto" + dir_filter=None`（嗅探 + 内容过滤），目录命名完全自由。
 
-`_run_ti_core` 执行共享 TI 分析，流程：
-1. 发现约束点 → 带索引列表显示 `[0] ξ = ...`
-2. **Python 切片选择**（可选）：用户输入如 `3:8`、`::2`、`:8` 等，空回车 = 全部
-3. 可选逐点 equilibration 覆盖
-4. 加载数据 → dt 一致性检查
-5. `analyze_ti(... auto_equilibration=ctx[K.AUTO_EQUILIBRATION])` → 控制台摘要表 → 写文件
+**Phase 6.5 入口迁移**：`_run_ti_core` 已删除，312/313 改走
+`workflows.enhanced_sampling.run_ti_full_analysis` /
+`run_ti_constant_potential_correction`。交互 prompt 拆为两个 helper：
+
+- `_prompt_ti_slice_and_equil(ctx, point_defs)`：
+  1. prompt slice 字符串 → **用 workflow 的 `_parse_point_slice` 即时校验**
+     （消除旧 CLI `"2"→slice(2)` 歧义；非法 slice 在收 per-point equil
+     **之前**抛 `ValueError`，被 `MenuCommand.run()` try-except 接住）
+  2. `point_slice` 按 **str 原样**传 workflow；本地 slice 仅用于 prompt
+     sizing + 回显
+  3. 可选逐点 equilibration → `int | list[int]`（list 长度 = sliced 点数）
+- `_print_ti_summary_table(ti_report)`：控制台收敛摘要表（per-point
+  PASS/FAIL + 建议时间分配）
+
+312/313 流程：
+1. `discover_ti_points(root, reverse=..., strict=False)` 预发现（显示 +
+   prompt sizing）。**`strict=False` 显式传**（不依赖 io 默认）以保留
+   旧 CLI 对损坏 `ti_target_*` 子目录的宽松行为
+2. `_prompt_ti_slice_and_equil` 收 slice/equil
+3. 调 workflow facade（`strict=False` 显式传 → workflow 内部 re-discover
+   + re-slice 与 CLI 预发现完全一致；correction 第二次 discover 同 strict）
+4. `_print_ti_summary_table(result.extra[.ti_report])` + ΔA + artifact 列表
+
+`strict` 形参链（Phase 6.5 新增，默认 True）：CLI 312/313 → workflow
+facade → `run_ti_full_from_root` → `discover_ti_points`；agent
+`ti_full_analysis` contract 暴露 `strict`（默认 True，失败语义零回退）。
+311 `TISingleDiagCmd` 直接 1:1 映射 `run_ti_single_diagnostics`（无
+discover/slice；不暴露 `auto_equilibration`，与旧行为一致）。
 
 ## 陷阱与历史 Bug
 

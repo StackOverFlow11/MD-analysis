@@ -40,21 +40,21 @@ def _print_sg_info(restart_path: str, log_path: str) -> None:
 
     from ..utils.constants import AU_TIME_TO_FS
 
-    ColvarMDInfo = lazy_import(
-        "md_analysis.utils.RestartParser.ColvarParser", "ColvarMDInfo",
+    read_constraint_run_from_files = lazy_import(
+        "md_analysis.engines.cp2k", "read_constraint_run_from_files",
     )
     try:
-        info = ColvarMDInfo.from_paths(restart_path, log_path)
+        info = read_constraint_run_from_files(restart_path, log_path)
     except Exception as exc:
         print(f"  (Could not parse metadata: {exc})")
         return
 
-    cv = info.restart.colvars.primary
-    dt_au = info.restart.timestep_fs / AU_TIME_TO_FS
+    cv = info.metadata.colvars.primary
+    dt_au = info.metadata.timestep_fs / AU_TIME_TO_FS
     growth_per_step = cv.target_growth_au * dt_au
     print(f"\n  Trajectory info:")
     print(f"    Steps:        {info.n_steps}")
-    print(f"    Timestep:     {info.restart.timestep_fs} fs")
+    print(f"    Timestep:     {info.metadata.timestep_fs} fs")
     print(f"    CV target:    {cv.target_au:.6f} a.u.")
     print(f"    CV growth:    {growth_per_step:.6e} a.u./step")
     xi = info.target_series_au()
@@ -62,7 +62,7 @@ def _print_sg_info(restart_path: str, log_path: str) -> None:
     print(f"    Valid index:   0 .. {info.n_steps - 1}")
 
     # Warn about overflow (nan) steps
-    nan_mask = np.isnan(info.lagrange.collective_shake)
+    nan_mask = np.isnan(info.lambda_series.collective_shake)
     n_nan = int(np.sum(nan_mask))
     if n_nan > 0:
         nan_indices = np.where(nan_mask)[0]
@@ -81,7 +81,11 @@ def _print_sg_info(restart_path: str, log_path: str) -> None:
 class _SlowgrowthPlotCmd(MenuCommand):
     """Base for slow-growth plot commands."""
 
-    _plot_style: str = "both"
+    # Workflow name to look up on md_analysis.workflows.enhanced_sampling.
+    # Subclasses override; the base value matches the historical
+    # ``plot_style="both"`` semantics by combining the two plot styles
+    # but is never instantiated directly.
+    _workflow_name: str = ""
 
     def _collect_all_params(self) -> dict:
         print()
@@ -122,25 +126,27 @@ class _SlowgrowthPlotCmd(MenuCommand):
         return ctx
 
     def execute(self, ctx: dict) -> None:
-        slowgrowth_analysis = lazy_import(
-            "md_analysis.enhanced_sampling.slowgrowth.SlowGrowthPlot",
-            "slowgrowth_analysis",
+        if not self._workflow_name:
+            raise RuntimeError(
+                f"{type(self).__name__} must set _workflow_name"
+            )
+        run_sg = lazy_import(
+            "md_analysis.workflows.enhanced_sampling",
+            self._workflow_name,
         )
-        outdir = ctx[K.OUTDIR_RESOLVED]
-        slowgrowth_analysis(
-            ctx[K.RESTART_PATH],
-            ctx[K.LOG_PATH],
+        run_sg(
+            restart_path=ctx[K.RESTART_PATH],
+            log_path=ctx[K.LOG_PATH],
+            output_dir=ctx[K.OUTDIR_RESOLVED],
             initial_step=ctx[K.INITIAL_STEP],
             final_step=ctx[K.FINAL_STEP],
-            output_dir=outdir,
-            plot_style=self._plot_style,
             colvar_id=ctx[K.COLVAR_ID],
         )
 
 
 class SGQuickPlotCmd(_SlowgrowthPlotCmd):
-    _plot_style = "quick"
+    _workflow_name = "run_slowgrowth_quick_plot"
 
 
 class SGPublicationPlotCmd(_SlowgrowthPlotCmd):
-    _plot_style = "publication"
+    _workflow_name = "run_slowgrowth_publication_plot"

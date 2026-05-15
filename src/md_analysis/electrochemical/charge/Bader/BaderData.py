@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 
 from ....scripts.utils.IndexMapper import read_index_map_from_poscar, remap_array
-from ....utils.BaderParser import load_bader_atoms
+from ....utils.formats.bader.acf import load_bader_atoms
 from ..config import (
     DEFAULT_ACF_FILENAME,
     DEFAULT_DIR_PATTERN,

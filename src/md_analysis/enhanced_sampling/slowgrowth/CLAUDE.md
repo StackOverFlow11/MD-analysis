@@ -27,5 +27,5 @@
 - **Bug 7c69901**：TARGET_GROWTH per-a.u.-time → per-step 转换遗漏，导致积分偏差一个 dt_au 因子
 - **Bug e3e116e**：积分曾用正号，应为负号（CP2K 约定）
 - **Bug bc16b9a**：CV 递减时 x 轴未反转，视觉上自由能曲线方向反了
-- `SlowgrowthFull.md_info` 保留原始 `ColvarMDInfo` — 可用于回溯 restart 参数
+- `SlowgrowthFull.md_info` 保留原始 `ConstraintRun` — 可用于回溯 restart 参数
 - NaN 步（overflow）在积分中传播 — 下游绘图需处理 NaN gap

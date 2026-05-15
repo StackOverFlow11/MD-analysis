@@ -31,8 +31,8 @@ def _parse_range_txt(range_txt_path: Path) -> tuple[float, float]:
 
 def test_adsorbed_water_theta_distribution_0_180_plot() -> None:
     """Compute and plot theta PDF (0-180 degree) inside detected adsorbed-water range."""
-    xyz_path = REPO_ROOT / "data_example" / "potential" / "md-pos-1.xyz"
-    md_inp_path = REPO_ROOT / "data_example" / "potential" / "md.inp"
+    xyz_path = REPO_ROOT / "data_example" / "potential" / "dense" / "md-pos-1.xyz"
+    md_inp_path = REPO_ROOT / "data_example" / "potential" / "dense" / "md.inp"
     out_dir = REPO_ROOT / "test" / "_tmp_preview"
     out_dir.mkdir(parents=True, exist_ok=True)
 

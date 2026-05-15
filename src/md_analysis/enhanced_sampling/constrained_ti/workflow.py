@@ -678,20 +678,20 @@ def standalone_diagnostics(
     -------
     dict with keys "report", "diagnostics_png", "csv".
     """
-    from ...utils.RestartParser.ColvarParser import ColvarMDInfo
+    from ...engines.cp2k import read_constraint_run_from_files
 
-    md_info = ColvarMDInfo.from_paths(restart_path, log_path)
-    lambda_series = md_info.lagrange.collective_shake
+    md_info = read_constraint_run_from_files(restart_path, log_path)
+    lambda_series = md_info.lambda_series.collective_shake
 
     constraint = (
-        md_info.restart.colvars[colvar_id]
+        md_info.metadata.colvars[colvar_id]
         if colvar_id is not None
-        else md_info.restart.colvars.primary
+        else md_info.metadata.colvars.primary
     )
     xi = float(constraint.target_au)
-    dt = float(md_info.restart.timestep_fs)
+    dt = float(md_info.metadata.timestep_fs)
 
-    t0 = float(md_info.restart.time_start_fs)
+    t0 = float(md_info.metadata.time_start_fs)
     report = analyze_standalone(
         lambda_series,
         dt=dt,
@@ -969,6 +969,7 @@ def run_ti_full_from_root(
     epsilon_tol_ev: float = DEFAULT_EPSILON_TOL_EV,
     auto_equilibration: bool = False,
     point_slice: str | None = None,
+    strict: bool = True,
 ) -> TIFullAnalysisReport:
     """End-to-end constrained-TI analysis from a root directory.
 
@@ -1007,6 +1008,11 @@ def run_ti_full_from_root(
         (e.g. ``"0:2"``, ``":4"``, ``"::2"``).  Must be a valid slice with
         2–3 colon-separated parts.  After slicing, at least 2 points must
         remain.
+    strict : bool, default ``True``
+        Forwarded to :func:`discover_ti_points`.  ``True`` (agent-facing
+        default): a matched directory missing required files raises
+        ``FileNotFoundError``.  ``False`` (CLI menu path): such
+        directories are skipped with a warning.
 
     Returns
     -------
@@ -1038,16 +1044,18 @@ def run_ti_full_from_root(
             f"root_dir not found or not a directory: {root_path}"
         )
 
-    # ── 1. Discover constraint points (strict: agent-facing) ─────────
-    # strict=True so a matched directory missing required files
-    # surfaces as FileNotFoundError rather than being silently skipped
-    # (the latter is acceptable for the CLI menu path).
+    # ── 1. Discover constraint points ────────────────────────────────
+    # strict defaults to True (agent-facing): a matched directory
+    # missing required files surfaces as FileNotFoundError rather than
+    # being silently skipped. The CLI menu path passes strict=False to
+    # preserve its historical lenient behavior (skip broken subdirs
+    # with a warning).
     point_defs = discover_ti_points(
         root_path,
         parser=parser,
         dir_filter=dir_filter,
         reverse=reverse,
-        strict=True,
+        strict=strict,
     )
 
     # ── 2. Optional slice selection (hard-validated) ─────────────────

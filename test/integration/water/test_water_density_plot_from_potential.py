@@ -19,8 +19,8 @@ from md_analysis.water import water_mass_density_z_distribution_analysis
 
 def test_water_density_analysis_and_plot_from_potential_data() -> None:
     """Generate CSV + PNG from data_example/potential using WaterDensity analysis."""
-    xyz_path = REPO_ROOT / "data_example" / "potential" / "md-pos-1.xyz"
-    md_inp_path = REPO_ROOT / "data_example" / "potential" / "md.inp"
+    xyz_path = REPO_ROOT / "data_example" / "potential" / "dense" / "md-pos-1.xyz"
+    md_inp_path = REPO_ROOT / "data_example" / "potential" / "dense" / "md.inp"
     out_dir = REPO_ROOT / "test" / "_tmp_preview"
     out_dir.mkdir(parents=True, exist_ok=True)
 

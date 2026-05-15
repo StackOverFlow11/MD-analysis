@@ -19,14 +19,14 @@ Interactive CLI package providing a VASPKIT-style numbered menu interface. Repla
 
 ## Dependencies
 
-- `cli` -> `main` (for integrated workflow functions like `run_water_analysis`)
+- `cli` -> `workflows` (for integrated workflow facades like `run_water_three_panel` and `run_potential_full`; the entrance refactor removed the CLI dependency on the legacy `md_analysis.main:run_*_analysis` shims)
 - `cli` -> `water`, `electrochemical.potential`, `electrochemical.charge`, `electrochemical.calibration` (for individual analysis functions)
 - `cli` -> `electrochemical.potential.config` (for default constants)
 - `cli` -> `scripts` (for `generate_bader_workdir`, `batch_generate_bader_workdirs`)
 - `cli` -> `enhanced_sampling.slowgrowth` (via `lazy_import` for `slowgrowth_analysis`)
 - `cli` -> `enhanced_sampling.constrained_ti` (via `lazy_import` for `standalone_diagnostics`, `analyze_ti`, `discover_ti_points`, etc.)
-- `cli` -> `utils.CellParser` (for `parse_abc_from_restart`, `parse_abc_from_md_inp`)
-- `cli` -> `utils.RestartParser.ColvarParser` (via `lazy_import` for `ColvarMDInfo`, used by `_enhanced_sampling.py` info display)
+- `cli` -> `utils.formats.cp2k_cell` (for `parse_abc_from_restart`, `parse_abc_from_md_inp`)
+- `cli` -> `utils.formats.cp2k_colvar` (via `lazy_import` for `ColvarMDInfo`, used by `_enhanced_sampling.py` info display)
 - `cli` -> `config` (for persistent user configuration, `CONFIGURABLE_DEFAULTS` registry, and `delete_config`)
 - No reverse dependencies: no other module imports from `cli`
 

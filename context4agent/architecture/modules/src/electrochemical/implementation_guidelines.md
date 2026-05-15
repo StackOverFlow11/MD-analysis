@@ -11,8 +11,8 @@
 
 ## 依赖方向
 
-- `electrochemical.potential` → `utils`（CubeParser, LayerParser, ClusterUtils, config, _io_helpers）
-- `electrochemical.charge` → `utils`（BaderParser, LayerParser, WaterParser, config, _io_helpers）
+- `electrochemical.potential` → `utils`（formats.cube, structure.layer, structure.cluster, config, _io_helpers）
+- `electrochemical.charge` → `utils`（formats.bader, structure.layer, structure.water, config, _io_helpers）
 - `electrochemical.calibration` → numpy, matplotlib（scipy 仅 spline 拟合时 lazy import）
 - `potential`、`charge`、`calibration` **互不依赖**
 - 其他模块不应直接依赖 `electrochemical/__init__.py`（应通过子包访问）

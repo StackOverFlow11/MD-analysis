@@ -54,8 +54,14 @@ Lightweight analysis utilities for periodic metal-water interfaces from CP2K MD 
 
 ```bash
 pip install numpy matplotlib ase pytest tqdm
-pip install .
+pip install -e .   # editable install — recommended for development;
+                   # without -e, tests may import a stale site-packages copy.
 ```
+
+If you skip the editable install (or use a non-editable `pip install .`),
+prefix every test command with `PYTHONPATH=src` so pytest imports the
+current working tree instead of any older copy installed in your
+environment.
 
 ### CLI (interactive menu)
 
@@ -78,9 +84,17 @@ The VASPKIT-style numbered menu guides you through:
 - **4) Scripts / Tools**
   - **41) Bader** — single frame (411), batch (412)
   - **42) TI** — single target (421), batch (422)
-- **9) Settings** — VASP script (901), CP2K script (908), show config (902), analysis defaults (903-906), reset (907), potential reference (909)
+  - **43) SP Potential** — single (431), batch (432)
+  - **44) DeePMD SP** — single (441), batch (442)
+- **9) Settings**
+  - **90) Show / Reset** — show config (900), reset all (909)
+  - **91) Script Paths** — VASP submit (911), CP2K submit (912), SP inp template (913), DP SP inp template (914)
+  - **92) Analysis Defaults** — layer tol (921), Z bin (922), theta bin (923), water O-H cutoff (924)
+  - **93) Potential Output** — reference scale / pH / T / φ_PZC (931)
 
 Each option prompts for required inputs, then offers an optional "Modify advanced parameters?" gate.
+
+> **Chinese user docs (CLI guide / workflows / settings / pitfalls):** see [`docs/`](docs/README.md).
 
 ### Python API
 
@@ -88,20 +102,37 @@ Each option prompts for required inputs, then offers an optional "Modify advance
 from md_analysis.water import plot_water_three_panel_analysis
 
 plot_water_three_panel_analysis(
-    xyz_path="data_example/potential/md-pos-1.xyz",
-    md_inp_path="data_example/potential/md.inp",
+    xyz_path="data_example/potential/dense/md-pos-1.xyz",
+    md_inp_path="data_example/potential/dense/md.inp",
     output_dir="output/",
 )
 ```
 
-Or use the programmatic entry points:
+Or use the programmatic entry points (canonical module:
+`md_analysis.workflows`; the same names are re-exported by
+`md_analysis.main` as a thin facade):
 
 ```python
-from md_analysis.main import (
-    run_water_analysis, run_potential_analysis, run_charge_analysis,
-    run_tracked_charge_analysis, run_counterion_charge_analysis, run_all,
+from md_analysis.workflows import (
+    run_water_three_panel, run_potential_full,
+    run_surface_charge, run_tracked_charge, run_counterion_charge,
+    run_interface_analysis,  # composite: water + potential
 )
+
+# Each run_* returns a WorkflowResult; iterate result.artifacts:
+result = run_water_three_panel(
+    xyz_path="data_example/potential/dense/md-pos-1.xyz",
+    md_inp_path="data_example/potential/dense/md.inp",
+    output_dir="output/water/",
+)
+for name, path in result.artifacts.items():
+    print(name, path)
 ```
+
+> The legacy `run_*_analysis` / `run_all` names that previously lived
+> in `md_analysis.main` were removed in the entrance refactor
+> (Phase 7a) without an alias — switch to the names above and read
+> `WorkflowResult.artifacts` instead of the old `dict[str, Path]`.
 
 Generate VASP Bader work directories from an MD trajectory:
 
@@ -127,10 +158,11 @@ batch_generate_bader_workdirs(
 
 ### Example input data
 
-- `data_example/potential/md-pos-1.xyz` — trajectory frames
-- `data_example/potential/md.inp` — cell parameters (`ABC [angstrom] a b c`)
-- `data_example/potential/md.out` — CP2K output with Fermi energies
-- `data_example/potential/md-POTENTIAL-v_hartree-1_*.cube` — Hartree potential cube snapshots
+- `data_example/potential/dense/md-pos-1.xyz` — trajectory frames (continuous mode)
+- `data_example/potential/dense/md.inp` — cell parameters (`ABC [angstrom] a b c`)
+- `data_example/potential/dense/md.out` — CP2K output with Fermi energies
+- `data_example/potential/dense/md-POTENTIAL-v_hartree-1_*.cube` — Hartree potential cube snapshots
+- `data_example/potential/distributed/potential_t*_i*/` — per-frame SP subdirs (distributed mode)
 - `data_example/bader/bader_work_dir/` — POSCAR, ACF.dat, POTCAR for Bader charge tests
 - `data_example/sg/` — CP2K COLVAR restart + LagrangeMultLog files (4 scenarios: angle, distance, combinedCV, more_constrain)
 
@@ -155,19 +187,38 @@ src/md_analysis/
 │   ├── _constrained_ti.py  #   constrained TI sub-menu (311-313)
 │   ├── _scripts.py         #   scripts/tools sub-menu (411-412, 421-422)
 │   └── _settings.py        #   settings sub-menu (901-909)
-├── utils/                  # single-frame low-level tools
+├── utils/                  # single-frame low-level tools (split into 3 layers)
 │   ├── constants.py        #   physical constants, unit conversions, cSHE parameters, defaults
-│   ├── _io_helpers.py      #   private shared I/O helpers (_cumulative_average, _write_csv)
-│   ├── _frame_discovery.py #   private: frame directory discovery (bader_t*_i* / potential_t*_i*)
-│   ├── CubeParser.py       #   cube file I/O, plane-averaged φ(z), slab-averaged potential
-│   ├── BaderParser.py      #   VASP Bader charge parsing (ACF.dat + POTCAR)
-│   ├── StructureParser/    #   structure analysis sub-package
-│   │   ├── ClusterUtils.py #     1D periodic clustering + gap detection
-│   │   ├── LayerParser.py  #     metal layer detection, interface identification
-│   │   └── WaterParser.py  #     water topology, density/orientation/angle profiles
-│   └── RestartParser/      #   CP2K restart file parsing sub-package
-│       ├── CellParser.py   #     cell parameter parsing (.restart + md.inp)
-│       └── ColvarParser.py #     COLVAR restart + LagrangeMultLog parsing
+│   ├── formats/            #   single-file parsers, grouped by engine family
+│   │   ├── common/         #     engine-neutral formats
+│   │   │   └── cube.py     #       cube file I/O, plane-averaged φ(z), slab-averaged potential
+│   │   ├── cp2k/           #     CP2K single-file parsers
+│   │   │   ├── cell.py     #       cell parameter parsing (.restart + md.inp)
+│   │   │   ├── colvar.py   #       COLVAR restart + LagrangeMultLog (ConstraintMetadata / LambdaSeries)
+│   │   │   ├── stdout.py   #       md.out / sp.out Fermi-level + step/time parsing
+│   │   │   └── xyz.py      #       xyz step-comment parser + per-step Atoms streaming
+│   │   ├── vasp/           #     VASP placeholders (NotImplementedError, NOT auto-registered)
+│   │   │   ├── report.py   #       VASP REPORT (constraint MD)
+│   │   │   ├── outcar.py   #       VASP OUTCAR (Fermi series)
+│   │   │   └── locpot.py   #       VASP LOCPOT (planar-averaged potential)
+│   │   └── bader/          #     Bader code outputs
+│   │       ├── _errors.py  #       BaderParseError (shared)
+│   │       ├── acf.py      #       ACF.dat parsing + load_bader_atoms
+│   │       └── potcar.py   #       POTCAR ZVAL extraction
+│   ├── structure/          #   geometric / chemical-semantics helpers
+│   │   ├── cluster.py      #     1D periodic clustering + gap detection
+│   │   ├── layer.py        #     metal layer detection, interface identification
+│   │   └── water.py        #     water topology, density/orientation/angle profiles
+│   └── io/                 #   generic I/O scaffolding (engine-neutral only)
+│       ├── _frame_discovery.py  # private: frame directory discovery (bader_t*_i* / potential_t*_i*)
+│       └── _io_helpers.py       # private shared I/O helpers (_cumulative_average, _write_csv)
+├── engines/                # CP2K / VASP engine facade + neutral dataclasses
+│   ├── __init__.py         #   public facade (Protocol, registry, models, CP2K read_*)
+│   ├── protocols.py        #   ConstraintMDParser Protocol + parser registry
+│   ├── models.py           #   ConstraintMetadata / LambdaSeries / PotentialFrame / FermiRecord
+│   ├── cp2k.py             #   CP2KParser + read_constraint_metadata / read_lambda_series /
+│   │                       #     read_fermi_series / read_continuous|distributed_potential_frames
+│   └── vasp.py             #   VASPParser placeholder (NotImplementedError, NOT auto-registered)
 ├── water/                  # multi-frame water analysis workflows
 │   ├── config.py           #   water analysis defaults + output filename constants
 │   ├── Water.py            #   plot_water_three_panel_analysis() — primary entry point
@@ -199,8 +250,8 @@ src/md_analysis/
 test/
 ├── conftest.py             # shared fixtures
 ├── unit/
-│   ├── utils/              # ClusterUtils, LayerParser, WaterParser, BaderParser, CellParser,
-│   │                       #   CubeParser, ColvarParser (SlowGrowth parser)
+│   ├── utils/              # tests for formats.{common.cube, bader.{acf,potcar}, cp2k.{cell,colvar,stdout,xyz}}
+│   │                       #   + structure.{layer,water,cluster} + io._frame_discovery
 │   ├── cli/                # MenuCommand error handling, settings defaults
 │   ├── calibration/        # CalibrationData, Mapper, reference conversion, workflow
 │   ├── charge/             # surface charge, atom charges, tracked charges
@@ -218,7 +269,11 @@ test/
     └── test_main.py        # programmatic entry points (run_* functions)
 
 data_example/               # minimal reproducible input data
-├── potential/              #   cube files, md.out, md-pos-1.xyz, md.inp, .restart files
+├── potential/
+│   ├── dense/              #   continuous-mode fixture: md.inp / md.out /
+│   │                       #   md-pos-1.xyz / md-POTENTIAL-v_hartree-1_*.cube
+│   └── distributed/        #   distributed-mode fixture: per-frame potential_t*_i*/
+│                           #   sub-directories with cube + sp.out
 ├── bader/                  #   bader_work_dir/ with POSCAR, ACF.dat, POTCAR
 ├── sg/                     #   COLVAR restart + LagrangeMultLog test data (4 scenarios)
 └── ti/                     #   8 ti_target_* constraint-point directories for TI regression tests
@@ -228,16 +283,20 @@ context4agent/              # architecture contracts, decisions, requirements
 ## Running Tests
 
 ```bash
-# All tests (requires pip install . first)
-pytest test/
+# All tests — prefix with PYTHONPATH=src if you used a non-editable
+# install, otherwise pytest may import a stale site-packages copy:
+PYTHONPATH=src pytest test/
 
 # Single unit test file
-pytest test/unit/utils/test_water_parser.py
+PYTHONPATH=src pytest test/unit/utils/test_water_parser.py
 
 # Specific module tests
-pytest test/unit/utils/test_slowgrowth_parser.py   # ColvarParser tests
-pytest test/unit/charge/test_charge_analysis.py     # Bader charge tests
-pytest test/integration/                             # all integration tests
+PYTHONPATH=src pytest test/unit/utils/test_slowgrowth_parser.py   # cp2k.colvar tests
+PYTHONPATH=src pytest test/unit/charge/test_charge_analysis.py     # Bader charge tests
+PYTHONPATH=src pytest test/integration/                             # all integration tests
+
+# With an editable install (`pip install -e .`) the PYTHONPATH=src
+# prefix is unnecessary.
 ```
 
 ## Architecture Notes

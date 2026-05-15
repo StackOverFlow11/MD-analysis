@@ -9,7 +9,7 @@ Core Bader charge analysis sub-package. Handles surface charge density (two meth
 - `BaderData.py` — `BaderTrajectoryData` frozen dataclass + `load_bader_trajectory()` (remap via IndexMap to XYZ order)
 - `SurfaceCharge.py` — `SurfaceChargeResult` frozen dataclass (return type of `surface_charge_analysis`), `compute_frame_surface_charge()` (counterion/layer methods), `trajectory_surface_charge()`, `surface_charge_analysis()` (end-to-end CSV+PNG with optional calibration, returns `SurfaceChargeResult`)
 - `AtomCharges.py` — `frame_indexed_atom_charges()`, `trajectory_indexed_atom_charges()`, `tracked_atom_charge_analysis()`, `counterion_charge_analysis()`
-- `_frame_utils.py` — delegates to `utils/_frame_discovery.py` for frame directory discovery and step/time extraction
+- `_frame_utils.py` — delegates to `utils/io/_frame_discovery.py` for frame directory discovery and step/time extraction
 - `_plot.py` — matplotlib plotting helpers (`plot_surface_charge`, `plot_single_side_charge`, `plot_tracked_charges`, `plot_counterion_charges`)
 
 ## Two Charge Methods
@@ -27,8 +27,8 @@ Core Bader charge analysis sub-package. Handles surface charge density (two meth
 
 ## Dependencies
 
-- `utils.BaderParser` (load_bader_atoms)
-- `utils.StructureParser` (LayerParser, WaterParser)
+- `utils.formats.bader` (load_bader_atoms)
+- `utils.structure` (structure.layer, structure.water)
 - `utils.constants` (AREA_VECTOR_INDICES, AXIS_MAP)
 - `scripts.utils.IndexMapper` (remap_array, read_index_map_from_poscar)
 - `electrochemical.calibration` (optional, for phi extrapolation)

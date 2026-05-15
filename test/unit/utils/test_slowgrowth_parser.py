@@ -1,4 +1,4 @@
-"""Tests for ColvarParser — restart + LagrangeMultLog parsing."""
+"""Tests for CP2K colvar parsers — restart + LagrangeMultLog parsing."""
 
 from __future__ import annotations
 
@@ -8,14 +8,21 @@ import numpy as np
 import pytest
 
 from md_analysis.utils.constants import AU_TIME_TO_FS
-from md_analysis.utils.RestartParser import (
+from md_analysis.engines.models import (
     ColvarInfo,
-    ColvarMDInfo,
-    ColvarParseError,
-    ColvarRestart,
     ConstraintInfo,
-    LagrangeMultLog,
+    ConstraintMetadata,
+    ConstraintRun,
+    LambdaSeries,
+)
+from md_analysis.engines.cp2k import (
     compute_target_series,
+    read_constraint_metadata_from_restart,
+    read_constraint_run_from_files,
+    read_lambda_series_from_log,
+)
+from md_analysis.utils.formats.cp2k.colvar import (
+    ColvarParseError,
     parse_colvar_restart,
     parse_lagrange_mult_log,
 )
@@ -64,7 +71,7 @@ class TestParseColvarRestart:
     """Parse restart files for all 4 data scenarios."""
 
     def test_angle(self):
-        r = parse_colvar_restart(DATA / "angle" / "slowgrowth-1.restart")
+        r = read_constraint_metadata_from_restart(DATA / "angle" / "slowgrowth-1.restart")
         assert r.project_name == "slowgrowth"
         assert r.step_start == 5100
         assert r.total_steps == 6000
@@ -87,7 +94,7 @@ class TestParseColvarRestart:
         assert r.fixed_atom_indices is None
 
     def test_distance(self):
-        r = parse_colvar_restart(
+        r = read_constraint_metadata_from_restart(
             DATA / "distance" / "slowgrowth-1.restart.bak-1"
         )
         assert r.project_name == "slowgrowth"
@@ -103,7 +110,7 @@ class TestParseColvarRestart:
         assert r.fixed_atom_indices is None
 
     def test_distance_combinedCV(self):
-        r = parse_colvar_restart(
+        r = read_constraint_metadata_from_restart(
             DATA / "distance_combinedCV" / "slowgrowth-1.restart"
         )
         assert r.project_name == "slowgrowth"
@@ -116,7 +123,7 @@ class TestParseColvarRestart:
         assert r.fixed_atom_indices is None
 
     def test_more_constrain(self):
-        r = parse_colvar_restart(
+        r = read_constraint_metadata_from_restart(
             DATA / "more_constrain" / "slowgrowth-1.restart"
         )
         assert r.project_name == "slowgrowth"
@@ -153,7 +160,7 @@ class TestMultiCollectiveBlocks:
     """Test parsing of restart files with multiple &COLLECTIVE blocks."""
 
     def test_more_constrain_has_multiple_colvars(self):
-        r = parse_colvar_restart(
+        r = read_constraint_metadata_from_restart(
             DATA / "more_constrain" / "slowgrowth-1.restart"
         )
         # more_constrain has multiple COLLECTIVE blocks
@@ -191,7 +198,7 @@ class TestMultiCollectiveBlocks:
             "  &END CONSTRAINT\n"
             "&END MOTION\n"
         )
-        r = parse_colvar_restart(restart)
+        r = read_constraint_metadata_from_restart(restart)
         assert r.project_name == "multi_cv"
         assert len(r.colvars) == 2
 
@@ -219,7 +226,7 @@ class TestParseLagrangeMultLog:
         )
 
     def test_angle_single(self):
-        log = parse_lagrange_mult_log(self._log_path("angle"))
+        log = read_lambda_series_from_log(self._log_path("angle"))
         assert log.n_constraints == 1
         assert log.n_steps > 0
         assert log.shake.ndim == 1
@@ -234,19 +241,19 @@ class TestParseLagrangeMultLog:
         np.testing.assert_array_equal(log.collective_rattle, log.rattle)
 
     def test_distance_single(self):
-        log = parse_lagrange_mult_log(self._log_path("distance"))
+        log = read_lambda_series_from_log(self._log_path("distance"))
         assert log.n_constraints == 1
         assert log.n_steps > 0
         assert log.shake.ndim == 1
 
     def test_combinedCV_single(self):
-        log = parse_lagrange_mult_log(self._log_path("distance_combinedCV"))
+        log = read_lambda_series_from_log(self._log_path("distance_combinedCV"))
         assert log.n_constraints == 1
         assert log.n_steps > 0
         assert log.shake.ndim == 1
 
     def test_more_constrain_multi(self):
-        log = parse_lagrange_mult_log(self._log_path("more_constrain"))
+        log = read_lambda_series_from_log(self._log_path("more_constrain"))
         assert log.n_constraints > 1
         assert log.n_steps > 0
         assert log.shake.ndim == 2
@@ -271,8 +278,8 @@ class TestComputeTargetSeries:
 
     def test_at_step_start_equals_target(self):
         """xi(step_start) == target_au by construction."""
-        r = parse_colvar_restart(DATA / "angle" / "slowgrowth-1.restart")
-        log = parse_lagrange_mult_log(
+        r = read_constraint_metadata_from_restart(DATA / "angle" / "slowgrowth-1.restart")
+        log = read_lambda_series_from_log(
             DATA / "angle"
             / "slowgrowth-constraint_force.dat-1.LagrangeMultLog"
         )
@@ -286,7 +293,7 @@ class TestComputeTargetSeries:
 
     def test_linear_growth(self):
         """Verify linearity: xi(k+1) - xi(k) == growth_per_step."""
-        r = parse_colvar_restart(
+        r = read_constraint_metadata_from_restart(
             DATA / "distance" / "slowgrowth-1.restart.bak-1"
         )
         xi = compute_target_series(r, 100)
@@ -296,7 +303,7 @@ class TestComputeTargetSeries:
         np.testing.assert_allclose(diffs, expected_step, rtol=1e-10)
 
     def test_shape(self):
-        r = parse_colvar_restart(
+        r = read_constraint_metadata_from_restart(
             DATA / "distance_combinedCV" / "slowgrowth-1.restart"
         )
         xi = compute_target_series(r, 50)
@@ -326,7 +333,7 @@ class TestComputeTargetSeries:
             "  &END CONSTRAINT\n"
             "&END MOTION\n"
         )
-        r = parse_colvar_restart(restart)
+        r = read_constraint_metadata_from_restart(restart)
         dt_au = r.timestep_fs / AU_TIME_TO_FS
         # Default uses primary (colvar_id=1); step_start=0, so xi[0]=target_au
         xi_default = compute_target_series(r, 10)
@@ -349,7 +356,7 @@ class TestEdgeCases:
         empty = tmp_path / "empty.LagrangeMultLog"
         empty.write_text("")
         with pytest.raises(ColvarParseError, match="empty"):
-            parse_lagrange_mult_log(empty)
+            read_lambda_series_from_log(empty)
 
     def test_missing_constraint_raises(self, tmp_path):
         fake = tmp_path / "no_constraint.restart"
@@ -360,11 +367,11 @@ class TestEdgeCases:
             "  &END MD\n&END MOTION\n"
         )
         with pytest.raises(ColvarParseError, match="CONSTRAINT"):
-            parse_colvar_restart(fake)
+            read_constraint_metadata_from_restart(fake)
 
     def test_fixed_atoms_range_expansion(self, tmp_path):
         """Verify that N..M range syntax is expanded correctly."""
-        from md_analysis.utils.RestartParser.ColvarParser import (
+        from md_analysis.utils.formats.cp2k.colvar import (
             _parse_fixed_atoms_list,
         )
         text = (
@@ -379,11 +386,11 @@ class TestEdgeCases:
 
 
 # =========================================================================
-# ColvarMDInfo
+# ConstraintRun
 # =========================================================================
 
-class TestColvarMDInfo:
-    """Test ColvarMDInfo — combined restart + log session object."""
+class TestConstraintRun:
+    """Test ConstraintRun — combined restart + log session object."""
 
     def _restart_path(self, scenario: str) -> Path:
         mapping = {
@@ -401,15 +408,15 @@ class TestColvarMDInfo:
         )
 
     def test_from_paths(self):
-        info = ColvarMDInfo.from_paths(
+        info = read_constraint_run_from_files(
             self._restart_path("angle"), self._log_path("angle"),
         )
-        assert isinstance(info.restart, ColvarRestart)
-        assert isinstance(info.lagrange, LagrangeMultLog)
-        assert info.n_steps == info.lagrange.n_steps
+        assert isinstance(info.metadata, ConstraintMetadata)
+        assert isinstance(info.lambda_series, LambdaSeries)
+        assert info.n_steps == info.lambda_series.n_steps
 
     def test_steps_start_from_zero(self):
-        info = ColvarMDInfo.from_paths(
+        info = read_constraint_run_from_files(
             self._restart_path("angle"), self._log_path("angle"),
         )
         steps = info.steps
@@ -418,10 +425,10 @@ class TestColvarMDInfo:
         assert len(steps) == info.n_steps
 
     def test_times_fs(self):
-        info = ColvarMDInfo.from_paths(
+        info = read_constraint_run_from_files(
             self._restart_path("angle"), self._log_path("angle"),
         )
-        dt = info.restart.timestep_fs
+        dt = info.metadata.timestep_fs
         times = info.times_fs
         assert times[0] == pytest.approx(0.0)
         assert times[1] == pytest.approx(dt)
@@ -429,25 +436,25 @@ class TestColvarMDInfo:
 
     def test_target_at_step_start(self):
         """xi(step_start) == target_au — the restart snapshot anchor."""
-        info = ColvarMDInfo.from_paths(
+        info = read_constraint_run_from_files(
             self._restart_path("angle"), self._log_path("angle"),
         )
-        s0 = info.restart.step_start
+        s0 = info.metadata.step_start
         if s0 < info.n_steps:
             xi = info.target_series_au()
             assert xi[s0] == pytest.approx(
-                info.restart.colvars.primary.target_au, rel=1e-10,
+                info.metadata.colvars.primary.target_au, rel=1e-10,
             )
 
     def test_target_linear_growth(self):
         """Verify linearity: xi(k+1) - xi(k) == growth_per_step."""
-        info = ColvarMDInfo.from_paths(
+        info = read_constraint_run_from_files(
             self._restart_path("distance"), self._log_path("distance"),
         )
         xi = info.target_series_au()
         diffs = np.diff(xi)
-        dt_au = info.restart.timestep_fs / AU_TIME_TO_FS
-        expected_step = info.restart.colvars.primary.target_growth_au * dt_au
+        dt_au = info.metadata.timestep_fs / AU_TIME_TO_FS
+        expected_step = info.metadata.colvars.primary.target_growth_au * dt_au
         np.testing.assert_allclose(diffs, expected_step, rtol=1e-10)
 
     def test_target_with_colvar_id(self, tmp_path):
@@ -487,8 +494,8 @@ class TestColvarMDInfo:
             "Shake Lagrangian Multipliers: 0.5\n"
             "Rattle Lagrangian Multipliers: 0.6\n"
         )
-        info = ColvarMDInfo.from_paths(restart, log_file)
-        dt_au = info.restart.timestep_fs / AU_TIME_TO_FS
+        info = read_constraint_run_from_files(restart, log_file)
+        dt_au = info.metadata.timestep_fs / AU_TIME_TO_FS
         # step_start=0, so xi[0] = target_au
         xi1 = info.target_series_au()
         assert xi1[0] == pytest.approx(1.0)
@@ -499,10 +506,61 @@ class TestColvarMDInfo:
         assert xi2[1] == pytest.approx(5.0 + (-0.05) * dt_au)
 
     def test_consistent_with_compute_target_series(self):
-        """ColvarMDInfo.target_series_au matches standalone compute_target_series."""
-        info = ColvarMDInfo.from_paths(
+        """ConstraintRun.target_series_au matches standalone compute_target_series."""
+        info = read_constraint_run_from_files(
             self._restart_path("angle"), self._log_path("angle"),
         )
         xi_method = info.target_series_au()
-        xi_func = compute_target_series(info.restart, info.n_steps)
+        xi_func = compute_target_series(info.metadata, info.n_steps)
         np.testing.assert_array_equal(xi_method, xi_func)
+
+
+# =========================================================================
+# Raw parser contract (Phase 4 Commit 2 — codex Commit 1 LOW 1 fold)
+# =========================================================================
+
+
+class TestRawParserContract:
+    """Direct raw-parser contract: parse_colvar_restart and
+    parse_lagrange_mult_log return ``Cp2k*Raw`` types, not canonical.
+
+    The canonical facade (``read_constraint_metadata_from_restart`` /
+    ``read_lambda_series_from_log``) is covered by ``TestParseColvarRestart``
+    and ``TestParseLagrangeMultLog`` above; this class pins the raw layer
+    so any future refactor that accidentally re-introduces canonical
+    types into ``utils.formats.cp2k.colvar`` fails loudly.
+    """
+
+    def test_parse_colvar_restart_returns_raw_metadata(self):
+        from md_analysis.utils.formats.cp2k.colvar import (
+            Cp2kColvarInfoRaw,
+            Cp2kConstraintInfoRaw,
+            Cp2kConstraintMetadataRaw,
+        )
+
+        raw = parse_colvar_restart(DATA / "angle" / "slowgrowth-1.restart")
+
+        assert isinstance(raw, Cp2kConstraintMetadataRaw)
+        assert isinstance(raw.colvars, Cp2kColvarInfoRaw)
+        assert raw.colvars.constraints  # non-empty tuple
+        assert isinstance(raw.colvars.constraints[0], Cp2kConstraintInfoRaw)
+
+        # Raw field access (no canonical @property indirection).
+        assert raw.project_name == "slowgrowth"
+        assert raw.step_start == 5100
+        assert raw.colvars.constraints[0].colvar_id == 1
+        assert raw.colvars.constraints[0].intermolecular is True
+
+    def test_parse_lagrange_mult_log_returns_raw_series(self):
+        from md_analysis.utils.formats.cp2k.colvar import Cp2kLambdaSeriesRaw
+
+        # Real CP2K filename: <project>-<lagrange_filename>-1.LagrangeMultLog
+        log = parse_lagrange_mult_log(
+            DATA / "angle" / "slowgrowth-constraint_force.dat-1.LagrangeMultLog"
+        )
+
+        assert isinstance(log, Cp2kLambdaSeriesRaw)
+        assert log.n_steps > 0
+        assert log.n_constraints >= 1
+        assert log.shake.shape[0] == log.n_steps
+        assert log.rattle.shape[0] == log.n_steps

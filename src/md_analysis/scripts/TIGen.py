@@ -13,12 +13,10 @@ from ase import Atoms
 from ase.io import iread, write
 
 from ..config import KEY_CP2K_SCRIPT_PATH, get_config
+from ..engines.models import ConstraintMetadata
 from ..exceptions import MDAnalysisError
 from ..utils.constants import AU_TIME_TO_FS
-from ..utils.RestartParser.ColvarParser import (
-    ColvarRestart,
-    parse_colvar_restart,
-)
+from ..engines.cp2k import read_constraint_metadata_from_restart
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +71,7 @@ _COORD_FILE_FORMAT_RE = re.compile(
 # ---------------------------------------------------------------------------
 
 
-def _cv_at_step(restart: ColvarRestart, step: int,
+def _cv_at_step(restart: ConstraintMetadata, step: int,
                 colvar_id: int | None = None) -> float:
     """Compute the target CV value (a.u.) at a given absolute step."""
     c = (restart.colvars[colvar_id]
@@ -85,7 +83,7 @@ def _cv_at_step(restart: ColvarRestart, step: int,
 
 def _load_trajectory_cv(
     xyz_path: str | Path,
-    restart: ColvarRestart,
+    restart: ConstraintMetadata,
     colvar_id: int | None = None,
 ) -> list[tuple[int, float, Atoms]]:
     """Load all trajectory frames, returning ``(step, cv_au, atoms)`` triples.
@@ -258,19 +256,22 @@ def _plan_ti_targets(
     *,
     targets_au: list[float] | np.ndarray | None = None,
     time_range: dict[str, float | int] | None = None,
+    colvar_id: int | None = None,
 ) -> list[_PlannedTarget]:
-    """Plan a list of TI targets (primary CV only).
+    """Plan a list of TI targets.
 
     Accepts exactly one target specification:
 
     - ``targets_au``: explicit list of CV values in atomic units
     - ``time_range``: dict ``{time_initial_fs, time_final_fs, n_points}``
 
-    Each planned target carries the snapped CV (from the nearest SG
-    trajectory frame) plus metadata for agent-layer metrics and
-    collision checks.  ``inp_path`` is accepted for signature symmetry
-    with :func:`batch_generate_ti_workdirs` but not read here (the inp
-    file is consumed only at generation time).
+    ``colvar_id`` selects which constraint the CV is read from
+    (``None`` = primary / first colvar).  Each planned target carries
+    the snapped CV (from the nearest SG trajectory frame) plus metadata
+    for agent-layer metrics and collision checks.  ``inp_path`` is
+    accepted for signature symmetry with
+    :func:`batch_generate_ti_workdirs` but not read here (the inp file
+    is consumed only at generation time).
     """
     numeric_mode = targets_au is not None
     time_mode = time_range is not None
@@ -283,8 +284,8 @@ def _plan_ti_targets(
             "Must specify either targets_au or time_range."
         )
 
-    restart = parse_colvar_restart(restart_path)
-    frames = _load_trajectory_cv(xyz_path, restart, colvar_id=None)
+    restart = read_constraint_metadata_from_restart(restart_path)
+    frames = _load_trajectory_cv(xyz_path, restart, colvar_id)
 
     if time_mode:
         required_keys = {"time_initial_fs", "time_final_fs", "n_points"}
@@ -309,7 +310,7 @@ def _plan_ti_targets(
         requested: list[float] = []
         for t in times:
             step_idx = round(t / restart.timestep_fs)
-            requested.append(_cv_at_step(restart, step_idx, colvar_id=None))
+            requested.append(_cv_at_step(restart, step_idx, colvar_id))
     else:
         requested = [float(x) for x in targets_au]  # type: ignore[union-attr]
 
@@ -401,21 +402,41 @@ def generate_ti_batch_with_report(
     time_range: dict[str, float | int] | None = None,
     steps: int = 10000,
     script_path: str | Path | None = None,
+    colvar_id: int | None = None,
+    overwrite: bool = False,
+    verbose: bool = False,
 ) -> TIGenBatchReport:
     """Agent-safe batch generator with collision check and structured report.
 
-    This wrapper is intended as the backend for the ``ti_gen_batch`` agent
-    task.  Differences from :func:`batch_generate_ti_workdirs`:
+    This wrapper is the backend for the ``ti_gen_batch`` agent task and
+    (via ``workflows.scripts.run_ti_batch``) for CLI 422.  Differences
+    from :func:`batch_generate_ti_workdirs`:
 
     - Uses an object-form ``time_range`` dict instead of three separate
       positional-ish args (more JSON Schema friendly).
     - Returns a :class:`TIGenBatchReport` so metrics can flow into the
       agent layer without reparsing directory names.
     - **Collision check**: if any planned target directory name already
-      exists under ``output_dir``, raises :class:`ValueError` *before*
-      writing anything.  The old :func:`batch_generate_ti_workdirs` does
-      not do this and retains its overwrite behaviour for CLI 422.
-    - MVP: primary CV only (no ``colvar_id``).
+      exists under ``output_dir`` *and* ``overwrite`` is False, raises
+      :class:`ValueError` *before* writing anything.
+
+    ``colvar_id`` selects which constraint the CV target is read from
+    (``None`` = primary / first colvar; default).  This is pure
+    plumbing — snapping, ``ti_target_<cv>`` dirname formatting, and the
+    inp-modification rules are unchanged.
+
+    ``overwrite`` (default False = agent-safe collision guard) only
+    skips the pre-write collision check.  Per-target generation still
+    goes through :func:`generate_ti_workdir`, which uses
+    ``mkdir(exist_ok=True)`` and rewrites ``cMD.inp`` / ``init.xyz`` /
+    ``script.sh`` in place.  It is a per-file overwrite — **no
+    ``rmtree``, no directory wipe**; any other file already present in a
+    colliding ``ti_target_*`` directory is left untouched.  CLI 422
+    passes ``overwrite=True`` to preserve its historical
+    overwrite-on-regeneration behavior.
+
+    ``verbose`` shows a tqdm progress bar (CLI 422 passes True; the
+    agent task does not expose it).
 
     Parameters
     ----------
@@ -446,7 +467,8 @@ def generate_ti_batch_with_report(
         ``time_range``).
     ValueError
         A planned target directory already exists under ``output_dir``
-        (collision check).  No files are written in this case.
+        and ``overwrite`` is False (collision check).  No files are
+        written in this case.
     FileNotFoundError
         ``inp_path`` / ``xyz_path`` / ``restart_path`` / ``script_path``
         missing on disk.
@@ -470,33 +492,44 @@ def generate_ti_batch_with_report(
         restart_path=restart_path,
         targets_au=targets_au,
         time_range=time_range,
+        colvar_id=colvar_id,
     )
 
     # Collision check — compare planned dirnames against existing ti_target_*
     # directory names.  Use exact string match (6-decimal dirname) as key.
-    existing_names = {p.name for p in output_dir.glob("ti_target_*") if p.is_dir()} \
-        if output_dir.is_dir() else set()
-    collisions = [pl.dirname for pl in planned if pl.dirname in existing_names]
-    if collisions:
-        raise ValueError(
-            "TI workdir collision — the following target directories already "
-            f"exist under {output_dir}: {sorted(collisions)}. "
-            "Remove them or choose different targets to proceed."
-        )
+    # overwrite=True only skips this pre-write guard; per-target generation
+    # below still does a per-file overwrite via mkdir(exist_ok=True) — it
+    # never removes or wipes a colliding directory.
+    if not overwrite:
+        existing_names = {p.name for p in output_dir.glob("ti_target_*") if p.is_dir()} \
+            if output_dir.is_dir() else set()
+        collisions = [pl.dirname for pl in planned if pl.dirname in existing_names]
+        if collisions:
+            raise ValueError(
+                "TI workdir collision — the following target directories already "
+                f"exist under {output_dir}: {sorted(collisions)}. "
+                "Remove them, choose different targets, or pass overwrite=True "
+                "to proceed."
+            )
 
     # Pre-load restart / inp / frames once for efficiency.
-    restart = parse_colvar_restart(restart_path)
+    restart = read_constraint_metadata_from_restart(restart_path)
     inp_text = Path(inp_path).read_text(encoding="utf-8")
-    frames = _load_trajectory_cv(xyz_path, restart, colvar_id=None)
+    frames = _load_trajectory_cv(xyz_path, restart, colvar_id)
+
+    iterator: list[_PlannedTarget] | object = planned
+    if verbose:
+        from tqdm import tqdm
+        iterator = tqdm(planned, desc="TI workdirs", unit="point", ascii=" =")
 
     workdirs: list[Path] = []
-    for pl in planned:
+    for pl in iterator:
         wd = generate_ti_workdir(
             inp_path, xyz_path, restart_path,
             target_au=pl.requested_cv,
             output_dir=output_dir,
             steps=steps,
-            colvar_id=None,
+            colvar_id=colvar_id,
             workdir_name=pl.dirname,
             script_path=script_path,
             _preloaded=frames,
@@ -531,7 +564,7 @@ def generate_ti_workdir(
     workdir_name: str | None = None,
     script_path: str | Path | None = None,
     _preloaded: list[tuple[int, float, Atoms]] | None = None,
-    _restart: ColvarRestart | None = None,
+    _restart: ConstraintMetadata | None = None,
     _inp_text: str | None = None,
 ) -> Path:
     """Create a CP2K constrained-MD work directory for one TI sampling point.
@@ -566,7 +599,7 @@ def generate_ti_workdir(
     Path
         The created work directory.
     """
-    restart = _restart or parse_colvar_restart(restart_path)
+    restart = _restart or read_constraint_metadata_from_restart(restart_path)
     inp_text = _inp_text or Path(inp_path).read_text(encoding="utf-8")
     frames = _preloaded or _load_trajectory_cv(xyz_path, restart, colvar_id)
 
@@ -673,7 +706,7 @@ def batch_generate_ti_workdirs(
             "(time_initial_fs, time_final_fs, n_points)."
         )
 
-    restart = parse_colvar_restart(restart_path)
+    restart = read_constraint_metadata_from_restart(restart_path)
     inp_text = Path(inp_path).read_text(encoding="utf-8")
     frames = _load_trajectory_cv(xyz_path, restart, colvar_id)
 

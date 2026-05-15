@@ -15,10 +15,10 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-from ...utils._io_helpers import _write_csv_from_arrays
+from ...utils.io._io_helpers import _write_csv_from_arrays
 
 from ...utils.constants import BOHR_TO_ANG, DEFAULT_LAYER_TOL_A, TRANSITION_METAL_SYMBOLS
-from ...utils.CubeParser import (
+from ...utils.formats.common.cube import (
     CubeHeader,
     _float,
     discover_cube_files,
@@ -28,8 +28,8 @@ from ...utils.CubeParser import (
     read_cube_header_and_values,
     z_coords_ang,
 )
-from ...utils.StructureParser.ClusterUtils import gap_midpoint_periodic
-from ...utils.StructureParser.LayerParser import detect_interface_layers
+from ...utils.structure.cluster import gap_midpoint_periodic
+from ...utils.structure.layer import detect_interface_layers
 from ._plot import plot_phi_z_profile
 from .config import DEFAULT_PHI_Z_PNG_NAME, DEFAULT_PHI_Z_STATS_CSV_NAME
 

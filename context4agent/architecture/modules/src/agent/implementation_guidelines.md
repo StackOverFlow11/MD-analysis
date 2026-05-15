@@ -2,6 +2,10 @@
 
 > 对应代码：`src/md_analysis/agent/`
 
+> ⚠️ **入口重构主体已完成。** 当前文档描述完成后的 contract-backed agent 实现。
+> 后续大规模破坏性重构按 `context4agent/requirements/overall_reconstruction_plan.md`
+> 推进，迁移到新架构后需同步更新本文档。
+
 ## 1. 职责边界
 
 - **是**：参数转换（str→Path）、任务注册与分发、JSON Schema 生成、统一异常包装
@@ -21,7 +25,7 @@
 
 ```
 agent/ → main.py → water/ | electrochemical/ | enhanced_sampling/
-agent/ → utils/cell_resolver.py → utils/RestartParser/CellParser.py
+agent/ → utils/io/cell_resolver.py → utils/formats/cp2k_cell.py
 agent/ → exceptions.py (MDAnalysisError)
 ```
 

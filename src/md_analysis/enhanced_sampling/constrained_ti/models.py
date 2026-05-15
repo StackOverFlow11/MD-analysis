@@ -14,8 +14,8 @@ import numpy as np
 from ...exceptions import MDAnalysisError
 
 if TYPE_CHECKING:
-    from .._parsers import ConstraintMDParser
-    from ...utils.RestartParser.ColvarParser import ColvarRestart
+    from ...engines.protocols import ConstraintMDParser
+    from ...engines.models import ConstraintMetadata
 
 # ---------------------------------------------------------------------------
 # Exceptions
@@ -189,7 +189,7 @@ class TIPointDefinition:
 
     directory: Path
     parser: ConstraintMDParser
-    metadata: ColvarRestart
+    metadata: ConstraintMetadata
 
     @property
     def xi(self) -> float:

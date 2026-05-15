@@ -27,23 +27,23 @@
   - 全局常量：`TRANSITION_METAL_SYMBOLS`、`DEFAULT_METAL_SYMBOLS`、默认分箱宽度/阈值
   - 单位换算：`HA_TO_EV`、`BOHR_TO_ANG`
   - cSHE 常量：`DP_A_H3O_W_EV`、`MU_HPLUS_G0_EV`、`DELTA_E_ZP_EV`
-- `CubeParser.py`
+- `cube.py`
   - Gaussian cube 文件 I/O、plane-averaged φ(z)、slab-averaged potential
-- `StructureParser/` 子包（结构解析：周期聚类、金属层识别、水分子拓扑）
-  - `ClusterUtils.py`：1D 周期性聚类 + 最大间隙检测 + 间隙中点计算
-  - `LayerParser.py`
+- `structure/` 子包（结构解析：周期聚类、金属层识别、水分子拓扑）
+  - `cluster.py`：1D 周期性聚类 + 最大间隙检测 + 间隙中点计算
+  - `layer.py`
     - 金属原子筛选 → 沿法向投影做 1D 聚类成"层"
     - 在周期水–金属–水体系下标记**两侧**直接面向环境的界面层（每侧固定 1 层，共 2 层）
     - 给界面层附带 `normal_unit`（从金属指向环境一侧）
-  - `WaterParser.py`
+  - `water.py`
     - 以 MIC 距离 + O–H 截断推断水分子拓扑，输出 `(n_water, 3)` 的 `[O, H1, H2]`
     - 基于氧索引计算：
       - 水质量密度 $\rho(z)$（`g/cm^3`）
       - 取向加权密度（`g/cm^3`，按 $\sum_i \cos\theta_i \cdot m_{\mathrm{H_2O}} / V_{\mathrm{bin}}$）
       - 指定 c 分数窗口内的 $\theta$ PDF（`degree^-1`）
-- `RestartParser/` 子包（CP2K restart 文件解析）
-  - `CellParser.py`：CP2K cell 参数解析（`.restart` + `md.inp`）
-  - `ColvarParser.py`：CP2K COLVAR restart + LagrangeMultLog 解析
+- `formats/` 子包（CP2K restart 文件解析）
+  - `cp2k_cell.py`：CP2K cell 参数解析（`.restart` + `md.inp`）
+  - `cp2k_colvar.py`：CP2K COLVAR restart + LagrangeMultLog 解析
 
 > 低层 shape/单位/窗口规则以 `context4agent/architecture/modules/data_contract.md` 为准。
 
@@ -133,15 +133,16 @@
   - 电势输出配置键：`KEY_POTENTIAL_REFERENCE`、`KEY_POTENTIAL_PH`、`KEY_POTENTIAL_TEMPERATURE_K`、`KEY_POTENTIAL_PHI_PZC`
   - `CONFIGURABLE_DEFAULTS`：可配置分析参数注册表（键 → 硬编码默认值 + 标签）
 
-### 7) `md_analysis.main` / `md_analysis.cli` / `md_analysis.agent`（集成入口）
+### 7) `md_analysis.workflows` / `md_analysis.main` / `md_analysis.cli` / `md_analysis.agent`（集成入口）
 
-- `main.py`：编程入口 `run_water_analysis()`、`run_potential_analysis()`、`run_charge_analysis()`、`run_tracked_charge_analysis()`、`run_counterion_charge_analysis()`、`run_all()`
+- `workflows/`：编程入口的 **canonical** 位置。全部 `run_*` 函数 + `WorkflowResult` frozen dataclass（`artifacts` / `metadata` / `extra`）。**完整 `run_*` 清单以 `src/md_analysis/workflows/__init__.py.__all__` 为权威**。按域拆子模块（`water.py` / `potential.py` / `charge.py` / `calibration.py` / `enhanced_sampling.py` / `scripts.py` / `composite.py` + `models.py` + `__init__.py`）。每个 `run_*` 主动 `Path()` 规范化路径参数；artifacts 字典值始终是 `Path`，metadata 轻量 scalars，extra 携带强类型 report（TI / calibration 等）。
+- `main.py`：import-only **re-export facade**。导出与 `workflows/` 完全一致的公开符号（`WorkflowResult` + 全部 `run_*`，清单以 `workflows/__init__.py.__all__` 为权威）。**入口重构期间删除了所有 legacy 名**：`run_water_analysis` / `run_potential_analysis` / `run_charge_analysis` / `run_tracked_charge_analysis` / `run_counterion_charge_analysis` / `run_all`；旧返回类型 `dict[str, Path]` → 新返回类型 `WorkflowResult`，**未保留 alias**（避免同名静默换返回类型）。新调用方式 `for k, p in result.artifacts.items()`。
 - `agent/`：Agent-friendly 非交互式编程入口（dispatch + JSON Schema + TaskResult + Tools-layer contract）
   - `_core.py`：`TaskResult`、`TaskHandler` Protocol、`TaskDef`（含 `contract` / `reference_fn` 字段）、注册表
   - `_contracts.py`：`FieldSpec` / `ExceptionMapping` / `TaskContract`（双 schema 出口：`to_agent_schema` OpenAI 形状、`to_mcp_tool_schema` MCP `inputSchema` 形状，供未来 MCP server 层）
   - `_dispatch.py`：`dispatch()` 任务执行、`get_task_schema()`（contract-first，fallback 到函数签名推导）、contract-aware 参数转换、contract-aware 有序异常映射
-  - `_handlers.py`：`_make_handler()` 工厂 + 任务注册（14 个；其中 3 个带完整 contract：`ti_gen_batch` / `ti_full_analysis` / `bader_gen_batch`，其余 11 个走 legacy 签名推导路径）
-  - 设计：薄适配层，不含分析逻辑；新任务走 contract-first（声明 `TaskContract` 紧邻 `register` 调用）；schema 从 `FieldSpec.json_schema` 字段直通（权威，draft-07），无手写 ParamDef；异常在 dispatch 层按 contract 有序匹配（先具体后父类）+ 默认 4 级分类 fallback
+  - `_handlers.py`：`_make_handler()` 工厂 + 任务注册。入口重构期间删除了 legacy task（water/potential/charge/composite 类，对应业务现在通过 `workflows.run_*` 直接调用），**剩余任务全部 contract-backed**；完整任务清单 / target_fn 以 agent registry（`list_tasks()` / `get_task(name)`）为权威，不在文档手写
+  - 设计：薄适配层，不含分析逻辑；schema 从 `FieldSpec.json_schema` 字段直通（权威，draft-07），无手写 ParamDef；异常在 dispatch 层按 contract 有序匹配（先具体后父类）+ 默认 4 级分类 fallback
 - `cli/`：VASPKIT 风格交互式 CLI 包，注册为 `md-analysis` console script
   - `__init__.py`：`main()` 入口 + banner + 顶层菜单分发
   - `_prompt.py`：可复用的输入提示辅助函数
@@ -168,7 +169,7 @@
   - `plot.py`：2×2 诊断图 + 自由能曲线图
   - `integration.py`：梯形积分权重、SEM targets、自由能积分
   - `analysis/`：四步诊断引擎（ACF、F&P block average、running average、Geweke）
-- 依赖方向：`enhanced_sampling` → `utils`（`ColvarParser`、`config`、`_io_helpers`）；无反向依赖
+- 依赖方向：`enhanced_sampling` → `utils`（`formats.cp2k_colvar`、`config`、`_io_helpers`）；无反向依赖
 - CLI 集成：30=Slow-Growth（301-302，`cli/_enhanced_sampling.py`），31=Constrained TI（311-313，`cli/_constrained_ti.py`）
 
 ### 9) `md_analysis.scripts`（自动化脚本工具）

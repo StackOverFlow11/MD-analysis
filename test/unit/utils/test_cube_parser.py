@@ -1,4 +1,4 @@
-"""Unit tests for md_analysis.utils.CubeParser."""
+"""Unit tests for md_analysis.utils.formats.common.cube."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from md_analysis.utils.CubeParser import (
+from md_analysis.utils.formats.common.cube import (
     CubeHeader,
     discover_cube_files,
     extract_step_from_cube_filename,

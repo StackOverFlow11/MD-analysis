@@ -21,18 +21,22 @@
 
 ### I/O (io.py)
 
-Engine-agnostic — parsing delegated to `ConstraintMDParser` (see
-`enhanced_sampling/_parsers.py`).
+Engine-agnostic — parsing delegated to `ConstraintMDParser` Protocol
+exposed by `md_analysis.engines.protocols` (the legacy
+`enhanced_sampling/_parsers.py` shim has been removed; CP2K
+implementation lives in `md_analysis.engines.cp2k.CP2KParser` and is
+auto-registered at engines package import).
 
 | Function | Description |
 |----------|-------------|
 | `discover_ti_points(root, *, parser="auto", dir_filter=None, reverse=False, strict=False)` | Discover constraint-point dirs; `parser`="auto" sniffs registered parsers, `dir_filter` is None/glob/callable |
 | `load_ti_series(point_defs)` | Parse Lagrange-multiplier series for each point (metadata is already cached on each `TIPointDefinition`) |
 
-`TIPointDefinition` fields: `directory: Path`, `parser: ConstraintMDParser`,
-`metadata: ColvarRestart`. `xi` is a property derived from
-`metadata.colvars.primary.target_au` — single source of truth, never
-parsed from directory name.
+`TIPointDefinition` fields: `directory: Path`,
+`parser: md_analysis.engines.protocols.ConstraintMDParser`,
+`metadata: md_analysis.engines.models.ConstraintMetadata`. `xi` is a
+property derived from `metadata.colvars.primary.target_au` — single
+source of truth, never parsed from directory name.
 
 ### Plot (plot.py)
 

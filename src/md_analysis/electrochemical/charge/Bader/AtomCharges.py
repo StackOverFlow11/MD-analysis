@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
@@ -10,19 +11,19 @@ import numpy as np
 from ase import Atoms
 
 from ....scripts.utils.IndexMapper import read_index_map_from_poscar, remap_array
-from ....utils._io_helpers import _cumulative_average, _write_csv
-from ....utils.BaderParser import load_bader_atoms
+from ....utils.io._io_helpers import _cumulative_average, _write_csv
+from ....utils.formats.bader.acf import load_bader_atoms
 from ....utils.constants import (
     AREA_VECTOR_INDICES,
     AXIS_MAP,
     DEFAULT_LAYER_TOL_A,
 )
-from ....utils.StructureParser.LayerParser import (
+from ....utils.structure.layer import (
     circular_mean_fractional,
     detect_interface_layers,
     mic_delta_fractional,
 )
-from ....utils.StructureParser.WaterParser import detect_water_molecule_indices
+from ....utils.structure.water import detect_water_molecule_indices
 from ..config import (
     DEFAULT_ACF_FILENAME,
     DEFAULT_DIR_PATTERN,
@@ -42,6 +43,40 @@ DEFAULT_TRACKED_CHARGE_PNG = "tracked_atom_charges.png"
 DEFAULT_COUNTERION_CHARGE_CSV = "counterion_charges.csv"
 DEFAULT_COUNTERION_SUMMARY_CSV = "counterion_summary.csv"
 DEFAULT_COUNTERION_CHARGE_PNG = "counterion_charges.png"
+
+
+# ---------------------------------------------------------------------------
+# Report dataclasses — in-memory metrics for agent wrappers
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class TrackedChargeResult:
+    """Return value of :func:`tracked_atom_charge_analysis_with_report`."""
+
+    csv_path: Path
+    png_path: Path
+    n_frames: int
+    atom_indices_xyz: tuple[int, ...]
+    n_atoms_tracked: int
+
+
+@dataclass(frozen=True)
+class CounterionChargeResult:
+    """Return value of :func:`counterion_charge_analysis_with_report`.
+
+    ``png_path`` is ``None`` when no counterion was detected in any
+    frame — :func:`plot_counterion_charges` short-circuits for empty
+    detection and does not write a file, so claiming a non-existent
+    path would violate the agent-layer invariant that
+    ``TaskResult.outputs`` only contains real artifact paths.
+    """
+
+    csv_path: Path
+    summary_path: Path
+    png_path: Path | None
+    n_frames: int
+    n_unique_counterions: int
 
 
 # ---------------------------------------------------------------------------
@@ -204,7 +239,7 @@ def trajectory_indexed_atom_charges(
 # Tracked atom charge analysis (NEW — XYZ order)
 # ---------------------------------------------------------------------------
 
-def tracked_atom_charge_analysis(
+def _tracked_atom_charge_analysis_core(
     root_dir: str | Path = ".",
     *,
     atom_indices_xyz: Iterable[int],
@@ -217,30 +252,13 @@ def tracked_atom_charge_analysis(
     frame_end: int | None = None,
     frame_step: int | None = None,
     verbose: bool = False,
-) -> Path:
-    """Track Bader net charges for specified XYZ atoms: time evolution + ensemble average.
+) -> TrackedChargeResult:
+    """Shared core producing :class:`TrackedChargeResult`.
 
-    Parameters
-    ----------
-    root_dir
-        Parent directory containing per-frame subdirectories.
-    atom_indices_xyz
-        Atom indices in original XYZ ordering (0-based).
-    dir_pattern
-        Glob pattern for frame subdirectories.
-    structure_filename, acf_filename, potcar_filename
-        Per-frame file names.
-    output_dir
-        Where to write CSV and PNG.  Defaults to *root_dir*.
-    frame_start, frame_end, frame_step
-        Slice parameters applied to the sorted frame list.
-    verbose
-        Show tqdm progress bar.
-
-    Returns
-    -------
-    Path
-        Path to the written CSV file.
+    Both the legacy :func:`tracked_atom_charge_analysis` (``Path`` return)
+    and the agent wrapper :func:`tracked_atom_charge_analysis_with_report`
+    call this; the legacy function preserves its historical public shape
+    by returning ``result.csv_path``.
     """
     indices = np.asarray(list(atom_indices_xyz), dtype=int)
     if indices.ndim != 1 or indices.size == 0:
@@ -307,14 +325,89 @@ def tracked_atom_charge_analysis(
 
     logger.info("Tracked atom charge analysis: %d frames, %d atoms → %s",
                 n_frames, len(indices), csv_path)
-    return csv_path
+
+    return TrackedChargeResult(
+        csv_path=csv_path,
+        png_path=png_path,
+        n_frames=int(n_frames),
+        atom_indices_xyz=tuple(int(i) for i in indices),
+        n_atoms_tracked=int(len(indices)),
+    )
+
+
+def tracked_atom_charge_analysis(
+    root_dir: str | Path = ".",
+    *,
+    atom_indices_xyz: Iterable[int],
+    dir_pattern: str = DEFAULT_DIR_PATTERN,
+    structure_filename: str = DEFAULT_STRUCTURE_FILENAME,
+    acf_filename: str = DEFAULT_ACF_FILENAME,
+    potcar_filename: str = DEFAULT_POTCAR_FILENAME,
+    output_dir: Path | None = None,
+    frame_start: int | None = None,
+    frame_end: int | None = None,
+    frame_step: int | None = None,
+    verbose: bool = False,
+) -> Path:
+    """Track Bader net charges for specified XYZ atoms: time evolution + ensemble average.
+
+    Returns the CSV path (legacy public shape).  The agent-facing
+    :func:`tracked_atom_charge_analysis_with_report` returns a richer
+    :class:`TrackedChargeResult`.
+    """
+    return _tracked_atom_charge_analysis_core(
+        root_dir,
+        atom_indices_xyz=atom_indices_xyz,
+        dir_pattern=dir_pattern,
+        structure_filename=structure_filename,
+        acf_filename=acf_filename,
+        potcar_filename=potcar_filename,
+        output_dir=output_dir,
+        frame_start=frame_start,
+        frame_end=frame_end,
+        frame_step=frame_step,
+        verbose=verbose,
+    ).csv_path
+
+
+def tracked_atom_charge_analysis_with_report(
+    root_dir: str | Path = ".",
+    *,
+    atom_indices_xyz: Iterable[int],
+    dir_pattern: str = DEFAULT_DIR_PATTERN,
+    structure_filename: str = DEFAULT_STRUCTURE_FILENAME,
+    acf_filename: str = DEFAULT_ACF_FILENAME,
+    potcar_filename: str = DEFAULT_POTCAR_FILENAME,
+    output_dir: Path | None = None,
+    frame_start: int | None = None,
+    frame_end: int | None = None,
+    frame_step: int | None = None,
+    verbose: bool = False,
+) -> TrackedChargeResult:
+    """Like :func:`tracked_atom_charge_analysis` but returns a
+    :class:`TrackedChargeResult` with in-memory metrics (n_frames,
+    atom_indices_xyz, n_atoms_tracked) so the agent layer can surface
+    them without re-parsing the CSV."""
+    return _tracked_atom_charge_analysis_core(
+        root_dir,
+        atom_indices_xyz=atom_indices_xyz,
+        dir_pattern=dir_pattern,
+        structure_filename=structure_filename,
+        acf_filename=acf_filename,
+        potcar_filename=potcar_filename,
+        output_dir=output_dir,
+        frame_start=frame_start,
+        frame_end=frame_end,
+        frame_step=frame_step,
+        verbose=verbose,
+    )
 
 
 # ---------------------------------------------------------------------------
 # Counterion charge analysis (NEW — per-frame detection, XYZ order)
 # ---------------------------------------------------------------------------
 
-def counterion_charge_analysis(
+def _counterion_charge_analysis_core(
     root_dir: str | Path = ".",
     *,
     metal_symbols: Iterable[str] | None = None,
@@ -329,41 +422,12 @@ def counterion_charge_analysis(
     frame_end: int | None = None,
     frame_step: int | None = None,
     verbose: bool = False,
-) -> Path:
-    """Per-frame counterion detection with charge time evolution + ensemble average.
+) -> CounterionChargeResult:
+    """Shared core producing :class:`CounterionChargeResult`.
 
-    Detects non-water, non-metal atoms with non-zero net charge at each frame,
-    remaps their indices back to original XYZ ordering, and outputs:
-
-    - Per-frame CSV with detected atom indices and charges.
-    - Summary CSV with per-atom mean charge and detection frequency.
-    - PNG with charge time evolution for each unique detected atom.
-
-    Parameters
-    ----------
-    root_dir
-        Parent directory containing per-frame subdirectories.
-    metal_symbols
-        Override default metal symbols for layer/water detection.
-    normal
-        Cell axis perpendicular to the surface (``"a"``, ``"b"``, or ``"c"``).
-    layer_tol_A
-        Layer clustering tolerance in Ångströms.
-    dir_pattern
-        Glob pattern for frame subdirectories.
-    structure_filename, acf_filename, potcar_filename
-        Per-frame file names.
-    output_dir
-        Where to write CSV and PNG.  Defaults to *root_dir*.
-    frame_start, frame_end, frame_step
-        Slice parameters applied to the sorted frame list.
-    verbose
-        Show tqdm progress bar.
-
-    Returns
-    -------
-    Path
-        Path to the written per-frame CSV file.
+    Called by both :func:`counterion_charge_analysis` (legacy ``Path``
+    return, via ``.csv_path``) and
+    :func:`counterion_charge_analysis_with_report`.
     """
     if normal not in AREA_VECTOR_INDICES:
         raise ValueError(
@@ -487,6 +551,94 @@ def counterion_charge_analysis(
 
     logger.info("Counterion charge analysis: %d frames, %d unique atoms → %s",
                 n_frames, len(sorted_xyz_indices), csv_path)
-    return csv_path
+
+    # plot_counterion_charges() short-circuits when there are no
+    # detections and does not write a PNG — surface this through the
+    # result so downstream agents don't claim a non-existent artifact.
+    png_result: Path | None = png_path if sorted_xyz_indices else None
+
+    return CounterionChargeResult(
+        csv_path=csv_path,
+        summary_path=summary_path,
+        png_path=png_result,
+        n_frames=int(n_frames),
+        n_unique_counterions=int(len(sorted_xyz_indices)),
+    )
+
+
+def counterion_charge_analysis(
+    root_dir: str | Path = ".",
+    *,
+    metal_symbols: Iterable[str] | None = None,
+    normal: str = "c",
+    layer_tol_A: float = DEFAULT_LAYER_TOL_A,
+    dir_pattern: str = DEFAULT_DIR_PATTERN,
+    structure_filename: str = DEFAULT_STRUCTURE_FILENAME,
+    acf_filename: str = DEFAULT_ACF_FILENAME,
+    potcar_filename: str = DEFAULT_POTCAR_FILENAME,
+    output_dir: Path | None = None,
+    frame_start: int | None = None,
+    frame_end: int | None = None,
+    frame_step: int | None = None,
+    verbose: bool = False,
+) -> Path:
+    """Per-frame counterion detection with charge time evolution + ensemble average.
+
+    Returns the per-frame CSV path (legacy public shape).  The agent-
+    facing :func:`counterion_charge_analysis_with_report` returns a
+    richer :class:`CounterionChargeResult`.
+    """
+    return _counterion_charge_analysis_core(
+        root_dir,
+        metal_symbols=metal_symbols,
+        normal=normal,
+        layer_tol_A=layer_tol_A,
+        dir_pattern=dir_pattern,
+        structure_filename=structure_filename,
+        acf_filename=acf_filename,
+        potcar_filename=potcar_filename,
+        output_dir=output_dir,
+        frame_start=frame_start,
+        frame_end=frame_end,
+        frame_step=frame_step,
+        verbose=verbose,
+    ).csv_path
+
+
+def counterion_charge_analysis_with_report(
+    root_dir: str | Path = ".",
+    *,
+    metal_symbols: Iterable[str] | None = None,
+    normal: str = "c",
+    layer_tol_A: float = DEFAULT_LAYER_TOL_A,
+    dir_pattern: str = DEFAULT_DIR_PATTERN,
+    structure_filename: str = DEFAULT_STRUCTURE_FILENAME,
+    acf_filename: str = DEFAULT_ACF_FILENAME,
+    potcar_filename: str = DEFAULT_POTCAR_FILENAME,
+    output_dir: Path | None = None,
+    frame_start: int | None = None,
+    frame_end: int | None = None,
+    frame_step: int | None = None,
+    verbose: bool = False,
+) -> CounterionChargeResult:
+    """Like :func:`counterion_charge_analysis` but returns a
+    :class:`CounterionChargeResult` with ``n_frames`` and
+    ``n_unique_counterions`` computed from in-memory frame_records (no
+    CSV reparsing)."""
+    return _counterion_charge_analysis_core(
+        root_dir,
+        metal_symbols=metal_symbols,
+        normal=normal,
+        layer_tol_A=layer_tol_A,
+        dir_pattern=dir_pattern,
+        structure_filename=structure_filename,
+        acf_filename=acf_filename,
+        potcar_filename=potcar_filename,
+        output_dir=output_dir,
+        frame_start=frame_start,
+        frame_end=frame_end,
+        frame_step=frame_step,
+        verbose=verbose,
+    )
 
 

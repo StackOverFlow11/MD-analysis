@@ -9,18 +9,18 @@ import pytest
 
 ase_io = pytest.importorskip("ase.io")
 
-from md_analysis.utils.RestartParser.CellParser import parse_abc_from_md_inp as _parse_abc_from_md_inp
-from md_analysis.utils.StructureParser.LayerParser import detect_interface_layers
-from md_analysis.utils.StructureParser.WaterParser import _compute_water_mass_density_z_distribution as compute_water_mass_density_z_distribution
-from md_analysis.utils.StructureParser.WaterParser import _compute_water_orientation_weighted_density_z_distribution as compute_water_orientation_weighted_density_z_distribution
-from md_analysis.utils.StructureParser.WaterParser import detect_water_molecule_indices
-from md_analysis.utils.StructureParser.WaterParser import get_water_oxygen_indices_array
+from md_analysis.utils.formats.cp2k.cell import parse_abc_from_md_inp as _parse_abc_from_md_inp
+from md_analysis.utils.structure.layer import detect_interface_layers
+from md_analysis.utils.structure.water import _compute_water_mass_density_z_distribution as compute_water_mass_density_z_distribution
+from md_analysis.utils.structure.water import _compute_water_orientation_weighted_density_z_distribution as compute_water_orientation_weighted_density_z_distribution
+from md_analysis.utils.structure.water import detect_water_molecule_indices
+from md_analysis.utils.structure.water import get_water_oxygen_indices_array
 
 
 def test_last_frame_pipeline_outputs_have_consistent_shapes() -> None:
     repo_root = Path(__file__).resolve().parents[3]
-    xyz_path = repo_root / "data_example" / "potential" / "md-pos-1.xyz"
-    md_inp_path = repo_root / "data_example" / "potential" / "md.inp"
+    xyz_path = repo_root / "data_example" / "potential" / "dense" / "md-pos-1.xyz"
+    md_inp_path = repo_root / "data_example" / "potential" / "dense" / "md.inp"
 
     atoms = ase_io.read(str(xyz_path), index=-1)
     a, b, c = _parse_abc_from_md_inp(md_inp_path)

@@ -1,8 +1,14 @@
 # `md_analysis.utils` 内部实现准则（当前实现口径）
 
-> 适用范围：`src/md_analysis/utils/`（`constants.py`、`_io_helpers.py`、`CubeParser.py`、`BaderParser.py`、`StructureParser/`（`ClusterUtils.py`、`LayerParser.py`、`WaterParser.py`）、`RestartParser/`（`CellParser.py`、`ColvarParser.py`））。
+> 适用范围：`src/md_analysis/utils/`，Phase 2-4 后划分为三个子层：
+> - `formats/`：单文件解析器（`cube.py` / `bader.py` / `cp2k_cell.py` / `cp2k_colvar.py` / `cp2k_stdout.py` / `cp2k_xyz.py` / `vasp_{report,outcar,locpot}.py` 占位）
+> - `structure/`：几何 / 化学语义（`layer.py` / `water.py` / `cluster.py`）
+> - `io/`：路径与 IO 调度（`_frame_discovery.py` / `_io_helpers.py` / `cell_resolver.py`）
+> - 顶层：物理常量 `constants.py`。
 >
 > 目标：在明确物理口径与输入输出契约的前提下，提供可复用、可测试、可维护的底层实现。
+
+> ⚠️ **Phase 9 部分同步状态**：本文档全文做了 sed 路径替换，但下方按旧目录结构组织的章节内容尚未按 formats/structure/io 重写。开发者请以 `src/md_analysis/utils/CLAUDE.md` 为准。
 
 ## 1. 职责分层与边界
 
@@ -23,7 +29,7 @@
 - `utils/__init__.py` 仅包含包定位说明和 `__all__ = []`，不 re-export 任何符号。
 - 原则：任何调用方（包内/测试/外部用户）必须按 **子模块直接路径** 导入，例如：
   - `from md_analysis.utils.constants import HA_TO_EV`
-  - `from md_analysis.utils.StructureParser.LayerParser import detect_interface_layers`
+  - `from md_analysis.utils.structure.layer import detect_interface_layers`
 - 理由：集中 re-export hub 要为每次子模块变更同步维护，且相对子模块直接路径无额外信息。子模块直接路径使调用站点自文档化，并消除 `__init__.py` 作为单点故障源。
 - 子模块内部仍应声明 `__all__`（见各 `interface_exposure.md`）以表达公开意图。
 
@@ -48,13 +54,13 @@
 - 两种 frame 目录约定下，`time_fs` 和 `step` 对真实轨迹均单调，元组排序保证稳定。
 - 被 `electrochemical/charge/Bader/_frame_utils.py`（Bader 目录）和 `electrochemical/potential/_frame_source.py`（SP 目录）共同调用，取代原本三处各自的正则与排序实现。
 
-### `StructureParser/ClusterUtils.py`
+### `structure/cluster.py`
 
 - 负责 1D 周期性聚类、最大间隙检测、间隙中点计算。
-- 被 `StructureParser/LayerParser.py` 和 `md_analysis.potential.CenterPotential` 调用。
+- 被 `structure/layer.py` 和 `md_analysis.potential.CenterPotential` 调用。
 - 不依赖 ASE 或其他上层模块。
 
-### `CubeParser.py`
+### `cube.py`
 
 - 负责 Gaussian cube 文件的读取与解析。
 - 负责 plane-averaged φ(z) 计算和 slab-averaged potential 计算。
@@ -65,16 +71,16 @@
 - 单位：cube 内部为 Bohr/Hartree，输出转为 Angstrom/eV。
 - `discover_cube_files(cube_pattern, *, workdir, frame_start, frame_end, frame_step)` — 在 `workdir` 下按 glob 匹配 cube 文件，词法排序后按 `[frame_start:frame_end:frame_step]` 切片返回。无匹配时抛出 `FileNotFoundError`。被 `potential/CenterPotential.py` 调用，取代原来内联的 glob+检查逻辑。
 
-### `StructureParser/LayerParser.py`
+### `structure/layer.py`
 
 - 负责金属层识别、界面层标记、法向符号判定。
 - 负责层级数据结构与摘要输出。
 - 不负责水分子拓扑识别、角度 PDF 统计。
 - 使用 `constants.py` 中的 `AXIS_MAP` 常量（取代原有的模块局部 `_AXIS_MAP` 字典）。
 - 使用 `constants.py` 中的 `INTERFACE_NORMAL_ALIGNED`/`INTERFACE_NORMAL_OPPOSED` 常量作为界面标签。
-- `circular_mean_fractional()` 委托给 `ClusterUtils._circular_mean(values, period=1.0)`。
+- `circular_mean_fractional()` 委托给 `cluster._circular_mean(values, period=1.0)`。
 
-### `RestartParser/CellParser.py`
+### `formats/cp2k_cell.py`
 
 - 统一的 CP2K cell 参数解析模块，负责从 `.restart` 和 `md.inp` 文件解析正交 cell 参数。
 - `parse_abc_from_restart`：用正则表达式定位 `&CELL ... &END CELL` 块，提取 A/B/C 向量行，验证正交性（离对角元素 < 1e-6 Å）。
@@ -83,10 +89,10 @@
 - 统一异常类型 `CellParseError`。
 - 不依赖 ASE。
 
-### `RestartParser/ColvarParser.py`
+### `formats/cp2k_colvar.py`
 
 - 负责 CP2K COLVAR（集合变量约束）模拟的 restart 文件和 LagrangeMultLog 文件解析。
-- 复用 `CellParser.parse_abc_from_restart()` 获取 cell 参数，避免重复实现。
+- 复用 `formats.cp2k_cell.parse_abc_from_restart()` 获取 cell 参数，避免重复实现。
 - 使用 `finditer` 解析所有 `&COLLECTIVE` 块，支持多约束场景，结果包装为 `ColvarInfo` 容器。
 - 不解析 COLVAR 定义（CV 类型由 CP2K 决定，种类繁多，不逐一写正则）。
 - 支持 `&FIXED_ATOMS` 的 `LIST` 行解析：逗号/空格分隔、`N..M` 范围展开、`\` 续行。
@@ -94,7 +100,7 @@
 - 不完整末尾处理：末尾只有 Shake 无配对 Rattle 时静默丢弃。
 - 不依赖 ASE。
 
-### `StructureParser/WaterParser.py`
+### `structure/water.py`
 
 - 负责水分子标记、氧索引提取、质量密度与取向统计。
 - 负责 c 轴窗口角度 PDF 统计。
@@ -122,7 +128,7 @@
 - 最后一段边界直接落在 `Lz`，避免累计误差
 - bin 归属使用 `searchsorted(..., side="right") - 1` 再 clip，确保边界可控
 
-## 3. `LayerParser.py` 实现准则
+## 3. `layer.py` 实现准则
 
 ### 3.1 输入与默认值
 
@@ -145,7 +151,7 @@
 - `Layer` 与 `SurfaceDetectionResult` 保持 dataclass 不可变语义
 - 对外返回应优先使用 tuple，避免可变容器泄漏
 
-## 4. `WaterParser.py` 实现准则
+## 4. `water.py` 实现准则
 
 ### 4.1 水分子标记
 

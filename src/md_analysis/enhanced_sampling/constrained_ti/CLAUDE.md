@@ -10,7 +10,7 @@ Agent 入口：`dispatch("ti_full_analysis", {root_dir, output_dir, parser, dir_
 
 **Strict discovery 差异**：`run_ti_full_from_root` 调 `discover_ti_points(..., strict=True)`，任何被 `dir_filter` 选中但 metadata 解析失败的目录直接抛 `FileNotFoundError`（agent 映射为 `file_not_found`）；CLI 312 菜单路径保持 `strict=False`（跳过失败目录并 WARN）。
 
-**IO 层架构（2026-05-10 重构）**：discover/load 完全 engine-agnostic，靠 `enhanced_sampling/_parsers.py` 的 `ConstraintMDParser` Protocol 适配。`TIPointDefinition` 字段为 `directory + parser + metadata(ColvarRestart)`，`xi` 是 property（从 `metadata.colvars.primary.target_au` 推导，不再从目录名解析）。`discover_ti_points(parser="auto", dir_filter=None)`：parser="auto" 嗅探注册 parser，dir_filter=None 用 `parser.is_constraint_directory` 做内容过滤（目录命名自由）；用户传 `dir_filter="ti_target_*"` 这种 glob 时，跳过 sniff 直接用第一个注册 parser（默认 CP2KParser）。新增 engine 适配 = 实现 Protocol + `register_parser` 注册，io.py 不动。
+**IO 层架构**：discover/load 完全 engine-agnostic，靠 `md_analysis.engines.protocols.ConstraintMDParser` Protocol 适配；CP2K 实现是 `md_analysis.engines.cp2k.CP2KParser`（engines 包 import 时自动注册）。早期的 `enhanced_sampling/_parsers.py` shim 已在 engines 重构中删除，不要再创建本地 parser 缓存层。`TIPointDefinition` 字段为 `directory + parser + metadata(ConstraintMetadata)`，`xi` 是 property（从 `metadata.colvars.primary.target_au` 推导，不再从目录名解析）。`discover_ti_points(parser="auto", dir_filter=None)`：parser="auto" 嗅探注册 parser，dir_filter=None 用 `parser.is_constraint_directory` 做内容过滤（目录命名自由）；用户传 `dir_filter="ti_target_*"` 这种 glob 时，跳过 sniff 直接用第一个注册 parser（默认 CP2KParser）。新增 engine 适配 = 实现 Protocol + `register_parser` 注册，io.py 不动。
 
 ## 四步诊断流程
 
@@ -39,7 +39,7 @@ otherwise           → SEM at largest valid block size
 | `workflow.py` | 编排器：`analyze_single_point`, `analyze_standalone`, `analyze_ti`, `standalone_diagnostics`, `run_ti_full_from_root` (agent wrapper), `TIFullAnalysisReport`, `_parse_point_slice`, CSV 导出 |
 | `plot.py` | 2×2 诊断图（running avg / ACF / block avg / summary）+ 自由能曲线图 |
 | `integration.py` | 梯形积分权重、SEM targets、自由能积分 |
-| `io.py` | Engine-agnostic 约束点目录发现 + 批量加载（`discover_ti_points(parser="auto", dir_filter=None, reverse, strict)`、`load_ti_series`）；解析委托给 `_parsers.py` |
+| `io.py` | Engine-agnostic 约束点目录发现 + 批量加载（`discover_ti_points(parser="auto", dir_filter=None, reverse, strict)`、`load_ti_series`）；解析委托给 `md_analysis.engines.protocols.ConstraintMDParser` Protocol（CP2K 实现在 `engines.cp2k.CP2KParser`，engines 包 import 时自动注册） |
 | `correction.py` | 恒电势自由能修正（Nørskov）：`ConstantPotentialCorrection`, `ConstantPotentialResult`, `compute_constant_potential_correction`。`plot_corrected_free_energy_profile` 已迁至 `plot.py`，`correction.py` 仅 re-export 以保持旧导入路径 |
 | `analysis/` | 四步诊断引擎 → `analysis/CLAUDE.md` |
 

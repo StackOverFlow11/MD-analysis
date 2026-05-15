@@ -7,7 +7,7 @@ from typing import Iterable
 
 import numpy as np
 
-from ...utils._io_helpers import _write_csv_from_arrays
+from ...utils.io._io_helpers import _write_csv_from_arrays
 from ...utils.constants import DEFAULT_LAYER_TOL_A, DEFAULT_Z_BIN_WIDTH_A
 from ..config import DEFAULT_OUTPUT_DIR, DEFAULT_WATER_MASS_DENSITY_CSV_NAME
 from ..config import DEFAULT_START_INTERFACE
@@ -15,7 +15,6 @@ from ._common import (
     StartInterface,
     _compute_density_orientation_ensemble,
     _detect_interface_fractions,
-    _parse_abc_from_md_inp,
 )
 
 __all__ = ["water_mass_density_z_distribution_analysis"]

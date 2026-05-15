@@ -2,14 +2,14 @@
 
 ## Layer dependency
 
-- `md_analysis.charge` depends on `md_analysis.utils` (BaderParser, LayerParser, WaterParser, config constants, `_io_helpers`)
+- `md_analysis.charge` depends on `md_analysis.utils` (formats.bader, structure.layer, structure.water, config constants, `_io_helpers`)
 - `md_analysis.charge` does NOT depend on `md_analysis.water` or `md_analysis.potential`
 
 ## Module layout
 
 `Bader/` sub-package with modular split:
 - `config.py` — unit conversion constant + default filenames + output file name constants
-- `Bader/_frame_utils.py` — delegates to `utils/_frame_discovery.py` for frame directory discovery, numeric sorting, step/time extraction
+- `Bader/_frame_utils.py` — delegates to `utils/io/_frame_discovery.py` for frame directory discovery, numeric sorting, step/time extraction
 - `Bader/_plot.py` — matplotlib plotting helpers for charge visualisation
 - `Bader/BaderData.py` — `BaderTrajectoryData` frozen dataclass + `load_bader_trajectory()` (loads all frames, remaps to XYZ order via IndexMap)
 - `Bader/SurfaceCharge.py` — single-frame surface charge (two methods), trajectory surface charge, end-to-end analysis (CSV+PNG)
@@ -19,8 +19,8 @@
 
 - `....utils.constants`: `AXIS_MAP`, `AREA_VECTOR_INDICES` — 轴索引和面积计算向量索引
 - `....utils.constants`: `CHARGE_METHOD_COUNTERION`, `CHARGE_METHOD_LAYER` — 电荷方法名称常量
-- `....utils._io_helpers`: `_cumulative_average`, `_write_csv` — 私有共享 helper
-- `....utils.BaderParser`: `load_bader_atoms` — 加载 Bader 数据到 ASE Atoms
+- `....utils.io._io_helpers`: `_cumulative_average`, `_write_csv` — 私有共享 helper
+- `....utils.formats.bader`: `load_bader_atoms` — 加载 Bader 数据到 ASE Atoms
 - `....scripts.utils.IndexMapper`: `read_index_map_from_poscar`, `remap_array` — XYZ↔POSCAR 索引映射（BaderData.py 和 AtomCharges.py 使用）
 
 ## Surface charge methods

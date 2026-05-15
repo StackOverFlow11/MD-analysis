@@ -33,15 +33,15 @@ enhanced_sampling/
 ## 依赖方向
 
 ### slowgrowth
-- `slowgrowth` → `utils.RestartParser.ColvarParser`（`ColvarMDInfo`）
+- `slowgrowth` → `utils.formats.cp2k_colvar`（`ColvarMDInfo`）
 - `slowgrowth` → `utils.constants`（`HA_TO_EV`）
-- `slowgrowth` → `utils._io_helpers`（`_write_csv`）
+- `slowgrowth` → `utils.io._io_helpers`（`_write_csv`）
 
 ### constrained_ti
-- `constrained_ti.io` → `utils.RestartParser.ColvarParser`（仅 I/O）
+- `constrained_ti.io` → `utils.formats.cp2k_colvar`（仅 I/O）
 - `constrained_ti.workflow` → `constrained_ti.analysis.*`、`integration`、`plot`、`io`
 - `constrained_ti.workflow` → `utils.constants`（`HA_TO_EV`）
-- `constrained_ti.workflow` → `utils._io_helpers`（`_write_csv`）
+- `constrained_ti.workflow` → `utils.io._io_helpers`（`_write_csv`）
 
 ### 模块内单向约束
 - `workflow.py` 可导入 `plot.py`；`plot.py` **不得**导入 `workflow.py`

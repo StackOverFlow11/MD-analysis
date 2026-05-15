@@ -25,15 +25,24 @@ U = -E_Fermi + φ_center + ΔΨ_a(H₃O⁺/w) - μ(H⁺,g⁰) - ΔE_ZP
   - cube 发现：遍历子目录，每个含一个 cube 文件（默认 `sp_potential-v_hartree-1_0.cube`）
   - Fermi 能：从每个子目录的 `sp.out` 提取（仅取最后一条 `Fermi energy:` 行）
   - 原子坐标：从 cube 文件自身读取（`read_cube_atoms()`），天然包含 cell 信息
-  - step/time 从目录名正则提取：`_t(\d+)_i(\d+)`（共享自 `utils/_frame_discovery.py`）
+  - step/time 从目录名正则提取：`_t(\d+)_i(\d+)`（共享自 `utils/io/_frame_discovery.py`）
 
-### 帧数据抽象（_frame_source.py）
-- `PotentialFrame` frozen dataclass：统一两种模式的帧数据
-  - 字段：`step, time_fs, cube_path, header, values, fermi_raw, atoms`
-- `discover_continuous_frames()` — 模式 A 帧发现
-- `discover_distributed_frames()` — 模式 B 帧发现
-- `_parse_sp_out_fermi()` — 从单点 sp.out 提取 Fermi 能
-- 两种模式返回统一的 `list[PotentialFrame]`，下游分析逻辑无差异
+### 帧数据抽象（canonical 路径在 `engines/`）
+
+`PotentialFrame` 现在是 engine-neutral dataclass，定义在 `md_analysis.engines.models`。两个发现函数也在 Phase 7b2 下沉到 `engines/cp2k.py`：
+
+| canonical（`engines/cp2k.py`） | legacy wrapper（`electrochemical/potential/_frame_source.py`） | 模式 |
+|---|---|---|
+| `read_continuous_potential_frames(...)` | `discover_continuous_frames(...)` | A：单目录 cube + md.out |
+| `read_distributed_potential_frames(...)` | `discover_distributed_frames(...)` | B：`potential_t*_i*` SP 子目录 |
+
+`_frame_source.py` 自 Phase 7b2 起退化为 **thin forwarding wrapper**（~100 行，无业务逻辑），仅保留 `discover_*_frames` 旧名让 `CenterPotential.py` / `PhiZProfile.py` / `__init__.py` 内部 import 继续工作。新代码请直接从 `md_analysis.engines` import canonical 名。
+
+`PotentialFrame` 字段：`step, time_fs, cube_path, header, values, fermi_raw, atoms`（Phase 4 以来未变）。
+
+Fermi 能解析：连续模式 → `engines.cp2k.read_fermi_series(md_out_path)` 返回 `list[FermiRecord]`；分布式模式 → `utils.formats.cp2k.stdout.parse_sp_out_fermi(sp_out_path)`（单点不附 step 元数据，step 由目录名提供）。
+
+两种模式都返回 `list[PotentialFrame]`，下游分析逻辑（`CenterPotential.py` / `PhiZProfile.py`）无差异。
 
 ### 分析模式
 - `center_mode="interface"`：需要 xyz 轨迹（连续模式）或 cube 原子坐标（分布式模式）做层检测 → 用界面中点作为 slab 中心
@@ -56,4 +65,4 @@ U = -E_Fermi + φ_center + ΔΨ_a(H₃O⁺/w) - μ(H⁺,g⁰) - ΔE_ZP
 - `discover_cube_files` 的 glob pattern 必须匹配 CP2K 的输出命名（如 `*-HARTREE-*.cube`）
 - 分布式模式下，未完成计算的子目录（无 cube 文件）会被自动跳过（debug 级别日志）
 - 分布式模式下 sp.out 无 `STEP NUMBER` 行（单点计算），`_parse_sp_out_fermi()` 只提取 Fermi 值，step 从目录名获取
-- `read_cube_atoms()` 已从 PhiZProfile 私有函数提升为 CubeParser 公开函数
+- `read_cube_atoms()` 已从 PhiZProfile 私有函数提升为 `formats.common.cube` 公开函数

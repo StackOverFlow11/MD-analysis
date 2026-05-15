@@ -1,4 +1,13 @@
-"""Constrained TI analysis command classes (311-313)."""
+"""Constrained TI analysis command classes (311-313).
+
+Phase 6.5: routed through ``workflows.enhanced_sampling.run_ti_*``
+facades. The interactive prompts that don't fit a single end-to-end
+call (point-slice selection, per-point equilibration override) stay
+here: each command pre-discovers points with ``strict=False`` (the
+historical lenient behavior on broken ``ti_target_*`` subdirs),
+prompts, then dispatches to the workflow with ``strict=False`` so the
+analysis pass sees the same point set the user saw.
+"""
 
 from __future__ import annotations
 
@@ -42,120 +51,72 @@ def _collect_ti_base_params(ctx: dict) -> None:
     )
 
 
-def _run_ti_core(ctx: dict):
-    """Shared TI analysis: discover → load → analyze → summary → write.
+def _prompt_ti_slice_and_equil(ctx: dict, point_defs):
+    """Prompt for an optional Python-slice and per-point equilibration.
 
-    Includes interactive per-point equilibration prompt.
+    ``point_slice`` is validated eagerly with the SAME parser the
+    workflow uses (``_parse_point_slice``) so an ambiguous / illegal
+    spec (e.g. ``"2"`` with no colon) raises ``ValueError`` BEFORE any
+    per-point equilibration is collected. The string is forwarded
+    verbatim to the workflow; the local slice is only used to size the
+    per-point prompt and the selection echo.
 
     Returns
     -------
-    ti_report
-        Full TI analysis report.
-    point_defs : list
-        Discovered constraint point definitions.
-    xi_values : np.ndarray
-        Constraint values array.
-    outdir : Path
-        Resolved output directory.
+    (point_slice, equilibration)
+        ``point_slice``: ``str | None`` (forwarded as-is to the workflow)
+        ``equilibration``: ``int | list[int]`` (per-point list sized by
+        the *sliced* point count so the workflow's re-discovered +
+        re-sliced point set aligns 1:1)
     """
-    import numpy as np
-
-    discover_ti_points = lazy_import(
-        "md_analysis.enhanced_sampling.constrained_ti.io",
-        "discover_ti_points",
-    )
-    load_ti_series = lazy_import(
-        "md_analysis.enhanced_sampling.constrained_ti.io",
-        "load_ti_series",
-    )
-    analyze_ti = lazy_import(
+    _parse_point_slice = lazy_import(
         "md_analysis.enhanced_sampling.constrained_ti.workflow",
-        "analyze_ti",
-    )
-    write_convergence_csv = lazy_import(
-        "md_analysis.enhanced_sampling.constrained_ti.workflow",
-        "write_convergence_csv",
-    )
-    write_free_energy_csv = lazy_import(
-        "md_analysis.enhanced_sampling.constrained_ti.workflow",
-        "write_free_energy_csv",
-    )
-    plot_point_diagnostics = lazy_import(
-        "md_analysis.enhanced_sampling.constrained_ti.plot",
-        "plot_point_diagnostics",
-    )
-    plot_free_energy_profile = lazy_import(
-        "md_analysis.enhanced_sampling.constrained_ti.plot",
-        "plot_free_energy_profile",
+        "_parse_point_slice",
     )
 
-    outdir = ctx[K.OUTDIR_RESOLVED]
-    root_dir = Path(ctx[K.TI_ROOT_DIR])
-
-    # 1. Discover constraint points (auto-sniff parser, content-based filter)
-    point_defs = discover_ti_points(
-        root_dir,
-        reverse=ctx[K.TI_REVERSE],
-    )
-    print(f"\n  Found {len(point_defs)} constraint points:")
-    for i, p in enumerate(point_defs):
-        print(f"    [{i}] ξ = {p.xi:.6f}")
-
-    # 1b. Optional point selection via Python slice syntax
     slice_str = prompt_str(
         "Select points (Python slice, e.g. 3:8, :8, 3::2, empty=all)",
         default="",
     )
+    point_slice: str | None
     if slice_str:
-        parts = slice_str.split(":")
-        args = [int(x) if x.strip() else None for x in parts]
-        point_defs = point_defs[slice(*args)]
-        print(f"  Selected {len(point_defs)} points:")
-        for i, p in enumerate(point_defs):
+        # Validate with the workflow's parser. Raises ValueError on
+        # ambiguous / illegal specs; the MenuCommand.run() try-except
+        # catches it and aborts before per-point prompts run.
+        sl = _parse_point_slice(slice_str)
+        sliced = point_defs[sl]
+        point_slice = slice_str
+        print(f"  Selected {len(sliced)} points:")
+        for i, p in enumerate(sliced):
             print(f"    [{i}] ξ = {p.xi:.6f}")
+    else:
+        sliced = point_defs
+        point_slice = None
 
-    # 2. Per-point equilibration (interactive)
     default_equil = ctx[K.EQUILIBRATION]
-    if len(point_defs) > 1 and prompt_bool(
+    if len(sliced) > 1 and prompt_bool(
         "Set per-point equilibration frames?", default=False,
     ):
         equil_list = []
-        for p in point_defs:
+        for p in sliced:
             val = prompt_int(
                 f"  ξ={p.xi:.6f} equilibration frames",
                 default=default_equil,
             )
             equil_list.append(val if val is not None else default_equil)
-        equilibration = equil_list
+        equilibration: int | list[int] = equil_list
     else:
         equilibration = default_equil
 
-    # 3. Load series + use cached metadata for time_start
-    series_data = load_ti_series(point_defs)
-    xi_values = np.array([x for x, _, _ in series_data])
-    lambda_list = [s for _, s, _ in series_data]
-    time_starts = [float(p.metadata.time_start_fs) for p in point_defs]
+    return point_slice, equilibration
 
-    # 4. dt consistency check
-    dts = [d for _, _, d in series_data]
-    unique_dts = set(f"{d:.10f}" for d in dts)
-    if len(unique_dts) > 1:
-        print(f"\n  WARNING: inconsistent timesteps detected: {set(dts)}")
-        print(f"  Using dt = {dts[0]:.6f} fs from first point")
-    dt = dts[0]
-    print(f"  Timestep: {dt:.6f} fs")
 
-    # 5. Analyze
-    ti_report = analyze_ti(
-        xi_values, lambda_list, dt,
-        epsilon_tol_ev=ctx[K.EPSILON_TOL_EV],
-        equilibration=equilibration,
-        time_starts=time_starts,
-        auto_equilibration=ctx.get(K.AUTO_EQUILIBRATION, False),
-    )
+def _print_ti_summary_table(ti_report) -> None:
+    """Console convergence summary for a :class:`TIReport`.
 
-    # 6. Console summary table
-    from ..utils.constants import HA_TO_EV
+    Shared by 312 and 313; reads ``ti_report.point_reports`` plus the
+    pass/fail roll-up and the optional suggested time-allocation hint.
+    """
     print(f"\n  {'Point':<6} {'ξ':<12} {'⟨λ⟩':<14} {'SEM':<14} "
           f"{'N':<8} {'Time range (fs)':<24} {'Status'}")
     print(f"  {'─' * 82}")
@@ -175,6 +136,7 @@ def _run_ti_core(ctx: dict):
         print(f"  Status: {len(failing)} FAILED "
               f"(indices: {', '.join(str(i) for i in failing)})")
         if ti_report.suggested_time_ratios is not None:
+            xi_values = [r.xi for r in ti_report.point_reports]
             print("  Suggested time allocation (relative):")
             parts = [
                 f"ξ={xi_values[i]:.4f}: "
@@ -182,15 +144,6 @@ def _run_ti_core(ctx: dict):
                 for i in range(len(xi_values))
             ]
             print(f"    {', '.join(parts)}")
-
-    # 7. Write output files + plots
-    write_convergence_csv(ti_report, output_dir=outdir)
-    write_free_energy_csv(ti_report, output_dir=outdir)
-    plot_free_energy_profile(ti_report, output_dir=outdir)
-    for r in ti_report.point_reports:
-        plot_point_diagnostics(r, output_dir=outdir)
-
-    return ti_report, point_defs, xi_values, outdir
 
 
 # ---------------------------------------------------------------------------
@@ -236,32 +189,30 @@ class TISingleDiagCmd(MenuCommand):
         return ctx
 
     def execute(self, ctx: dict) -> None:
-        standalone_diagnostics = lazy_import(
-            "md_analysis.enhanced_sampling.constrained_ti.workflow",
-            "standalone_diagnostics",
+        run_single = lazy_import(
+            "md_analysis.workflows.enhanced_sampling",
+            "run_ti_single_diagnostics",
         )
         outdir = ctx[K.OUTDIR_RESOLVED]
-        result = standalone_diagnostics(
+        result = run_single(
             restart_path=ctx[K.RESTART_PATH],
             log_path=ctx[K.LOG_PATH],
+            output_dir=outdir,
             equilibration=ctx[K.EQUILIBRATION],
             sem_target=ctx[K.SEM_TARGET],
             colvar_id=ctx[K.COLVAR_ID],
-            output_dir=outdir,
         )
 
-        # Console summary
-        r = result["report"]
+        # Console summary from result.extra (ConstraintPointReport) +
+        # result.metadata (frame counts / time range).
+        r = result.extra
+        m = result.metadata
         status = "N/A" if r.passed is None else ("PASS" if r.passed else "FAIL")
         method = "plateau" if r.block_avg.plateau_reached else "acf"
         print(f"\n  ξ = {r.xi:.6f} a.u.")
-        n_total = result["n_total"]
-        n_analyzed = result["n_analyzed"]
-        equil = result["equilibration"]
-        t_start = result["time_start_fs"]
-        t_end = result["time_end_fs"]
-        print(f"  Frames: {n_total} total, {equil} discarded, {n_analyzed} analyzed")
-        print(f"  Time range: {t_start:.1f} – {t_end:.1f} fs")
+        print(f"  Frames: {m['n_total']} total, {m['equilibration']} discarded, "
+              f"{m['n_analyzed']} analyzed")
+        print(f"  Time range: {m['time_start_fs']:.1f} – {m['time_end_fs']:.1f} fs")
         print(f"  ⟨λ⟩ = {r.lambda_mean:.6f} a.u.")
         print(f"  τ_corr = {r.autocorr.tau_corr:.1f} frames, N_eff = {r.autocorr.n_eff:.1f}")
         print(f"  SEM_final = {r.sem_final:.6f} a.u. (method: {method})")
@@ -273,8 +224,8 @@ class TISingleDiagCmd(MenuCommand):
                 print(f"    - {reason}")
 
         for key in ("diagnostics_png", "csv"):
-            if key in result:
-                print(f"  {key}: {result[key]}")
+            if key in result.artifacts:
+                print(f"  {key}: {result.artifacts[key]}")
 
 
 # ---------------------------------------------------------------------------
@@ -293,19 +244,54 @@ class TIFullAnalysisCmd(MenuCommand):
         return ctx
 
     def execute(self, ctx: dict) -> None:
-        ti_report, _point_defs, _xi_values, outdir = _run_ti_core(ctx)
+        discover_ti_points = lazy_import(
+            "md_analysis.enhanced_sampling.constrained_ti.io",
+            "discover_ti_points",
+        )
+        run_full = lazy_import(
+            "md_analysis.workflows.enhanced_sampling",
+            "run_ti_full_analysis",
+        )
+        outdir = ctx[K.OUTDIR_RESOLVED]
+        root = Path(ctx[K.TI_ROOT_DIR])
 
-        from ..utils.constants import HA_TO_EV
-        delta_A_ev = ti_report.delta_A * HA_TO_EV
-        sigma_A_ev = ti_report.sigma_A * HA_TO_EV
-        print(f"\n  ΔA = {delta_A_ev:.6f} ± {sigma_A_ev:.6f} eV")
+        # Pre-discover for display + per-point equil prompt sizing.
+        # strict=False is explicit (not the io default) so the wiring
+        # test can pin the D4 invariant: CLI sees the same N points the
+        # workflow analyses (workflow also passes strict=False).
+        point_defs = discover_ti_points(
+            root, reverse=ctx[K.TI_REVERSE], strict=False,
+        )
+        print(f"\n  Found {len(point_defs)} constraint points:")
+        for i, p in enumerate(point_defs):
+            print(f"    [{i}] ξ = {p.xi:.6f}")
+
+        point_slice, equilibration = _prompt_ti_slice_and_equil(ctx, point_defs)
+
+        result = run_full(
+            root_dir=root,
+            output_dir=outdir,
+            reverse=ctx[K.TI_REVERSE],
+            equilibration=equilibration,
+            epsilon_tol_ev=ctx[K.EPSILON_TOL_EV],
+            auto_equilibration=ctx.get(K.AUTO_EQUILIBRATION, False),
+            point_slice=point_slice,
+            strict=False,
+        )
+
+        _print_ti_summary_table(result.extra.ti_report)
+
+        delta_A = result.metadata["delta_A_eV"]
+        sigma_A = result.metadata["sigma_A_eV"]
+        print(f"\n  ΔA = {delta_A:.6f} ± {sigma_A:.6f} eV")
 
         print(f"\n  Output files:")
-        print(f"    {outdir / 'ti_free_energy.png'}")
-        print(f"    {outdir / 'ti_free_energy.csv'}")
-        print(f"    {outdir / 'ti_convergence_report.csv'}")
-        for r in ti_report.point_reports:
-            print(f"    {outdir / f'ti_diag_xi{r.xi:.4f}.png'}")
+        print(f"    {result.artifacts['free_energy_png']}")
+        print(f"    {result.artifacts['free_energy_csv']}")
+        print(f"    {result.artifacts['convergence_csv']}")
+        for key, path in result.artifacts.items():
+            if key.startswith("diagnostics_png_"):
+                print(f"    {path}")
 
 
 # ---------------------------------------------------------------------------
@@ -344,59 +330,74 @@ class TIConstPotCorrectionCmd(MenuCommand):
         return ctx
 
     def execute(self, ctx: dict) -> None:
-        # Phase 1: shared TI analysis
-        ti_report, point_defs, xi_values, outdir = _run_ti_core(ctx)
+        import numpy as np
+
+        discover_ti_points = lazy_import(
+            "md_analysis.enhanced_sampling.constrained_ti.io",
+            "discover_ti_points",
+        )
+        run_corr = lazy_import(
+            "md_analysis.workflows.enhanced_sampling",
+            "run_ti_constant_potential_correction",
+        )
+        default_json = lazy_import(
+            "md_analysis.electrochemical.calibration.config",
+            "DEFAULT_CALIBRATION_FILE",
+        )
+        outdir = ctx[K.OUTDIR_RESOLVED]
+        root = Path(ctx[K.TI_ROOT_DIR])
+
+        # Pre-discover for display + per-point equil prompt. strict=False
+        # explicit (D4 invariant — same as 312).
+        point_defs = discover_ti_points(
+            root, reverse=ctx[K.TI_REVERSE], strict=False,
+        )
+        print(f"\n  Found {len(point_defs)} constraint points:")
+        for i, p in enumerate(point_defs):
+            print(f"    [{i}] ξ = {p.xi:.6f}")
+
+        point_slice, equilibration = _prompt_ti_slice_and_equil(ctx, point_defs)
+
+        cal_path = ctx.get(K.CALIBRATION_JSON) or default_json
+
+        result = run_corr(
+            root_dir=root,
+            output_dir=outdir,
+            calibration_json_path=Path(cal_path),
+            target_side=ctx[K.TARGET_SIDE],
+            method=ctx[K.METHOD],
+            normal=ctx[K.NORMAL],
+            reverse=ctx[K.TI_REVERSE],
+            equilibration=equilibration,
+            epsilon_tol_ev=ctx[K.EPSILON_TOL_EV],
+            auto_equilibration=ctx.get(K.AUTO_EQUILIBRATION, False),
+            point_slice=point_slice,
+            strict=False,
+        )
 
         from ..utils.constants import HA_TO_EV
+
+        correction_result = result.extra  # ConstantPotentialResult
+        ti_report = correction_result.ti_report
+        _print_ti_summary_table(ti_report)
+
+        # Preserve the pre-migration numeric formula exactly: ΔA (const-q)
+        # is the raw integrated TI free energy converted Hartree → eV
+        # (NOT metadata["delta_A_const_q_eV"], whose definition is the
+        # cumulative const-q value at the last point — same physical
+        # quantity but a different code path; keep byte-equal output).
         delta_A_ev = ti_report.delta_A * HA_TO_EV
         sigma_A_ev = ti_report.sigma_A * HA_TO_EV
         print(f"\n  ΔA (const-q) = {delta_A_ev:.6f} ± {sigma_A_ev:.6f} eV")
 
-        # Phase 2: constant-potential correction
-        compute_constant_potential_correction = lazy_import(
-            "md_analysis.enhanced_sampling.constrained_ti.correction",
-            "compute_constant_potential_correction",
-        )
-        write_corrected_free_energy_csv = lazy_import(
-            "md_analysis.enhanced_sampling.constrained_ti.correction",
-            "write_corrected_free_energy_csv",
-        )
-        plot_corrected_free_energy_profile = lazy_import(
-            "md_analysis.enhanced_sampling.constrained_ti.correction",
-            "plot_corrected_free_energy_profile",
-        )
-
-        # Load calibration
-        load_calibration_json = lazy_import(
-            "md_analysis.electrochemical.calibration._data",
-            "load_calibration_json",
-        )
-        mapper_from_dict = lazy_import(
-            "md_analysis.electrochemical.calibration._mapper",
-            "mapper_from_dict",
-        )
-        cal_path = ctx.get(K.CALIBRATION_JSON)
-        _cal_data, fit_params = load_calibration_json(cal_path)
-        mapper = mapper_from_dict(fit_params)
-
-        # Compute correction
-        result = compute_constant_potential_correction(
-            ti_report,
-            point_defs,
-            mapper,
-            target_side=ctx[K.TARGET_SIDE],
-            method=ctx[K.METHOD],
-            normal=ctx[K.NORMAL],
-        )
-
-        # Correction console summary
-        corr = result.correction
+        corr = correction_result.correction
         print(f"\n  --- Constant-Potential Correction (Norskov) ---")
         print(f"  Electrode surface: {ctx[K.TARGET_SIDE]}, "
               f"area = {corr.area_A2:.2f} Å²")
         print(f"\n  {'Point':<6} {'ξ':<12} {'σ(μC/cm²)':<14} "
               f"{'Φ(V/SHE)':<14} {'correction(eV)'}")
         print(f"  {'─' * 60}")
+        xi_values = np.array([r.xi for r in ti_report.point_reports])
         for i in range(len(xi_values)):
             print(
                 f"  {i:<6} {xi_values[i]:<12.6f} "
@@ -404,21 +405,16 @@ class TIConstPotCorrectionCmd(MenuCommand):
                 f"{corr.phi_V_SHE[i]:<14.4f} "
                 f"{corr.correction_eV[i]:<14.6f}"
             )
-        total_corr = (result.delta_A_const_phi_eV
-                      - float(result.A_const_q_eV[-1]))
-        print(f"\n  ΔA (const-Φ) = {result.delta_A_const_phi_eV:.6f} eV"
-              f"  (correction = {total_corr:+.6f} eV)")
+        print(f"\n  ΔA (const-Φ) = {result.metadata['delta_A_const_phi_eV']:.6f} eV"
+              f"  (correction = {result.metadata['total_correction_eV']:+.6f} eV)")
 
-        # Write corrected output files
-        write_corrected_free_energy_csv(result, output_dir=outdir)
-        plot_corrected_free_energy_profile(result, output_dir=outdir)
-
-        # List all output files
+        # Output files
         print(f"\n  Output files:")
-        print(f"    {outdir / 'ti_free_energy.png'}")
-        print(f"    {outdir / 'ti_free_energy.csv'}")
-        print(f"    {outdir / 'ti_corrected_free_energy.png'}")
-        print(f"    {outdir / 'ti_corrected_free_energy.csv'}")
-        print(f"    {outdir / 'ti_convergence_report.csv'}")
-        for r in ti_report.point_reports:
-            print(f"    {outdir / f'ti_diag_xi{r.xi:.4f}.png'}")
+        for key in ("free_energy_png", "free_energy_csv",
+                    "corrected_free_energy_png", "corrected_free_energy_csv",
+                    "convergence_csv"):
+            if key in result.artifacts:
+                print(f"    {result.artifacts[key]}")
+        for k, p in result.artifacts.items():
+            if k.startswith("diagnostics_png_"):
+                print(f"    {p}")

@@ -11,10 +11,10 @@ from ase.io import read
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
-from md_analysis.utils.StructureParser.WaterParser import _compute_water_mass_density_z_distribution as compute_water_mass_density_z_distribution
-from md_analysis.utils.StructureParser.WaterParser import _compute_water_orientation_weighted_density_z_distribution as compute_water_orientation_weighted_density_z_distribution
-from md_analysis.utils.StructureParser.WaterParser import detect_water_molecule_indices
-from md_analysis.utils.StructureParser.WaterParser import get_water_oxygen_indices_array
+from md_analysis.utils.structure.water import _compute_water_mass_density_z_distribution as compute_water_mass_density_z_distribution
+from md_analysis.utils.structure.water import _compute_water_orientation_weighted_density_z_distribution as compute_water_orientation_weighted_density_z_distribution
+from md_analysis.utils.structure.water import detect_water_molecule_indices
+from md_analysis.utils.structure.water import get_water_oxygen_indices_array
 from md_analysis.utils.constants import DEFAULT_Z_BIN_WIDTH_A
 
 
@@ -37,8 +37,8 @@ def _z_bin_centers_A(lz_A: float, dz_A: float, nbins: int) -> np.ndarray:
 
 def main() -> None:
     repo_root = REPO_ROOT
-    xyz_path = repo_root / "data_example" / "potential" / "md-pos-1.xyz"
-    md_inp_path = repo_root / "data_example" / "potential" / "md.inp"
+    xyz_path = repo_root / "data_example" / "potential" / "dense" / "md-pos-1.xyz"
+    md_inp_path = repo_root / "data_example" / "potential" / "dense" / "md.inp"
 
     atoms = read(str(xyz_path), index=-1)
     a, b, c = _parse_abc_from_md_inp(md_inp_path)

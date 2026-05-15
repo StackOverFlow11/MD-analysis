@@ -36,17 +36,17 @@
 
 数据结构与异常：
 
-- `Layer`（dataclass，来自 `utils.StructureParser.LayerParser`）
-- `SurfaceDetectionResult`（来自 `utils.StructureParser.LayerParser`）
-- `SurfaceGeometryError`（来自 `utils.StructureParser.LayerParser`）
-- `WaterTopologyError`（来自 `utils.StructureParser.WaterParser`）
+- `Layer`（dataclass，来自 `utils.structure.layer`）
+- `SurfaceDetectionResult`（来自 `utils.structure.layer`）
+- `SurfaceGeometryError`（来自 `utils.structure.layer`）
+- `WaterTopologyError`（来自 `utils.structure.water`）
 
 函数：
 
-- `detect_interface_layers`（来自 `utils.StructureParser.LayerParser`）
-- `format_detection_summary`（来自 `utils.StructureParser.LayerParser`）
-- `detect_water_molecule_indices`（来自 `utils.StructureParser.WaterParser`）
-- `get_water_oxygen_indices_array`（来自 `utils.StructureParser.WaterParser`）
+- `detect_interface_layers`（来自 `utils.structure.layer`）
+- `format_detection_summary`（来自 `utils.structure.layer`）
+- `detect_water_molecule_indices`（来自 `utils.structure.water`）
+- `get_water_oxygen_indices_array`（来自 `utils.structure.water`）
 
 常量：
 

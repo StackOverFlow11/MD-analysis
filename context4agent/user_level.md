@@ -19,4 +19,6 @@
 
 ## 当前已掌握的样例数据（来自仓库）
 
-- `data_example/potential/`：包含 `md.inp`、`md.out`、`md-1.ener`、`md-pos-*.xyz`、`CHARGE.mulliken`、`md-POTENTIAL-*.cube` 等
+- `data_example/potential/`：分两套 fixture
+  - `data_example/potential/dense/`（continuous 模式）：`md.inp`、`md.out`、`md-1.ener`、`md-pos-1.xyz`、`md-POTENTIAL-v_hartree-1_*.cube` 等
+  - `data_example/potential/distributed/potential_t*_i*/`（distributed 模式）：每帧一个子目录，含 cube 文件 + `sp.out`

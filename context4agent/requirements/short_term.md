@@ -1,24 +1,36 @@
 # 近期诉求（持续更新）
 
 > 维护要求：每次提出"最近要做什么/优先级变化/卡点"，都更新这里。
+> 本文只记「能力分组摘要 + 关键不变量 + 待办意图」；逐函数/逐菜单号
+> **不手写**，以代码权威为准（见下「权威来源」）。
 
-## 当前阶段目标（与仓库现状对齐）
+## 权威来源（不在本文复制，避免漂移）
 
-- **目标**：围绕"周期性金属-水界面"体系，提供可复现的水/电势分析（CSV/PNG）与可复用 API。
-- **当前已覆盖**（对应 `src/md_analysis/`）：
-  - 单帧工具（`utils/`）：金属界面层识别、H2O 拓扑识别、密度/取向/角度 PDF、cube 文件解析、slab-averaged potential
-  - 水分析（`water/`）：从选定界面到两界面中点的系综平均（A 口径）、吸附层自动识别、吸附层角度分布、三联图输出
-  - 电势分析（`electrochemical/potential/`）：center slab potential、Fermi energy、electrode potential U vs SHE、φ(z) overlay、thickness sensitivity
-  - 增强抽样（`enhanced_sampling/`）：慢增长自由能绘图（quick / publication）+ CSV 导出 + 约束 TI 收敛诊断与自由能积分 + CLI 集成
-  - 集成入口：CLI（`md-analysis` 命令）、编程入口（`main.py`）、Agent 入口（`agent/`：dispatch + JSON Schema + TaskResult + Tools-layer `TaskContract`；当前 14 个任务，其中 `ti_gen_batch` / `ti_full_analysis` / `bader_gen_batch` 已落地完整 contract —— `ti_full_analysis` 是首个 composite 样例，由真实 wrapper `run_ti_full_from_root` 支撑；`bader_gen_batch` 是脚本准备型样例，只写 VASP 工作目录不提交作业）
-- Bader 电荷解析（`utils/BaderParser.py`）：从 VASP Bader 输出（ACF.dat + POTCAR）读取原始电子数与净电荷，附加到 ASE Atoms
-  - Bader 电荷下游分析（`electrochemical/charge/Bader/`）：
-    - 核心数据结构 `BaderTrajectoryData` + `load_bader_trajectory()` — 加载轨迹并通过 IndexMap remap 回 XYZ 原子序
-    - 单帧表面电荷密度 `compute_frame_surface_charge(method=...)`，支持 `"counterion"`（反离子/溶质）和 `"layer"`（界面层净电荷）两种计算方法
-    - 按帧指定原子索引提取净电荷（`trajectory_indexed_atom_charges`）
-    - 指定 XYZ 原子电荷追踪（`tracked_atom_charge_analysis`）— 含时演化 + 系综平均
-    - Counterion 逐帧自动检测追踪（`counterion_charge_analysis`）— 含时演化 + 系综平均
-- **当前未覆盖**：按层/按元素电荷转移统计；Mulliken 电荷分析仍未实现。
+- 编程入口完整清单：`src/md_analysis/workflows/__init__.py` 的 `__all__`
+  （全部 `run_*` + `WorkflowResult`；`md_analysis.main` 是同名薄 re-export）
+- Agent 任务清单 / target_fn / schema：agent registry +
+  `get_task(name).target_fn` + `TaskContract`（`md_analysis.agent`）
+- CLI 菜单号与行为：`src/md_analysis/cli/` + `test/unit/cli/`
+- 模块职责边界 / 数据流：`context4agent/architecture/`
+
+## 当前阶段目标
+
+- **目标**：围绕"周期性金属-水界面"体系，提供可复现的水/电势/电荷/
+  增强采样分析（CSV/PNG）与可复用 API（CLI + workflows + agent 三入口）。
+- **当前已覆盖**（按能力域，详清单见代码权威位置）：
+  - 单帧底层（`utils/`）：界面层识别、H2O 拓扑、密度/取向/角度 PDF、
+    cube 解析、slab-averaged potential
+  - 水分析（`water/`）：界面→中点系综平均、吸附层识别/角度、三联图
+  - 电势（`electrochemical/potential/`）：center potential、Fermi、
+    electrode potential U vs SHE、φ(z) overlay、thickness sensitivity
+  - 电荷（`electrochemical/charge/Bader/`）：表面电荷密度（counterion/
+    layer 双方法）、原子电荷追踪、反离子逐帧检测；附 σ→φ 标定外推
+  - 增强采样（`enhanced_sampling/`）：慢增长自由能（quick/publication）
+    + 约束 TI 收敛诊断与自由能积分 + 恒电势修正
+  - 脚本生成（`scripts/`）：Bader/TI/Potential/SP 工作目录批量生成
+  - 三入口：CLI、`md_analysis.workflows`（`run_*`+`WorkflowResult`）、
+    Agent（dispatch + JSON Schema + `TaskContract`，全部 contract-backed）
+- **当前未覆盖**：按层/按元素电荷转移统计；Mulliken 电荷分析。
 
 ## 已确认的体系前提（用户声明，值得记录）
 
@@ -26,80 +38,58 @@
 - 始终包含**金属/水界面**
 - 由于周期性边界条件，体系中总会存在**两个表面**（两个界面）
 
-## 当前已实现能力（按"可跑通的入口"）
+## 入口现状要点（只记策略与例外，不记逐项清单）
 
-- **CLI 入口**（`md-analysis` 启动 VASPKIT 风格交互式编号菜单，无 argparse 参数）：
-  - 1xx：Water（密度/取向/吸附层/三联图）
-  - 21x：Potential（center potential / Fermi / electrode potential / φ(z) / thickness sensitivity / full）
-  - 22x：Charge（221 counterion σ / 222 layer σ / 223 full σ / 224 single-side σ+φ / 225 tracked atoms / 226 counterion tracking）
-  - 23x：Calibration（CSV/手动标定 + 预测）
-  - 30x：Slow-Growth（301 quick plot / 302 publication plot）
-  - 31x：Constrained TI（311 single-point diagnostics / 312 full analysis / 313 constant-potential correction）
-  - 41x：Bader 工作目录生成（411 单帧 / 412 批量）
-  - 42x：TI 工作目录生成（421 单帧 / 422 批量）
-  - 9xx：Settings（配置管理）
-- **编程入口**：
-  - `md_analysis.main.run_water_analysis(xyz_path, md_inp_path, ...)`
-  - `md_analysis.main.run_potential_analysis(cube_pattern=..., md_out_path=..., ...)`
-  - `md_analysis.main.run_charge_analysis(output_dir=..., root_dir=..., ...)`
-  - `md_analysis.main.run_tracked_charge_analysis(root_dir=..., atom_indices_xyz=..., ...)`
-  - `md_analysis.main.run_counterion_charge_analysis(root_dir=..., ...)`
-  - `md_analysis.main.run_all(...)`
-  - `md_analysis.enhanced_sampling.slowgrowth.slowgrowth_analysis(restart_path, log_path, ...)`
-  - `md_analysis.enhanced_sampling.constrained_ti.workflow.standalone_diagnostics(restart_path, log_path, ...)`
-  - `md_analysis.enhanced_sampling.constrained_ti.workflow.analyze_ti(xi_values, lambda_series_list, dt, ...)`
-- **Agent 入口**（`md_analysis.agent`，非交互式，面向 AI agent / MCP Server）：
-  - `dispatch(task, params)` → 统一任务执行，返回 `TaskResult`
-  - `list_tasks()` → 枚举已注册任务
-  - `get_task_schema(task)` → 有 contract 时从 `TaskContract.to_agent_schema()` 生成（权威），否则从 `target_fn` 签名推导（legacy 路径）。返回形状始终为 OpenAI function-calling 兼容的 `{name, description, parameters}`
-  - Tools-layer 契约（`_contracts.py`）：`TaskContract`（`inputs` + 三分法 `outputs_artifacts/metrics/raw_model` + `preconditions` + `side_effects` + `exceptions`）、`FieldSpec`（`json_schema` 权威，`unit`/`shape`/`path_kind`/`category` 领域标注）、`ExceptionMapping`（FQN + `error_type` 重写 dispatch 分类，有序先具体后父类）
-  - 当前 14 个任务：water_three_panel, potential_full, charge_surface, charge_tracked, charge_counterion, run_all, calibration_fit_csv, calibration_predict, slowgrowth_quick, ti_full_analysis（✅ 带 contract，composite wrapper）, bader_gen_batch（✅ 带 contract，script-preparation）, ti_gen_batch（✅ 带 contract）, sp_gen_batch, config_show
-- **水分析**：
-  - `plot_water_three_panel_analysis(xyz_path, md_inp_path, ...)`
-    - 输出：密度/取向 CSV、吸附层 profile CSV、吸附层 range TXT、吸附层角度分布 CSV、三联图 PNG
-  - `water_mass_density_z_distribution_analysis(...)`
-  - `water_orientation_weighted_density_z_distribution_analysis(...)`
-  - `ad_water_orientation_analysis(...)`
-  - `compute_adsorbed_water_theta_distribution(...)`
-- **电势分析**：
-  - `center_slab_potential_analysis(...)`
-  - `fermi_energy_analysis(...)`
-  - `electrode_potential_analysis(...)`
-  - `thickness_sensitivity_analysis(...)`
-  - `phi_z_planeavg_analysis(...)`
+- **入口分层**：`cli`/`agent` → `workflows` → 业务 → `engines` → `utils`。
+  CLI 菜单命令全部走 `workflows.*` facade；agent 任务全部 contract-backed。
+- **入口重构期间**移除了 legacy 名（旧 `run_*_analysis`/`run_all` 及对应
+  6 个 legacy agent task），未保留 alias；业务经 `workflows.run_*` 调用。
+- **长期例外**（有意保留，非遗漏）：
+  - `slowgrowth_quick`（agent）有意直调 `slowgrowth_analysis_with_report`
+    ——它是通用 SG 入口，暴露 `plot_style`(quick/publication/both) +
+    可选 `output_dir`；`run_slowgrowth_quick_plot` 是 CLI quick 专用窄
+    facade（硬编码 plot_style、output_dir 必填），强迁会丢 publication/
+    both 能力（能力回退，非清理）
+  - `config_show`（agent）read-only
+- **关键坑**（影响后续 agent 决策）：`WorkflowResult` **无** `.workdirs`；
+  batch 类 agent handler 的 outputs 必须从 `WorkflowResult.artifacts`
+  显式构建、summary 从 `result.extra` 取（不可用 `_normalize_outputs`）。
+
+## 已批准行为变化（用户拍板，长效记录）
+
+> 格式：default-preserving migration（参数默认保旧行为）/
+> approved tightening（更合理但改旧行为，须用户批准）。
+
+- **6.5 `strict`（default-preserving）**：`ti_full_analysis` 等迁
+  workflows 后新增 `strict: bool=True`；agent 默认不变（失败语义不变），
+  CLI 显式传 `False` 维持旧行为。
+- **6.6 `overwrite`（default-preserving）**：`ti_gen_batch` 新增
+  `overwrite: bool=False`（保留 collision guard），`True` 仅跳 guard
+  逐文件覆盖**不清目录**；agent 默认不变，CLI 显式传 `True`。
+- **6.5 TI dt 不一致（approved tightening，user 拍板接受）**：旧行为
+  = warning + continue；新行为 = `ValueError`。理由：混用不同 dt 会让
+  autocorrelation / N_eff / time-range 收敛诊断产生误导，继续算等于在
+  不可信诊断上出结果，报错更合理。已在对应 commit message 标
+  `BEHAVIOR CHANGE`。
 
 ## 近期任务清单（仍待补齐）
 
-- **I/O（读取与标准化）**
-  - 统一记录单位、时间步、采样间隔等元数据（当前仅解析 `md.inp` 的 `ABC [angstrom]`）
-- **Analysis（扩展分析量）**
-  - Bader 电荷下游分析（`electrochemical/charge/Bader/`）：
-    - ✅ 表面电荷密度（双方法）：
-      - `method="counterion"`：排除水分子和金属原子，仅反离子/溶质物种净电荷贡献 σ
-      - `method="layer"`：界面层金属原子净电荷求和 / 面积（`n_surface_layers` 参数控制每侧取几层，默认 1）
-      - CLI 通过交互式菜单选择（221=counterion / 222=layer / 223=prompted）；输出目录按方法分离 `<outdir>/electrochemical/charge/<method>/`
-    - ✅ 单帧原子净电荷提取：`frame_indexed_atom_charges` 传入 `(N,)` 索引，返回 `(N, 2)` 的索引+净电荷数组
-    - ✅ 轨迹原子净电荷提取：`trajectory_indexed_atom_charges` 按帧传入 `(t, N)` 索引矩阵，返回 `(t, N, 2)` 的索引+净电荷数组（内部调用 `frame_indexed_atom_charges`）
-    - ✅ 轨迹表面电荷密度时序：`trajectory_surface_charge` 逐帧计算表面电荷密度，返回 `(t, 2)` 的 μC/cm² 数组
-    - ✅ 端到端表面电荷分析：`surface_charge_analysis` 输出 CSV（含累积平均）+ PNG；若存在标定文件（`calibration.json`）则自动追加外推电势列及 PNG 右轴
-    - 按层/按元素电荷转移统计：分层聚合 `bader_net_charge`，输出每层各元素的平均净电荷（待实现）
-    - 典型工作流：CP2K MD → 提取结构帧 → `generate_bader_workdir` 生成 VASP 工作目录 → VASP 单点 → Bader 分析 → `load_bader_atoms` → 表面电荷/电荷转移
-  - Bader 工作目录生成（`scripts/BaderGen.py`）：
-    - ✅ `generate_bader_workdir()`：从单帧 Atoms 生成完整 VASP 工作目录（POSCAR + INCAR + KPOINTS + POTCAR + script.sh）
-    - ✅ POSCAR 通过 IndexMapper 生成，保留 XYZ↔POSCAR 索引映射
-    - ✅ POTCAR 通过 vaspkit 103 自动生成（可选）
-    - ✅ 提交脚本路径支持持久化配置（`~/.config/md_analysis/config.json`）
-    - ✅ 多帧批量生成：`batch_generate_bader_workdirs(xyz_path, cell_abc, output_dir, *, frame_start/end/step, ...)`
-    - ✅ CLI 支持：411（单帧）+ 412（批量），cell 来源支持 `.restart` 和 `md.inp`
-    - ✅ RestartParser：`parse_abc_from_restart()` 从 CP2K `.restart` 文件解析正交 cell 参数
-    - ✅ ColvarParser：解析 CP2K COLVAR restart 元数据（COLLECTIVE、CONSTRAINT、FIXED_ATOMS）和 LagrangeMultLog（单约束/多约束自动检测），重建 ξ(t) 目标序列；溢出值 `***` 自动处理为 `np.nan`
-  - 持久化用户配置（`config.py`）：
-    - ✅ `load_config`、`save_config`、`get_config`、`set_config`、`delete_config`
-    - ✅ `CONFIGURABLE_DEFAULTS` 注册表：`layer_tol_A`、`z_bin_width_A`、`theta_bin_deg`、`water_oh_cutoff_A`
-    - ✅ CLI 设置菜单（901-907）支持查看/修改配置和分析参数默认值
-  - Mulliken 电荷：按元素/分组/分层统计（优先级低于 Bader，待后续明确需求）
-- **工程化（可复现与易用性）**
-  - 依赖与环境说明（固定最小依赖集合与安装方式）
+- **I/O**：统一记录单位/时间步/采样间隔等元数据（当前仅解析 `md.inp`
+  的 `ABC [angstrom]`）
+- **Analysis**：
+  - 按层/按元素电荷转移统计（分层聚合 `bader_net_charge`，输出每层各
+    元素平均净电荷）——待实现
+  - Mulliken 电荷：按元素/分组/分层统计（优先级低于 Bader，需求待明确）
+- **工程化**：固定最小依赖集合与安装方式说明
+- **文档 follow-up**：中性化旧子阶段标签 `Phase 7b` / `Phase 7b1` /
+  `Phase 7b2`（formats/engines 重构历史语境），避免与 canonical Phase 7
+  混淆；独立计划处理。
+- **旧 shim 弃用计划**：`batch_generate_ti_workdirs` 自入口重构 TI batch
+  迁移后 CLI 无调用方（现行 backend = `generate_ti_batch_with_report`），
+  但它仍是 **public Python API**（`scripts/__init__.py.__all__` + 直接
+  单测）。**计划弃用**；真正删除须为**独立一笔 commit + 用户明确批准 +
+  commit message 标 `API BREAK` + 同步 scripts public docs/tests**。
+  本阶段（Phase 7）不删，仅登记此意图。
 
 ## 关键口径：已在当前实现中落地（不是待讨论）
 

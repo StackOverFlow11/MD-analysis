@@ -60,14 +60,67 @@ class TestSchemaPublicShape:
         assert required == {"inp_path", "xyz_path", "restart_path", "output_dir"}
 
 
-class TestSchemaNonContractTasksUnchanged:
-    """Legacy (non-contract) tasks must retain the {name, description,
-    parameters} public shape."""
+class TestTiGenBatchPhase66:
+    """Phase 6.6: ti_gen_batch reroute + colvar_id/overwrite contract."""
 
-    def test_water_three_panel_still_works(self):
-        s = get_task_schema("water_three_panel")
-        assert set(s.keys()) == {"name", "description", "parameters"}
-        assert s["parameters"]["type"] == "object"
+    def test_target_fn_routes_through_workflows(self):
+        from md_analysis.agent._core import get_task
+
+        assert get_task("ti_gen_batch").target_fn == (
+            "md_analysis.workflows.scripts:run_ti_batch"
+        )
+
+    def test_schema_exposes_colvar_id_and_overwrite_not_verbose(self):
+        s = get_task_schema("ti_gen_batch")
+        props = s["parameters"]["properties"]
+        assert "colvar_id" in props
+        assert "overwrite" in props
+        # verbose is UI-only — must NOT leak into the agent contract
+        assert "verbose" not in props
+
+    def test_colvar_id_and_overwrite_defaults(self):
+        s = get_task_schema("ti_gen_batch")
+        props = s["parameters"]["properties"]
+        assert props["colvar_id"].get("default") is None
+        assert props["overwrite"].get("default") is False
+        # both optional — not in required
+        required = set(s["parameters"].get("required", []))
+        assert "colvar_id" not in required
+        assert "overwrite" not in required
+
+
+class TestAgentCleanupReroute:
+    """Phase 6.agent-cleanup: sp/bader rerouted to workflows;
+    slowgrowth_quick intentionally NOT rerouted (D1=Option A)."""
+
+    def test_sp_gen_batch_rerouted(self):
+        from md_analysis.agent._core import get_task
+
+        assert get_task("sp_gen_batch").target_fn == (
+            "md_analysis.workflows.scripts:run_sp_batch"
+        )
+
+    def test_bader_gen_batch_rerouted(self):
+        from md_analysis.agent._core import get_task
+
+        assert get_task("bader_gen_batch").target_fn == (
+            "md_analysis.workflows.scripts:run_bader_batch"
+        )
+
+    def test_slowgrowth_quick_intentionally_not_rerouted(self):
+        """slowgrowth_quick stays on slowgrowth_analysis_with_report:
+        its contract is the general SG entry (exposes plot_style
+        quick/publication/both, optional output_dir). The plot-style-
+        fixed run_slowgrowth_quick_plot facade would be a capability
+        regression. Pin so a future 'cleanup' does not silently break
+        publication/both output."""
+        from md_analysis.agent._core import get_task
+
+        tf = get_task("slowgrowth_quick").target_fn
+        assert tf == (
+            "md_analysis.enhanced_sampling.slowgrowth.SlowGrowthPlot"
+            ":slowgrowth_analysis_with_report"
+        ), tf
 
 
 class TestListTasksIncludesTiGenBatch:
@@ -79,17 +132,20 @@ class TestListTasksIncludesTiGenBatch:
 class TestHandlerReloadRegression:
     """Batch 0 regression: after splitting _handlers.py into task modules,
     ``_reset_registry()`` + ``reload(_handlers)`` must still produce the
-    full 14-task registry."""
+    full registry (currently 8 after Phase 5 Step B removed
+    water_three_panel / potential_full / run_all on top of the Phase 3
+    charge legacy cleanup)."""
 
-    def test_reset_then_reload_restores_14_tasks(self):
+    def test_reset_then_reload_restores_full_registry(self):
         from md_analysis.agent import _handlers
         from md_analysis.agent._core import _reset_registry
 
-        assert len(list_tasks()) == 14  # baseline
+        baseline = len(list_tasks())
+        assert baseline == 8
         _reset_registry()
         assert len(list_tasks()) == 0
         importlib.reload(_handlers)
-        assert len(list_tasks()) == 14
+        assert len(list_tasks()) == baseline
 
     def test_reload_preserves_task_order(self):
         from md_analysis.agent import _handlers
@@ -201,10 +257,14 @@ class TestBaderGenBatchSchema:
         assert ca["minItems"] == 3 and ca["maxItems"] == 3
         assert ca["items"]["type"] == "number"
 
-    def test_registered_task_count_14(self):
+    def test_registered_task_count(self):
         names = [t["name"] for t in list_tasks()]
         assert "bader_gen_batch" in names
-        assert len(names) == 14
+        # 14 -> 11 after Phase 3 charge legacy cleanup removed
+        # charge_surface / charge_tracked / charge_counterion.
+        # 11 -> 8 after Phase 5 Step B removed water_three_panel /
+        # potential_full / run_all.
+        assert len(names) == 8
 
 
 # ---------------------------------------------------------------------------
