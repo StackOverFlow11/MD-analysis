@@ -57,6 +57,6 @@ Phase 1（破坏性重构）后 `formats/` 进一步按 engine 家族切分为 `
 - **`formats/bader/potcar.py`**：POTCAR 中元素符号可能带 `_pv`/`_sv` 后缀，解析时需去除
 - **`formats/bader/_errors.py`**：`BaderParseError` 单独存放，避免 `acf.py` 与 `potcar.py` 循环 import（`acf.py` 同时依赖 `_errors` 和 `potcar`）
 - **`formats/cp2k/colvar.py`**：解析器返回 CP2K 专有的 raw 类型（`Cp2kConstraintMetadataRaw` / `Cp2kLambdaSeriesRaw` 等）；engine-neutral canonical 类型（`ConstraintMetadata` / `LambdaSeries` / `ConstraintRun`）由 `engines.models` 持有，raw→canonical 转换在 `engines.cp2k`
-- **`formats/cp2k/stdout.py`** 与 **`formats/cp2k/xyz.py`**：Phase 7a 从 `electrochemical/potential/_frame_source.py` 抽出；后者现已退化为 thin wrapper（见 `electrochemical/potential/CLAUDE.md`）
+- **`formats/cp2k/stdout.py`** 与 **`formats/cp2k/xyz.py`**：formats 抽取期间从 `electrochemical/potential/_frame_source.py` 抽出；后者现已退化为 thin wrapper（见 `electrochemical/potential/CLAUDE.md`）
 - **`formats/vasp/*.py`** 占位：runtime **不**反向 import `engines/`，类型注解通过 `TYPE_CHECKING` + 字符串引用
 - **常量精度**：`AU_TIME_TO_FS = 0.02418884326585`（CODATA 值），不要随意修改

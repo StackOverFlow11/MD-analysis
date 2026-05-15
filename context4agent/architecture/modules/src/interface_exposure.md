@@ -10,7 +10,7 @@
 - `md_analysis` 不直接暴露业务算法函数、数据结构或配置常量。
 - 业务能力通过 `md_analysis.utils`、`md_analysis.water`、`md_analysis.electrochemical`（含 `potential`、`charge` 子包）向下访问。顶层通过 `from .electrochemical import potential, charge` 提供向后兼容的便捷访问。
 - CLI 入口通过 `md_analysis.cli:main` 注册为 `md-analysis` console script（VASPKIT 风格交互式菜单）。
-- 编程入口的 **canonical** 模块是 `md_analysis.workflows`，提供 21 个 `run_*` 函数 + `WorkflowResult` frozen dataclass。`md_analysis.main` 是同名薄 re-export facade。入口重构 Phase 7a 删除了 legacy 名 `run_water_analysis` / `run_potential_analysis` / `run_charge_analysis` / `run_tracked_charge_analysis` / `run_counterion_charge_analysis` / `run_all`，未保留 alias；新名分别为 `run_water_three_panel` / `run_potential_full` / `run_surface_charge` / `run_tracked_charge` / `run_counterion_charge` / `run_interface_analysis`。
+- 编程入口的 **canonical** 模块是 `md_analysis.workflows`，提供 `run_*` 函数集 + `WorkflowResult` frozen dataclass（完整清单以 `workflows/__init__.py.__all__` 为权威）。`md_analysis.main` 是同名薄 re-export facade。入口重构期间删除了 legacy 名 `run_water_analysis` / `run_potential_analysis` / `run_charge_analysis` / `run_tracked_charge_analysis` / `run_counterion_charge_analysis` / `run_all`，未保留 alias；新名分别为 `run_water_three_panel` / `run_potential_full` / `run_surface_charge` / `run_tracked_charge` / `run_counterion_charge` / `run_interface_analysis`。
 - 目录治理硬约束见：`context4agent/architecture/modules/README.md`（镜像对齐 + 双文档）。
 
 ## 2. 当前公开接口清单

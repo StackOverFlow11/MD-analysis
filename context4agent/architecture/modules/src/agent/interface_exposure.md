@@ -76,22 +76,33 @@
 - `ERROR_ANALYSIS = "analysis"`
 - `ERROR_INTERNAL = "internal"`
 
-## 3. 当前注册任务（8 个，全部 contract-backed）
+## 3. 当前注册任务（权威以 registry 为准）
 
-入口重构 Phase 3 / 5B 删除了 6 个 legacy task（`water_three_panel` / `potential_full`
-/ `charge_surface` / `charge_tracked` / `charge_counterion` / `run_all`），对应业务
-通过 `md_analysis.workflows.run_*` 直接调用即可。剩余任务全部带完整 `TaskContract`：
+入口重构期间删除了 legacy task（water/potential/charge/composite 类），
+对应业务通过 `md_analysis.workflows.run_*` 直接调用即可。剩余任务**全部
+带完整 `TaskContract`**。
 
-| 任务名 | 目标函数 | CLI 编号 | 类别 | 有 contract |
-|--------|---------|---------|------|---|
-| `calibration_fit_csv` | `CalibrationWorkflow:calibrate_with_report` | 231 | calibration | ✅ |
-| `calibration_predict` | `CalibrationWorkflow:predict_potential_with_report` | 233 | calibration | ✅ |
-| `slowgrowth_quick` | `SlowGrowthPlot:slowgrowth_analysis_with_report` | 301 | enhanced_sampling | ✅ |
-| `ti_full_analysis` | `constrained_ti.workflow:run_ti_full_from_root` | 312 | enhanced_sampling | ✅ |
-| `bader_gen_batch` | `scripts.BaderGen:generate_bader_batch_with_report` | 412 | scripts | ✅ |
-| `ti_gen_batch` | `scripts.TIGen:generate_ti_batch_with_report` | 422 | scripts | ✅ |
-| `sp_gen_batch` | `scripts.SpGen:generate_sp_batch_with_report` | 442 | scripts | ✅ |
-| `config_show` | `config:load_config` | 900 | meta | ✅ |
+**任务清单 / `target_fn` / CLI 编号不在本文手写**（易随迁移漂移），以
+代码权威为准：
+
+- 枚举：`md_analysis.agent.list_tasks()`
+- 单任务 target / 元数据：`md_analysis.agent._core.get_task(name)`
+  （`.target_fn` / `.contract` / `.cli_codes`）
+- schema：`get_task_schema(name)`（contract-first，见 §2.1）
+
+**长期例外 / 决策要点**（这些不能从代码稳定推断，必须记录）：
+
+- `slowgrowth_quick`：**有意**直调通用 SG 入口 `slowgrowth_analysis_with_report`
+  （暴露 `plot_style` quick/publication/both + 可选 `output_dir`）。
+  `run_slowgrowth_quick_plot` 是 CLI quick 专用窄 facade（硬编码
+  `plot_style="quick"`、`output_dir` 必填），强迁会丢 publication/both
+  能力——属能力回退非清理，故不迁。
+- `config_show`：read-only（`config:load_config`）。
+- batch 类任务（`ti_gen_batch` / `sp_gen_batch` / `bader_gen_batch` /
+  `ti_full_analysis`）入口重构期间 `target_fn` 已改走
+  `md_analysis.workflows.*` facade；handler 的 `outputs` 必须从
+  `WorkflowResult.artifacts` **显式构建**、`summary` 从 `result.extra`
+  取——`WorkflowResult` **无** `.workdirs`，不可用 `_normalize_outputs`。
 
 ## 4. 推荐导入方式
 
@@ -110,12 +121,21 @@ from md_analysis.agent._contracts import (
 - `register` / `TaskDef` / `TaskHandler`：**Stable**（供外部扩展）
 - `FieldSpec` / `ExceptionMapping` / `TaskContract`：**Evolving**（MVP 阶段，字段可能调整；在 Resources 层引入前保留弹性）
 - `TaskDef.contract` / `TaskDef.reference_fn`：**Evolving**（迁移期；旧任务暂未迁移）
-- 任务注册清单：**Evolving**（Phase 2 将扩展至 ~33 个任务）
+- 任务注册清单：**Evolving**（以 registry 为权威，详见 §3）
 
-## 6. Contract-backed 任务说明
+## 6. Contract-backed 任务说明（领域语义，非完整清单）
 
-当前 3 个任务带完整 `TaskContract`：
+下列任务的 contract 含**值得记录、不能从代码稳定推断**的领域语义；
+`target_fn` 一律以 registry / `get_task(name).target_fn` 为权威（§3）。
 
-- **`ti_gen_batch`**（CLI 422）：pass-through 到 `scripts.TIGen.generate_ti_batch_with_report`；含文件预检 + collision check
-- **`ti_full_analysis`**（CLI 312）：composite，backed by 真实 wrapper `constrained_ti.workflow.run_ti_full_from_root`（handler 薄化）。`summary.per_point` 是**未来 Resources 层**用于判定业务失败类别（非平衡漂移 / N_eff 太少 / 遍历性假阳等）的信号源 —— 字段：`point_index`、`xi`、`n_analyzed`、`time_start_fs`、`time_end_fs`、`time_total_fs`、`tau_corr`、`n_eff`、`sem_final_au`、`sem_max_au`、`geweke_z`、`drift_D`、`passed`、`failure_reasons`
-- **`bader_gen_batch`**（CLI 412）：pass-through 到 `scripts.BaderGen.generate_bader_batch_with_report`；**只**准备 VASP Bader 工作目录（POSCAR/INCAR/KPOINTS [+ POTCAR via `vaspkit 103`] + script.sh），**不**提交任务、**不**解析 Bader 输出、**不**做恒电势修正。`summary` 暴露 `n_frames`/`frame_indices`/`steps`/`times_fs`/`generate_potcar`
+- **`ti_gen_batch`**（CLI 422）：含文件预检 + collision check
+- **`ti_full_analysis`**（CLI 312）：composite（handler 薄化）。
+  `summary.per_point` 是**未来 Resources 层**用于判定业务失败类别（非平衡
+  漂移 / N_eff 太少 / 遍历性假阳等）的信号源 —— 字段：`point_index`、
+  `xi`、`n_analyzed`、`time_start_fs`、`time_end_fs`、`time_total_fs`、
+  `tau_corr`、`n_eff`、`sem_final_au`、`sem_max_au`、`geweke_z`、`drift_D`、
+  `passed`、`failure_reasons`
+- **`bader_gen_batch`**（CLI 412）：**只**准备 VASP Bader 工作目录
+  （POSCAR/INCAR/KPOINTS [+ POTCAR via `vaspkit 103`] + script.sh），
+  **不**提交任务、**不**解析 Bader 输出、**不**做恒电势修正。`summary`
+  暴露 `n_frames`/`frame_indices`/`steps`/`times_fs`/`generate_potcar`

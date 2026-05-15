@@ -50,7 +50,7 @@ for name, path in result.artifacts.items():
 
 > 历史说明：`md_analysis.main` 也 re-export 同一批新名（薄 facade，等价于
 > `md_analysis.workflows`）。旧的 `run_*_analysis` / `run_all` 名字已在
-> 入口重构 Phase 7a 移除，不再可用。
+> 入口重构期间移除，不再可用。
 
 ### Agent 入口（`agent.dispatch`）
 

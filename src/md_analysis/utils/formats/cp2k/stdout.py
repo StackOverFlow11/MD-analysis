@@ -4,8 +4,8 @@ Regex + tiny streaming parsers for ``md.out`` and ``sp.out`` files produced
 by CP2K. Extracts the per-step Fermi energy (Hartree) plus the step number
 and time embedded in the surrounding ``STEP NUMBER`` / ``TIME [fs]`` lines.
 
-Phase 7a status
----------------
+Formats-extraction status
+-------------------------
 Plain mechanical move from ``electrochemical.potential._frame_source`` —
 no behaviour change. The dict-of-records return shape of
 ``parse_md_out_fermi`` is preserved exactly; introducing a ``FermiRecord``

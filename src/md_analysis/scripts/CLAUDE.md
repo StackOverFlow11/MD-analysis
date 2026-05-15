@@ -47,7 +47,10 @@
   - `verbose: bool = False`：tqdm 进度（与 legacy `batch_generate_ti_workdirs`
     同款）。CLI 422 传 `True`；agent contract **不暴露** verbose
   - 旧 `batch_generate_ti_workdirs`（legacy，无 collision guard、无 preflight）
-    迁移后 CLI 不再调用；保留待 Phase 7 清理
+    迁移后 CLI 不再调用，但仍是 **public Python API**（`scripts/__init__.py`
+    `__all__` + 直接单测）。**弃用计划见 `context4agent/requirements/`
+    `short_term.md`**；真正删除须为独立一笔 commit + 用户明确批准 + commit
+    message 标 `API BREAK` + 同步 scripts public docs/tests。本阶段不删。
 
 ## 陷阱与历史 Bug
 

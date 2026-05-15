@@ -186,7 +186,7 @@ ti_diagnostics_<i>.png        # 每点 2x2 图（running avg / ACF / block / Gew
 ## Agent 任务列表
 
 非交互入口 `agent.dispatch(task, params)` 的完整任务清单（**全部 contract-backed**，
-入口重构 Phase 3 / 5B 已移除 water/potential/charge/composite 6 个 legacy task）：
+入口重构期间已移除 water/potential/charge/composite legacy task）：
 
 | Task | 关联菜单 | 契约层级 |
 |---|---|---|

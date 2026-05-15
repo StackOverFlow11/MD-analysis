@@ -90,7 +90,7 @@ VASP 占位文件（`utils/formats/vasp_{report,outcar}.py`）需要 `Constraint
 - Phase 5a：建 `engines/` 骨架，把 `enhanced_sampling/_parsers.py` 的 Protocol + CP2KParser 搬过来；`PotentialFrame` 从 `electrochemical/potential/_frame_source.py` 搬到 `engines/models.py`；VASP placeholder 加好。
 - 重构期 dataclass rename：CP2K 风格 colvar/lagrange 命名统一改为 engine-neutral canonical 名（`ConstraintMetadata` / `LambdaSeries` / `ConstraintRun`，物理位置 `engines.models`）；过渡期保留的 CP2K-名兼容 alias 已在命名清理时移除。
 - Phase 6：删 `enhanced_sampling/_parsers.py` shim，业务代码改从 `engines` import。
-- Phase 7a：抽 `utils/formats/cp2k/stdout.py` 和 `utils/formats/cp2k/xyz.py`（CP2K stdout / xyz 解析；Phase 1 后路径从平铺 `cp2k_*` 迁到 `cp2k/` 子包）。
+- formats 抽取期间：抽 `utils/formats/cp2k/stdout.py` 和 `utils/formats/cp2k/xyz.py`（CP2K stdout / xyz 解析；Phase 1 后路径从平铺 `cp2k_*` 迁到 `cp2k/` 子包）。
 - Phase 7b1：加 `read_constraint_metadata` / `read_lambda_series` / `read_fermi_series` 薄 facade；引入 `FermiRecord`。
 - Phase 7b2：下沉 `read_continuous_potential_frames` / `read_distributed_potential_frames` 到 `engines.cp2k`；`electrochemical/potential/_frame_source.py` 退化成 thin forwarding wrapper。
 - Phase 8：补 `utils/formats/vasp_*.py` 三个占位文件 + 配套测试，确认 VASP 不进 auto-discovery。

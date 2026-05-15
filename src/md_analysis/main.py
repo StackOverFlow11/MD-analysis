@@ -7,9 +7,9 @@ top-level access (``from md_analysis.main import run_water_three_panel``
 matches the historical ``from md_analysis.main import ...`` shape).
 
 The legacy ``run_*_analysis`` and ``run_all`` names that previously
-lived here were removed in Phase 7a of the entrance refactor. New
-code should depend on either ``md_analysis.workflows`` or this
-facade, not on the removed legacy names.
+lived here were removed during the entrance refactor. New code
+should depend on either ``md_analysis.workflows`` or this facade,
+not on the removed legacy names.
 
 Every public ``run_*`` function returns a
 :class:`md_analysis.workflows.WorkflowResult` with file artifacts on

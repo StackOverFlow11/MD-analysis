@@ -5,8 +5,8 @@ frame's comment line in ``*-pos-1.xyz`` files, and walks the (possibly
 large) trajectory file once to materialise ``ase.Atoms`` objects for a
 specific set of MD steps without holding the full trajectory in memory.
 
-Phase 7a status
----------------
+Formats-extraction status
+-------------------------
 Plain mechanical move from ``electrochemical.potential._frame_source`` —
 no behaviour change. The ``(out, inferred_metal)`` return shape of
 ``read_xyz_atoms_for_steps`` is preserved exactly.
