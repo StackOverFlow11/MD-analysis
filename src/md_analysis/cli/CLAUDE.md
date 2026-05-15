@@ -67,6 +67,9 @@ VASPKIT 风格交互式编号菜单。无 argparse，所有输入通过 `input()
 | 233 | `PredictPotentialCmd` | `workflows.calibration.run_calibration_predict` |
 | 301 | `SGQuickPlotCmd` | `workflows.enhanced_sampling.run_slowgrowth_quick_plot` |
 | 302 | `SGPublicationPlotCmd` | `workflows.enhanced_sampling.run_slowgrowth_publication_plot` |
+| 311 | `TISingleDiagCmd` | `workflows.enhanced_sampling.run_ti_single_diagnostics` |
+| 312 | `TIFullAnalysisCmd` | `workflows.enhanced_sampling.run_ti_full_analysis` |
+| 313 | `TIConstPotCorrectionCmd` | `workflows.enhanced_sampling.run_ti_constant_potential_correction` |
 | 411 | `BaderSingleCmd` | `workflows.scripts.run_bader_single` |
 | 412 | `BaderBatchCmd` | `workflows.scripts.run_bader_batch` |
 | 421 | `TISingleCmd` | `workflows.scripts.run_ti_single` |
@@ -79,7 +82,6 @@ VASPKIT 风格交互式编号菜单。无 argparse，所有输入通过 `input()
 
 | CLI | 命令 | 保留原因 |
 |---|---|---|
-| 311 / 312 / 313 | constrained TI | CLI 有 Python-slice 切片 UI、逐点 equilibration override、约束点交互列表等富交互流程；workflow `run_ti_full_analysis` / `run_ti_constant_potential_correction` 是单次端到端调用，目前不能完整覆盖这套交互细节 |
 | 422 | `TIBatchCmd` | `workflows.scripts.run_ti_batch`（底层 `generate_ti_batch_with_report`）不接受 `colvar_id`（MVP 限定 primary CV）；CLI 仍 expose colvar_id |
 
 任何后续往 workflows 收敛的工作，前提是先扩展 workflow 签名覆盖这些 gap；
@@ -120,12 +122,34 @@ VASPKIT 风格交互式编号菜单。无 argparse，所有输入通过 `input()
 
 CLI 不再 prompt directory pattern：discover_ti_points 默认 `parser="auto" + dir_filter=None`（嗅探 + 内容过滤），目录命名完全自由。
 
-`_run_ti_core` 执行共享 TI 分析，流程：
-1. 发现约束点 → 带索引列表显示 `[0] ξ = ...`
-2. **Python 切片选择**（可选）：用户输入如 `3:8`、`::2`、`:8` 等，空回车 = 全部
-3. 可选逐点 equilibration 覆盖
-4. 加载数据 → dt 一致性检查
-5. `analyze_ti(... auto_equilibration=ctx[K.AUTO_EQUILIBRATION])` → 控制台摘要表 → 写文件
+**Phase 6.5 入口迁移**：`_run_ti_core` 已删除，312/313 改走
+`workflows.enhanced_sampling.run_ti_full_analysis` /
+`run_ti_constant_potential_correction`。交互 prompt 拆为两个 helper：
+
+- `_prompt_ti_slice_and_equil(ctx, point_defs)`：
+  1. prompt slice 字符串 → **用 workflow 的 `_parse_point_slice` 即时校验**
+     （消除旧 CLI `"2"→slice(2)` 歧义；非法 slice 在收 per-point equil
+     **之前**抛 `ValueError`，被 `MenuCommand.run()` try-except 接住）
+  2. `point_slice` 按 **str 原样**传 workflow；本地 slice 仅用于 prompt
+     sizing + 回显
+  3. 可选逐点 equilibration → `int | list[int]`（list 长度 = sliced 点数）
+- `_print_ti_summary_table(ti_report)`：控制台收敛摘要表（per-point
+  PASS/FAIL + 建议时间分配）
+
+312/313 流程：
+1. `discover_ti_points(root, reverse=..., strict=False)` 预发现（显示 +
+   prompt sizing）。**`strict=False` 显式传**（不依赖 io 默认）以保留
+   旧 CLI 对损坏 `ti_target_*` 子目录的宽松行为
+2. `_prompt_ti_slice_and_equil` 收 slice/equil
+3. 调 workflow facade（`strict=False` 显式传 → workflow 内部 re-discover
+   + re-slice 与 CLI 预发现完全一致；correction 第二次 discover 同 strict）
+4. `_print_ti_summary_table(result.extra[.ti_report])` + ΔA + artifact 列表
+
+`strict` 形参链（Phase 6.5 新增，默认 True）：CLI 312/313 → workflow
+facade → `run_ti_full_from_root` → `discover_ti_points`；agent
+`ti_full_analysis` contract 暴露 `strict`（默认 True，失败语义零回退）。
+311 `TISingleDiagCmd` 直接 1:1 映射 `run_ti_single_diagnostics`（无
+discover/slice；不暴露 `auto_equilibration`，与旧行为一致）。
 
 ## 陷阱与历史 Bug
 

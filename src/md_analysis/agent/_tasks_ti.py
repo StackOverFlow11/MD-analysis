@@ -89,6 +89,17 @@ _TI_FULL_CONTRACT = TaskContract(
             type="str | None",
             required=False, default=None,
         ),
+        "strict": FieldSpec(
+            description=(
+                "If True (default, agent-facing), a matched constraint-"
+                "point directory missing required files raises "
+                "FileNotFoundError. If False, such directories are "
+                "skipped with a warning (the CLI menu path uses False)."
+            ),
+            json_schema={"type": "boolean"},
+            type="bool",
+            required=False, default=True,
+        ),
     },
     outputs_artifacts={
         "convergence_csv": FieldSpec(
@@ -261,12 +272,18 @@ _TI_FULL_CONTRACT = TaskContract(
 
 
 def _ti_full_analysis_handler(params: dict[str, Any]) -> TaskResult:
-    """Thin handler: delegate to run_ti_full_from_root; route artifacts + metrics."""
-    from ..enhanced_sampling.constrained_ti.workflow import (
-        run_ti_full_from_root,
-    )
+    """Thin handler: dispatch via workflows facade; route artifacts + metrics.
 
-    report = run_ti_full_from_root(**params)
+    Phase 6.5: routes through workflows.enhanced_sampling.run_ti_full_analysis
+    instead of run_ti_full_from_root directly. ``result.extra`` is the
+    same TIFullAnalysisReport the previous wrapper returned, so the
+    TaskResult outputs / summary contract is byte-equal — agent callers
+    cannot observe the routing change.
+    """
+    from ..workflows.enhanced_sampling import run_ti_full_analysis
+
+    result = run_ti_full_analysis(**params)
+    report = result.extra  # TIFullAnalysisReport
 
     # Artifacts → TaskResult.outputs
     outputs: dict[str, str] = {
@@ -300,10 +317,7 @@ register(TaskDef(
     category="enhanced_sampling",
     description="Full constrained-TI convergence analysis + free-energy integration",
     handler=_ti_full_analysis_handler,
-    target_fn=(
-        "md_analysis.enhanced_sampling.constrained_ti.workflow"
-        ":run_ti_full_from_root"
-    ),
+    target_fn="md_analysis.workflows.enhanced_sampling:run_ti_full_analysis",
     cli_codes=("312",),
     contract=_TI_FULL_CONTRACT,
 ))

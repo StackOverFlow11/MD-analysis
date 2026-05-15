@@ -1528,3 +1528,399 @@ class TestPredictPotentialCmdExplicitJson:
         out = capsys.readouterr().out
         assert "σ = -2.0000 μC/cm²" in out
         assert "φ = -0.432100 V vs RHE" in out
+
+
+# ---------------------------------------------------------------------------
+# _constrained_ti.py: CLI 311/312/313 wiring (Phase 6.5)
+# ---------------------------------------------------------------------------
+#
+# The TI CLI is allowed exactly two pre-flight biz helpers for the
+# interactive prompts: discover_ti_points (.io) and _parse_point_slice
+# (.workflow). The stub routes those to injected fakes (the real
+# _parse_point_slice so slice semantics match the workflow), workflow
+# facade targets to kwargs-capturing wrappers, and ANY other
+# constrained_ti.* analysis-orchestration target to AssertionError so a
+# missed migration is caught here, not in production.
+
+
+import re as _re
+from types import SimpleNamespace
+
+
+class _TILazyImportStub:
+    WORKFLOW_MOD = "md_analysis.workflows.enhanced_sampling"
+    IO_MOD = "md_analysis.enhanced_sampling.constrained_ti.io"
+    WF_MOD = "md_analysis.enhanced_sampling.constrained_ti.workflow"
+    CFG_MOD = "md_analysis.electrochemical.calibration.config"
+
+    def __init__(self, workflow_stubs, point_defs, default_json=None):
+        self.lookups: list[tuple[str, str]] = []
+        self.calls: list[tuple[str, dict[str, Any]]] = []
+        self.discover_calls: list[dict[str, Any]] = []
+        self._workflow_stubs = workflow_stubs
+        self._point_defs = point_defs
+        self._default_json = default_json
+
+    def __call__(self, module: str, name: str):
+        self.lookups.append((module, name))
+
+        if module == self.WORKFLOW_MOD:
+            stub = self._workflow_stubs[name]
+
+            def _wf(*a: Any, **kw: Any):
+                self.calls.append((name, dict(kw)))
+                return stub(*a, **kw)
+
+            return _wf
+
+        if (module, name) == (self.IO_MOD, "discover_ti_points"):
+            def _disc(root: Any, **kw: Any):
+                self.discover_calls.append({"root": root, **kw})
+                return list(self._point_defs)
+
+            return _disc
+
+        if (module, name) == (self.WF_MOD, "_parse_point_slice"):
+            # Use the REAL parser so CLI slice validation semantics are
+            # byte-for-byte identical to what the workflow enforces.
+            from md_analysis.enhanced_sampling.constrained_ti.workflow import (
+                _parse_point_slice,
+            )
+
+            return _parse_point_slice
+
+        if (module, name) == (self.CFG_MOD, "DEFAULT_CALIBRATION_FILE"):
+            return self._default_json
+
+        if module.startswith("md_analysis.enhanced_sampling.constrained_ti"):
+            raise AssertionError(
+                f"missed migration — biz lazy_import: ({module!r}, {name!r})"
+            )
+        raise AssertionError(
+            f"unexpected lazy_import target in TI CLI: ({module!r}, {name!r})"
+        )
+
+
+def _pt(xi: float):
+    return SimpleNamespace(xi=xi)
+
+
+def _fake_point_report(xi: float, passed: bool = True):
+    return SimpleNamespace(
+        xi=xi,
+        passed=passed,
+        lambda_mean=-0.12,
+        sem_final=0.003,
+        n_analyzed=400,
+        time_start_fs=10.0,
+        time_end_fs=210.0,
+        block_avg=SimpleNamespace(plateau_reached=True),
+        autocorr=SimpleNamespace(tau_corr=4.2, n_eff=95.0),
+        geweke=SimpleNamespace(z=0.8, passed=True),
+        failure_reasons=[],
+    )
+
+
+def _fake_ti_report(xis):
+    reports = [_fake_point_report(x) for x in xis]
+    return SimpleNamespace(
+        point_reports=reports,
+        all_passed=True,
+        failing_indices=(),
+        suggested_time_ratios=None,
+        delta_A=0.05,
+        sigma_A=0.002,
+    )
+
+
+class TestTISingleDiagCmd:
+    """CLI 311 → run_ti_single_diagnostics; no discover / slice."""
+
+    def test_dispatches_and_prints_summary(
+        self, monkeypatch, tmp_path: Path, capsys,
+    ) -> None:
+        from md_analysis.cli import _constrained_ti
+
+        outdir = tmp_path / "analysis"
+        outdir.mkdir()
+        png = outdir / "ti_diag.png"
+        png.write_bytes(b"")
+        csv = outdir / "ti_diag.csv"
+        csv.write_text("")
+
+        def fake_single(**kwargs):
+            return WorkflowResult(
+                name="ti_single_diagnostics",
+                output_dir=outdir,
+                artifacts={"diagnostics_png": png, "csv": csv},
+                metadata={
+                    "n_total": 500, "n_analyzed": 400,
+                    "equilibration": 100,
+                    "time_start_fs": 10.0, "time_end_fs": 210.0,
+                },
+                extra=_fake_point_report(0.314, passed=True),
+            )
+
+        stub = _TILazyImportStub(
+            {"run_ti_single_diagnostics": fake_single}, point_defs=[],
+        )
+        monkeypatch.setattr(_constrained_ti, "lazy_import", stub)
+
+        ctx = {
+            K.RESTART_PATH: str(tmp_path / "colvar.restart"),
+            K.LOG_PATH: str(tmp_path / "LagrangeMultLog"),
+            K.EQUILIBRATION: 100,
+            K.SEM_TARGET: None,
+            K.COLVAR_ID: None,
+            K.OUTDIR_RESOLVED: outdir,
+        }
+        cmd = _constrained_ti.TISingleDiagCmd("311", "Single-Point")
+        cmd.execute(ctx)
+
+        assert ("md_analysis.workflows.enhanced_sampling",
+                "run_ti_single_diagnostics") in stub.lookups
+        assert len(stub.calls) == 1
+        _, call = stub.calls[0]
+        assert call["restart_path"] == ctx[K.RESTART_PATH]
+        assert call["log_path"] == ctx[K.LOG_PATH]
+        assert call["equilibration"] == 100
+        assert call["sem_target"] is None
+        assert call["colvar_id"] is None
+
+        out = capsys.readouterr().out
+        assert "ξ = 0.314000 a.u." in out
+        assert "Overall: PASS" in out
+        assert "diagnostics_png:" in out
+        assert "csv:" in out
+
+
+class TestTIFullAnalysisCmd:
+    """CLI 312 → run_ti_full_analysis with scripted slice + equil."""
+
+    def test_routes_with_slice_and_per_point_equil(
+        self, monkeypatch, tmp_path: Path, capsys,
+    ) -> None:
+        from md_analysis.cli import _constrained_ti
+        from md_analysis.cli import _prompt
+
+        outdir = tmp_path / "analysis"
+        outdir.mkdir()
+        fe_png = outdir / "ti_free_energy.png"
+        fe_csv = outdir / "ti_free_energy.csv"
+        conv_csv = outdir / "ti_convergence_report.csv"
+        d0 = outdir / "ti_diag_xi0.png"
+        for f in (fe_png, fe_csv, conv_csv, d0):
+            f.write_text("")
+
+        ti_report = _fake_ti_report([0.10, 0.20])  # post-slice 2 points
+
+        def fake_full(**kwargs):
+            return WorkflowResult(
+                name="ti_full_analysis",
+                output_dir=outdir,
+                artifacts={
+                    "free_energy_png": fe_png,
+                    "free_energy_csv": fe_csv,
+                    "convergence_csv": conv_csv,
+                    "diagnostics_png_0": d0,
+                },
+                metadata={"delta_A_eV": 0.123456, "sigma_A_eV": 0.001234},
+                extra=SimpleNamespace(ti_report=ti_report),
+            )
+
+        # 3 discovered points; user selects ":2" then per-point equil yes
+        point_defs = [_pt(0.10), _pt(0.20), _pt(0.30)]
+        stub = _TILazyImportStub(
+            {"run_ti_full_analysis": fake_full}, point_defs=point_defs,
+        )
+        monkeypatch.setattr(_constrained_ti, "lazy_import", stub)
+
+        # Scripted prompts: slice ":2", per-point=yes, equil 5 then 7
+        scripted = iter([":2", "y", "5", "7"])
+        monkeypatch.setattr(
+            _prompt, "_input_fn", lambda _p: next(scripted),
+        )
+
+        ctx = {
+            K.TI_ROOT_DIR: str(tmp_path / "ti_root"),
+            K.TI_REVERSE: False,
+            K.EQUILIBRATION: 0,
+            K.EPSILON_TOL_EV: 0.05,
+            K.AUTO_EQUILIBRATION: False,
+            K.OUTDIR_RESOLVED: outdir,
+        }
+        cmd = _constrained_ti.TIFullAnalysisCmd("312", "Full TI")
+        cmd.execute(ctx)
+
+        # pre-discover got strict=False explicitly (D4 invariant)
+        assert len(stub.discover_calls) == 1
+        assert stub.discover_calls[0]["strict"] is False
+        assert stub.discover_calls[0]["reverse"] is False
+
+        assert len(stub.calls) == 1
+        _, call = stub.calls[0]
+        assert call["point_slice"] == ":2"          # forwarded as str
+        assert call["equilibration"] == [5, 7]      # per-point list
+        assert call["strict"] is False              # D1/D4
+        assert call["root_dir"] == Path(ctx[K.TI_ROOT_DIR])
+
+        out = capsys.readouterr().out
+        assert "Found 3 constraint points:" in out
+        assert "Selected 2 points:" in out
+        assert "Point" in out and "Status" in out   # summary table header
+        # ΔA numeric line (don't lock whitespace)
+        assert _re.search(r"ΔA = 0\.123456 ± 0\.001234 eV", out)
+        assert "ti_free_energy.png" in out
+        assert "ti_convergence_report.csv" in out
+
+    def test_illegal_slice_aborts_before_per_point_prompt(
+        self, monkeypatch, tmp_path: Path,
+    ) -> None:
+        """'2' (no colon) is rejected by _parse_point_slice BEFORE any
+        per-point equilibration prompt and BEFORE the workflow runs."""
+        from md_analysis.cli import _constrained_ti
+        from md_analysis.cli import _prompt
+
+        called = {"workflow": 0}
+
+        def fake_full(**kwargs):
+            called["workflow"] += 1
+            return None
+
+        point_defs = [_pt(0.1), _pt(0.2), _pt(0.3)]
+        stub = _TILazyImportStub(
+            {"run_ti_full_analysis": fake_full}, point_defs=point_defs,
+        )
+        monkeypatch.setattr(_constrained_ti, "lazy_import", stub)
+
+        input_calls = {"n": 0}
+
+        def _scripted(_prompt_text):
+            input_calls["n"] += 1
+            return "2"  # illegal slice (no colon)
+
+        monkeypatch.setattr(_prompt, "_input_fn", _scripted)
+
+        ctx = {
+            K.TI_ROOT_DIR: str(tmp_path / "ti_root"),
+            K.TI_REVERSE: False,
+            K.EQUILIBRATION: 0,
+            K.EPSILON_TOL_EV: 0.05,
+            K.AUTO_EQUILIBRATION: False,
+            K.OUTDIR_RESOLVED: tmp_path / "analysis",
+        }
+        (tmp_path / "analysis").mkdir()
+        cmd = _constrained_ti.TIFullAnalysisCmd("312", "Full TI")
+
+        with pytest.raises(ValueError):
+            cmd.execute(ctx)
+
+        # workflow never called; only the slice prompt was read (1 input)
+        assert called["workflow"] == 0
+        assert input_calls["n"] == 1
+
+
+class TestTIConstPotCorrectionCmd:
+    """CLI 313 → run_ti_constant_potential_correction."""
+
+    def _run(self, monkeypatch, tmp_path, capsys, *, explicit_json):
+        from md_analysis.cli import _constrained_ti
+        from md_analysis.cli import _prompt
+
+        outdir = tmp_path / "analysis"
+        outdir.mkdir()
+        for fn in ("ti_free_energy.png", "ti_free_energy.csv",
+                   "ti_corrected_free_energy.png",
+                   "ti_corrected_free_energy.csv",
+                   "ti_convergence_report.csv"):
+            (outdir / fn).write_text("")
+
+        ti_report = _fake_ti_report([0.10, 0.20])
+        correction = SimpleNamespace(
+            area_A2=42.5,
+            sigma_uC_cm2=[1.0, 2.0],
+            phi_V_SHE=[0.10, 0.20],
+            correction_eV=[0.0, -0.03],
+        )
+        cp_result = SimpleNamespace(
+            ti_report=ti_report, correction=correction,
+        )
+
+        def fake_corr(**kwargs):
+            return WorkflowResult(
+                name="ti_constant_potential_correction",
+                output_dir=outdir,
+                artifacts={
+                    "free_energy_png": outdir / "ti_free_energy.png",
+                    "free_energy_csv": outdir / "ti_free_energy.csv",
+                    "corrected_free_energy_png":
+                        outdir / "ti_corrected_free_energy.png",
+                    "corrected_free_energy_csv":
+                        outdir / "ti_corrected_free_energy.csv",
+                    "convergence_csv": outdir / "ti_convergence_report.csv",
+                },
+                metadata={
+                    "delta_A_const_phi_eV": 0.321,
+                    "total_correction_eV": -0.045,
+                },
+                extra=cp_result,
+            )
+
+        default_json = tmp_path / "config" / "calibration.json"
+        point_defs = [_pt(0.10), _pt(0.20)]
+        stub = _TILazyImportStub(
+            {"run_ti_constant_potential_correction": fake_corr},
+            point_defs=point_defs,
+            default_json=default_json,
+        )
+        monkeypatch.setattr(_constrained_ti, "lazy_import", stub)
+
+        # No slicing (empty) → 2 points remain → per-point equil prompt
+        # (len > 1) answered "n".
+        scripted = iter(["", "n"])
+        monkeypatch.setattr(_prompt, "_input_fn", lambda _p: next(scripted))
+
+        explicit = tmp_path / "custom" / "cal.json"
+        ctx = {
+            K.TI_ROOT_DIR: str(tmp_path / "ti_root"),
+            K.TI_REVERSE: False,
+            K.EQUILIBRATION: 0,
+            K.EPSILON_TOL_EV: 0.05,
+            K.AUTO_EQUILIBRATION: False,
+            K.TARGET_SIDE: "aligned",
+            K.NORMAL: "c",
+            K.METHOD: "counterion",
+            K.CALIBRATION_JSON: str(explicit) if explicit_json else None,
+            K.OUTDIR_RESOLVED: outdir,
+        }
+        cmd = _constrained_ti.TIConstPotCorrectionCmd("313", "Const-Pot")
+        cmd.execute(ctx)
+        return stub, capsys.readouterr().out, default_json, explicit
+
+    def test_default_json_fallback(
+        self, monkeypatch, tmp_path: Path, capsys,
+    ) -> None:
+        stub, out, default_json, _ = self._run(
+            monkeypatch, tmp_path, capsys, explicit_json=False,
+        )
+        assert len(stub.calls) == 1
+        _, call = stub.calls[0]
+        assert call["calibration_json_path"] == Path(default_json)
+        assert call["strict"] is False
+        assert call["point_slice"] is None
+        assert stub.discover_calls[0]["strict"] is False
+
+        assert "Found 2 constraint points:" in out
+        assert "Constant-Potential Correction (Norskov)" in out
+        assert _re.search(r"ΔA \(const-Φ\) = 0\.321000 eV", out)
+        assert "ti_corrected_free_energy.csv" in out
+
+    def test_explicit_json_takes_precedence(
+        self, monkeypatch, tmp_path: Path, capsys,
+    ) -> None:
+        stub, out, _default, explicit = self._run(
+            monkeypatch, tmp_path, capsys, explicit_json=True,
+        )
+        _, call = stub.calls[0]
+        assert call["calibration_json_path"] == Path(str(explicit))
+        assert call["strict"] is False

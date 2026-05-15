@@ -57,6 +57,16 @@ handler 都通过本包调用业务流程，业务模块本身不持有 workflow
   metadata 一律包含 `n_successful` / `n_skipped` / `n_failed` 三计数
   + `workdir_paths` 列表；当前底层 succeed-all-or-raise，所以
   `n_skipped == n_failed == 0`，但 key 占位以保未来扩展。
+- **TI `strict` 契约**（Phase 6.5）：`run_ti_full_analysis` /
+  `run_ti_constant_potential_correction` 的 `strict: bool = True`
+  默认值是 **agent-facing** 语义——损坏的约束点目录抛
+  `FileNotFoundError`。CLI 312/313 显式传 `strict=False` 保留菜单路径
+  历史的宽松行为（WARN+skip）。`run_ti_constant_potential_correction`
+  把 `strict` **同时**透传给内部 `run_ti_full_analysis` **和** phase-2
+  的 `discover_ti_points`，否则两次发现的点集会错位、correction 的
+  per-point Bader 对齐相对 `ti_report.point_reports` 漂移。
+  `agent ti_full_analysis` 的 `TaskContract` 暴露 `strict`
+  （`required=False, default=True`），agent 失败语义零回退。
 
 ## 依赖方向（必须遵守）
 

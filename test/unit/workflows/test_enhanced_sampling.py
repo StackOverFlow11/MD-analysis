@@ -377,10 +377,14 @@ def mock_correction_pipeline(monkeypatch, tmp_path):
         state["ti_full_calls"].append(kwargs)
         return ti_baseline
 
-    def fake_discover(root, *, parser, dir_filter, reverse):
+    def fake_discover(root, *, parser, dir_filter, reverse, strict=True):
+        # Phase 6.5: the correction workflow's phase-2 re-discovery now
+        # forwards strict; capture it so the D5 invariant (phase-1 and
+        # phase-2 see the same strict) can be asserted.
         state["discover_calls"].append(
             {"root": root, "parser": parser,
-             "dir_filter": dir_filter, "reverse": reverse}
+             "dir_filter": dir_filter, "reverse": reverse,
+             "strict": strict}
         )
         return list(state["discover_returns"])
 
@@ -600,3 +604,147 @@ class TestConstantPotentialCorrectionOrchestration:
         assert len(loaded) == 1
         assert loaded[0] == cal_path
         assert len(mock_correction_pipeline["state"]["mapper_calls"]) == 1
+
+
+# ---------------------------------------------------------------------------
+# Phase 6.5: strict forwarding (workflow layer, not just CLI wiring)
+# ---------------------------------------------------------------------------
+#
+# D1 = Option 1: strict is plumbed run_ti_full_analysis →
+# run_ti_full_from_root → discover_ti_points, and
+# run_ti_constant_potential_correction forwards it to BOTH the inner
+# run_ti_full_analysis AND the phase-2 re-discovery (D5). Default True
+# keeps agent / contract behaviour unchanged; the CLI passes False.
+
+
+class TestStrictForwarding:
+    def test_run_ti_full_analysis_forwards_strict_to_from_root(
+        self, monkeypatch, tmp_path: Path
+    ) -> None:
+        """run_ti_full_analysis → run_ti_full_from_root: explicit False
+        is forwarded; the default is True (agent behaviour unchanged)."""
+        from md_analysis.enhanced_sampling.constrained_ti import (
+            workflow as _wf_mod,
+        )
+
+        calls: list[dict[str, Any]] = []
+
+        def fake_from_root(**kwargs):
+            calls.append(kwargs)
+            return type(
+                "R", (),
+                {
+                    "convergence_csv": tmp_path / "c.csv",
+                    "free_energy_csv": tmp_path / "f.csv",
+                    "free_energy_png": tmp_path / "f.png",
+                    "diagnostics_pngs": (),
+                    "n_points": 2,
+                    "delta_A_eV": 0.1,
+                    "sigma_A_eV": 0.01,
+                    "all_passed": True,
+                    "failing_indices": (),
+                    "per_point": (),
+                    "ti_report": object(),
+                },
+            )()
+
+        monkeypatch.setattr(_wf_mod, "run_ti_full_from_root", fake_from_root)
+
+        run_ti_full_analysis(
+            root_dir=tmp_path, output_dir=tmp_path / "o1", strict=False,
+        )
+        assert calls[-1]["strict"] is False
+
+        run_ti_full_analysis(root_dir=tmp_path, output_dir=tmp_path / "o2")
+        assert calls[-1]["strict"] is True
+
+    def test_run_ti_full_from_root_forwards_strict_to_discover(
+        self, monkeypatch, tmp_path: Path
+    ) -> None:
+        """run_ti_full_from_root → discover_ti_points: strict passthrough.
+
+        Stops the pipeline right after discovery by returning an empty
+        list (workflow then raises ValueError on < 2 points) so we only
+        exercise the discover call.
+        """
+        from md_analysis.enhanced_sampling.constrained_ti import io as _io_mod
+        from md_analysis.enhanced_sampling.constrained_ti.workflow import (
+            run_ti_full_from_root,
+        )
+
+        seen: list[bool] = []
+
+        def fake_discover(root, *, parser, dir_filter, reverse, strict=True):
+            seen.append(strict)
+            return []  # → workflow raises ValueError (< 2 points)
+
+        monkeypatch.setattr(_io_mod, "discover_ti_points", fake_discover)
+        root = tmp_path / "ti_root"
+        root.mkdir()
+
+        with pytest.raises(ValueError):
+            run_ti_full_from_root(
+                root_dir=root, output_dir=tmp_path / "o", strict=False,
+            )
+        assert seen[-1] is False
+
+        with pytest.raises(ValueError):
+            run_ti_full_from_root(root_dir=root, output_dir=tmp_path / "o")
+        assert seen[-1] is True
+
+    def test_correction_forwards_strict_to_both_phases(
+        self, mock_correction_pipeline, tmp_path: Path
+    ) -> None:
+        """run_ti_constant_potential_correction forwards strict to BOTH
+        the inner run_ti_full_analysis AND the phase-2 discover (D5)."""
+        from md_analysis.workflows.enhanced_sampling import (
+            run_ti_constant_potential_correction,
+        )
+
+        run_ti_constant_potential_correction(
+            root_dir=tmp_path / "ti_root",
+            output_dir=mock_correction_pipeline["out_dir"],
+            calibration_json_path=tmp_path / "cal.json",
+            strict=False,
+        )
+        st = mock_correction_pipeline["state"]
+        assert st["ti_full_calls"][0]["strict"] is False
+        assert st["discover_calls"][0]["strict"] is False
+
+    def test_correction_strict_defaults_true_both_phases(
+        self, mock_correction_pipeline, tmp_path: Path
+    ) -> None:
+        from md_analysis.workflows.enhanced_sampling import (
+            run_ti_constant_potential_correction,
+        )
+
+        run_ti_constant_potential_correction(
+            root_dir=tmp_path / "ti_root",
+            output_dir=mock_correction_pipeline["out_dir"],
+            calibration_json_path=tmp_path / "cal.json",
+        )
+        st = mock_correction_pipeline["state"]
+        assert st["ti_full_calls"][0]["strict"] is True
+        assert st["discover_calls"][0]["strict"] is True
+
+
+class TestTiFullAnalysisAgentSchema:
+    """Phase 6.5: agent reroute + strict contract exposure."""
+
+    def test_target_fn_routes_through_workflows(self) -> None:
+        from md_analysis.agent._core import get_task
+
+        assert get_task("ti_full_analysis").target_fn == (
+            "md_analysis.workflows.enhanced_sampling:run_ti_full_analysis"
+        )
+
+    def test_schema_exposes_strict_default_true(self) -> None:
+        from md_analysis.agent import get_task_schema
+
+        schema = get_task_schema("ti_full_analysis")
+        props = schema["parameters"]["properties"]
+        assert "strict" in props
+        # default True → agent failure semantics unchanged
+        assert props["strict"].get("default") is True
+        # strict is optional (not in required)
+        assert "strict" not in schema["parameters"].get("required", [])

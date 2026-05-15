@@ -238,6 +238,7 @@ def run_ti_full_analysis(
     epsilon_tol_ev: float = DEFAULT_EPSILON_TOL_EV,
     auto_equilibration: bool = False,
     point_slice: str | None = None,
+    strict: bool = True,
 ) -> WorkflowResult:
     """End-to-end multi-point constrained TI analysis.
 
@@ -252,6 +253,12 @@ def run_ti_full_analysis(
     :class:`WorkflowResult` artifact contract is a flat
     ``dict[str, Path]``; tuples are flattened by integer index). The
     full :class:`TIFullAnalysisReport` is preserved on ``extra``.
+
+    ``strict`` (default ``True``, agent-facing) controls how broken
+    constraint-point directories are handled during discovery: ``True``
+    raises ``FileNotFoundError``; ``False`` skips them with a warning
+    (the CLI menu path passes ``False`` to preserve its historical
+    lenient behavior).
     """
     from ..enhanced_sampling.constrained_ti.workflow import (
         run_ti_full_from_root,
@@ -278,6 +285,7 @@ def run_ti_full_analysis(
         epsilon_tol_ev=epsilon_tol_ev,
         auto_equilibration=auto_equilibration,
         point_slice=point_slice,
+        strict=strict,
     )
 
     artifacts: dict[str, Path] = {
@@ -300,6 +308,7 @@ def run_ti_full_analysis(
         "point_slice": point_slice,
         "auto_equilibration": auto_equilibration,
         "epsilon_tol_ev": epsilon_tol_ev,
+        "strict": strict,
     }
     return WorkflowResult(
         name="ti_full_analysis",
@@ -325,6 +334,7 @@ def run_ti_constant_potential_correction(
     epsilon_tol_ev: float = DEFAULT_EPSILON_TOL_EV,
     auto_equilibration: bool = False,
     point_slice: str | None = None,
+    strict: bool = True,
 ) -> WorkflowResult:
     """Run TI full analysis and apply the Nørskov constant-potential correction.
 
@@ -345,6 +355,12 @@ def run_ti_constant_potential_correction(
     surfaced via ``metadata``; the strongly-typed
     :class:`ConstantPotentialResult` (which embeds the TIReport) is
     placed on ``extra``.
+
+    ``strict`` (default ``True``, agent-facing) is forwarded to BOTH
+    the inner :func:`run_ti_full_analysis` AND the phase-2 re-discovery
+    of constraint-point directories, so the analysed report and the
+    Bader-data point ordering stay aligned regardless of whether broken
+    subdirs raise (``True``) or are skipped (``False``).
     """
     from ..electrochemical.calibration._data import load_calibration_json
     from ..electrochemical.calibration._mapper import mapper_from_dict
@@ -374,14 +390,19 @@ def run_ti_constant_potential_correction(
         epsilon_tol_ev=epsilon_tol_ev,
         auto_equilibration=auto_equilibration,
         point_slice=point_slice,
+        strict=strict,
     )
     ti_report = ti_result.extra.ti_report  # underlying TIReport
 
     # Phase 2: re-discover point_defs (cheap; no series reload) and slice
     # the same way run_ti_full_from_root did so indices align with
-    # ti_report.point_reports.
+    # ti_report.point_reports.  strict MUST match phase 1 so the two
+    # discovery passes return the same point set (otherwise the
+    # correction's per-point Bader alignment drifts vs the analysed
+    # report).
     point_defs = discover_ti_points(
         root_p, parser=parser, dir_filter=dir_filter, reverse=reverse,
+        strict=strict,
     )
     # Mirror run_ti_full_from_root's two-pronged "no-slice" check: both
     # None and "" mean "use all points". Treating "" as a slice spec
