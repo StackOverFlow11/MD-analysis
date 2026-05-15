@@ -89,6 +89,40 @@ class TestTiGenBatchPhase66:
         assert "overwrite" not in required
 
 
+class TestAgentCleanupReroute:
+    """Phase 6.agent-cleanup: sp/bader rerouted to workflows;
+    slowgrowth_quick intentionally NOT rerouted (D1=Option A)."""
+
+    def test_sp_gen_batch_rerouted(self):
+        from md_analysis.agent._core import get_task
+
+        assert get_task("sp_gen_batch").target_fn == (
+            "md_analysis.workflows.scripts:run_sp_batch"
+        )
+
+    def test_bader_gen_batch_rerouted(self):
+        from md_analysis.agent._core import get_task
+
+        assert get_task("bader_gen_batch").target_fn == (
+            "md_analysis.workflows.scripts:run_bader_batch"
+        )
+
+    def test_slowgrowth_quick_intentionally_not_rerouted(self):
+        """slowgrowth_quick stays on slowgrowth_analysis_with_report:
+        its contract is the general SG entry (exposes plot_style
+        quick/publication/both, optional output_dir). The plot-style-
+        fixed run_slowgrowth_quick_plot facade would be a capability
+        regression. Pin so a future 'cleanup' does not silently break
+        publication/both output."""
+        from md_analysis.agent._core import get_task
+
+        tf = get_task("slowgrowth_quick").target_fn
+        assert tf == (
+            "md_analysis.enhanced_sampling.slowgrowth.SlowGrowthPlot"
+            ":slowgrowth_analysis_with_report"
+        ), tf
+
+
 class TestListTasksIncludesTiGenBatch:
     def test_ti_gen_batch_registered(self):
         names = [t["name"] for t in list_tasks()]

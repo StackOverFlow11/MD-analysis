@@ -74,7 +74,7 @@
 - 复用 `_inp_utils.py` 的 cell/topology 修改逻辑，和 PotentialGen 共享
 - CLI 菜单：441（单帧）、442（批量），独立 MenuGroup "44 DeePMD SP Preparation"
 - Settings 菜单：914 `SetDpSpInpTemplateCmd`
-- **Agent 任务**：`sp_gen_batch` 注册到 agent 模块（`_handlers.py`），通过 `batch_generate_sp_workdirs` 直通。PotentialGen 仍是 CLI-only；BaderGen / TIGen 已各自暴露为带完整 contract 的 agent 任务（`bader_gen_batch` / `ti_gen_batch`）。`bader_gen_batch` 经 `generate_bader_batch_with_report` wrapper 直通；`ti_gen_batch`（Phase 6.6 起）handler 改走 `workflows.scripts.run_ti_batch`（target_fn 已 repoint），由 facade 内部调 `generate_ti_batch_with_report`，outputs 从 `WorkflowResult.artifacts` 显式构建、summary 从 `result.extra` 取
+- **Agent 任务**：PotentialGen 仍是 CLI-only；SpGen / BaderGen / TIGen 均暴露为带完整 contract 的 agent 任务（`sp_gen_batch` / `bader_gen_batch` / `ti_gen_batch`）。Phase 6.6 + 6.agent-cleanup 后**三者 handler 均改走 workflows facade**（`workflows.scripts.run_sp_batch` / `run_bader_batch` / `run_ti_batch`，target_fn 已 repoint）：facade 内部调各自 `*_with_report` wrapper，handler 的 outputs 从 `WorkflowResult.artifacts` 显式构建（**不**用 `_normalize_outputs`——WorkflowResult 无 `.workdirs`，会落空 dict）、summary 从 `result.extra` 取。contract / schema 不变（facade 与 wrapper 参数 1:1）
 - 后端链路：SP 算完 → `dpdata` 或 `cp2kdata` 插件转训练集 → DeePMD-kit 训练
 
 ### 共享 helper：`_inp_utils.py`

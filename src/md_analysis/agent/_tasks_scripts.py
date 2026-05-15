@@ -10,7 +10,6 @@ from typing import Any, Callable
 
 from ._contracts import ExceptionMapping, FieldSpec, TaskContract
 from ._core import TaskDef, TaskResult, register
-from ._handler_utils import _make_handler, _normalize_outputs
 
 
 # 12. sp_gen_batch (CLI 442) — Batch-generate CP2K SP work directories for
@@ -244,17 +243,26 @@ _SP_GEN_BATCH_CONTRACT = TaskContract(
 
 
 def _make_sp_gen_batch_handler() -> Callable[[dict[str, Any]], TaskResult]:
-    """Handler for sp_gen_batch: route artifacts + metrics."""
+    """Handler for sp_gen_batch: route artifacts + metrics.
+
+    Phase 6.agent-cleanup: dispatches through
+    workflows.scripts.run_sp_batch (mirrors the 6.6 ti_gen_batch
+    reroute). WorkflowResult has no .workdirs attribute, so outputs
+    are built explicitly from result.artifacts (NOT _normalize_outputs,
+    which would yield an empty dict) and summary is read from
+    result.extra (the SpGenBatchReport). outputs (workdir_*) / summary
+    contract stays byte-equal.
+    """
 
     def handler(params: dict[str, Any]) -> TaskResult:
-        from ..scripts.SpGen import generate_sp_batch_with_report
+        from ..workflows.scripts import run_sp_batch
 
-        result = generate_sp_batch_with_report(**params)
+        result = run_sp_batch(**params)
         return TaskResult(
             success=True,
             task="sp_gen_batch",
-            outputs=_normalize_outputs(result),
-            summary=_sp_gen_batch_summary(result, params),
+            outputs={k: str(v) for k, v in result.artifacts.items()},
+            summary=_sp_gen_batch_summary(result.extra, params),
         )
 
     return handler
@@ -271,7 +279,7 @@ register(TaskDef(
         "greedy matching on atoms.info['time']).  Does NOT submit jobs."
     ),
     handler=_make_sp_gen_batch_handler(),
-    target_fn="md_analysis.scripts.SpGen:generate_sp_batch_with_report",
+    target_fn="md_analysis.workflows.scripts:run_sp_batch",
     cli_codes=("442",),
     contract=_SP_GEN_BATCH_CONTRACT,
 ))
@@ -773,17 +781,24 @@ _BADER_GEN_BATCH_CONTRACT = TaskContract(
 
 
 def _make_bader_gen_batch_handler() -> Callable[[dict[str, Any]], TaskResult]:
-    """Handler for bader_gen_batch: route artifacts + metrics."""
+    """Handler for bader_gen_batch: route artifacts + metrics.
+
+    Phase 6.agent-cleanup: dispatches through
+    workflows.scripts.run_bader_batch (mirrors the 6.6 ti_gen_batch
+    reroute). outputs built explicitly from result.artifacts (NOT
+    _normalize_outputs — WorkflowResult has no .workdirs), summary from
+    result.extra (the BaderGenBatchReport). Contract byte-equal.
+    """
 
     def handler(params: dict[str, Any]) -> TaskResult:
-        from ..scripts.BaderGen import generate_bader_batch_with_report
+        from ..workflows.scripts import run_bader_batch
 
-        result = generate_bader_batch_with_report(**params)
+        result = run_bader_batch(**params)
         return TaskResult(
             success=True,
             task="bader_gen_batch",
-            outputs=_normalize_outputs(result),
-            summary=_bader_gen_batch_summary(result, params),
+            outputs={k: str(v) for k, v in result.artifacts.items()},
+            summary=_bader_gen_batch_summary(result.extra, params),
         )
 
     return handler
@@ -800,9 +815,7 @@ register(TaskDef(
         "or parse Bader output; that stage is external."
     ),
     handler=_make_bader_gen_batch_handler(),
-    target_fn=(
-        "md_analysis.scripts.BaderGen:generate_bader_batch_with_report"
-    ),
+    target_fn="md_analysis.workflows.scripts:run_bader_batch",
     cli_codes=("412",),
     contract=_BADER_GEN_BATCH_CONTRACT,
 ))

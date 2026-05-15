@@ -303,3 +303,23 @@ class TestSpGenBatchDispatch:
         assert any(k.startswith("workdir_") for k in r.outputs)
         # summary is JSON-serializable
         json.dumps(r.summary)
+
+    def test_outputs_built_from_artifacts_phase6_cleanup(self, sp_fixture):
+        """Phase 6.agent-cleanup regression (codex LOW 1): handler now
+        gets a WorkflowResult (no .workdirs). outputs MUST be built from
+        result.artifacts, NOT _normalize_outputs (which would fall
+        through to an empty dict). Pin exact key set + dir existence."""
+        r = dispatch("sp_gen_batch", {
+            "xyz_path": str(sp_fixture["xyz"]),
+            "cell_abc": [5.0, 5.0, 10.0],
+            "output_dir": str(sp_fixture["outdir"]),
+            "inp_template_path": str(sp_fixture["tmpl"]),
+        })
+        assert r.success, r.errors
+        # fixture writes n_frames=3 (index mode, all frames)
+        assert set(r.outputs) == {"workdir_0", "workdir_1", "workdir_2"}
+        for v in r.outputs.values():
+            assert Path(v).is_dir()
+        # summary still sourced from result.extra (SpGenBatchReport)
+        assert r.summary["n_frames"] == 3
+        assert len(r.summary["frame_indices"]) == 3

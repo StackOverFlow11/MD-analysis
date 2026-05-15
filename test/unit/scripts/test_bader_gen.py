@@ -463,6 +463,29 @@ class TestDispatchBaderGenBatch:
         assert r.summary["steps"] == [0, 5, 10]
         assert r.summary["generate_potcar"] is False
 
+    def test_outputs_built_from_artifacts_phase6_cleanup(self, tmp_path):
+        """Phase 6.agent-cleanup regression (codex LOW 1): handler now
+        gets a WorkflowResult (no .workdirs). outputs MUST be built from
+        result.artifacts, NOT _normalize_outputs (which would fall
+        through to an empty dict). Pin exact key set + dir existence."""
+        from md_analysis.agent import dispatch
+
+        xyz = tmp_path / "traj.xyz"
+        _write_test_xyz(xyz, n_frames=3)
+        r = dispatch("bader_gen_batch", {
+            "xyz_path": str(xyz),
+            "cell_abc": [3.6, 3.6, 10.0],
+            "output_dir": str(tmp_path / "out"),
+            "generate_potcar": False,
+        })
+        assert r.success, f"errors: {r.errors}"
+        assert set(r.outputs) == {"workdir_0", "workdir_1", "workdir_2"}
+        for v in r.outputs.values():
+            assert Path(v).is_dir()
+        # summary still sourced from result.extra (BaderGenBatchReport)
+        assert r.summary["n_frames"] == 3
+        assert r.summary["frame_indices"] == [0, 1, 2]
+
     def test_dispatch_time_mode_success(self, tmp_path):
         from md_analysis.agent import dispatch
 
