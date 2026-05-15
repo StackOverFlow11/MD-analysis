@@ -183,27 +183,4 @@ ti_diagnostics_<i>.png        # 每点 2x2 图（running avg / ACF / block / Gew
 
 ---
 
-## Agent 任务列表
-
-非交互入口 `agent.dispatch(task, params)` 的完整任务清单（**全部 contract-backed**，
-入口重构期间已移除 water/potential/charge/composite legacy task）：
-
-| Task | 关联菜单 | 契约层级 |
-|---|---|---|
-| `calibration_fit_csv` | 231 | **TaskContract** |
-| `calibration_predict` | 233 | **TaskContract** |
-| `slowgrowth_quick` | 301 | **TaskContract** |
-| `ti_full_analysis` | 312 | **TaskContract**（含 parser/dir_filter） |
-| `bader_gen_batch` | 412 | **TaskContract** |
-| `ti_gen_batch` | 422 | **TaskContract** |
-| `sp_gen_batch` | 442 | **TaskContract** |
-| `config_show` | 900 | **TaskContract**（read-only） |
-
-> 所有任务都有完整的 `FieldSpec` + `ExceptionMapping` 描述，schema 自动生成，能映射
-> MCP tool schema。Phase 3 / 5B 删除的旧 task：`water_three_panel`、`potential_full`、
-> `charge_surface`、`charge_tracked`、`charge_counterion`、`run_all`。对应业务现在
-> 通过 `md_analysis.workflows.run_*` 直接调用即可，无需经过 agent dispatch。
-
----
-
 [← 回索引](README.md)

@@ -7,7 +7,6 @@ from pathlib import Path
 
 import pytest
 
-from md_analysis.agent import dispatch, get_task_schema
 from md_analysis.enhanced_sampling.slowgrowth.SlowGrowthPlot import (
     SlowgrowthAnalysisReport,
     slowgrowth_analysis_with_report,
@@ -67,7 +66,7 @@ class TestSlowgrowthReportWrapper:
     def test_invalid_plot_style_without_inputs_still_raises(
         self, tmp_path,
     ):
-        """Agent-boundary validation — must fail before any file I/O."""
+        """Input validation — must fail before any file I/O."""
         with pytest.raises(ValueError):
             slowgrowth_analysis_with_report(
                 "any.restart", "any.log",
@@ -152,118 +151,4 @@ class TestSlowgrowthReportWrapper:
                 str(data_paths["restart"]), str(data_paths["log"]),
                 initial_step=100, final_step=100,
                 output_dir=tmp_path, plot_style="quick",
-            )
-
-
-# ---------------------------------------------------------------------------
-# Contract / dispatch
-# ---------------------------------------------------------------------------
-
-
-class TestSlowgrowthQuickContract:
-    def test_schema_keys(self):
-        s = get_task_schema("slowgrowth_quick")
-        assert set(s.keys()) == {"name", "description", "parameters"}
-
-    def test_required_fields(self):
-        s = get_task_schema("slowgrowth_quick")
-        assert set(s["parameters"]["required"]) == {"restart_path", "log_path"}
-
-    def test_includes_all_contract_fields(self):
-        s = get_task_schema("slowgrowth_quick")
-        assert set(s["parameters"]["properties"].keys()) == {
-            "restart_path", "log_path", "initial_step", "final_step",
-            "output_dir", "plot_style", "colvar_id",
-        }
-
-    def test_plot_style_enum(self):
-        s = get_task_schema("slowgrowth_quick")
-        assert set(
-            s["parameters"]["properties"]["plot_style"].get("enum", [])
-        ) == {"quick", "publication", "both"}
-
-    def test_colvar_id_is_nullable_integer(self):
-        s = get_task_schema("slowgrowth_quick")
-        cid = s["parameters"]["properties"]["colvar_id"]
-        assert cid["type"] == ["integer", "null"]
-
-    def test_is_contract_backed(self):
-        from md_analysis.agent._core import _TASK_REGISTRY
-        assert _TASK_REGISTRY["slowgrowth_quick"].contract is not None
-
-
-class TestSlowgrowthQuickDispatch:
-    def test_invalid_plot_style_returns_validation(self):
-        r = dispatch("slowgrowth_quick", {
-            "restart_path": "missing.restart",
-            "log_path": "missing.log",
-            "plot_style": "bogus",
-        })
-        assert not r.success
-        assert r.error_type == "validation"
-
-    def test_missing_file_returns_file_not_found(self):
-        r = dispatch("slowgrowth_quick", {
-            "restart_path": "nope.restart",
-            "log_path": "nope.log",
-        })
-        assert not r.success
-        assert r.error_type == "file_not_found"
-
-    def test_success_path_exposes_summary_metrics(
-        self, data_paths, tmp_path,
-    ):
-        r = dispatch("slowgrowth_quick", {
-            "restart_path": str(data_paths["restart"]),
-            "log_path": str(data_paths["log"]),
-            "output_dir": str(tmp_path),
-            "plot_style": "quick",
-        })
-        assert r.success, r.errors
-        for k in (
-            "n_steps", "target_start_au", "target_end_au",
-            "delta_F_eV", "delta_F_barrier_eV", "barrier_step",
-            "is_reversed",
-        ):
-            assert k in r.summary
-        assert r.outputs.get("csv")
-        assert r.outputs.get("quick_png")
-        # summary is JSON-serializable
-        json.dumps(r.summary)
-
-    def test_reverse_path_exposes_is_reversed_true(
-        self, data_paths, tmp_path,
-    ):
-        r = dispatch("slowgrowth_quick", {
-            "restart_path": str(data_paths["restart"]),
-            "log_path": str(data_paths["log"]),
-            "initial_step": 200,
-            "final_step": 0,
-            "output_dir": str(tmp_path),
-            "plot_style": "quick",
-        })
-        assert r.success, r.errors
-        assert r.summary["is_reversed"] is True
-        assert 0 <= r.summary["barrier_step"] <= 200
-
-
-class TestContractBackedRegistryCount:
-    """Batch 5 exit criterion: every registered task is contract-backed.
-
-    Headcount was 14 originally; Phase 3 charge legacy cleanup removed
-    ``charge_surface`` / ``charge_tracked`` / ``charge_counterion``
-    (14 -> 11). Phase 5 Step B then removed ``water_three_panel`` /
-    ``potential_full`` / ``run_all`` (11 -> 8). Further entrance-refactor
-    phases may continue to shrink this number as legacy wrappers are
-    consolidated into ``md_analysis.workflows``.
-    """
-
-    def test_all_registered_tasks_are_contract_backed(self):
-        from md_analysis.agent._core import _TASK_REGISTRY
-        # Exhaustive + registry-size guard, so accidentally unregistering
-        # a task or adding a new one without a contract breaks this test.
-        assert len(_TASK_REGISTRY) == 8
-        for name, t in _TASK_REGISTRY.items():
-            assert t.contract is not None, (
-                f"task {name!r} is not contract-backed"
             )

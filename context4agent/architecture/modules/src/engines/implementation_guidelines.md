@@ -24,10 +24,10 @@
 engines/  →  utils/{formats, structure, io}, utils/constants, exceptions
 ```
 
-**禁止**反向 import `electrochemical` / `water` / `enhanced_sampling` / `scripts` / `cli` / `agent`。每个 phase 后扫描：
+**禁止**反向 import `electrochemical` / `water` / `enhanced_sampling` / `scripts` / `cli`。每个 phase 后扫描：
 
 ```bash
-rg "from\s+\.\.+\.?(electrochemical|water|enhanced_sampling|cli|scripts|agent)" \
+rg "from\s+\.\.+\.?(electrochemical|water|enhanced_sampling|cli|scripts)" \
    src/md_analysis/engines/
 # (must be empty)
 ```

@@ -13,22 +13,24 @@
   - CLI 工作流、配置文件（yaml/toml）、批处理整个项目目录
   - 单元测试覆盖率提升、文档站点、发布到 PyPI（如需要）
 
-## 下一步候选 agent 工具：`ti_bader_status`（只读就绪性检查）
+## 下一步候选：`ti_bader_status`（只读就绪性检查，CLI + skill）
 
 > 来源：入口重构期间 `temp/agent_friendly_refactor/next_steps.md`
 > 蒸馏（2026-05-15）。设计意图，**未实现**；实现前以本节为准并按当时
-> 工程现状复核。
+> 工程现状复核。development 走 CLI + skill 路线：`ti_bader_status`
+> 实现为 **CLI 子命令 + workflow wrapper**，skill 经其**结构化输出**
+> （JSON / report）读取状态做决策。
 
 **目的**：在决定是否做 surface-charge / 恒电势修正前，判定每个 TI 点的
 Bader 数据是否齐全。恒电势修正本身廉价，**昂贵的是为所有 TI 点生成/提交/
-跑完 Bader/VASP**（整条 TI 线可达数天机时），所以下一个有用的 agent 工具
-应回答"就绪性/状态"问题，而非替用户决定是否开跑。
+跑完 Bader/VASP**（整条 TI 线可达数天机时），所以下一步有用的工具应回答
+"就绪性/状态"问题，而非替用户决定是否开跑。
 
 **工具形状（建议）**：
 
-- task：`ti_bader_status`（备选名 `ti_bader_readiness`）；agent-tools
-  任务，**非** MCP-server 任务（先保持 wrapper/contract/dispatch/tests
-  稳定，MCP 暴露待真实外部需求再说）
+- 入口：CLI 子命令 + `workflows` wrapper（返回 `WorkflowResult`，
+  结构化数值在 `.extra`，可选 CSV 在 `.artifacts`）；skill 读取该结构化
+  输出做下一步判断
 - inputs：`ti_root_dir`、`pattern`(`auto|ti_target|xi`)、
   `bader_subdir`(默认 `bader`)、`dir_pattern`(默认 `bader_t*_i*`)、
   期望文件 `POSCAR`/`ACF.dat`/`POTCAR`
@@ -43,17 +45,20 @@ Bader 数据是否齐全。恒电势修正本身廉价，**昂贵的是为所有
 
 **Non-Goals（明确不做）**：作业提交、队列/负载查询、超出"必需文件存在
 性检查"的 Bader 结果解析、surface charge 计算、恒电势修正、判定 Bader/
-恒电势修正"科学上是否必要"（属用户基于化学/结构/体系上下文的决定）、
-MCP server、协议级 Resources/Prompts。
+恒电势修正"科学上是否必要"（属用户基于化学/结构/体系上下文的决定）。
 
 **后续 roadmap（`ti_bader_status` 稳定后）**：
 
-1. 加 TI/Bader 就绪性解读的 Resources-layer 文档
-2. 按需 contract 化已有 charge-surface 工具
-3. 加 `ti_constant_potential_correction`（在现有修正代码上薄 wrapper）
-4. 构建协调 Prompt workflow：`ti_full_analysis → ti_bader_status →
-   用户决定是否跑 Bader → pbs-auto/用户提交 → ti_bader_status →
-   用户决定是否做恒电势修正 → ti_constant_potential_correction`
+1. 加 TI/Bader 就绪性解读的 skill 知识（何时跑 Bader、怎么读状态）
+2. 按需把已有 charge-surface 流程补 CLI 子命令 / workflow facade
+3. 加 `ti_constant_potential_correction`（在现有修正代码上薄 workflow
+   wrapper + CLI 子命令）
+4. 构建协调 skill：`ti_full_analysis → ti_bader_status → 用户决定是否
+   跑 Bader → pbs-auto/用户提交 → ti_bader_status → 用户决定是否做
+   恒电势修正 → ti_constant_potential_correction`
+
+> 历史备注：agent-task 原型设计见 `development_agent` 分支（仅历史
+> 备份，development 不依赖该分支）。
 
 ## 多引擎适配策略
 

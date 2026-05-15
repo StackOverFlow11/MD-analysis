@@ -133,16 +133,10 @@
   - 电势输出配置键：`KEY_POTENTIAL_REFERENCE`、`KEY_POTENTIAL_PH`、`KEY_POTENTIAL_TEMPERATURE_K`、`KEY_POTENTIAL_PHI_PZC`
   - `CONFIGURABLE_DEFAULTS`：可配置分析参数注册表（键 → 硬编码默认值 + 标签）
 
-### 7) `md_analysis.workflows` / `md_analysis.main` / `md_analysis.cli` / `md_analysis.agent`（集成入口）
+### 7) `md_analysis.workflows` / `md_analysis.main` / `md_analysis.cli`（集成入口）
 
 - `workflows/`：编程入口的 **canonical** 位置。全部 `run_*` 函数 + `WorkflowResult` frozen dataclass（`artifacts` / `metadata` / `extra`）。**完整 `run_*` 清单以 `src/md_analysis/workflows/__init__.py.__all__` 为权威**。按域拆子模块（`water.py` / `potential.py` / `charge.py` / `calibration.py` / `enhanced_sampling.py` / `scripts.py` / `composite.py` + `models.py` + `__init__.py`）。每个 `run_*` 主动 `Path()` 规范化路径参数；artifacts 字典值始终是 `Path`，metadata 轻量 scalars，extra 携带强类型 report（TI / calibration 等）。
 - `main.py`：import-only **re-export facade**。导出与 `workflows/` 完全一致的公开符号（`WorkflowResult` + 全部 `run_*`，清单以 `workflows/__init__.py.__all__` 为权威）。**入口重构期间删除了所有 legacy 名**：`run_water_analysis` / `run_potential_analysis` / `run_charge_analysis` / `run_tracked_charge_analysis` / `run_counterion_charge_analysis` / `run_all`；旧返回类型 `dict[str, Path]` → 新返回类型 `WorkflowResult`，**未保留 alias**（避免同名静默换返回类型）。新调用方式 `for k, p in result.artifacts.items()`。
-- `agent/`：Agent-friendly 非交互式编程入口（dispatch + JSON Schema + TaskResult + Tools-layer contract）
-  - `_core.py`：`TaskResult`、`TaskHandler` Protocol、`TaskDef`（含 `contract` / `reference_fn` 字段）、注册表
-  - `_contracts.py`：`FieldSpec` / `ExceptionMapping` / `TaskContract`（双 schema 出口：`to_agent_schema` OpenAI 形状、`to_mcp_tool_schema` MCP `inputSchema` 形状，供未来 MCP server 层）
-  - `_dispatch.py`：`dispatch()` 任务执行、`get_task_schema()`（contract-first，fallback 到函数签名推导）、contract-aware 参数转换、contract-aware 有序异常映射
-  - `_handlers.py`：`_make_handler()` 工厂 + 任务注册。入口重构期间删除了 legacy task（water/potential/charge/composite 类，对应业务现在通过 `workflows.run_*` 直接调用），**剩余任务全部 contract-backed**；完整任务清单 / target_fn 以 agent registry（`list_tasks()` / `get_task(name)`）为权威，不在文档手写
-  - 设计：薄适配层，不含分析逻辑；schema 从 `FieldSpec.json_schema` 字段直通（权威，draft-07），无手写 ParamDef；异常在 dispatch 层按 contract 有序匹配（先具体后父类）+ 默认 4 级分类 fallback
 - `cli/`：VASPKIT 风格交互式 CLI 包，注册为 `md-analysis` console script
   - `__init__.py`：`main()` 入口 + banner + 顶层菜单分发
   - `_prompt.py`：可复用的输入提示辅助函数

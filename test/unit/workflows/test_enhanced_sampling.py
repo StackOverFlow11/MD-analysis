@@ -614,7 +614,7 @@ class TestConstantPotentialCorrectionOrchestration:
 # run_ti_full_from_root → discover_ti_points, and
 # run_ti_constant_potential_correction forwards it to BOTH the inner
 # run_ti_full_analysis AND the phase-2 re-discovery (D5). Default True
-# keeps agent / contract behaviour unchanged; the CLI passes False.
+# keeps the workflow default behaviour unchanged; the CLI passes False.
 
 
 class TestStrictForwarding:
@@ -622,7 +622,7 @@ class TestStrictForwarding:
         self, monkeypatch, tmp_path: Path
     ) -> None:
         """run_ti_full_analysis → run_ti_full_from_root: explicit False
-        is forwarded; the default is True (agent behaviour unchanged)."""
+        is forwarded; the default is True (workflow default unchanged)."""
         from md_analysis.enhanced_sampling.constrained_ti import (
             workflow as _wf_mod,
         )
@@ -726,25 +726,3 @@ class TestStrictForwarding:
         st = mock_correction_pipeline["state"]
         assert st["ti_full_calls"][0]["strict"] is True
         assert st["discover_calls"][0]["strict"] is True
-
-
-class TestTiFullAnalysisAgentSchema:
-    """Phase 6.5: agent reroute + strict contract exposure."""
-
-    def test_target_fn_routes_through_workflows(self) -> None:
-        from md_analysis.agent._core import get_task
-
-        assert get_task("ti_full_analysis").target_fn == (
-            "md_analysis.workflows.enhanced_sampling:run_ti_full_analysis"
-        )
-
-    def test_schema_exposes_strict_default_true(self) -> None:
-        from md_analysis.agent import get_task_schema
-
-        schema = get_task_schema("ti_full_analysis")
-        props = schema["parameters"]["properties"]
-        assert "strict" in props
-        # default True → agent failure semantics unchanged
-        assert props["strict"].get("default") is True
-        # strict is optional (not in required)
-        assert "strict" not in schema["parameters"].get("required", [])

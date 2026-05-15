@@ -17,6 +17,6 @@
 - 架构与实现细节记录在 `context4agent/architecture/` 中，不放在本目录。
 - **本目录不维护完整 API 手册**：`short_term.md` 只写「能力分组摘要 +
   关键不变量」；public 函数清单 / 参数 / 菜单号一律**引用代码权威位置**
-  （`src/md_analysis/workflows/__init__.py`、agent registry/`get_task()`、
-  `src/md_analysis/cli/`），不手写易漂移长清单。已确认的科学口径（公式/
+  （`src/md_analysis/workflows/__init__.py`、`src/md_analysis/cli/`），
+  不手写易漂移长清单。已确认的科学口径（公式/
   单位/CSV 列名）属例外，必须在 `short_term.md` 保留原样。

@@ -27,8 +27,7 @@
 | temp | `temp/`（git untracked） | 局部 plan 草稿 / handoff / 未定归属上下文 | 默认不入库；沉淀后压成短条目搬入正式文件，原处标「已迁移」 |
 
 **权威来源原则**：public API 导出以 `src/md_analysis/workflows/__init__.py`
-为准；agent target_fn / schema 以 `get_task(name).target_fn` / registry +
-`TaskContract` 为准；CLI 行为以 `src/md_analysis/cli/` + 测试为准。
+为准；CLI 行为以 `src/md_analysis/cli/` + 测试为准。
 `context4agent/` 只记录**入口策略、长期例外、已批准行为变化、科学口径**，
 不复制易漂移的逐函数/逐菜单号长清单。
 

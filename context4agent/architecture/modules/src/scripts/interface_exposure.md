@@ -285,10 +285,6 @@ from `scripts/_frame_selector.py`. See "Frame Selection (shared)" section below.
 
 After SP calculations complete, feed the output directories to `dpdata.LabeledSystem` or the `cp2kdata` dpdata plugin to produce DeePMD training sets.
 
-### Agent Task
-
-Registered in `md_analysis.agent` as `sp_gen_batch` (category=`scripts`, CLI code=`442`). Simple pass-through handler via `_make_handler`; the `_normalize_outputs` layer converts the returned `list[Path]` into `{"workdir_0": ..., "workdir_1": ..., ...}`.
-
 ---
 
 ## Frame Selection (shared, `_frame_selector.py` private module)
@@ -313,11 +309,11 @@ class FrameSelection:
 ```
 
 - `mode` is an explicit discriminator (not inferred from which params are `None`)
-  so JSON Schema enum generation is clean for agent dispatch.
+  so schema enum exposure is clean for structured callers.
 - `__post_init__` validates: invalid `mode` string, `frame_step < 1`, time mode
   with incomplete params, `time_step_fs <= 0`, `time_start_fs > time_end_fs`.
-  All failures raise `FrameSelectionError(MDAnalysisError)` which
-  `agent/_dispatch.py` classifies as `ERROR_VALIDATION`.
+  All failures raise `FrameSelectionError(MDAnalysisError)` (input-validation
+  class failure).
 
 ### `iter_selected_frames(xyz_path, selection) -> Iterator[(int, Atoms)]`
 

@@ -1,4 +1,4 @@
-"""Tests for ``run_ti_full_from_root`` agent wrapper and slice helper."""
+"""Tests for ``run_ti_full_from_root`` workflow wrapper and slice helper."""
 
 from __future__ import annotations
 
@@ -204,23 +204,6 @@ class TestStrictDiscovery:
         # Strict discovery must fail before any output side effects.
         assert not (tmp_path / "out").exists()
 
-    def test_dispatch_maps_missing_file_to_file_not_found(self, tmp_path):
-        """Dispatch-level mirror of the above."""
-        from md_analysis.agent import dispatch
-
-        root = tmp_path / "root"
-        root.mkdir()
-        _seed_real_point(root, "ti_target_0.031369")
-        _make_minimal_ti_dir(root, "ti_target_0.200000", with_log=False)
-
-        result = dispatch("ti_full_analysis", {
-            "root_dir": str(root),
-            "output_dir": str(tmp_path / "out"),
-            "dir_filter": "ti_target_*",
-        })
-        assert not result.success
-        assert result.error_type == "file_not_found"
-
 
 # ---------------------------------------------------------------------------
 # run_ti_full_from_root — end-to-end on real example data
@@ -289,82 +272,3 @@ class TestRunTIFullEndToEnd:
         assert report.convergence_csv.name == "ti_convergence_report.csv"
         assert report.free_energy_csv.name == "ti_free_energy.csv"
         assert report.free_energy_png.name == "ti_free_energy.png"
-
-
-# ---------------------------------------------------------------------------
-# Dispatch-level integration
-# ---------------------------------------------------------------------------
-
-
-@_skip_no_example
-class TestDispatchTIFullAnalysis:
-    def test_dispatch_success(self, tmp_path):
-        from md_analysis.agent import dispatch
-
-        result = dispatch("ti_full_analysis", {
-            "root_dir": str(_EXAMPLE_TI_ROOT),
-            "output_dir": str(tmp_path / "out"),
-            "point_slice": "0:2",
-        })
-        assert result.success, f"errors: {result.errors}"
-        assert "convergence_csv" in result.outputs
-        assert "free_energy_csv" in result.outputs
-        assert "free_energy_png" in result.outputs
-        assert "diagnostics_png_0" in result.outputs
-
-    def test_dispatch_summary_has_all_metrics(self, tmp_path):
-        from md_analysis.agent import dispatch
-
-        result = dispatch("ti_full_analysis", {
-            "root_dir": str(_EXAMPLE_TI_ROOT),
-            "output_dir": str(tmp_path / "out"),
-            "point_slice": "0:2",
-        })
-        assert result.success
-        expected = {"n_points", "delta_A_eV", "sigma_A_eV",
-                    "all_passed", "failing_indices", "per_point"}
-        assert expected <= set(result.summary.keys())
-
-    def test_dispatch_summary_is_json_serializable(self, tmp_path):
-        from md_analysis.agent import dispatch
-
-        result = dispatch("ti_full_analysis", {
-            "root_dir": str(_EXAMPLE_TI_ROOT),
-            "output_dir": str(tmp_path / "out"),
-            "point_slice": "0:2",
-        })
-        assert result.success
-        json.dumps(result.summary)   # raises TypeError if not serializable
-
-    def test_dispatch_missing_root_file_not_found(self, tmp_path):
-        from md_analysis.agent import dispatch
-
-        result = dispatch("ti_full_analysis", {
-            "root_dir": str(tmp_path / "nonexistent"),
-            "output_dir": str(tmp_path / "out"),
-            "point_slice": "0:2",
-        })
-        assert not result.success
-        assert result.error_type == "file_not_found"
-
-    def test_dispatch_invalid_point_slice_validation(self, tmp_path):
-        from md_analysis.agent import dispatch
-
-        result = dispatch("ti_full_analysis", {
-            "root_dir": str(_EXAMPLE_TI_ROOT),
-            "output_dir": str(tmp_path / "out"),
-            "point_slice": "2",   # no colon → invalid
-        })
-        assert not result.success
-        assert result.error_type == "validation"
-
-    def test_dispatch_too_few_points_validation(self, tmp_path):
-        from md_analysis.agent import dispatch
-
-        result = dispatch("ti_full_analysis", {
-            "root_dir": str(_EXAMPLE_TI_ROOT),
-            "output_dir": str(tmp_path / "out"),
-            "point_slice": "0:1",   # < 2 points after slice
-        })
-        assert not result.success
-        assert result.error_type == "validation"

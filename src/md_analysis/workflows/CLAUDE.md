@@ -4,8 +4,8 @@
 
 程序化入口的 **canonical** 模块。每个 `run_*` 函数封装一种分析或工作目录生成，
 返回统一的 `WorkflowResult`（`artifacts` / `metadata` / `extra`）。`md_analysis.main`
-是同一批名字的薄 re-export facade（79 行 import-only）；CLI / notebook / agent
-handler 都通过本包调用业务流程，业务模块本身不持有 workflow 编排逻辑。
+是同一批名字的薄 re-export facade（import-only）；CLI / notebook / skill
+都通过本包调用业务流程，业务模块本身不持有 workflow 编排逻辑。
 
 当前共 30 个 `run_*` + `WorkflowResult`，分 8 个子模块。
 
@@ -57,31 +57,25 @@ handler 都通过本包调用业务流程，业务模块本身不持有 workflow
   metadata 一律包含 `n_successful` / `n_skipped` / `n_failed` 三计数
   + `workdir_paths` 列表；当前底层 succeed-all-or-raise，所以
   `n_skipped == n_failed == 0`，但 key 占位以保未来扩展。
-- **TI batch `colvar_id`/`overwrite`/`verbose` 契约**（Phase 6.6）：
+- **TI batch `colvar_id`/`overwrite`/`verbose` 默认**（Phase 6.6）：
   `run_ti_batch` 的 `colvar_id: int | None = None`(默认 primary CV)、
-  `overwrite: bool = False`、`verbose: bool = False` 默认值均为
-  **agent-facing** 语义。CLI 422 显式传 `overwrite=True`(保留旧式逐文件
-  覆盖,**不清目录**)+`verbose=True`(tqdm 进度)。`colvar_id`/`overwrite`
-  进 metadata;`verbose` 是 UI-only,**不**进 metadata。agent
-  `ti_gen_batch` contract 暴露 `colvar_id`/`overwrite`(均 optional,默认
-  None/False),**不**暴露 `verbose`;agent handler 走 `run_ti_batch`,
-  outputs 显式从 `result.artifacts` 构建(WorkflowResult 无 `.workdirs`,
-  不能用 `_normalize_outputs`),summary 从 `result.extra` 取。
-- **TI `strict` 契约**（Phase 6.5）：`run_ti_full_analysis` /
+  `overwrite: bool = False`、`verbose: bool = False`。CLI 422 显式传
+  `overwrite=True`(保留旧式逐文件覆盖,**不清目录**)+`verbose=True`
+  (tqdm 进度)。`colvar_id`/`overwrite` 进 metadata;`verbose` 是
+  UI-only,**不**进 metadata。
+- **TI `strict` 默认**（Phase 6.5）：`run_ti_full_analysis` /
   `run_ti_constant_potential_correction` 的 `strict: bool = True`
-  默认值是 **agent-facing** 语义——损坏的约束点目录抛
-  `FileNotFoundError`。CLI 312/313 显式传 `strict=False` 保留菜单路径
-  历史的宽松行为（WARN+skip）。`run_ti_constant_potential_correction`
-  把 `strict` **同时**透传给内部 `run_ti_full_analysis` **和** phase-2
-  的 `discover_ti_points`，否则两次发现的点集会错位、correction 的
-  per-point Bader 对齐相对 `ti_report.point_reports` 漂移。
-  `agent ti_full_analysis` 的 `TaskContract` 暴露 `strict`
-  （`required=False, default=True`），agent 失败语义零回退。
+  ——损坏的约束点目录抛 `FileNotFoundError`。CLI 312/313 显式传
+  `strict=False` 保留菜单路径历史的宽松行为（WARN+skip）。
+  `run_ti_constant_potential_correction` 把 `strict` **同时**透传给
+  内部 `run_ti_full_analysis` **和** phase-2 的 `discover_ti_points`，
+  否则两次发现的点集会错位、correction 的 per-point Bader 对齐相对
+  `ti_report.point_reports` 漂移。
 
 ## 依赖方向（必须遵守）
 
 ```
-cli / agent
+cli
    ↓
 workflows
    ↓
@@ -90,7 +84,7 @@ water / electrochemical / enhanced_sampling / scripts
 engines / utils / exceptions
 ```
 
-- workflows 不允许 import `cli` 或 `agent`（架构守卫扫描，零命中）
+- workflows 不允许 import `cli`（架构守卫扫描，零命中）
 - 业务模块（water / electrochemical / 等）不允许 import workflows
 
 ## 测试位置

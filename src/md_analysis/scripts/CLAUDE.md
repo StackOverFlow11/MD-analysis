@@ -19,10 +19,9 @@
   `generate_potcar`，`to_dict()` 直接 JSON 可序列化）。`element_order` 接受
   list/tuple 两种。**只准备目录，不提交 VASP 作业、不解析 Bader 结果**；
   作业提交归 pbs-auto、结果解析归 `charge_*` 类 API。
-- `BaderGenError` 在 agent 契约里映射为 `error_type="validation"`：典型触发
-  路径是 `generate_potcar=True` 但 `vaspkit` 不在 `PATH` 上（环境前置条件
-  未满足），agent 的修复策略是"修正输入"，与 `validation` 一致；`analysis`
-  留给分析本身的数值/逻辑失败。
+- `BaderGenError` 典型触发路径是 `generate_potcar=True` 但 `vaspkit`
+  不在 `PATH` 上（环境前置条件未满足）——属"修正输入"类失败，区别于
+  分析本身的数值/逻辑失败。
 
 ### TIGen
 - 修改 SG 的 inp 文件生成约束 MD 输入：
@@ -34,7 +33,7 @@
 - Frame snapping：目标 CV → 找轨迹中 CV 最近的帧 → 用该帧的实际 CV 作为 TARGET
 - 批量两种模式：numeric（直接给 a.u. 值）/ time（linspace 时间范围 → 映射到 CV）
 - 不支持自定义单位（避免配位数等复杂 CV 的量纲转换问题）
-- **`generate_ti_batch_with_report`（agent/workflow 后端，Phase 6.6）**：
+- **`generate_ti_batch_with_report`（workflow 后端，Phase 6.6）**：
   - `colvar_id: int | None = None`（None=primary）已 threading 进
     `_plan_ti_targets` + 两次 `_load_trajectory_cv` + per-target
     `generate_ti_workdir`。**纯 threading**：snapping / `ti_target_<cv>`
@@ -45,7 +44,7 @@
     `cMD.inp`/`init.xyz`/`script.sh`）—— **绝不 `rmtree`/清目录**，撞目录
     内其他文件保留
   - `verbose: bool = False`：tqdm 进度（与 legacy `batch_generate_ti_workdirs`
-    同款）。CLI 422 传 `True`；agent contract **不暴露** verbose
+    同款）。CLI 422 传 `True`
   - 旧 `batch_generate_ti_workdirs`（legacy，无 collision guard、无 preflight）
     迁移后 CLI 不再调用，但仍是 **public Python API**（`scripts/__init__.py`
     `__all__` + 直接单测）。**弃用计划见 `context4agent/requirements/`
@@ -77,7 +76,7 @@
 - 复用 `_inp_utils.py` 的 cell/topology 修改逻辑，和 PotentialGen 共享
 - CLI 菜单：441（单帧）、442（批量），独立 MenuGroup "44 DeePMD SP Preparation"
 - Settings 菜单：914 `SetDpSpInpTemplateCmd`
-- **Agent 任务**：PotentialGen 仍是 CLI-only；SpGen / BaderGen / TIGen 均暴露为带完整 contract 的 agent 任务（`sp_gen_batch` / `bader_gen_batch` / `ti_gen_batch`）。Phase 6.6 + 6.agent-cleanup 后**三者 handler 均改走 workflows facade**（`workflows.scripts.run_sp_batch` / `run_bader_batch` / `run_ti_batch`，target_fn 已 repoint）：facade 内部调各自 `*_with_report` wrapper，handler 的 outputs 从 `WorkflowResult.artifacts` 显式构建（**不**用 `_normalize_outputs`——WorkflowResult 无 `.workdirs`，会落空 dict）、summary 从 `result.extra` 取。contract / schema 不变（facade 与 wrapper 参数 1:1）
+- **Workflow facade 后端**：SpGen / BaderGen / TIGen 各有 `*_with_report` wrapper，由 `workflows.scripts.run_sp_batch` / `run_bader_batch` / `run_ti_batch` 调用（facade 与 wrapper 参数 1:1，返回 `WorkflowResult`，artifacts 为工作目录路径、extra 携带 report）。PotentialGen 仅 CLI 入口，无 workflow facade。
 - 后端链路：SP 算完 → `dpdata` 或 `cp2kdata` 插件转训练集 → DeePMD-kit 训练
 
 ### 共享 helper：`_inp_utils.py`
@@ -91,11 +90,11 @@
 - 私有模块，统一轨迹帧切片逻辑
 - 由 **BaderGen / PotentialGen / SpGen** 三个 batch 函数共享使用；TIGen **不适用**（TIGen 的 time mode 是"linspace → 映射到 CV → nearest 帧"的目标点语义，与区间切片不同）
 - 核心抽象：`FrameSelection` frozen dataclass + `iter_selected_frames(xyz_path, selection)` iterator
-- `mode` 字段是显式字符串判别器（`"index"` / `"time"`），不是隐式 None 触发 — 目的是让 agent 的 JSON Schema 能清晰暴露 enum 选择
+- `mode` 字段是显式字符串判别器（`"index"` / `"time"`），不是隐式 None 触发 — 便于在 schema / 结构化输出中清晰暴露 enum 选择
 - **Index mode**（默认）：`frame_start/end/step` 零基索引切片，与重构前行为一致
 - **Time mode**：要求同时提供 `time_start_fs` / `time_end_fs` / `time_step_fs`；贪心匹配：每个目标 `t_k = t_start + k*t_step`，yield 首个 `time >= t_k` 的帧，然后 `next_target = time + t_step`；区间边界 `[t_start, t_end]` 包含；缺 `atoms.info['time']` 元数据 → 直接 `FrameSelectionError`（早失败）
-- **单帧定位**：`resolve_single_frame(xyz_path, *, mode, frame=0, time_fs=None, time_tol_fs=1e-6)` — Single Cmd 专用。Time mode 下做最近邻搜索（假设 time 单调），返回 `(idx, atoms, warnings)` 三元组；`|actual - requested| > tol` 时 warnings 非空，由 CLI/Agent 分别处理
-- 错误类型：`FrameSelectionError(MDAnalysisError)` — `dispatch()` 层捕获为 `ERROR_VALIDATION`
+- **单帧定位**：`resolve_single_frame(xyz_path, *, mode, frame=0, time_fs=None, time_tol_fs=1e-6)` — Single Cmd 专用。Time mode 下做最近邻搜索（假设 time 单调），返回 `(idx, atoms, warnings)` 三元组；`|actual - requested| > tol` 时 warnings 非空，由 CLI 处理
+- 错误类型：`FrameSelectionError(MDAnalysisError)` — 属输入校验类失败
 - 向后兼容：所有 batch 函数的 `mode` 默认 `"index"`，旧调用无需修改
 - CLI 默认 `mode="time"`（通过 `ChoiceParam` 的 `default="time"` 触发）；Python API 默认 `mode="index"`
 

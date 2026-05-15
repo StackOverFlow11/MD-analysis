@@ -52,29 +52,6 @@ for name, path in result.artifacts.items():
 > `md_analysis.workflows`）。旧的 `run_*_analysis` / `run_all` 名字已在
 > 入口重构期间移除，不再可用。
 
-### Agent 入口（`agent.dispatch`）
-
-JSON 序列化、JSON Schema 自描述，方便给 LLM / MCP / 批处理用：
-
-```python
-from md_analysis.agent import dispatch, list_tasks, get_task_schema
-
-for t in list_tasks():
-    print(t["name"], "—", t["description"])
-
-schema = get_task_schema("ti_full_analysis")
-
-result = dispatch("ti_full_analysis", {
-    "root_dir": "./ti_runs/",
-    "output_dir": "./output/",
-    "epsilon_tol_ev": 0.01,
-    "equilibration": 500,
-})
-print(result.success, result.summary["delta_A_eV"])
-```
-
-任务列表（8 个）见 [menu_reference.md 末尾](menu_reference.md#agent-任务列表)。
-
 ---
 
 [← 回索引](README.md)

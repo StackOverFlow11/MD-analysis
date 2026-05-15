@@ -8,15 +8,16 @@
 
 - 编程入口完整清单：`src/md_analysis/workflows/__init__.py` 的 `__all__`
   （全部 `run_*` + `WorkflowResult`；`md_analysis.main` 是同名薄 re-export）
-- Agent 任务清单 / target_fn / schema：agent registry +
-  `get_task(name).target_fn` + `TaskContract`（`md_analysis.agent`）
 - CLI 菜单号与行为：`src/md_analysis/cli/` + `test/unit/cli/`
 - 模块职责边界 / 数据流：`context4agent/architecture/`
 
 ## 当前阶段目标
 
 - **目标**：围绕"周期性金属-水界面"体系，提供可复现的水/电势/电荷/
-  增强采样分析（CSV/PNG）与可复用 API（CLI + workflows + agent 三入口）。
+  增强采样分析（CSV/PNG）与可复用 API（CLI + workflows 双入口；后续走
+  CLI + skill 路线）。
+  > 注：非交互 `agent`（dispatch/TaskContract）入口已在 development
+  > 移除，保留于 `development_agent` 分支（未来 MCP 路线）。
 - **当前已覆盖**（按能力域，详清单见代码权威位置）：
   - 单帧底层（`utils/`）：界面层识别、H2O 拓扑、密度/取向/角度 PDF、
     cube 解析、slab-averaged potential
@@ -28,8 +29,7 @@
   - 增强采样（`enhanced_sampling/`）：慢增长自由能（quick/publication）
     + 约束 TI 收敛诊断与自由能积分 + 恒电势修正
   - 脚本生成（`scripts/`）：Bader/TI/Potential/SP 工作目录批量生成
-  - 三入口：CLI、`md_analysis.workflows`（`run_*`+`WorkflowResult`）、
-    Agent（dispatch + JSON Schema + `TaskContract`，全部 contract-backed）
+  - 双入口：CLI、`md_analysis.workflows`（`run_*`+`WorkflowResult`）
 - **当前未覆盖**：按层/按元素电荷转移统计；Mulliken 电荷分析。
 
 ## 已确认的体系前提（用户声明，值得记录）
@@ -40,32 +40,27 @@
 
 ## 入口现状要点（只记策略与例外，不记逐项清单）
 
-- **入口分层**：`cli`/`agent` → `workflows` → 业务 → `engines` → `utils`。
-  CLI 菜单命令全部走 `workflows.*` facade；agent 任务全部 contract-backed。
-- **入口重构期间**移除了 legacy 名（旧 `run_*_analysis`/`run_all` 及对应
-  6 个 legacy agent task），未保留 alias；业务经 `workflows.run_*` 调用。
-- **长期例外**（有意保留，非遗漏）：
-  - `slowgrowth_quick`（agent）有意直调 `slowgrowth_analysis_with_report`
-    ——它是通用 SG 入口，暴露 `plot_style`(quick/publication/both) +
-    可选 `output_dir`；`run_slowgrowth_quick_plot` 是 CLI quick 专用窄
-    facade（硬编码 plot_style、output_dir 必填），强迁会丢 publication/
-    both 能力（能力回退，非清理）
-  - `config_show`（agent）read-only
-- **关键坑**（影响后续 agent 决策）：`WorkflowResult` **无** `.workdirs`；
-  batch 类 agent handler 的 outputs 必须从 `WorkflowResult.artifacts`
-  显式构建、summary 从 `result.extra` 取（不可用 `_normalize_outputs`）。
+- **入口分层**：`cli` → `workflows` → 业务 → `engines` → `utils`。
+  CLI 菜单命令全部走 `workflows.*` facade。
+- **入口重构期间**移除了 legacy 名（旧 `run_*_analysis`/`run_all`），
+  未保留 alias；业务经 `workflows.run_*` 调用。
+- **关键坑**（影响后续 skill / 下游决策）：`WorkflowResult` **无**
+  `.workdirs`；批量类 `run_*`（如 `run_ti_batch`）的工作目录路径在
+  `WorkflowResult.artifacts`，强类型 report 在 `.extra`。
+- **agent 路线例外**（`slowgrowth_quick` 直调、`config_show` read-only
+  等）随 agent 层迁至 `development_agent` 分支，development 不再维护。
 
 ## 已批准行为变化（用户拍板，长效记录）
 
 > 格式：default-preserving migration（参数默认保旧行为）/
 > approved tightening（更合理但改旧行为，须用户批准）。
 
-- **6.5 `strict`（default-preserving）**：`ti_full_analysis` 等迁
-  workflows 后新增 `strict: bool=True`；agent 默认不变（失败语义不变），
-  CLI 显式传 `False` 维持旧行为。
-- **6.6 `overwrite`（default-preserving）**：`ti_gen_batch` 新增
+- **6.5 `strict`（default-preserving）**：`run_ti_full_analysis` 等
+  workflow 入口 `strict: bool=True`（损坏点目录抛 `FileNotFoundError`）；
+  CLI 显式传 `False` 维持菜单路径旧的宽松行为（WARN+skip）。
+- **6.6 `overwrite`（default-preserving）**：`run_ti_batch` 的
   `overwrite: bool=False`（保留 collision guard），`True` 仅跳 guard
-  逐文件覆盖**不清目录**；agent 默认不变，CLI 显式传 `True`。
+  逐文件覆盖**不清目录**；CLI 422 显式传 `True`。
 - **6.5 TI dt 不一致（approved tightening，user 拍板接受）**：旧行为
   = warning + continue；新行为 = `ValueError`。理由：混用不同 dt 会让
   autocorrelation / N_eff / time-range 收敛诊断产生误导，继续算等于在

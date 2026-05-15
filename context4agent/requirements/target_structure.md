@@ -103,13 +103,15 @@ src/md_analysis/engines/
 ## 入口层
 
 - `workflows`：程序化入口，组织业务模块调用，返回 `WorkflowResult`。
-- `agent`：非交互式 agent/MCP 入口；不放业务逻辑。
-- `cli`：交互式菜单入口；最后迁移，尽量只做参数收集和 workflow 调用。
+- `cli`：交互式菜单入口；只做参数收集和 workflow 调用。
+
+> 注：`agent`（非交互式 dispatch/TaskContract）入口在 development 路线已移除，
+> 保留于 `development_agent` 分支(未来 MCP 路线)。development 走 CLI + skill。
 
 ## 依赖方向
 
 ```text
-cli / agent
+cli
   -> workflows
   -> business modules
   -> engines

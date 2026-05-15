@@ -90,10 +90,10 @@ register_parser("vasp", VASPParser)
 engines/  →  utils/{formats, structure, io}, utils/constants, exceptions
 ```
 
-**禁止**反向 import `electrochemical` / `water` / `enhanced_sampling` / `scripts` / `cli` / `agent`。开发期间用以下命令守护：
+**禁止**反向 import `electrochemical` / `water` / `enhanced_sampling` / `scripts` / `cli`。开发期间用以下命令守护：
 
 ```bash
-rg "from\s+\.\.+\.?(electrochemical|water|enhanced_sampling|cli|scripts|agent)" \
+rg "from\s+\.\.+\.?(electrochemical|water|enhanced_sampling|cli|scripts)" \
    src/md_analysis/engines/
 # (must be empty)
 ```
