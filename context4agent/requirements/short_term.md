@@ -81,6 +81,9 @@
     元素平均净电荷）——待实现
   - Mulliken 电荷：按元素/分组/分层统计（优先级低于 Bader，需求待明确）
 - **工程化**：固定最小依赖集合与安装方式说明
+- **文档 follow-up**：中性化旧子阶段标签 `Phase 7b` / `Phase 7b1` /
+  `Phase 7b2`（formats/engines 重构历史语境），避免与 canonical Phase 7
+  混淆；独立计划处理。
 - **旧 shim 弃用计划**：`batch_generate_ti_workdirs` 自入口重构 TI batch
   迁移后 CLI 无调用方（现行 backend = `generate_ti_batch_with_report`），
   但它仍是 **public Python API**（`scripts/__init__.py.__all__` + 直接
