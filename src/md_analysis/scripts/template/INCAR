@@ -81,6 +81,7 @@ ALGO = VeryFast      #set the algorithm here Fast = DAV+RMM                     
 ################################# out put ####################################
 LWAVE  = .FALSE.  #WAVECAR                                                   #
 LCHARG = .TRUE.  #CHGCAR  CHG                                               #
+LAECHG = .TRUE.  #AECCAR0/AECCAR2 all-electron Bader ref            #
 LVTOT  = .FALSE.  #LOCPOT local potential                                    #
 LELF   = .FALSE.  #ELFCAR                                                    #
 ############################################################################## 	 
