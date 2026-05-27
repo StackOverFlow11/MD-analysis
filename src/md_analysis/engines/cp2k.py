@@ -27,6 +27,7 @@ Phase 7b2 status
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 
 from ..utils.constants import AU_TIME_TO_FS, BOHR_TO_ANG, HA_TO_EV, TRANSITION_METAL_SYMBOLS
@@ -73,6 +74,12 @@ except ImportError:  # pragma: no cover
 
 logger = logging.getLogger(__name__)
 
+# Match CP2K's primary rolling restart ``<PROJECT>-<RUN>.restart`` and
+# explicitly exclude RESTART_HISTORY snapshots
+# ``<PROJECT>-<RUN>_<STEP>.restart`` (which are always older than the
+# rolling file).
+_PRIMARY_RESTART_RE = re.compile(r"^.*-\d+\.restart$")
+
 
 class CP2KParser:
     """Parser for CP2K constraint-MD point directories.
@@ -107,16 +114,21 @@ class CP2KParser:
 
     @staticmethod
     def _find_restart(directory: Path) -> Path:
-        """Find the primary .restart file (skips .bak and .RESTART.wfn)."""
-        candidates = sorted(directory.glob("*.restart"))
+        """Find the primary rolling CP2K restart ``<PROJECT>-<RUN>.restart``.
+
+        CP2K writes ``<PROJECT>-<RUN>.restart`` as a per-step rolling file
+        (always the *latest* state) and ``<PROJECT>-<RUN>_<STEP>.restart``
+        as periodic RESTART_HISTORY snapshots (always *older* than the
+        rolling file). This selects the rolling file via regex and
+        excludes snapshots and ``.bak`` backups.
+        """
         candidates = [
-            p for p in candidates
-            if ".bak" not in p.name and "RESTART.wfn" not in p.name
+            p for p in directory.glob("*.restart")
+            if _PRIMARY_RESTART_RE.match(p.name) and ".bak" not in p.name
         ]
         if not candidates:
-            raise FileNotFoundError(f"No .restart file in {directory}")
-        # Prefer the one with highest suffix number (e.g. cMD-1_1500.restart)
-        return candidates[-1]
+            raise FileNotFoundError(f"No primary .restart file in {directory}")
+        return sorted(candidates)[-1]
 
     @staticmethod
     def _find_log(directory: Path) -> Path:
