@@ -57,7 +57,7 @@ class AutocorrResult:
     tau_corr: float  # integrated autocorrelation time (frames)
     n_eff: float  # effective independent sample count
     sem_auto: float  # sigma_lambda * sqrt(2 * tau / N)
-    passed_neff: bool  # N_eff >= N_EFF_MIN
+    passed_neff: bool  # N_eff >= N_eff floor (DEFAULT_NEFF_FLOOR)
     passed_sem: bool | None  # SEM_auto <= SEM_max; None if sem_max not provided
     t_min_frames: int | None  # minimum frames needed if N_eff < threshold; else None
 
@@ -79,6 +79,7 @@ class BlockAverageResult:
     plateau_sem: float  # SEM at plateau (or SEM at max B if no plateau)
     plateau_delta: float  # δSEM at plateau point
     plateau_block_size: int | None  # B at plateau; None if not detected
+    n_blocks_plateau: int  # n_b at the level plateau_sem was taken from
     plateau_reached: bool  # True if plateau was detected
     passed: bool | None  # plateau_reached AND SEM <= SEM_max; None if no target
 
@@ -140,7 +141,10 @@ class ConstraintPointReport:
     geweke: GewekeResult
 
     # Summary
-    sem_final: float  # SEM_block (primary) or SEM_auto (fallback)
+    sem_final: float  # SEM_block (primary) or SEM_auto (fallback); NOT inflated
+    sem_inflated: float  # chi-square one-sided 95% upper bound of sem_final
+    sem_inflation_factor: float  # sqrt(nu / chi2_0.05,nu) >= 1
+    n_blocks_plateau: int  # blocks at the F&P plateau (nu = this - 1)
     sem_max: float | None  # precision target; None in standalone
     passed: bool | None  # all four passed; None if sem_max not set
     failure_reasons: tuple[str, ...]  # empty if passed
@@ -159,7 +163,7 @@ class TIReport:
     xi_values: np.ndarray  # shape (K,)
     weights: np.ndarray  # shape (K,) — trapezoid weights
     forces: np.ndarray  # shape (K,) — lambda_mean at each point
-    force_errors: np.ndarray  # shape (K,) — SEM_final at each point
+    force_errors: np.ndarray  # shape (K,) — inflated SEM (reported upper bound)
 
     delta_A: float  # integrated free-energy difference
     sigma_A: float  # propagated statistical error

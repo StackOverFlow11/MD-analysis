@@ -13,7 +13,7 @@ Four independent analysis engines for TI convergence diagnostics. All are pure f
 
 ### autocorrelation.py (Step 2)
 - `analyze_autocorrelation(series, *, sem_max, ...)` -> `AutocorrResult`
-- Wraps _acf_core + pass/fail: N_eff >= 50, SEM <= SEM_max
+- Wraps _acf_core + pass/fail: N_eff >= 10 (floor), SEM <= SEM_max
 
 ### block_average.py (Step 3)
 - `analyze_block_average(series, *, sem_max, min_blocks=4, n_consecutive=2)` -> `BlockAverageResult`

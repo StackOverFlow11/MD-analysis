@@ -7,7 +7,7 @@ Lightweight analysis utilities for periodic metal-water interfaces from CP2K MD 
 ## Quick Start
 
 ```bash
-pip install numpy matplotlib ase pytest tqdm
+pip install numpy matplotlib ase pytest tqdm scipy
 pip install .          # install package (required before running tests)
 pytest test/           # run all tests
 ```

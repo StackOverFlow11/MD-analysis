@@ -20,17 +20,24 @@ Constrained TI convergence diagnostics, free energy integration, and constant-po
 ## 4-Step Diagnostic Pipeline
 
 1. **Running Average** — cumulative mean drift D < 3.0 * SEM
-2. **ACF** — Sokal (1997) self-consistent cutoff -> tau_corr -> N_eff >= 50
-3. **Block Average** — F&P (1989) pow2 blocks -> delta_SEM plateau detection
+2. **ACF** — Sokal (1997) self-consistent cutoff -> tau_corr -> N_eff >= 10 (floor; below it the IAT estimate is unreliable and the point fails outright)
+3. **Block Average** — F&P (1989) pow2 blocks -> delta_SEM plateau detection; also returns `n_blocks_plateau`
 4. **Geweke** — front 10% vs rear 50% z-test (|z| < 1.96)
 
 SEM selection: F&P plateau (primary) -> ACF fallback. Cross-check warning at >15% disagreement.
+
+SEM reporting: the plateau SEM is inflated to its chi-square one-sided 95%
+upper bound, `SEM_report = SEM * sqrt(nu / chi2_0.05(nu))` with
+`nu = n_blocks_plateau - 1` (`sem_chi2_upper_bound` in `integration.py`;
+scipy, confidence hard-coded via `DEFAULT_SEM_CONFIDENCE = 0.95`).
+Pass/fail and sigma_A propagation use the inflated value; `sem_final`
+stays un-inflated.
 
 ## Integration
 
 - Non-uniform trapezoid: `compute_trapezoid_weights(xi)` supports ascending/descending xi
 - Forces: dA/dxi = -lambda_mean (negated in workflow)
-- Error: sigma_A = sqrt(sum(w^2 * sem^2))
+- Error: sigma_A = sqrt(sum(w^2 * sem^2)) with sem = inflated SEM (SEM_report)
 - Units: lambda in a.u., only final delta_A converted to eV
 
 ## Constant-Potential Correction

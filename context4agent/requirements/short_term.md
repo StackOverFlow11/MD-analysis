@@ -32,6 +32,14 @@
   - 双入口：CLI、`md_analysis.workflows`（`run_*`+`WorkflowResult`）
 - **当前未覆盖**：按层/按元素电荷转移统计；Mulliken 电荷分析。
 
+## 下一步待办（2026-08-10 立）
+
+- **VASP MD 工作目录 → CP2K（电势）SP 目录生成 + 端到端 PZC 工具包**：
+  完整需求规格见 [vasp_md_to_cp2k_potential_sp.md](vasp_md_to_cp2k_potential_sp.md)。
+  要点：VASP 帧源（XDATCAR/vasprun.xml）→ 复用 `PotentialGen` 出 CP2K SP 目录；
+  模板三级解析（显式参数 > config > 包内置默认电势模板，SpGen 范式）；
+  分析端内置 Le 2017 方程出 U_PZC。目标用户 = 只懂 VASP 的同门（sjy）。
+
 ## 已确认的体系前提（用户声明，值得记录）
 
 - 三基矢**正交**的周期性体系
@@ -55,6 +63,17 @@
 > 格式：default-preserving migration（参数默认保旧行为）/
 > approved tightening（更合理但改旧行为，须用户批准）。
 
+- **TI SEM 卡方上界（approved tightening，2026-08-20 拍板并实施）**：
+  报告 SEM 由"硬门槛（N_eff ≥ 50）"改为连续惩罚
+  `SEM_report = SEM·√(ν/χ²₀.₀₅(ν))`（ν = F&P 平台块数 − 1，单侧 95%
+  硬编码 `DEFAULT_SEM_CONFIDENCE = 0.95`）；pass/fail 与 σ_A 传播
+  统一用膨胀值。`sem_final` 保持未膨胀语义；`ConstraintPointReport`
+  新增 `sem_inflated` / `sem_inflation_factor` / `n_blocks_plateau`
+  （CSV 同步加列）；N_eff 只留 `DEFAULT_NEFF_FLOOR = 10` 地板（低于则
+  τ_corr 失效直接 fail）。原本 N_eff∈[10,50) 但精度富裕的点由 fail
+  变 pass（立项动因：Ag1Cu4 disp Volmer 点 N_eff=16.5 误杀）。
+  规格：`requirements/ti_sem_chi2_upper_bound.md`。
+  附带打包变化：scipy≥1.10 由可选 extra `[ti]` 转为硬依赖。
 - **6.5 `strict`（default-preserving）**：`run_ti_full_analysis` 等
   workflow 入口 `strict: bool=True`（损坏点目录抛 `FileNotFoundError`）；
   CLI 显式传 `False` 维持菜单路径旧的宽松行为（WARN+skip）。

@@ -237,6 +237,7 @@ class TestRunTIFullEndToEnd:
             "point_index", "xi", "n_analyzed",
             "time_start_fs", "time_end_fs", "time_total_fs",
             "tau_corr", "n_eff", "sem_final_au", "sem_max_au",
+            "sem_inflated_au", "sem_inflation_factor", "n_blocks_plateau",
             "geweke_z", "drift_D", "passed", "failure_reasons",
         }
         for pt in report.per_point:

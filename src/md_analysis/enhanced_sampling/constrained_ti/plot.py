@@ -176,6 +176,7 @@ def plot_point_diagnostics(
         f"t = {r.time_start_fs:.1f} – {r.time_end_fs:.1f} fs",
         f"⟨λ⟩ = {r.lambda_mean:.6f} a.u.",
         f"SEM  = {r.sem_final:.6f} a.u.",
+        f"SEM95= {r.sem_inflated:.6f} a.u. (x{r.sem_inflation_factor:.2f})",
     ]
     if r.passed is not None:
         sec1.append(f"OVERALL: {'PASS' if r.passed else 'FAIL'}")
@@ -198,6 +199,7 @@ def plot_point_diagnostics(
         "── Block Average ──",
         f"plateau: {plat_info}",
         f"SEM    = {ba.plateau_sem:.6f} ± {ba.plateau_delta:.6f} a.u.",
+        f"n_b    = {r.n_blocks_plateau}  (nu={r.n_blocks_plateau - 1})",
         f"τ_impl = {tau_block:.1f} frames",
         f"N_impl = {neff_block:.1f}",
     ]

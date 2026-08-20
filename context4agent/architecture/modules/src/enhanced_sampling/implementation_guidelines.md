@@ -52,8 +52,8 @@ enhanced_sampling/
 ## constrained_ti 四步诊断流程
 
 1. **Running Average**（`running_average.py`）— 累积均值漂移 D < drift_factor × SEM
-2. **ACF**（`autocorrelation.py`）— Sokal (1997) 自洽截断 → τ_corr → N_eff ≥ 50
-3. **Block Average**（`block_average.py`）— F&P (1989) pow2 块 → δSEM 平台检测
+2. **ACF**（`autocorrelation.py`）— Sokal (1997) 自洽截断 → τ_corr → N_eff ≥ 10（地板；低于此 IAT 估计失效，直接 fail）
+3. **Block Average**（`block_average.py`）— F&P (1989) pow2 块 → δSEM 平台检测 + `n_blocks_plateau`
 4. **Geweke**（`geweke.py`）— 前 10% vs 后 50% z 检验（|z| < 1.96）
 
 ### SEM 选择（2-tier）
@@ -64,6 +64,14 @@ otherwise           → SEM_auto  (ACF fallback)
 ```
 
 交叉验证：|SEM_block − SEM_auto| / max > 15% 时发出 warning。
+
+### SEM 报告值（卡方上界）
+
+报告 SEM 为平台 SEM 的卡方单侧 95% 上界：
+`SEM_report = SEM × √(ν / χ²_0.05(ν))`，`ν = n_blocks_plateau − 1`
+（`integration.sem_chi2_upper_bound`，scipy；置信度硬编码
+`DEFAULT_SEM_CONFIDENCE = 0.95`）。pass/fail 判定与 σ_A 传播统一用
+膨胀值；`sem_final` 保持未膨胀语义。
 
 ### 符号约定
 
@@ -76,7 +84,7 @@ otherwise           → SEM_auto  (ACF fallback)
 - 非均匀梯形积分：`compute_trapezoid_weights(xi)` 支持升序和降序 ξ
 - `reverse=True` 时 ξ 降序排列，权重为负，ΔA = A(ξ_min) − A(ξ_max)
 - SEM 目标分配：`SEM_max,k = ε_tol / (|w_k| × √K)`
-- 误差传播：`σ_A = √(Σ (w_k × SEM_k)²)`
+- 误差传播：`σ_A = √(Σ (w_k × SEM_k)²)`，其中 SEM_k 为膨胀后 SEM（SEM_report）
 
 ### 单位约定
 

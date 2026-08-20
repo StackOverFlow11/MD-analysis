@@ -13,11 +13,11 @@ dependencies = [
     "ase",
     "matplotlib",
     "tqdm",
+    "scipy>=1.10",
 ]
 
 [project.optional-dependencies]
 test = ["pytest"]
-ti = ["scipy>=1.10"]
 
 [project.scripts]
 md-analysis = "md_analysis.cli:main"

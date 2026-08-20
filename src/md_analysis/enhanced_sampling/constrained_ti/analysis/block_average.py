@@ -89,6 +89,7 @@ def analyze_block_average(
         plateau_sem = float(sem_curve[plateau_index])
         plateau_delta = float(delta_sem[plateau_index])
         plateau_block_size: int | None = int(block_sizes[plateau_index])
+        n_blocks_plateau = n // int(block_sizes[plateau_index])
     else:
         # Fallback: largest block size with n_b >= fallback_min_blocks
         n_blocks = np.array([n // bs for bs in block_sizes])
@@ -104,6 +105,7 @@ def analyze_block_average(
         plateau_sem = float(sem_curve[last])
         plateau_delta = float(delta_sem[last])
         plateau_block_size = None
+        n_blocks_plateau = n // int(block_sizes[last])
 
     # Pass/fail
     if sem_max is not None:
@@ -120,6 +122,7 @@ def analyze_block_average(
         plateau_sem=plateau_sem,
         plateau_delta=plateau_delta,
         plateau_block_size=plateau_block_size,
+        n_blocks_plateau=n_blocks_plateau,
         plateau_reached=plateau_reached,
         passed=passed,
     )

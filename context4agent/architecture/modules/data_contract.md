@@ -257,13 +257,17 @@ $$
 - 默认文件名：`ti_convergence_report.csv`
 - 每约束点一行，按 ξ 排列
 - λ 相关量单位为 a.u.
-- CSV 列：`xi, lambda_mean, sigma_lambda, tau_corr, n_eff, sem_auto, sem_block, delta_sem_block, plateau_B, plateau_reached, sem_final, sem_final_method, sem_max, geweke_z, geweke_reliable, drift_D, passed, failure_reasons`
+- CSV 列：`xi, n_analyzed, time_start_fs, time_end_fs, lambda_mean, sigma_lambda, tau_corr, n_eff, sem_auto, sem_block, delta_sem_block, plateau_B, plateau_reached, sem_final, sem_final_method, n_blocks_plateau, sem_inflation_factor, sem_inflated, sem_max, geweke_z, geweke_reliable, drift_D, passed, failure_reasons`
+  - `sem_final` = 未膨胀的平台 SEM；`sem_inflated` = 卡方单侧 95% 上界（报告值，判定用）；
+    `sem_inflation_factor` = √(ν/χ²₀.₀₅(ν))；`n_blocks_plateau` = 平台处块数（ν = 该值 − 1）
 
 #### `write_free_energy_csv(ti_report)` — 自由能曲线
 
 - 默认文件名：`ti_free_energy.csv`
 - dA/dξ 单位 a.u.；积分后 A 单位 eV
 - CSV 列：`xi, weight, dA_dxi, sem, A_integrated_eV, sigma_A_cumulative_eV`
+- `sem` 列 = 膨胀后 SEM（卡方 95% 上界 SEM_report，即 `TIReport.force_errors`）；
+  `sigma_A_cumulative_eV` 同样由膨胀值传播
 
 #### `write_single_point_csv(report)` — 单点诊断报告
 

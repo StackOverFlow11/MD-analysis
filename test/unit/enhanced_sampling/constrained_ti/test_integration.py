@@ -8,6 +8,7 @@ from md_analysis.enhanced_sampling.constrained_ti.integration import (
     _integrate_free_energy,
     _suggest_time_allocation,
     compute_trapezoid_weights,
+    sem_chi2_upper_bound,
 )
 
 
@@ -68,3 +69,27 @@ class TestTimeAllocation:
         ratios = _suggest_time_allocation(w, s, t)
         assert np.sum(ratios) == pytest.approx(1.0)
         assert len(ratios) == 3
+
+
+class TestSEMChi2UpperBound:
+    """Chi-square one-sided 95% upper bound of the block SEM."""
+
+    def test_nu15_factor_magnitude(self):
+        # chi2_0.05(15) = 7.261 → factor = sqrt(15/7.261) ≈ 1.44
+        sem_report, factor = sem_chi2_upper_bound(1.0, 16)
+        assert factor == pytest.approx(1.437, abs=1e-3)
+        assert sem_report == pytest.approx(1.437, abs=1e-3)
+
+    def test_factor_decreases_towards_one(self):
+        _, f5 = sem_chi2_upper_bound(1.0, 6)
+        _, f15 = sem_chi2_upper_bound(1.0, 16)
+        _, f100 = sem_chi2_upper_bound(1.0, 101)
+        assert f5 > f15 > f100 > 1.0
+
+    def test_sem_scaled_by_factor(self):
+        sem_report, factor = sem_chi2_upper_bound(0.01, 16)
+        assert sem_report == pytest.approx(0.01 * factor, rel=1e-12)
+
+    def test_fewer_than_2_blocks_raises(self):
+        with pytest.raises(ValueError, match="n_blocks"):
+            sem_chi2_upper_bound(1.0, 1)

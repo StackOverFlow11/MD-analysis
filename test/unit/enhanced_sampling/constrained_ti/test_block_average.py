@@ -108,3 +108,36 @@ class TestFPPlateau:
         # n_consecutive=1 should detect plateau at same or earlier B
         if r1.plateau_reached and r3.plateau_reached:
             assert r1.plateau_block_size <= r3.plateau_block_size
+
+
+class TestNBlocksPlateau:
+    """n_blocks_plateau: block count at the level plateau_sem is taken from."""
+
+    def test_plateau_path(self):
+        series = make_ar1(20000, 0.9, seed=42)
+        result = analyze_block_average(series)
+        assert result.plateau_reached
+        assert result.plateau_block_size is not None
+        assert (
+            result.n_blocks_plateau
+            == result.n_total // result.plateau_block_size
+        )
+        assert result.n_blocks_plateau >= 2
+
+    def test_fallback_path(self):
+        """Impossibly large n_consecutive → no plateau → fallback level."""
+        from md_analysis.enhanced_sampling.constrained_ti.config import (
+            DEFAULT_FP_FALLBACK_MIN_BLOCKS,
+        )
+
+        series = make_ar1(5000, 0.9, seed=42)
+        result = analyze_block_average(series, n_consecutive=10**6)
+        assert not result.plateau_reached
+
+        n_blocks = result.n_total // result.block_sizes
+        candidates = np.where(
+            (~np.isnan(result.sem_curve))
+            & (n_blocks >= DEFAULT_FP_FALLBACK_MIN_BLOCKS)
+        )[0]
+        expected = int(n_blocks[candidates[-1]])
+        assert result.n_blocks_plateau == expected
