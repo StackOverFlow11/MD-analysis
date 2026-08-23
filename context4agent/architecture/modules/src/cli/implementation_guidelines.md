@@ -49,8 +49,8 @@ Interactive CLI package providing a VASPKIT-style numbered menu interface. Repla
 | `_calibration.py` | `CalibrateFromCSVCmd`, `CalibrateManualCmd`, `PredictPotentialCmd` | 231-233 |
 | `_enhanced_sampling.py` | `SGQuickPlotCmd`, `SGPublicationPlotCmd`（共享基类 `_SlowgrowthPlotCmd`） | 301-302 (sub-group 30) |
 | `_constrained_ti.py` | `TISingleDiagCmd`, `TIFullAnalysisCmd`, `TIConstPotCorrectionCmd` | 311-313 (sub-group 31) |
-| `_scripts.py` | `BaderSingleCmd`, `BaderBatchCmd`, `TISingleCmd`, `TIBatchCmd`, `PotentialSingleCmd`, `PotentialBatchCmd` | 411-412 (sub-group 41), 421-422 (sub-group 42), 431-432 (sub-group 43) |
-| `_settings.py` | `ShowConfigCmd`, `ResetDefaultsCmd` (sub-group 90); `SetVaspScriptCmd`, `SetCp2kScriptCmd`, `SetSpInpTemplateCmd` (sub-group 91); `SetAnalysisDefaultCmd`×4 (sub-group 92); `SetPotentialReferenceCmd` (sub-group 93) | 900-931 |
+| `_scripts.py` | `BaderSingleCmd`, `BaderBatchCmd`, `TISingleCmd`, `TIBatchCmd`, `PotentialSingleCmd`, `PotentialBatchCmd`, `SpGenSingleCmd`, `SpGenBatchCmd` | 411-412 (sub-group 41), 421-422 (sub-group 42), 431-432 (sub-group 43), 441-442 (sub-group 44) |
+| `_settings.py` | `ShowConfigCmd`, `ResetDefaultsCmd` (sub-group 90); `SetVaspScriptCmd`, `SetCp2kScriptCmd`, `SetSpInpTemplateCmd`, `SetDpSpInpTemplateCmd` (sub-group 91); `SetAnalysisDefaultCmd`×4 (sub-group 92); `SetPotentialReferenceCmd` (sub-group 93) | 900-931 |
 
 `SurfaceChargeCmd.execute()` 使用 `surface_charge_analysis()` 返回的 `SurfaceChargeResult` 数据类直接打印系综统计摘要（不再依赖独立的 `_print_ensemble_summary()` 函数，已删除）。
 
@@ -87,11 +87,11 @@ Settings sub-group 92 allows users to persistently override algorithm defaults f
 
 `_ConfigBackedParam` 内部基类（在 `_params.py` 中定义）提供 `_get_config_value()` 和基础 `apply_default()` 实现。两个子类：
 - `ConfigDefaultParam`：通过 `CONFIGURABLE_DEFAULTS` 注册表 fallback 到硬编码默认值。Analysis sub-menus (`_potential.py`, `_water.py`, `_charge.py`) 使用此参数类来填充提示默认值。
-- `ConfigStrParam`：直接通过 `get_config(key)` 读取字符串配置值（不经过 `CONFIGURABLE_DEFAULTS` 注册表）。预定义实例 `vasp_script`、`cp2k_script`、`sp_inp_template` 供 Scripts 命令使用。
+- `ConfigStrParam`：直接通过 `get_config(key)` 读取字符串配置值（不经过 `CONFIGURABLE_DEFAULTS` 注册表）。预定义实例 `vasp_script`、`cp2k_script`、`sp_inp_template`、`dp_sp_inp_template` 供 Scripts 命令使用。
 
 `BoolParam`：yes/no 布尔提示参数（字段：`key`、`label`、`default`）。预定义实例 `gen_potcar` 供 Bader Scripts 命令使用。
 
-`DisplayAction`：在参数采集过程中执行副作用（如打印轨迹信息），不在 ctx 中存储值。`apply_default` 为 no-op。Scripts 命令（411-412、431-432）使用 `DisplayAction(lambda ctx: _print_trajectory_info(ctx[K.XYZ]))` 在采集完 XYZ 路径后立即显示轨迹元信息。
+`DisplayAction`：在参数采集过程中执行副作用（如打印轨迹信息），不在 ctx 中存储值。`apply_default` 为 no-op。Scripts 命令（411-412、431-432、441-442）使用 `DisplayAction(lambda ctx: _print_trajectory_info(ctx[K.XYZ]))` 在采集完 XYZ 路径后立即显示轨迹元信息。
 
 Library function signatures remain unchanged — persistence only affects CLI prompt defaults.
 

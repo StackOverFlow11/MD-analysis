@@ -27,8 +27,6 @@
   - 全局常量：`TRANSITION_METAL_SYMBOLS`、`DEFAULT_METAL_SYMBOLS`、默认分箱宽度/阈值
   - 单位换算：`HA_TO_EV`、`BOHR_TO_ANG`
   - cSHE 常量：`DP_A_H3O_W_EV`、`MU_HPLUS_G0_EV`、`DELTA_E_ZP_EV`
-- `cube.py`
-  - Gaussian cube 文件 I/O、plane-averaged φ(z)、slab-averaged potential
 - `structure/` 子包（结构解析：周期聚类、金属层识别、水分子拓扑）
   - `cluster.py`：1D 周期性聚类 + 最大间隙检测 + 间隙中点计算
   - `layer.py`
@@ -41,11 +39,35 @@
       - 水质量密度 $\rho(z)$（`g/cm^3`）
       - 取向加权密度（`g/cm^3`，按 $\sum_i \cos\theta_i \cdot m_{\mathrm{H_2O}} / V_{\mathrm{bin}}$）
       - 指定 c 分数窗口内的 $\theta$ PDF（`degree^-1`）
-- `formats/` 子包（CP2K restart 文件解析）
-  - `cp2k_cell.py`：CP2K cell 参数解析（`.restart` + `md.inp`）
-  - `cp2k_colvar.py`：CP2K COLVAR restart + LagrangeMultLog 解析
+- `formats/` 子包（单文件格式解析，按引擎家族分子包；不做目录发现与业务逻辑）
+  - `common/cube.py`：Gaussian cube 文件 I/O、plane-averaged φ(z)、slab-averaged potential
+  - `cp2k/cell.py`：CP2K cell 参数解析（`.restart` + `md.inp`）
+  - `cp2k/colvar.py`：CP2K COLVAR restart + LagrangeMultLog 解析（输出 CP2K raw dataclass，canonical 类型在 `engines.models`）
+  - `cp2k/stdout.py`：CP2K `md.out` / `sp.out` Fermi 能级提取（step/time/fermi_raw）
+  - `cp2k/xyz.py`：CP2K xyz 轨迹流式读取（`i = <step>` 注释解析，按 step 构建 `ase.Atoms`）
+  - `vasp/report.py` / `vasp/outcar.py` / `vasp/locpot.py`：VASP REPORT / OUTCAR / LOCPOT 占位解析器（全部 raise `NotImplementedError`）
+  - `bader/acf.py`：Bader ACF.dat 解析并将净电荷附着到 ASE `Atoms`
+  - `bader/potcar.py`：VASP POTCAR `(element, ZVAL)` 解析
+  - `bader/_errors.py`：`BaderParseError` 共享异常
+- `io/` 子包（目录发现与通用 I/O 脚手架，不做格式解析）
+  - `_frame_discovery.py`：帧工作目录发现与排序（`bader_t*_i*` / `potential_t*_i*` 命名约定）
+  - `_io_helpers.py`：私有共享辅助（CSV 写出、累积平均）
 
 > 低层 shape/单位/窗口规则以 `context4agent/architecture/modules/data_contract.md` 为准。
+
+### 1a) `md_analysis.engines`（引擎适配层）
+
+计算引擎（CP2K / VASP）门面层：把各引擎的原始文件组合（CP2K `*.restart` + `*.LagrangeMultLog`、`md.out` + cube 等）解析成 engine-neutral 的 frozen dataclass；上层业务（`water` / `electrochemical` / `enhanced_sampling` / `scripts`）只面向中性类型与 Protocol 编程，不触碰引擎细节。
+
+- `__init__.py`：公共 facade — re-export Protocol / registry / 中性 dataclass / CP2K 门面函数，并在包 import 时默认注册 CP2K parser（`register_parser("cp2k", CP2KParser)`）
+- `protocols.py`：`ConstraintMDParser` Protocol（`is_constraint_directory` / `parse_metadata` / `parse_lambda_series`）+ parser 注册表与目录嗅探（`register_parser` / `get_parser` / `infer_parser` / `resolve_parser`）+ `ParserInferenceError`；新增引擎 = 实现 Protocol + 注册，上层零改动
+- `models.py`：engine-neutral frozen dataclass
+  - 约束 MD：`ConstraintInfo` / `ColvarInfo` / `ConstraintMetadata` / `LambdaSeries` / `ConstraintRun`（metadata + λ(t) 复合视图，派生 target/time series 走 `@property`）
+  - 电势：`PotentialFrame` / `CenterPotentialScalarFrame` / `FermiRecord`
+  - cell：`CellSpec`（3×3 矩阵 + `abc_ang` / `is_orthorhombic`）
+- `cp2k.py`：`CP2KParser`（Protocol 实现）+ 模块级 `read_*` 门面函数（`read_constraint_metadata` / `read_lambda_series` / `read_constraint_run` / `read_fermi_series` / `read_cell` / `read_continuous_potential_frames` / `read_distributed_potential_frames` 等）
+- `vasp.py`：`VASPParser` 占位类——实现 Protocol 形状但所有方法 raise `NotImplementedError`，不在默认注册表中（避免 `infer_parser` 静默分派到 stub）
+- 依赖方向：`engines` → `utils/{formats, constants, io}` + `exceptions`；禁止反向 import 业务包
 
 ### 2) `md_analysis.water`（多帧/水分析工作流）
 
@@ -147,8 +169,8 @@
   - `_charge.py`：电荷分析命令类（221-226）：`SurfaceChargeCmd`（通过 `method` 参数区分）、`SingleSideChargeCmd`、`TrackedChargeCmd`、`CounterionChargeCmd`、`_print_ensemble_summary()`
   - `_enhanced_sampling.py`：慢增长命令类（30=SG 301-302）：`SGQuickPlotCmd`、`SGPublicationPlotCmd`
   - `_constrained_ti.py`：约束 TI 命令类（31=TI 311-313）：`TISingleDiagCmd`、`TIFullAnalysisCmd`、`TIConstPotCorrectionCmd`
-  - `_scripts.py`：脚本/工具命令类（41=Bader 411-412，42=TI 421-422）：`BaderSingleCmd`、`BaderBatchCmd`、`TISingleCmd`、`TIBatchCmd`
-  - `_settings.py`：设置命令类（901-909）：`SetVaspScriptCmd`、`SetCp2kScriptCmd`、`ShowConfigCmd`、`SetAnalysisDefaultCmd`、`ResetDefaultsCmd`、`SetPotentialReferenceCmd`
+  - `_scripts.py`：脚本/工具命令类（41=Bader 411-412，42=TI 421-422，43=SP Potential 431-432，44=DeePMD SP 441-442）：`BaderSingleCmd`、`BaderBatchCmd`、`TISingleCmd`、`TIBatchCmd`、`PotentialSingleCmd`、`PotentialBatchCmd`、`SpGenSingleCmd`、`SpGenBatchCmd`
+  - `_settings.py`：设置命令类（900-931）：`SetVaspScriptCmd`、`SetCp2kScriptCmd`、`SetSpInpTemplateCmd`、`SetDpSpInpTemplateCmd`、`ShowConfigCmd`、`SetAnalysisDefaultCmd`、`ResetDefaultsCmd`、`SetPotentialReferenceCmd`
 
 ### 8) `md_analysis.enhanced_sampling`（增强抽样分析工作流）
 
@@ -168,7 +190,7 @@
 
 ### 9) `md_analysis.scripts`（自动化脚本工具）
 
-- `scripts/__init__.py`：re-exports `BaderGenError`, `generate_bader_workdir`, `batch_generate_bader_workdirs`, `TIGenError`, `generate_ti_workdir`, `batch_generate_ti_workdirs`
+- `scripts/__init__.py`：re-exports `BaderGenError`, `generate_bader_workdir`, `batch_generate_bader_workdirs`, `PotentialGenError`, `generate_potential_workdir`, `batch_generate_potential_workdirs`, `SpGenError`, `generate_sp_workdir`, `batch_generate_sp_workdirs`, `TIGenError`, `generate_ti_workdir`, `batch_generate_ti_workdirs`
 - `scripts/BaderGen.py`：从单帧 MD 结构生成 VASP Bader 工作目录（POSCAR + INCAR + KPOINTS + POTCAR + script.sh）
 - `scripts/template/`：VASP 模板文件（INCAR、KPOINTS），通过 `importlib.resources` 访问
 - `scripts/utils/IndexMapper.py`

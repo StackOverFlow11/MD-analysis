@@ -1,5 +1,15 @@
 # Phase 2 — 业务层数据需求 Catalog
 
+> ## 实施状态（2026-08-23 更新；agent 层已移除）
+>
+> 本文件为 **Phase 3 实施前的需求快照**。正文中对 `agent/` 层
+> （`agent/_tasks_legacy.py`、`agent/_tasks_ti.py` 等）的引用均为撰写时的代码快照：
+> 该模块已于 commit `21795d5`（2026-05-15）从 development 分支移除，agent 路线保留
+> 于 `development_agent` 分支，相关行号引用不再逐行更新。异常定义现状以
+> `src/md_analysis/exceptions.py`（`MDAnalysisError` 基类）及各模块自身的异常定义
+> （`utils/formats/bader/_errors.py`、`engines/protocols.py`、
+> `utils/formats/cp2k/colvar.py` 等）为准。
+
 > 用途：从顶层业务反推所需 engine-neutral 数据形态，作为 Phase 3 engines 数据接口设
 > 计的**单一输入源**。本文件不指定 Phase 3 的类名、字段名、facade 名，也不假设 VASP
 > 端能与 CP2K 单位无损对齐——只列出当前业务的实际消费证据与判断依据。

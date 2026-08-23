@@ -73,6 +73,8 @@ rsync -a MD-analysis/src MD-analysis/context4agent MD-analysis/docs \
 
 - `workflows` 先稳定。
 - `agent` 跟随 workflows。
+  （后续说明：agent 入口已在 Phase 7 收尾后从 development 分支移除，commit
+  `21795d5`，保留于 `development_agent` 分支。）
 - `cli` 最后迁移，只保留参数收集和 workflow 调用。
 
 ## Phase 7：文档与测试收尾

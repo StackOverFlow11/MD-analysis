@@ -171,9 +171,19 @@ batch_generate_bader_workdirs(
 ```
 src/md_analysis/
 ├── __init__.py             # re-exports sub-packages + MDAnalysisError; __version__ = "0.1.0"
-├── exceptions.py           # MDAnalysisError — base class for all 9 domain exceptions
+├── exceptions.py           # MDAnalysisError — base class for all 17 domain exceptions
 ├── config.py               # persistent user configuration (~/.config/md_analysis/)
 ├── main.py                 # programmatic entry points
+├── workflows/              # canonical programmatic entry facades — run_* return WorkflowResult
+│   ├── __init__.py         #   re-exports all run_* entry points by domain
+│   ├── models.py           #   WorkflowResult / MissingArtifactError / require_artifacts_exist
+│   ├── water.py            #   run_water_* entry points (density / orientation / three-panel)
+│   ├── potential.py        #   run_potential_* entry points (center / Fermi / U vs SHE / phi(z) / sweep)
+│   ├── charge.py           #   run_surface_charge / run_tracked_charge / run_counterion_charge
+│   ├── calibration.py      #   run_calibration_fit / run_calibration_predict
+│   ├── enhanced_sampling.py #   run_slowgrowth_* / run_ti_* entry points
+│   ├── scripts.py          #   run_bader_* / run_ti_* / run_potential_* / run_sp_* workdir generators
+│   └── composite.py        #   run_interface_analysis (composite: water three-panel + potential full)
 ├── cli/                    # VASPKIT-style interactive CLI (md-analysis console script)
 │   ├── __init__.py         #   main() entry point, banner, top menu, build_menu_tree()
 │   ├── _framework.py       #   MenuNode, MenuGroup, MenuCommand, lazy_import()
@@ -185,8 +195,8 @@ src/md_analysis/
 │   ├── _calibration.py     #   calibration sub-menu (231-233)
 │   ├── _enhanced_sampling.py #   slow-growth sub-menu (301-302)
 │   ├── _constrained_ti.py  #   constrained TI sub-menu (311-313)
-│   ├── _scripts.py         #   scripts/tools sub-menu (411-412, 421-422)
-│   └── _settings.py        #   settings sub-menu (901-909)
+│   ├── _scripts.py         #   scripts/tools sub-menu (411-412, 421-422, 431-432, 441-442)
+│   └── _settings.py        #   settings sub-menu (900-931)
 ├── utils/                  # single-frame low-level tools (split into 3 layers)
 │   ├── constants.py        #   physical constants, unit conversions, cSHE parameters, defaults
 │   ├── formats/            #   single-file parsers, grouped by engine family
@@ -243,6 +253,10 @@ src/md_analysis/
 └── scripts/                # automation scripts
     ├── BaderGen.py         #   VASP Bader work directory generation
     ├── TIGen.py            #   CP2K constrained-MD work directory generation
+    ├── PotentialGen.py     #   CP2K SP potential work directory generation (Hartree analysis)
+    ├── SpGen.py            #   CP2K SP work directory generation for DeePMD training data
+    ├── _frame_selector.py  #   private: shared frame selection for batch Gen scripts
+    ├── _inp_utils.py       #   private: shared CP2K inp text patching (modify_inp_for_sp)
     ├── template/           #   bundled VASP templates (INCAR, KPOINTS)
     └── utils/
         └── IndexMapper.py  #   CP2K XYZ <-> VASP POSCAR bijective index mapping
@@ -252,12 +266,16 @@ test/
 ├── unit/
 │   ├── utils/              # tests for formats.{common.cube, bader.{acf,potcar}, cp2k.{cell,colvar,stdout,xyz}}
 │   │                       #   + structure.{layer,water,cluster} + io._frame_discovery
+│   ├── engines/            # engines facade: parser registry, CP2K read_* contract tests
 │   ├── cli/                # MenuCommand error handling, settings defaults
 │   ├── calibration/        # CalibrationData, Mapper, reference conversion, workflow
 │   ├── charge/             # surface charge, atom charges, tracked charges
 │   ├── potential/          # single-frame electrode potential pipeline
 │   ├── scripts/            # BaderGen, TIGen, IndexMapper
 │   ├── enhanced_sampling/  # constrained_ti: ACF, block avg, correction, integration, I/O, workflow
+│   ├── workflows/          # run_* facades: WorkflowResult contract tests per domain
+│   ├── water/              # empty package placeholder (water tests live under integration/)
+│   ├── composite/          # empty package placeholder (composite tests live under workflows/)
 │   ├── test_config.py      # persistent user config
 │   └── test_logging_setup.py  # NullHandler / StreamHandler setup
 └── integration/
@@ -276,7 +294,10 @@ data_example/               # minimal reproducible input data
 │                           #   sub-directories with cube + sp.out
 ├── bader/                  #   bader_work_dir/ with POSCAR, ACF.dat, POTCAR
 ├── sg/                     #   COLVAR restart + LagrangeMultLog test data (4 scenarios)
-└── ti/                     #   8 ti_target_* constraint-point directories for TI regression tests
+├── ti/                     #   8 ti_target_* constraint-point directories for TI regression tests
+├── ti_with_correction/     #   9 ti_target_* dirs (restart + LagrangeMultLog + bader/) for TI correction tests
+├── calibration/            #   calibration (phi, sigma) CSV data + fitted JSON (counterion / layer)
+└── water/                  #   md-pos-1.xyz + md.inp for water analysis
 context4agent/              # architecture contracts, decisions, requirements
 ```
 
