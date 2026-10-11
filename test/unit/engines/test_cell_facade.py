@@ -112,9 +112,13 @@ class TestReadCellFromMdInp:
     def test_md_inp_orthogonal(self, tmp_path: Path) -> None:
         md_inp = tmp_path / "md.inp"
         md_inp.write_text(
-            "&CELL\n"
-            "  ABC [angstrom] 12.5 12.5 28.0\n"
-            "&END CELL\n",
+            "&FORCE_EVAL\n"
+            "  &SUBSYS\n"
+            "    &CELL\n"
+            "      ABC [angstrom] 12.5 12.5 28.0\n"
+            "    &END CELL\n"
+            "  &END SUBSYS\n"
+            "&END FORCE_EVAL\n",
             encoding="utf-8",
         )
         spec = read_cell(md_inp)

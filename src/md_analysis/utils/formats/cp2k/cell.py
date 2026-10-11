@@ -1,22 +1,26 @@
-"""Parse cell parameters from CP2K input and restart files."""
+"""Parse cell parameters from CP2K input and restart files.
+
+Both entry points parse the file with :func:`.inp.parse_inp` (cit tree,
+see :mod:`.inp` for tree conventions) and read the tree:
+
+- ``.restart`` / vector-form inputs: ``cell.{a,b,c}`` vectors, diagonal
+  elements, with the orthogonality validation in
+  :func:`_abc_ang_from_cell_tree` (shared with ``colvar.py``).
+- ``md.inp`` / ABC-form inputs: ``cell.abc`` scalars.  cit converts any
+  explicit unit token to the XML default unit (angstrom for ``ABC``), so
+  ``ABC [bohr]``-style lines are handled correctly too (superset of the
+  legacy regex, which only matched ``ABC [angstrom]``).
+
+Legacy error messages are preserved verbatim for the "parsed but the tree
+lacks the block" scenarios; files that fail to parse raise
+:class:`.inp.InpParseError` (with cit line information) instead.
+"""
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
-_CELL_BLOCK_RE = re.compile(
-    r"&CELL\s*\n(.*?)&END\s+CELL", re.DOTALL | re.IGNORECASE,
-)
-_VECTOR_RE = re.compile(
-    r"^\s*(A|B|C)\s+([0-9.eE+-]+)\s+([0-9.eE+-]+)\s+([0-9.eE+-]+)",
-    re.MULTILINE | re.IGNORECASE,
-)
-_ABC_RE = re.compile(
-    r"^\s*ABC\s+\[angstrom\]\s+([0-9.eE+-]+)\s+([0-9.eE+-]+)\s+([0-9.eE+-]+)\s*$",
-    re.MULTILINE,
-)
-
+from .inp import get_keyword, get_section, parse_inp
 
 from ....exceptions import MDAnalysisError
 
@@ -25,12 +29,78 @@ class CellParseError(MDAnalysisError):
     """Raised when parsing cell parameters from a CP2K file fails."""
 
 
+def _abc_ang_from_cell_tree(
+    tree: dict,
+    src_path: str | Path,
+) -> tuple[float, float, float]:
+    """Extract orthogonal cell lengths from the ``&CELL`` vectors of a tree.
+
+    Reads the ``force_eval.subsys.cell.{a,b,c}`` vectors (angstrom
+    semantics in cit trees, both for ``.inp`` and ``.restart`` files),
+    takes their diagonal elements and validates orthogonality
+    (off-diagonal tolerance 1e-6).  Shared by the restart and colvar
+    read paths so the orthogonality policy is identical everywhere.
+
+    Parameters
+    ----------
+    tree : dict
+        A cit simplified tree (see :func:`.inp.parse_inp`).
+    src_path : str or Path
+        Path interpolated into the error messages.
+
+    Returns
+    -------
+    tuple[float, float, float]
+        ``(a, b, c)`` cell lengths in angstrom.
+
+    Raises
+    ------
+    CellParseError
+        If the cell section is not found, any A/B/C vector is missing,
+        or the cell is not orthogonal.
+    """
+    try:
+        cell = get_section(tree, "force_eval.subsys.cell")
+    except KeyError:
+        raise CellParseError(
+            f"No &CELL ... &END CELL block found in {src_path}"
+        ) from None
+    if not isinstance(cell, dict):
+        raise CellParseError(
+            f"No &CELL ... &END CELL block found in {src_path}"
+        )
+
+    vectors: dict[str, tuple[float, float, float]] = {}
+    for label in ("a", "b", "c"):
+        vec = cell.get(label)
+        if not (isinstance(vec, (tuple, list)) and len(vec) == 3):
+            raise CellParseError(
+                f"Vector {label.upper()} not found in &CELL block of {src_path}"
+            )
+        vectors[label.upper()] = (float(vec[0]), float(vec[1]), float(vec[2]))
+
+    # Validate orthogonality: off-diagonal elements must be negligible.
+    tol = 1e-6
+    ax, ay, az = vectors["A"]
+    bx, by, bz = vectors["B"]
+    cx, cy, cz = vectors["C"]
+    off_diag = [ay, az, bx, bz, cx, cy]
+    if any(abs(v) > tol for v in off_diag):
+        raise CellParseError(
+            f"Non-orthogonal cell detected in {src_path}. "
+            f"Off-diagonal elements: A=({ay}, {az}), B=({bx}, {bz}), C=({cx}, {cy})"
+        )
+
+    return (ax, by, cz)
+
+
 def parse_abc_from_restart(
     restart_path: str | Path,
 ) -> tuple[float, float, float]:
     """Parse orthogonal cell lengths (A) from a CP2K .restart file.
 
-    Reads the ``&CELL`` section, extracts diagonal elements of A/B/C vectors.
+    Parses the file into a cit tree, reads the ``&CELL`` section and
+    extracts the diagonal elements of the A/B/C vectors (angstrom).
     Raises :class:`CellParseError` if the cell block is not found, any
     vector is missing, or the cell is not orthogonal.
 
@@ -44,39 +114,8 @@ def parse_abc_from_restart(
     tuple[float, float, float]
         ``(a, b, c)`` cell lengths in angstrom.
     """
-    text = Path(restart_path).read_text(encoding="utf-8")
-
-    match = _CELL_BLOCK_RE.search(text)
-    if match is None:
-        raise CellParseError(
-            f"No &CELL ... &END CELL block found in {restart_path}"
-        )
-    cell_block = match.group(1)
-
-    vectors: dict[str, tuple[float, float, float]] = {}
-    for m in _VECTOR_RE.finditer(cell_block):
-        label = m.group(1).upper()
-        vectors[label] = (float(m.group(2)), float(m.group(3)), float(m.group(4)))
-
-    for label in ("A", "B", "C"):
-        if label not in vectors:
-            raise CellParseError(
-                f"Vector {label} not found in &CELL block of {restart_path}"
-            )
-
-    # Validate orthogonality: off-diagonal elements must be negligible.
-    tol = 1e-6
-    ax, ay, az = vectors["A"]
-    bx, by, bz = vectors["B"]
-    cx, cy, cz = vectors["C"]
-    off_diag = [ay, az, bx, bz, cx, cy]
-    if any(abs(v) > tol for v in off_diag):
-        raise CellParseError(
-            f"Non-orthogonal cell detected in {restart_path}. "
-            f"Off-diagonal elements: A=({ay}, {az}), B=({bx}, {bz}), C=({cx}, {cy})"
-        )
-
-    return (ax, by, cz)
+    tree = parse_inp(restart_path)
+    return _abc_ang_from_cell_tree(tree, restart_path)
 
 
 def parse_abc_from_md_inp(
@@ -84,7 +123,11 @@ def parse_abc_from_md_inp(
 ) -> tuple[float, float, float]:
     """Parse orthogonal cell lengths (A) from a CP2K md.inp file.
 
-    Looks for an ``ABC [angstrom] a b c`` line in the input file.
+    Parses the file into a cit tree and reads
+    ``force_eval.subsys.cell.abc``.  Any explicit unit token on the
+    ``ABC`` line is converted by cit to the default unit (angstrom), so
+    ``ABC [angstrom]``, ``ABC [bohr]`` and bare values all yield the
+    angstrom triple.
 
     Parameters
     ----------
@@ -99,13 +142,15 @@ def parse_abc_from_md_inp(
     Raises
     ------
     CellParseError
-        If the ``ABC [angstrom] ...`` line is not found.
+        If the ``ABC ...`` line is not found in the ``&CELL`` block.
     """
     md_inp_path = Path(md_inp_path)
-    text = md_inp_path.read_text(encoding="utf-8")
-    match = _ABC_RE.search(text)
-    if not match:
+    tree = parse_inp(md_inp_path)
+    try:
+        abc = get_keyword(tree, "force_eval.subsys.cell.abc")
+    except KeyError:
         raise CellParseError(
             f"Cannot find `ABC [angstrom] ...` in {md_inp_path}"
-        )
-    return float(match.group(1)), float(match.group(2)), float(match.group(3))
+        ) from None
+    a, b, c = abc
+    return float(a), float(b), float(c)

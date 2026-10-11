@@ -1,4 +1,4 @@
-"""Tests for ``md_analysis.utils.formats.cp2k.inp`` (refactor step 1).
+"""Tests for ``md_analysis.utils.formats.cp2k.inp`` (refactor steps 1-2).
 
 Anchor groups follow the refactor plan §4 (step-1 group): preprocessing
 workarounds (W3/W1/W2), lazy singletons, xmlspec pass-through, exception
@@ -6,6 +6,11 @@ wrapping, two-form section normalisation, W1 x line-continuation, W2 unit
 anchors, W3 case-insensitivity, comment cleaning, stabilise/self-check,
 alias normalisation, ``@`` directive gate, value types and the
 ``set_cell_abc`` vector-form no-op.
+
+Step-2 group (see §4 / §3.2): CELL ``ABC`` unit three-form anchors,
+``cell._abc_ang_from_cell_tree`` vector-form anchors, and the md_inp
+fourth-message anchor (GLOBAL-only fixture, migrated verbatim from
+``test_cell_parser.py``).
 
 Real-data anchors use ``data_example/sg/distance_combinedCV`` (kept
 untouched); all synthetic anchors are inline strings, so no synthetic data
@@ -22,6 +27,11 @@ from pathlib import Path
 import pytest
 
 from md_analysis.utils.formats.cp2k import inp as inp_module
+from md_analysis.utils.formats.cp2k.cell import (
+    CellParseError,
+    _abc_ang_from_cell_tree,
+    parse_abc_from_md_inp,
+)
 from md_analysis.utils.formats.cp2k.inp import (
     InpGenerateError,
     InpParseError,
@@ -522,3 +532,111 @@ class TestSetCellAbc:
             set_cell_abc(tree, 11.0, 12.0, 13.0)
         assert any("ABC" in record.message for record in caplog.records)
         assert tree == {"global": {"project_name": "x"}}
+
+
+# ---------------------------------------------------------------------------
+# Step-2 anchors: cell.py on the cit tree path (plan §4 / §3.2)
+# ---------------------------------------------------------------------------
+
+
+def _cell_inp_text(cell_line: str) -> str:
+    """Minimal FORCE_EVAL/SUBSYS/CELL input carrying one *cell_line*."""
+    return (
+        "&FORCE_EVAL\n"
+        "  &SUBSYS\n"
+        "    &CELL\n"
+        f"      {cell_line}\n"
+        "    &END CELL\n"
+        "  &END SUBSYS\n"
+        "&END FORCE_EVAL\n"
+    )
+
+
+def _abc_of(cell_line: str) -> tuple:
+    tree = parse_inp(_cell_inp_text(cell_line))
+    return get_keyword(tree, "force_eval.subsys.cell.abc")
+
+
+class TestCellAbcUnitForms:
+    """Step 2: CELL ``ABC`` lands on the same angstrom triple for the
+    ``[angstrom]`` / ``[bohr]`` / bare-token forms (the XML default unit of
+    ``ABC`` is angstrom; cit converts any explicit unit token)."""
+
+    EXPECTED = (10.2239, 10.2239, 26.422)
+
+    def test_angstrom_token(self):
+        abc = _abc_of("ABC [angstrom] 10.2239 10.2239 26.422")
+        assert abc == pytest.approx(self.EXPECTED, rel=1e-12)
+
+    def test_bare_token_defaults_to_angstrom(self):
+        abc = _abc_of("ABC 10.2239 10.2239 26.422")
+        assert abc == pytest.approx(self.EXPECTED, rel=1e-12)
+
+    def test_bohr_token_converted_to_same_values(self):
+        # bohr values = EXPECTED / 0.5291772109039775 (cit bohr->angstrom),
+        # full float precision so the round-trip is exact to rel=1e-12.
+        abc = _abc_of("ABC [bohr] 19.320370925525722 19.320370925525722 49.930343664769865")
+        assert abc == pytest.approx(self.EXPECTED, rel=1e-12)
+
+
+class TestAbcAngFromCellTree:
+    """Step 2: ``_abc_ang_from_cell_tree`` takes ``cell.{a,b,c}`` vector
+    diagonals (restart-style tree, no ``abc`` keyword), keeps the
+    orthogonality policy (off-diagonal tolerance 1e-6) and the legacy
+    error messages (end-to-end coverage lives in test_cell_parser.py)."""
+
+    @staticmethod
+    def _tree(**overrides) -> dict:
+        cell = {
+            "a": (10.2239, 0.0, 0.0),
+            "b": (0.0, 10.2239, 0.0),
+            "c": (0.0, 0.0, 26.422),
+        }
+        cell.update(overrides)
+        return {"force_eval": {"subsys": {"cell": cell}}}
+
+    def test_parsed_vector_form_tree_diagonals(self):
+        text = (
+            "&FORCE_EVAL\n  &SUBSYS\n    &CELL\n"
+            "      A  10.2239   0.0    0.0\n"
+            "      B   0.0   10.2239   0.0\n"
+            "      C   0.0     0.0   26.422\n"
+            "    &END CELL\n  &END SUBSYS\n&END FORCE_EVAL\n"
+        )
+        tree = parse_inp(text)
+        assert "abc" not in tree["force_eval"]["subsys"]["cell"]  # vector form
+        assert _abc_ang_from_cell_tree(tree, "x.restart") == (
+            10.2239, 10.2239, 26.422,
+        )
+
+    def test_off_diagonal_below_tolerance_passes(self):
+        tree = self._tree(b=(1e-9, 10.2239, 0.0))
+        assert _abc_ang_from_cell_tree(tree, "x.restart") == (
+            10.2239, 10.2239, 26.422,
+        )
+
+    def test_missing_cell_section_raises(self):
+        with pytest.raises(CellParseError, match="No &CELL"):
+            _abc_ang_from_cell_tree({"global": {}}, "x.restart")
+
+    def test_missing_vector_raises(self):
+        tree = {"force_eval": {"subsys": {"cell": {"a": (1, 0, 0), "b": (0, 1, 0)}}}}
+        with pytest.raises(CellParseError, match="Vector C not found"):
+            _abc_ang_from_cell_tree(tree, "x.restart")
+
+    def test_non_orthogonal_raises(self):
+        tree = self._tree(a=(10.0, 5.0, 0.0))
+        with pytest.raises(CellParseError, match="Non-orthogonal"):
+            _abc_ang_from_cell_tree(tree, "x.restart")
+
+
+class TestMdInpMissingAbc:
+    """Step 2: md_inp fourth message — parse succeeds but the tree lacks
+    ``force_eval.subsys.cell.abc`` (GLOBAL-only fixture needs no
+    legalisation; migrated verbatim from test_cell_parser.py)."""
+
+    def test_global_only_inp_raises_cannot_find(self, tmp_path):
+        f = tmp_path / "bad.inp"
+        f.write_text("&GLOBAL\n  PROJECT test\n&END GLOBAL\n", encoding="utf-8")
+        with pytest.raises(CellParseError, match="Cannot find"):
+            parse_abc_from_md_inp(f)
