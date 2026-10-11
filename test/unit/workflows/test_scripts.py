@@ -90,8 +90,24 @@ def _write_slab_xyz(xyz_path: Path, n_frames: int = 3) -> None:
 
 
 def _minimal_sp_template() -> str:
+    """Minimal CP2K sp.inp satisfying the potential-SP hard requirements.
+
+    Carries ``&SMEAR`` / ``&V_HARTREE_CUBE`` plus a ``&KIND H`` block so it
+    passes PotentialGen's user-template validation for the H2 fixture
+    (SpGen does not validate and treats these sections as inert text).
+    """
     return (
         "&FORCE_EVAL\n"
+        "  &DFT\n"
+        "    &SCF\n"
+        "      &SMEAR ON\n"
+        "      &END SMEAR\n"
+        "    &END SCF\n"
+        "    &PRINT\n"
+        "      &V_HARTREE_CUBE ON\n"
+        "      &END V_HARTREE_CUBE\n"
+        "    &END PRINT\n"
+        "  &END DFT\n"
         "  &SUBSYS\n"
         "    &CELL\n"
         "      ABC 1.0 1.0 1.0\n"
@@ -100,6 +116,10 @@ def _minimal_sp_template() -> str:
         "      COORD_FILE_NAME init.xyz\n"
         "      COORD_FILE_FORMAT XYZ\n"
         "    &END TOPOLOGY\n"
+        "    &KIND H\n"
+        "      BASIS_SET DZVP-MOLOPT-SR-GTH\n"
+        "      POTENTIAL GTH-PBE\n"
+        "    &END KIND\n"
         "  &END SUBSYS\n"
         "&END FORCE_EVAL\n"
     )
