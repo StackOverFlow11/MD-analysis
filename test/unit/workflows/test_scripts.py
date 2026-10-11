@@ -402,7 +402,7 @@ class TestRunTiBatch:
 
 class TestRunPotentialSingle:
     def test_creates_workdir(
-        self, h2_xyz: Path, sp_inp: Path, tmp_path: Path
+        self, h2_xyz: Path, sp_inp: Path, tmp_path: Path, assert_inp_tree
     ) -> None:
         result = run_potential_single(
             xyz_path=h2_xyz,
@@ -417,6 +417,47 @@ class TestRunPotentialSingle:
         assert (workdir / "sp.inp").is_file()
         assert (workdir / "init.xyz").is_file()
         assert result.metadata["inp_template_path_resolved_from"] == "argument"
+        # Incremental tree assertions (refactor step 5): the user
+        # template's &KIND H block survives and the SP edits landed.
+        assert_inp_tree(
+            (workdir / "sp.inp").read_text(encoding="utf-8"),
+            {
+                "force_eval.subsys.cell.abc": (5.0, 5.0, 5.0),
+                "force_eval.subsys.topology.coord_file_name": "init.xyz",
+                "force_eval.subsys.topology.coord_file_format": "xyz",
+                "force_eval.subsys.kind.H.basis_set": "DZVP-MOLOPT-SR-GTH",
+                "force_eval.subsys.kind.H.potential": "GTH-PBE",
+            },
+        )
+
+    def test_builtin_default_template_upserts_kind_blocks(
+        self, h2_xyz: Path, tmp_path: Path, monkeypatch, assert_inp_tree
+    ) -> None:
+        """Level-3 fallback: no template argument/config -> the legalised
+        built-in template is parsed and &KIND blocks are upserted from the
+        frame elements (refactor step 5 template legalisation + tree
+        insertion)."""
+        monkeypatch.setattr(
+            "md_analysis.scripts.PotentialGen.get_config", lambda *a, **kw: None,
+        )
+        result = run_potential_single(
+            xyz_path=h2_xyz,
+            output_dir=tmp_path / "out",
+            cell_abc=(5.0, 5.0, 5.0),
+        )
+        assert result.metadata["inp_template_path_resolved_from"] == (
+            "config_or_default"
+        )
+        workdir = result.artifacts["workdir"]
+        assert_inp_tree(
+            (workdir / "sp.inp").read_text(encoding="utf-8"),
+            {
+                "force_eval.subsys.kind.H.basis_set": "DZVP-MOLOPT-SR-GTH",
+                "force_eval.subsys.kind.H.potential": "GTH-PBE",
+                "force_eval.subsys.cell.abc": (5.0, 5.0, 5.0),
+                "force_eval.subsys.topology.coord_file_name": "init.xyz",
+            },
+        )
 
 
 class TestRunPotentialBatch:
@@ -448,7 +489,7 @@ class TestRunPotentialBatch:
 
 class TestRunSpSingle:
     def test_creates_workdir(
-        self, h2_xyz: Path, sp_inp: Path, tmp_path: Path
+        self, h2_xyz: Path, sp_inp: Path, tmp_path: Path, assert_inp_tree
     ) -> None:
         result = run_sp_single(
             xyz_path=h2_xyz,
@@ -463,6 +504,14 @@ class TestRunSpSingle:
         assert workdir.is_dir()
         assert (workdir / "init.xyz").is_file()
         assert (workdir / "sp.inp").is_file()
+        # Incremental tree assertions (refactor step 5).
+        assert_inp_tree(
+            (workdir / "sp.inp").read_text(encoding="utf-8"),
+            {
+                "force_eval.subsys.cell.abc": (5.0, 5.0, 5.0),
+                "force_eval.subsys.topology.coord_file_name": "init.xyz",
+            },
+        )
 
 
 class TestRunSpBatch:

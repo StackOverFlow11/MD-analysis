@@ -12,14 +12,49 @@ from ase.io import write
 
 from ..config import KEY_CP2K_SCRIPT_PATH, KEY_DP_SP_INP_TEMPLATE_PATH, get_config
 from ..exceptions import MDAnalysisError
+from ..utils.formats.cp2k.inp import (
+    InpParseError,
+    generate_inp,
+    parse_inp,
+    set_cell_abc,
+)
 from ._frame_selector import FrameSelection, iter_selected_frames
-from ._inp_utils import modify_inp_for_sp
+from ._inp_tree_edit import ensure_topology_init_xyz
 
 logger = logging.getLogger(__name__)
 
 
 class SpGenError(MDAnalysisError):
     """Raised when SP work directory generation fails."""
+
+
+# ---------------------------------------------------------------------------
+# Template rendering: parse once -> tree edit -> generate once
+# ---------------------------------------------------------------------------
+
+
+def _render_sp_inp(
+    inp_template_path: Path,
+    cell_abc: tuple[float, float, float],
+) -> str:
+    """Parse the SP template, apply the frame-independent edits, generate.
+
+    The edits (``&CELL ABC`` update + ``&TOPOLOGY`` → ``init.xyz``) do
+    not depend on the frame, so batch callers reuse the returned text
+    for every work directory (parse-once / generate-once discipline,
+    refactor plan §3.3).  A template that cannot be parsed raises
+    :class:`SpGenError` (with the template path, cause preserved);
+    generate-side failures propagate untouched (programming errors).
+    """
+    try:
+        tree = parse_inp(inp_template_path)
+    except InpParseError as e:
+        raise SpGenError(
+            f"Cannot parse DP SP inp template {inp_template_path}: {e}"
+        ) from e
+    set_cell_abc(tree, *cell_abc)
+    ensure_topology_init_xyz(tree)
+    return generate_inp(tree)
 
 
 # ---------------------------------------------------------------------------
@@ -99,8 +134,7 @@ def generate_sp_workdir(
     write(str(workdir / "init.xyz"), atoms, format="xyz")
 
     # 2. Modify and write sp.inp
-    inp_text = inp_template_path.read_text(encoding="utf-8")
-    modified = modify_inp_for_sp(inp_text, cell_abc)
+    modified = _render_sp_inp(inp_template_path, cell_abc)
     (workdir / "sp.inp").write_text(modified, encoding="utf-8")
 
     # 3. Submission script
@@ -184,8 +218,7 @@ def batch_generate_sp_workdirs(
     if not inp_template_path.is_file():
         raise FileNotFoundError(f"DP SP inp template not found: {inp_template_path}")
 
-    inp_text = inp_template_path.read_text(encoding="utf-8")
-    modified_inp = modify_inp_for_sp(inp_text, cell_abc)
+    modified_inp = _render_sp_inp(inp_template_path, cell_abc)
 
     # Resolve script path once
     if script_path is None:
@@ -363,9 +396,9 @@ def generate_sp_batch_with_report(
             f"cell_abc components must be positive, got {cell}"
         )
 
-    # 5. Pre-modify sp.inp text once (cell substitution shared across frames).
-    inp_text = tmpl.read_text(encoding="utf-8")
-    modified_inp = modify_inp_for_sp(inp_text, cell)
+    # 5. Parse template + tree edits + generate once (frame-independent:
+    #    cell substitution shared across frames).
+    modified_inp = _render_sp_inp(tmpl, cell)
 
     # 6. Collect frames separately to build report metadata without
     #    reparsing directory names.

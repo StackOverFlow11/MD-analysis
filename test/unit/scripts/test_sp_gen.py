@@ -33,7 +33,7 @@ def _write_trajectory(xyz_path: Path, n_frames: int = 3) -> None:
 
 
 def _minimal_sp_template() -> str:
-    """Minimum CP2K sp.inp the modify_inp_for_sp helper will accept."""
+    """Minimum legal CP2K sp.inp for the SP tree-edit pipeline."""
     return (
         "&FORCE_EVAL\n"
         "  &SUBSYS\n"
@@ -65,7 +65,7 @@ def sp_fixture(tmp_path):
 
 
 class TestGenerateSpBatchWithReport:
-    def test_success_path_writes_expected_files(self, sp_fixture):
+    def test_success_path_writes_expected_files(self, sp_fixture, assert_inp_tree):
         r = generate_sp_batch_with_report(
             xyz_path=sp_fixture["xyz"],
             cell_abc=(5.0, 5.0, 10.0),
@@ -78,6 +78,47 @@ class TestGenerateSpBatchWithReport:
         for wd in r.workdirs:
             assert (wd / "init.xyz").is_file()
             assert (wd / "sp.inp").is_file()
+        # Incremental tree assertions (refactor step 5): the generated
+        # sp.inp carries the requested cell and points at init.xyz.
+        assert_inp_tree(
+            (r.workdirs[0] / "sp.inp").read_text(encoding="utf-8"),
+            {
+                "force_eval.subsys.cell.abc": (5.0, 5.0, 10.0),
+                "force_eval.subsys.topology.coord_file_name": "init.xyz",
+                "force_eval.subsys.topology.coord_file_format": "xyz",
+            },
+        )
+
+    def test_template_without_topology_gets_one_created(
+        self, sp_fixture, assert_inp_tree
+    ):
+        """Tree-edit semantics (step 5): a template without &TOPOLOGY
+        gets the section created (logger.info) instead of the legacy
+        silent no-op."""
+        tmpl = sp_fixture["tmp"] / "no_topo.inp"
+        tmpl.write_text(
+            "&FORCE_EVAL\n"
+            "  &SUBSYS\n"
+            "    &CELL\n"
+            "      ABC 1.0 1.0 1.0\n"
+            "    &END CELL\n"
+            "  &END SUBSYS\n"
+            "&END FORCE_EVAL\n",
+            encoding="utf-8",
+        )
+        r = generate_sp_batch_with_report(
+            xyz_path=sp_fixture["xyz"],
+            cell_abc=(5.0, 5.0, 10.0),
+            output_dir=sp_fixture["outdir"],
+            inp_template_path=tmpl,
+        )
+        assert_inp_tree(
+            (r.workdirs[0] / "sp.inp").read_text(encoding="utf-8"),
+            {
+                "force_eval.subsys.topology.coord_file_name": "init.xyz",
+                "force_eval.subsys.topology.coord_file_format": "xyz",
+            },
+        )
 
     def test_report_to_dict_is_json_serializable(self, sp_fixture):
         r = generate_sp_batch_with_report(

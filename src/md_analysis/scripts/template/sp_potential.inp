@@ -2,9 +2,9 @@
 ! Physics baseline: validated sp.inp from data_example/potential/distributed/
 ! (PBE + DFTD3, GTH-PBE pseudopotentials, DZVP-MOLOPT-SR-GTH basis, metallic
 ! smearing for the Fermi energy, &V_HARTREE_CUBE for the Hartree cube).
-! The &KIND blocks below the placeholder are generated per frame from the
-! element composition (BASIS_SET DZVP-MOLOPT-SR-GTH + POTENTIAL GTH-PBE for
-! every element; GTH_POTENTIALS / BASIS_MOLOPT are provided by CP2K at runtime).
+! The &KIND blocks are inserted per frame (tree edit) from the element
+! composition (BASIS_SET DZVP-MOLOPT-SR-GTH + POTENTIAL GTH-PBE for every
+! element; GTH_POTENTIALS / BASIS_MOLOPT are provided by CP2K at runtime).
 ! &CELL ABC is replaced with the frame cell; &TOPOLOGY is pointed at init.xyz.
 &GLOBAL
   PROJECT sp_potential
@@ -115,8 +115,6 @@
       COORD_FILE_NAME init.xyz
       COORD_FILE_FORMAT xyz
     &END TOPOLOGY
-
-{{KIND_BLOCKS}}
   &END SUBSYS
 
   &PRINT

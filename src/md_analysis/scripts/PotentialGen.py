@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import shutil
+from importlib.resources import files
 from pathlib import Path
 from typing import Iterable
 
@@ -12,13 +13,19 @@ from ase.io import write
 
 from ..config import KEY_CP2K_SCRIPT_PATH, KEY_SP_INP_TEMPLATE_PATH, get_config
 from ..exceptions import MDAnalysisError
+from ..utils.formats.cp2k.inp import (
+    InpParseError,
+    generate_inp,
+    parse_inp,
+    set_cell_abc,
+)
 from ._frame_selector import FrameSelection, iter_selected_frames
-from ._inp_utils import modify_inp_for_sp
+from ._inp_tree_edit import ensure_kind_blocks, ensure_topology_init_xyz
 from ._potential_template import (
+    DEFAULT_TEMPLATE_RESOURCE,
     extract_kind_elements,
     has_smear,
     has_v_hartree_cube,
-    render_default_potential_inp,
 )
 
 logger = logging.getLogger(__name__)
@@ -54,12 +61,12 @@ def _resolve_inp_template_path(
 
 
 def _validate_user_inp_template(
-    inp_text: str,
+    tree: dict,
     elements: tuple[str, ...],
     *,
     source: str,
 ) -> None:
-    """Validate a user-supplied template against the potential-SP hard requirements.
+    """Validate a user-supplied template tree against the potential-SP hard requirements.
 
     Checked (see ``context4agent/requirements/vasp_md_to_cp2k_potential_sp.md``):
 
@@ -74,14 +81,14 @@ def _validate_user_inp_template(
     generated from the element list and it ships both required sections.
     """
     problems: list[str] = []
-    if not has_v_hartree_cube(inp_text):
+    if not has_v_hartree_cube(tree):
         problems.append(
             "missing '&V_HARTREE_CUBE' in &DFT &PRINT — the potential "
             "analysis (phi(z) / PZC) reads the Hartree cube this print "
             "produces; without it the SP run yields no cube. Add "
             "'&V_HARTREE_CUBE ON' under &DFT &PRINT."
         )
-    if not has_smear(inp_text):
+    if not has_smear(tree):
         problems.append(
             "missing '&SMEAR' in &SCF — metallic systems need smeared "
             "occupations to converge and to print the Fermi energy used by "
@@ -89,7 +96,7 @@ def _validate_user_inp_template(
             "'METHOD FERMI_DIRAC' under &SCF (with diagonalization, cf. "
             "ADDED_MOS / CHOLESKY)."
         )
-    kind_elements = extract_kind_elements(inp_text)
+    kind_elements = extract_kind_elements(tree)
     missing = [el for el in elements if el.upper() not in kind_elements]
     if missing:
         problems.append(
@@ -106,15 +113,18 @@ def _validate_user_inp_template(
         )
 
 
-def _load_inp_template_text(
+def _load_inp_template_tree(
     template_path: Path | None,
     elements: tuple[str, ...],
-) -> str:
-    """Load the sp.inp template text (level 3 fallback: built-in default).
+) -> dict:
+    """Load the sp.inp template as a cit tree (level 3 fallback: built-in default).
 
-    User templates (explicit argument or config) are validated against the
-    potential-SP hard requirements; the built-in template instead gets its
-    ``&KIND`` blocks rendered from *elements* (full coverage by construction).
+    User templates (explicit argument or config) are parsed and validated
+    against the potential-SP hard requirements; the built-in template
+    instead gets its ``&KIND`` blocks upserted from *elements* (full
+    coverage by construction).  Templates that cannot be parsed raise
+    :class:`PotentialGenError` with the template path (cause preserved);
+    generate-side failures propagate untouched (programming errors).
     """
     if template_path is None:
         logger.info(
@@ -122,10 +132,42 @@ def _load_inp_template_text(
             "default potential template (elements: %s)",
             ", ".join(elements) or "<none>",
         )
-        return render_default_potential_inp(elements)
-    inp_text = template_path.read_text(encoding="utf-8")
-    _validate_user_inp_template(inp_text, elements, source=str(template_path))
-    return inp_text
+        resource = files("md_analysis.scripts.template").joinpath(
+            DEFAULT_TEMPLATE_RESOURCE
+        )
+        text = resource.read_text(encoding="utf-8")
+        try:
+            tree = parse_inp(text)
+        except InpParseError as e:
+            raise PotentialGenError(
+                f"Cannot parse built-in potential template "
+                f"md_analysis.scripts.template/{DEFAULT_TEMPLATE_RESOURCE}: {e}"
+            ) from e
+        ensure_kind_blocks(tree, elements)
+        return tree
+    try:
+        tree = parse_inp(template_path)
+    except InpParseError as e:
+        raise PotentialGenError(
+            f"Cannot parse SP inp template {template_path}: {e}"
+        ) from e
+    _validate_user_inp_template(tree, elements, source=str(template_path))
+    return tree
+
+
+def _apply_sp_edits_and_generate(
+    tree: dict,
+    cell_abc: tuple[float, float, float],
+) -> str:
+    """Apply the frame-independent SP edits and generate the sp.inp text once.
+
+    ``&CELL ABC`` update + ``&TOPOLOGY`` → ``init.xyz`` do not depend on
+    the frame, so batch callers reuse the returned text for every work
+    directory (parse-once / generate-once discipline, refactor plan §3.3).
+    """
+    set_cell_abc(tree, *cell_abc)
+    ensure_topology_init_xyz(tree)
+    return generate_inp(tree)
 
 
 def _unique_elements(atoms_iterable: Iterable[Atoms]) -> tuple[str, ...]:
@@ -193,9 +235,9 @@ def generate_potential_workdir(
     logger.info("Generating potential workdir: frame=%d, workdir=%s", frame, workdir_name)
 
     # Resolve inp template: explicit argument > config > built-in default
-    # (validated before any directory is created)
+    # (parsed/validated before any directory is created)
     template_path = _resolve_inp_template_path(inp_template_path)
-    inp_text = _load_inp_template_text(template_path, _unique_elements([atoms]))
+    inp_tree = _load_inp_template_tree(template_path, _unique_elements([atoms]))
 
     # Resolve cell
     if cell_abc is None:
@@ -209,7 +251,7 @@ def generate_potential_workdir(
     write(str(workdir / "init.xyz"), atoms, format="xyz")
 
     # 2. Modify and write sp.inp
-    modified = modify_inp_for_sp(inp_text, cell_abc)
+    modified = _apply_sp_edits_and_generate(inp_tree, cell_abc)
     (workdir / "sp.inp").write_text(modified, encoding="utf-8")
 
     # 3. Submission script
@@ -319,11 +361,12 @@ def batch_generate_potential_workdirs(
 
     logger.info("Batch potential: %d frames from %s", len(frames), xyz_path)
 
-    # Load and modify the inp template once (cell substitution shared across
-    # frames; &KIND blocks / coverage validation driven by the frame elements)
+    # Load and modify the inp template once (parse + tree edits + generate
+    # shared across frames; &KIND blocks / coverage validation driven by
+    # the frame elements)
     elements = _unique_elements(atoms for _, atoms in frames)
-    inp_text = _load_inp_template_text(template_path, elements)
-    modified_inp = modify_inp_for_sp(inp_text, cell_abc)
+    inp_tree = _load_inp_template_tree(template_path, elements)
+    modified_inp = _apply_sp_edits_and_generate(inp_tree, cell_abc)
 
     iterator: list[tuple[int, Atoms]] | object = frames
     if verbose:

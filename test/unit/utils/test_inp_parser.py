@@ -1,4 +1,4 @@
-"""Tests for ``md_analysis.utils.formats.cp2k.inp`` (refactor steps 1-3).
+"""Tests for ``md_analysis.utils.formats.cp2k.inp`` (refactor steps 1-3, 5).
 
 Anchor groups follow the refactor plan §4 (step-1 group): preprocessing
 workarounds (W3/W1/W2), lazy singletons, xmlspec pass-through, exception
@@ -19,6 +19,10 @@ sorted-tuple anchor through ``parse_colvar_restart``, and the
 non-orthogonal dual-path anchor (``parse_abc_from_restart`` and
 ``parse_colvar_restart`` on the same fixture).
 
+Step-5 group (see §4 / §3.3): the ``ensure_kind_blocks`` upsert tree
+anchors and the SpGen/PotentialGen parse-error translation anchors
+(the TIGen translation anchor follows with its migration in step 6).
+
 Real-data anchors use ``data_example/sg/distance_combinedCV`` (kept
 untouched); all synthetic anchors are inline strings, so no synthetic data
 files are needed under ``test/unit/data/cp2k_inp/``.
@@ -26,13 +30,22 @@ files are needed under ``test/unit/data/cp2k_inp/``.
 
 from __future__ import annotations
 
+import copy
 import logging
+import re
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
+from ase import Atoms
 
+from md_analysis.scripts._inp_tree_edit import ensure_kind_blocks
+from md_analysis.scripts.PotentialGen import (
+    PotentialGenError,
+    generate_potential_workdir,
+)
+from md_analysis.scripts.SpGen import SpGenError, generate_sp_workdir
 from md_analysis.utils.formats.cp2k import inp as inp_module
 from md_analysis.utils.formats.cp2k.cell import (
     CellParseError,
@@ -732,3 +745,119 @@ class TestColvarNonOrthogonalDualAnchor:
             parse_abc_from_restart(f)
         with pytest.raises(CellParseError, match="Non-orthogonal"):
             parse_colvar_restart(f)
+
+
+# ---------------------------------------------------------------------------
+# Step-5 anchors: scripts/_inp_tree_edit.py + Gen parse-error translation
+# ---------------------------------------------------------------------------
+
+_KINDLESS_SUBSYS = (
+    "&FORCE_EVAL\n"
+    "  &SUBSYS\n"
+    "    &CELL\n"
+    "      ABC 1.0 1.0 1.0\n"
+    "    &END CELL\n"
+    "    &TOPOLOGY\n"
+    "      COORD_FILE_NAME init.xyz\n"
+    "      COORD_FILE_FORMAT XYZ\n"
+    "    &END TOPOLOGY\n"
+    "  &END SUBSYS\n"
+    "&END FORCE_EVAL\n"
+)
+
+_KIND_DEFAULTS = {
+    "basis_set": "DZVP-MOLOPT-SR-GTH",
+    "potential": "GTH-PBE",
+}
+
+
+class TestEnsureKindBlocks:
+    """Step 5: ``ensure_kind_blocks`` upsert contract (plan §3.3)."""
+
+    def test_inserts_pt_o_h_with_defaults(self):
+        tree = parse_inp(_KINDLESS_SUBSYS)
+        ensure_kind_blocks(tree, ("Pt", "O", "H"))
+        kind = tree["force_eval"]["subsys"]["kind"]
+        # first-appearance, deduped order on the edited tree
+        assert list(kind.keys()) == ["Pt", "O", "H"]
+        for symbol in ("Pt", "O", "H"):
+            assert kind[symbol] == _KIND_DEFAULTS
+        # the edited tree survives the generate -> re-parse self-check
+        reparsed = parse_inp(generate_inp(tree))
+        assert reparsed["force_eval"]["subsys"]["kind"] == kind
+
+    def test_repeat_call_is_idempotent(self):
+        tree = parse_inp(_KINDLESS_SUBSYS)
+        ensure_kind_blocks(tree, ("Pt", "O", "H"))
+        snapshot = copy.deepcopy(tree)
+        ensure_kind_blocks(tree, ("Pt", "O", "H"))
+        assert tree == snapshot
+
+    def test_same_name_overwritten_with_defaults(self):
+        tree = parse_inp(
+            "&FORCE_EVAL\n"
+            "  &SUBSYS\n"
+            "    &KIND Pt\n"
+            "      BASIS_SET CUSTOM-BASIS\n"
+            "      POTENTIAL CUSTOM-PP\n"
+            "      MAGNETIZATION 2.0\n"
+            "    &END KIND\n"
+            "  &END SUBSYS\n"
+            "&END FORCE_EVAL\n"
+        )
+        ensure_kind_blocks(tree, ("Pt",))
+        assert tree["force_eval"]["subsys"]["kind"]["Pt"] == _KIND_DEFAULTS
+
+    def test_list_form_defensive_append_with_param_key(self):
+        tree = {
+            "force_eval": {
+                "subsys": {
+                    "kind": [{"_": "O", "basis_set": "X"}]
+                }
+            }
+        }
+        ensure_kind_blocks(tree, ("Pt",))
+        kind = tree["force_eval"]["subsys"]["kind"]
+        assert kind == [
+            {"_": "O", "basis_set": "X"},
+            {"_": "Pt", **_KIND_DEFAULTS},
+        ]
+
+
+class TestGenParseErrorTranslation:
+    """Step 5: an unparseable template surfaces as the Gen's own error
+    with the template path in the message and the ``InpParseError``
+    cause preserved (plan §3.3; generate-side failures are not
+    translated — they stay ``InpGenerateError``)."""
+
+    @staticmethod
+    def _bad_template(tmp_path: Path) -> Path:
+        bad = tmp_path / "bad_template.inp"
+        bad.write_text(
+            "&GLOBAL\n  BOGUS_KEYWORD 1\n&END GLOBAL\n", encoding="utf-8"
+        )
+        return bad
+
+    def test_sp_gen_bad_template(self, tmp_path):
+        bad = self._bad_template(tmp_path)
+        with pytest.raises(SpGenError, match=re.escape(str(bad))) as excinfo:
+            generate_sp_workdir(
+                Atoms("H2", positions=[(0.0, 0.0, 0.0), (0.0, 0.0, 0.7)]),
+                tmp_path / "out",
+                inp_template_path=bad,
+                cell_abc=(5.0, 5.0, 5.0),
+            )
+        assert isinstance(excinfo.value.__cause__, InpParseError)
+
+    def test_potential_gen_bad_template(self, tmp_path):
+        bad = self._bad_template(tmp_path)
+        with pytest.raises(
+            PotentialGenError, match=re.escape(str(bad))
+        ) as excinfo:
+            generate_potential_workdir(
+                Atoms("H2", positions=[(0.0, 0.0, 0.0), (0.0, 0.0, 0.7)]),
+                tmp_path / "out",
+                inp_template_path=bad,
+                cell_abc=(5.0, 5.0, 5.0),
+            )
+        assert isinstance(excinfo.value.__cause__, InpParseError)
