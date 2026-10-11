@@ -24,12 +24,13 @@
   分析本身的数值/逻辑失败。
 
 ### TIGen
-- 修改 SG 的 inp 文件生成约束 MD 输入：
-  - `PROJECT` → `cMD`
-  - `TARGET` → snapped CV 值（去掉 `[unit]` 标注，用 bare a.u.）
-  - `TARGET_GROWTH` → `0`（去掉 `[unit]` 标注）
-  - `STEPS` → 用户值（默认 10000）
-  - 确保 `&TOPOLOGY` 有 `COORD_FILE_NAME init.xyz` + `COORD_FILE_FORMAT XYZ`
+- 修改 SG 的 inp 文件生成约束 MD 输入（parse → 树编辑 → generate，见下"共享 helper"）：
+  - `PROJECT_NAME`（规范键 `project_name`）→ `cMD`
+  - `TARGET` → snapped CV 值（内部单位裸值；模板里的显式 `[unit]` 标注由 `inp.py` 预处理 W2 换算剥除）
+  - `TARGET_GROWTH` → `0`（全部 `&COLLECTIVE` 块，同样内部单位裸值）
+  - `STEPS` → 用户值（默认 10000，树路径 `motion.md.steps`）
+  - 确保 `&TOPOLOGY` 有 `COORD_FILE_NAME init.xyz` + `COORD_FILE_FORMAT XYZ`（无则新建 section）
+- **行为变更（refactor/cp2k-inp-parser）**：`colvar_id=None` 语义 = primary（第一个 `&COLLECTIVE` 块），与读侧 `colvars.primary` 对齐；旧 regex 实现写所有块（latent bug，真实语料零回归面）
 - Frame snapping：目标 CV → 找轨迹中 CV 最近的帧 → 用该帧的实际 CV 作为 TARGET
 - 批量两种模式：numeric（直接给 a.u. 值）/ time（linspace 时间范围 → 映射到 CV）
 - 不支持自定义单位（避免配位数等复杂 CV 的量纲转换问题）
@@ -55,17 +56,19 @@
 
 - **inp 文件名不固定**：用户可能 `mv sg.inp sginp1`，所以 TIGen 接受任意路径
 - **续算场景**：用户可能已删除 `&TOPOLOGY` 中的 `COORD_FILE_NAME`/`COORD_FILE_FORMAT` — TIGen 会自动补回
-- TARGET regex 必须用负向前瞻 `(?!_GROWTH)` 避免误匹配 `TARGET_GROWTH`
-- `_modify_inp_for_ti` 中 STEPS 替换仅限 `&MD` 块内（避免误改 `MAX_SCF` 等其他 STEPS）
+- TARGET/TARGET_GROWTH 在 cit 树中是两个独立规范键（`target` / `target_growth`），不存在 regex 误匹配问题；写树一律用规范小写键
+- `STEPS` 走树路径 `motion.md.steps`，天然只改 `&MD` 块，不会误伤 `MAX_SCF` 等其他同名 keyword
+- **树键必须用规范名**（如 `project_name` 而非别名 `PROJECT`）：别名键 generate 不报错但产生重复 keyword，re-parse 抛 `NameRepetitionError`（silent 陷阱）
+- **生成物 normalize（用户已接受）**：注释/空行丢失、keyword 大写、跨名同级 section 文本序反转（LIFO，非语义序）；语义序（无参重复 section 的 list 序）由 `inp._stabilize_tree` + 生成后自校验硬性保证；W1 范围展开不可逆（`LIST 7..10` → 全量整数）
 
 ### PotentialGen
 - 从 MD 轨迹抽帧生成 CP2K 单点电势计算目录：init.xyz + sp.inp + script.sh（可选）
-- sp.inp 由用户提供模板（体系相关，不内嵌到包中），通过 `KEY_SP_INP_TEMPLATE_PATH` 持久化或运行时指定
-- CELL ABC 自动替换：从 restart/md.inp 读取 cell 后替换模板中的 `&CELL ABC` 行
+- sp.inp 模板三级解析：显式参数 > `KEY_SP_INP_TEMPLATE_PATH` 持久化配置 > 包内置默认电势模板（`template/sp_potential.inp`，合法 CP2K 输入、无占位符，`&KIND` 块按帧元素用 `ensure_kind_blocks` 生成，默认 `DZVP-MOLOPT-SR-GTH` / `GTH-PBE`）；用户模板按树校验（必须有 `&V_HARTREE_CUBE`、`&SMEAR`，`&KIND` 覆盖全部元素）
+- CELL ABC 替换：从 restart/md.inp 读取 cell 后经 `inp.set_cell_abc` 写树（`force_eval.subsys.cell.abc`）；A/B/C 向量形态的模板 warning + no-op（语义等价迁移）
 - `&TOPOLOGY` 确保 `COORD_FILE_NAME init.xyz` + `COORD_FILE_FORMAT XYZ`
 - 批量目录命名：`potential_t{time}_i{step}`，与分析模块 `_frame_source.py` 的 `_SP_DIR_RE` 匹配
-- 批量模式下 inp 只解析一次（cell 替换 + topology 检查），复用 modified text 写入每个目录
-- 共享 inp 修改逻辑由 `_inp_utils.py` 提供（`replace_cell_abc` / `ensure_topology_init_xyz` / `modify_inp_for_sp`）
+- 批量模式下 parse 一次 → 树编辑一次（cell + topology，与帧无关）→ generate 一次，复用生成文本写入每个目录
+- 共享 inp 树编辑逻辑由 `_inp_tree_edit.py` 提供（`ensure_topology_init_xyz` / `ensure_kind_blocks` 等），底层 parse/generate 走 `utils.formats.cp2k.inp`
 
 ### SpGen
 - **用途区分**：用于 DeePMD 训练数据收集（前端），和 PotentialGen 的 Hartree 电势分析完全独立
@@ -73,18 +76,19 @@
 - **独立配置键** `KEY_DP_SP_INP_TEMPLATE_PATH`：用户可同时持久化"电势分析模板"（含 `V_HARTREE CUBE`）和"DP 训练模板"（含 `PRINT FORCES`），不用来回切换
 - **独立目录前缀** `sp_t{time}_i{step}`：与 `potential_t*_i*` 分开，避免电势分析 `discover_distributed_frames()`（默认 `dir_pattern="potential_t*_i*"`）误读
 - `_frame_discovery.py` 的 `FRAME_DIR_STEP_TIME_RE` 只匹配 `_t\d+_i\d+` 段，对前缀无约束
-- 复用 `_inp_utils.py` 的 cell/topology 修改逻辑，和 PotentialGen 共享
+- 复用 `_inp_tree_edit.py` 的 topology 编辑与 `inp.set_cell_abc`（cell 更新），和 PotentialGen 共享；批量 parse-once / generate-once 文本复用
 - CLI 菜单：441（单帧）、442（批量），独立 MenuGroup "44 DeePMD SP Preparation"
 - Settings 菜单：914 `SetDpSpInpTemplateCmd`
 - **Workflow facade 后端**：SpGen / BaderGen / TIGen 各有 `*_with_report` wrapper，由 `workflows.scripts.run_sp_batch` / `run_bader_batch` / `run_ti_batch` 调用（facade 与 wrapper 参数 1:1，返回 `WorkflowResult`，artifacts 为工作目录路径、extra 携带 report）。PotentialGen 仅 CLI 入口，无 workflow facade。
 - 后端链路：SP 算完 → `dpdata` 或 `cp2kdata` 插件转训练集 → DeePMD-kit 训练
 
-### 共享 helper：`_inp_utils.py`
-- 私有模块（前导下划线，不 re-export）
-- 纯字符串处理，无 I/O，无副作用
-- 函数：`replace_cell_abc(inp_text, a, b, c)`、`ensure_topology_init_xyz(inp_text)`、`modify_inp_for_sp(inp_text, cell_abc)`
-- 正则：`_CELL_BLOCK_RE`、`_ABC_LINE_RE`、`_TOPOLOGY_BLOCK_RE`、`_COORD_FILE_NAME_RE`、`_COORD_FILE_FORMAT_RE`
-- 由 PotentialGen 和 SpGen 共享使用，避免双份维护
+### 共享 helper：`_inp_tree_edit.py`
+- 私有模块（前导下划线，不 re-export），工作流语义层：知道单点/约束 MD 模板该有哪些 section、生成器拥有哪些 keyword、`&KIND` 默认基组/赝势
+- 两层划分：格式原语（`parse_inp` / `generate_inp` / `get_section` / `set_keyword` / `iter_collectives` / `set_cell_abc`）在 `utils/formats/cp2k/inp.py`；本模块只放工作流语义 helper
+- 函数（全部原地编辑 cit 树 dict）：`ensure_topology_init_xyz(tree)`、`set_project(tree, name)`、`set_md_steps(tree, steps)`、`set_collective_target(tree, target_au, colvar_id=None)`、`zero_target_growth(tree)`、`ensure_kind_blocks(tree, elements, *, basis_set, potential)`
+- **树编辑纪律（双轨）**：TIGen 每目标 TARGET 不同——parse 一次成 base_tree，每目标 `copy.deepcopy` 后编辑再 generate；SpGen / PotentialGen 编辑与帧无关——parse 一次 → 编辑一次 → generate 一次 → 文本复用
+- 由 TIGen / PotentialGen / SpGen 共享使用，避免双份维护
+- `set_collective_target` 的 `colvar_id=None` = primary（第一个 COLLECTIVE 块）；`zero_target_growth` 清零全部块；二者写内部单位裸值
 
 ### 共享 helper：`_frame_selector.py`
 - 私有模块，统一轨迹帧切片逻辑

@@ -28,7 +28,7 @@
     layer 双方法）、原子电荷追踪、反离子逐帧检测；附 σ→φ 标定外推
   - 增强采样（`enhanced_sampling/`）：慢增长自由能（quick/publication）
     + 约束 TI 收敛诊断与自由能积分 + 恒电势修正
-  - 脚本生成（`scripts/`）：Bader/TI/Potential/SP 工作目录批量生成
+  - 脚本生成（`scripts/`）：Bader/TI/Potential/SP 工作目录批量生成（写侧为 cit 树"parse → 树编辑 → generate"；PotentialGen 模板三级解析：显式参数 > config > 包内置默认电势模板，`&KIND` 按帧元素生成）
   - 双入口：CLI、`md_analysis.workflows`（`run_*`+`WorkflowResult`）
 - **当前未覆盖**：按层/按元素电荷转移统计；Mulliken 电荷分析。
 
@@ -37,7 +37,7 @@
 - **VASP MD 工作目录 → CP2K（电势）SP 目录生成 + 端到端 PZC 工具包**：
   完整需求规格见 [vasp_md_to_cp2k_potential_sp.md](vasp_md_to_cp2k_potential_sp.md)。
   要点：VASP 帧源（XDATCAR/vasprun.xml）→ 复用 `PotentialGen` 出 CP2K SP 目录；
-  模板三级解析（显式参数 > config > 包内置默认电势模板，SpGen 范式）；
+  模板三级解析（显式参数 > config > 包内置默认电势模板）**已在 PotentialGen 落地**（refactor/cp2k-inp-parser 分支）；
   分析端内置 Le 2017 方程出 U_PZC。目标用户 = 只懂 VASP 的同门（sjy）。
 
 ## 已确认的体系前提（用户声明，值得记录）

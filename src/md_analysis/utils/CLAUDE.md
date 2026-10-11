@@ -25,6 +25,7 @@ Phase 1（破坏性重构）后 `formats/` 进一步按 engine 家族切分为 `
   - `from md_analysis.utils.formats.bader.potcar import _read_potcar_zval`
   - `from md_analysis.utils.formats.cp2k.cell import parse_abc_from_md_inp`
   - `from md_analysis.utils.formats.cp2k.colvar import parse_colvar_restart, parse_lagrange_mult_log`
+  - `from md_analysis.utils.formats.cp2k.inp import parse_inp, generate_inp`（cit 树封装；全包唯一直接 import cp2k-input-tools/pint 的模块，惰性加载）
   - `from md_analysis.utils.formats.cp2k.stdout import parse_md_out_fermi, parse_sp_out_fermi`
   - `from md_analysis.utils.formats.cp2k.xyz import read_xyz_atoms_for_steps`
   - `from md_analysis.utils.structure.layer import detect_interface_layers`
@@ -44,7 +45,7 @@ Phase 1（破坏性重构）后 `formats/` 进一步按 engine 家族切分为 `
 | 目录 | 用途 |
 |---|---|
 | `formats/common/` | engine-neutral 文件格式：`cube`（CP2K cube + 后续 LOCPOT-as-cube 共享） |
-| `formats/cp2k/` | CP2K 单文件解析：`cell` / `colvar` / `stdout` / `xyz` |
+| `formats/cp2k/` | CP2K 单文件解析：`inp`（cit parse/generate 封装，cell/colvar 与 scripts 写侧共用）/ `cell` / `colvar` / `stdout` / `xyz` |
 | `formats/vasp/` | VASP 占位：`report` / `outcar` / `locpot`（hard-error，未注册到 parser registry） |
 | `formats/bader/` | Bader 解析：`acf`（`_read_acf` + `load_bader_atoms`） / `potcar`（`_read_potcar_zval`） / `_errors`（`BaderParseError`） |
 | `structure/` | 几何 / 拓扑：`layer` / `water` / `cluster` |

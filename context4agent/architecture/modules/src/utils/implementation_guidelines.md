@@ -80,23 +80,33 @@
 - 使用 `constants.py` 中的 `INTERFACE_NORMAL_ALIGNED`/`INTERFACE_NORMAL_OPPOSED` 常量作为界面标签。
 - `circular_mean_fractional()` 委托给 `cluster._circular_mean(values, period=1.0)`。
 
-### `formats/cp2k_cell.py`
+### `formats/cp2k/inp.py`
 
-- 统一的 CP2K cell 参数解析模块，负责从 `.restart` 和 `md.inp` 文件解析正交 cell 参数。
-- `parse_abc_from_restart`：用正则表达式定位 `&CELL ... &END CELL` 块，提取 A/B/C 向量行，验证正交性（离对角元素 < 1e-6 Å）。
-- `parse_abc_from_md_inp`：匹配 `ABC [angstrom] a b c` 行。从 `water/WaterAnalysis/_common.py` 迁移而来。
-- 两个函数返回类型一致：`(float, float, float)`，可互换使用。
+- CP2K `.inp` 文本 parse/generate 封装层，基于 cp2k-input-tools（cit，git-pinned 依赖）+ pint；**全包唯一直接 import cit/pint 的模块**，两者均惰性单例（`lru_cache`，首次调用才付 import 开销）。
+- `parse_inp(text_or_path, *, xmlspec=None) -> dict`：预处理管线 **CRLF 归一 → G1（`@` 预处理指令门禁，拒绝而非改写）→ W3（LIST 行逗号归一）→ W1（整数范围 `N..M` 展开，含 `\` 续行）→ W2（TARGET/TARGET_GROWTH 显式单位换算为内部单位并剥 token）→ 引号感知注释清洗**，再交给 cit simplified parser。
+- `generate_inp(tree, *, xmlspec=None) -> str`：`_stabilize_tree` 预反转 list-of-dicts（无参重复 section）抵消 generator 的 LIFO 反转；生成后 re-parse 与调用方原树全等自校验（键序不敏感、list 序敏感），不一致抛 `InpGenerateError`。
+- 树约定：键 = 规范名小写（别名 parse 时归一，如 `PROJECT` → `project_name`；读写一律用规范名）；`_` 键 = section 参数；`*` 键 = 默认 keyword 行；keyword 值落在 XML 默认单位（约束类 TARGET/TARGET_GROWTH 为 CP2K 内部单位，与 `.restart` 写出值同口径）。
+- 格式原语 helper：`get_section` / `get_keyword` / `set_keyword` / `iter_collectives` / `set_cell_abc`（A/B/C 向量形态模板 warning + no-op）；工作流语义 helper 不在此层（见 `scripts/_inp_tree_edit.py`）。
+- 异常：`InpParseError` / `InpGenerateError`（均继承 `MDAnalysisError`）。
+
+### `formats/cp2k/cell.py`
+
+- 统一的 CP2K cell 参数解析模块，负责从 `.restart` 和 `md.inp` 文件解析正交 cell 参数；两个入口都先经 `formats.cp2k.inp.parse_inp` 解析成 cit 树再读树。
+- `parse_abc_from_restart`：读 `force_eval.subsys.cell.{a,b,c}` 向量（angstrom 语义）的对角元素，经共享 helper `_abc_ang_from_cell_tree` 验证正交性（离对角元素 < 1e-6 Å）。
+- `parse_abc_from_md_inp`：读 `force_eval.subsys.cell.abc` 三标量；cit 自动把任意显式单位 token 换算到默认单位（angstrom），`ABC [bohr]` / 裸值形态同样正确（旧 regex 只匹配 `ABC [angstrom]`，此为行为超集）。ABC 三标量原理上无法检测非正交，正交校验仅 restart/向量路径有。
+- 两个函数返回类型一致：`(float, float, float)`，可互换使用；"parse 成功但树缺块"场景错误文案与旧实现逐字一致，parse 本身失败则抛 `inp.InpParseError`（带 cit 行号）。
+- `_abc_ang_from_cell_tree(tree, src_path)` 由 restart 路径与 colvar 路径共享（同一棵树），保证正交政策处处一致。
 - 统一异常类型 `CellParseError`。
 - 不依赖 ASE。
 
-### `formats/cp2k_colvar.py`
+### `formats/cp2k/colvar.py`
 
-- 负责 CP2K COLVAR（集合变量约束）模拟的 restart 文件和 LagrangeMultLog 文件解析。
-- 复用 `formats.cp2k_cell.parse_abc_from_restart()` 获取 cell 参数，避免重复实现。
-- 使用 `finditer` 解析所有 `&COLLECTIVE` 块，支持多约束场景，结果包装为 `ColvarInfo` 容器。
-- 不解析 COLVAR 定义（CV 类型由 CP2K 决定，种类繁多，不逐一写正则）。
-- 支持 `&FIXED_ATOMS` 的 `LIST` 行解析：逗号/空格分隔、`N..M` 范围展开、`\` 续行。
-- LagrangeMultLog 格式自动检测：单约束（每行一个值）vs 多约束（多行矩阵块）。
+- 负责 CP2K COLVAR（集合变量约束）模拟的 restart 文件和 LagrangeMultLog 文件解析；restart 经 `formats.cp2k.inp.parse_inp` 解析成 cit 树后按树路径直读（`global.project_name`、`motion.md.*`、`motion.constraint.collective.*` 内部单位直读、`motion.constraint.lagrange_multipliers.filename`、`motion.constraint.fixed_atoms.list`）。
+- cell 参数复用 `formats.cp2k.cell._abc_ang_from_cell_tree()`（同一棵树），避免重复实现，正交政策与 cell 路径一致。
+- 多个 `&COLLECTIVE` 块在树中为 list 形态，天然支持多约束场景，结果包装为 `ColvarInfo` 容器；校验次序钉死：PROJECT_NAME → MD → CONSTRAINT → COLLECTIVE → cell（lagrange/fixed_atoms 无块不抛）。
+- 不解析 COLVAR 定义（CV 类型由 CP2K 决定，种类繁多）。
+- `&FIXED_ATOMS` 的 `LIST` 行：逗号归一（W3）、`N..M` 范围展开（W1）、`\` 续行由 inp.py 预处理完成，本模块仅显式 `sorted` 保证升序 tuple 契约。
+- LagrangeMultLog 格式自动检测：单约束（每行一个值）vs 多约束（多行矩阵块）；纯文本逐行解析，与 cit 无关。
 - 不完整末尾处理：末尾只有 Shake 无配对 Rattle 时静默丢弃。
 - 不依赖 ASE。
 

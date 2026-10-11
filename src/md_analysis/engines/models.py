@@ -225,8 +225,10 @@ class CellSpec:
 
     Phase 4 status: the only engine adapter (CP2K's
     :func:`md_analysis.engines.cp2k.read_cell`) currently produces
-    orthorhombic matrices only -- both ``parse_abc_from_md_inp`` and
-    ``parse_abc_from_restart`` reject non-orthogonal cells.  The
+    orthorhombic matrices only -- ``parse_abc_from_restart`` (the
+    vector path) rejects non-orthogonal cells, while
+    ``parse_abc_from_md_inp`` reads the three ``ABC`` scalars, from
+    which non-orthogonality cannot be detected.  The
     dataclass shape is intentionally general so future engine adapters
     (or a future non-orthogonal restart parser) can populate
     ``cell_matrix_ang`` without a model rev.

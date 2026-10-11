@@ -43,6 +43,7 @@
   - `common/cube.py`：Gaussian cube 文件 I/O、plane-averaged φ(z)、slab-averaged potential
   - `cp2k/cell.py`：CP2K cell 参数解析（`.restart` + `md.inp`）
   - `cp2k/colvar.py`：CP2K COLVAR restart + LagrangeMultLog 解析（输出 CP2K raw dataclass，canonical 类型在 `engines.models`）
+  - `cp2k/inp.py`：CP2K `.inp` parse/generate 封装（cp2k-input-tools cit 树；全包唯一直接依赖 cit/pint 的模块，惰性加载。cell/colvar 读侧与 scripts 写侧"parse → 树编辑 → generate"的共用底座）
   - `cp2k/stdout.py`：CP2K `md.out` / `sp.out` Fermi 能级提取（step/time/fermi_raw）
   - `cp2k/xyz.py`：CP2K xyz 轨迹流式读取（`i = <step>` 注释解析，按 step 构建 `ase.Atoms`）
   - `vasp/report.py` / `vasp/outcar.py` / `vasp/locpot.py`：VASP REPORT / OUTCAR / LOCPOT 占位解析器（全部 raise `NotImplementedError`）
@@ -192,7 +193,9 @@
 
 - `scripts/__init__.py`：re-exports `BaderGenError`, `generate_bader_workdir`, `batch_generate_bader_workdirs`, `PotentialGenError`, `generate_potential_workdir`, `batch_generate_potential_workdirs`, `SpGenError`, `generate_sp_workdir`, `batch_generate_sp_workdirs`, `TIGenError`, `generate_ti_workdir`, `batch_generate_ti_workdirs`
 - `scripts/BaderGen.py`：从单帧 MD 结构生成 VASP Bader 工作目录（POSCAR + INCAR + KPOINTS + POTCAR + script.sh）
-- `scripts/template/`：VASP 模板文件（INCAR、KPOINTS），通过 `importlib.resources` 访问
+- `scripts/template/`：内置模板（VASP INCAR、KPOINTS；CP2K 默认电势模板 `sp_potential.inp`，PotentialGen 三级回退的第三级），通过 `importlib.resources` 访问
+- `scripts/_inp_tree_edit.py`：CP2K inp 树编辑 helper（工作流语义层，建于 `utils.formats.cp2k.inp` 格式原语之上；TIGen / PotentialGen / SpGen 写侧共享）
+- `scripts/_potential_template.py`：内置电势模板常量 + 树校验器（`extract_kind_elements` / `has_smear` / `has_v_hartree_cube`）
 - `scripts/utils/IndexMapper.py`
   - CP2K XYZ ↔ VASP POSCAR 双射索引映射
   - `compute_index_map()`：计算排列映射

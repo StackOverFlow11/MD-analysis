@@ -7,7 +7,8 @@
 - `TIGen.py`: generate CP2K constrained-MD work directories for thermodynamic integration (single target + batch).
 - `PotentialGen.py`: generate CP2K single-point work directories for Hartree potential analysis (single frame and batch from trajectory).
 - `SpGen.py`: generate CP2K single-point work directories for DeePMD training data collection. Mirrors `PotentialGen` but uses distinct config key (`KEY_DP_SP_INP_TEMPLATE_PATH`) and directory prefix (`sp_t*_i*`) to avoid mixing with potential analysis. Exposed via the `workflows.scripts.run_sp_batch` facade.
-- `_inp_utils.py`: private shared helpers (`replace_cell_abc`, `ensure_topology_init_xyz`, `modify_inp_for_sp`). Pure string transforms on CP2K input text, used by both `PotentialGen` and `SpGen` to avoid duplication.
+- `_inp_tree_edit.py`: private shared workflow-level CP2K inp **tree** editing helpers (`ensure_topology_init_xyz`, `set_project`, `set_md_steps`, `set_collective_target`, `zero_target_growth`, `ensure_kind_blocks`). Operate in place on cit trees produced by `utils.formats.cp2k.inp.parse_inp`; used by `TIGen`, `PotentialGen` and `SpGen` ("parse → tree edit → generate" write side).
+- `_potential_template.py`: built-in default potential template constants (`DEFAULT_BASIS_SET` / `DEFAULT_POTENTIAL` / `DEFAULT_TEMPLATE_RESOURCE`) + tree-driven template validators (`extract_kind_elements`, `has_smear`, `has_v_hartree_cube`), all operating on cit trees.
 - `_frame_selector.py`: private shared trajectory slicing module. Provides `FrameSelection` dataclass, `iter_selected_frames` iterator, and `resolve_single_frame` helper. Used by **all three batch Gen functions** (Bader/Potential/SpGen) to unify index-based and time-based frame selection. TIGen is excluded because its "time mode" is target-based (linspace → CV → nearest frame), not range-based slicing.
 
 ## Dependencies
@@ -22,7 +23,9 @@
 - `tqdm`: optional progress bar for batch generation
 
 ### TIGen
-- `md_analysis.utils.formats.cp2k_colvar`: `parse_colvar_restart`, `ColvarRestart`
+- `md_analysis.engines.cp2k`: `read_constraint_metadata_from_restart` (restart metadata for CV reconstruction)
+- `md_analysis.utils.formats.cp2k.inp`: `parse_inp` / `generate_inp` (cit tree parse + generate)
+- `md_analysis.scripts._inp_tree_edit`: `set_project`, `set_md_steps`, `set_collective_target`, `zero_target_growth`, `ensure_topology_init_xyz`
 - `md_analysis.utils.constants`: `AU_TIME_TO_FS`
 - `ase.io`: `iread` (trajectory reading), `write` (init.xyz output)
 - `tqdm`: optional progress bar for batch generation
@@ -36,12 +39,14 @@ scripts/
   TIGen.py                # TI constrained-MD work directory generation (single + batch)
   PotentialGen.py         # SP potential work directory generation (single + batch)
   SpGen.py                # DP training SP work directory generation (single + batch)
-  _inp_utils.py           # Private shared CP2K inp text helpers (cell/topology)
+  _inp_tree_edit.py       # Private shared CP2K inp tree-edit helpers (workflow semantics)
+  _potential_template.py  # Private: built-in potential template constants + tree validators
   _frame_selector.py      # Private shared trajectory slicing (FrameSelection + iter/resolve)
   template/
     __init__.py           # empty (importlib.resources requirement)
     INCAR                 # VASP INCAR template (single-point, Bader settings)
     KPOINTS               # VASP KPOINTS template (Gamma-only)
+    sp_potential.inp      # Built-in default CP2K potential-SP template (parseable, no placeholders)
   utils/
     __init__.py           # re-exports all IndexMapper public symbols
     IndexMapper.py        # bijective index mapping
@@ -57,26 +62,26 @@ scripts/
 ## TIGen Key Design Decisions
 
 1. **Frame snapping**: For a given target CV value, finds the trajectory frame whose reconstructed CV (from `compute_target_series`) is closest; uses that frame's actual CV as the snapped TARGET.
-2. **inp modification via regex**: Modifies PROJECT, STEPS (in `&MD` only), TARGET/TARGET_GROWTH (in `&COLLECTIVE`, strips `[unit]` annotations), and ensures `&TOPOLOGY` has `COORD_FILE_NAME init.xyz` + `COORD_FILE_FORMAT XYZ`.
+2. **inp modification via cit tree editing**: Parses the SG inp once into a cit tree (`inp.parse_inp`), then per target deep-copies the base tree and edits canonical keys — `project_name` → `cMD`, `motion.md.steps` → user value (tree path touches only `&MD`, never `MAX_SCF`-style same-name keywords), `target` → snapped a.u. as a bare internal-unit value in the `&COLLECTIVE` block selected by `colvar_id` (`None` = primary / first block, matching reader-side `colvars.primary`; pre-refactor behavior wrote all blocks), `target_growth` → `0` in every `&COLLECTIVE` block — then regenerates via `inp.generate_inp`. Explicit `[unit]` tokens in the template are converted to internal units by the inp.py preprocessing (W2).
 3. **Units**: All CV values in atomic units (CP2K default). No custom unit conversion supported — avoids complex dimensionality issues with exotic CVs.
 4. **Batch efficiency**: Pre-loads trajectory and parses restart once; reuses across all target points.
 5. **Two batch modes**: Numeric (explicit a.u. values) or time-based (linspace over fs range → map to CV values).
 
 ## PotentialGen Key Design Decisions
 
-1. **User-provided template**: sp.inp is body-specific (CELL, KIND blocks vary per system), so it's not bundled as package data. User provides the template path explicitly or via `KEY_SP_INP_TEMPLATE_PATH` persistent config.
-2. **CELL ABC replacement**: Regex-based substitution of `ABC [angstrom] a b c` line inside `&CELL` block. Cell values come from restart/md.inp parsing.
-3. **TOPOLOGY enforcement**: Same pattern as TIGen — ensures `COORD_FILE_NAME init.xyz` + `COORD_FILE_FORMAT XYZ`.
-4. **Batch efficiency**: Parses and modifies the inp template once; writes the same modified text to every subdirectory (cell is constant across frames).
+1. **Three-level template resolution**: explicit `inp_template_path` argument > `KEY_SP_INP_TEMPLATE_PATH` persistent config > built-in default potential template bundled at `scripts/template/sp_potential.inp` (plain parseable CP2K input, no placeholders). User templates are parsed to a cit tree and validated against the potential-SP hard requirements (`&V_HARTREE_CUBE` present, `&SMEAR` present, `&KIND` blocks cover every frame element — validators in `_potential_template.py`, tree-driven). The built-in template instead gets its `&KIND` blocks upserted from the frame's element composition via `ensure_kind_blocks` (defaults `DZVP-MOLOPT-SR-GTH` / `GTH-PBE`), so full coverage holds by construction.
+2. **CELL ABC replacement via tree edit**: `inp.set_cell_abc` writes `force_eval.subsys.cell.abc` on the parsed tree; cell values come from restart/md.inp parsing. Vector-form (A/B/C) templates are not modified — warning logged, no-op (legacy semantics preserved).
+3. **TOPOLOGY enforcement**: Same pattern as TIGen — ensures `COORD_FILE_NAME init.xyz` + `COORD_FILE_FORMAT XYZ` (section created when missing).
+4. **Batch efficiency (generate-once)**: Parses the template once, applies the frame-independent edits once (cell + topology) and generates the sp.inp text once; the same text is written to every subdirectory (cell is constant across frames).
 5. **Directory naming**: `potential_t{time}_i{step}` matches `_frame_source._SP_DIR_RE` for seamless downstream analysis with `input_mode="distributed"`.
-6. **Shared helpers**: Cell/topology text manipulation delegated to `_inp_utils.py` (shared with SpGen).
+6. **Shared helpers**: Tree edits delegated to `_inp_tree_edit.py` (`ensure_topology_init_xyz`, `ensure_kind_blocks`); parse/generate via `utils.formats.cp2k.inp`.
 
 ## SpGen Key Design Decisions
 
 1. **Separate config key**: Uses `KEY_DP_SP_INP_TEMPLATE_PATH` (not `KEY_SP_INP_TEMPLATE_PATH`), so users can persist both a Hartree-potential template (containing `V_HARTREE CUBE`) and a DP training template (containing `PRINT FORCES`) and select them via independent CLI menus (913 vs 914).
 2. **Distinct directory prefix**: `sp_t{time}_i{step}` instead of `potential_t{time}_i{step}`. This is critical because `electrochemical/potential/_frame_source.py:discover_distributed_frames()` defaults to `dir_pattern="potential_t*_i*"`; if SpGen reused that prefix, a mixed directory would cause accidental consumption of DP training dirs during potential analysis.
 3. **`_frame_discovery.FRAME_DIR_STEP_TIME_RE` compatibility**: The generic `_t\d+_i\d+` regex matches any prefix, so `sp_t*_i*` still works with downstream generic frame discovery utilities — only the electrochemical default pattern is `potential_t*_i*`.
-4. **Code reuse via `_inp_utils.py`**: `modify_inp_for_sp` is shared with `PotentialGen`. Each module keeps its own workdir orchestration (single + batch) but pure text transforms are factored out.
+4. **Code reuse via `_inp_tree_edit.py` + `utils.formats.cp2k.inp`**: The same tree-edit helpers (`ensure_topology_init_xyz`, `inp.set_cell_abc`) are shared with `PotentialGen`; each module keeps its own workdir orchestration (single + batch) but the "parse → tree edit → generate" write path is factored out. Batch callers parse once, edit once, generate once and reuse the text (frame-independent edits).
 5. **Workflow facade backend**: `SpGen` / `BaderGen` / `TIGen` batch wrappers are invoked through `workflows.scripts.run_sp_batch` / `run_bader_batch` / `run_ti_batch`; `PotentialGen` is CLI-only. Workdir paths are returned on `WorkflowResult.artifacts`.
 
 ## Unified Frame Selection Key Design Decisions (`_frame_selector.py`)

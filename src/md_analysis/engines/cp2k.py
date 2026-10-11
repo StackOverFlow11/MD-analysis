@@ -330,13 +330,16 @@ def read_cell(path: str | Path) -> CellSpec:
       - Any other suffix (e.g. ``md.inp``, ``.inp``) is dispatched to
         :func:`md_analysis.utils.formats.cp2k.cell.parse_abc_from_md_inp`.
 
-    Both underlying parsers currently return only orthorhombic
-    ``(a, b, c)`` tuples; this facade wraps the tuple as
-    ``np.diag([a, b, c])`` so the resulting :class:`CellSpec` always
-    exposes the 3x3 matrix form.  Non-orthogonal CP2K restart cells
-    are still rejected by ``parse_abc_from_restart`` with
-    ``CellParseError`` and that error is propagated unchanged
-    (Phase 4 R1: no science behavior change).
+    Both underlying parsers return ``(a, b, c)`` triples from the cit
+    tree and this facade wraps the tuple as ``np.diag([a, b, c])`` so
+    the resulting :class:`CellSpec` always exposes the 3x3 matrix form.
+    Orthogonality is only verifiable on the restart/vector path:
+    non-orthogonal CP2K restart cells are rejected by
+    ``parse_abc_from_restart`` with ``CellParseError`` and that error is
+    propagated unchanged (Phase 4 R1: no science behavior change); the
+    ``md.inp`` path reads the three ``ABC`` scalars (any explicit unit
+    token converted to angstrom), which carry no off-diagonal
+    information, so non-orthogonality cannot be detected there.
 
     Parameters
     ----------

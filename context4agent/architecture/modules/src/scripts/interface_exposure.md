@@ -106,6 +106,8 @@ def generate_ti_workdir(
 
 **Returns** the created work directory path.
 
+`colvar_id=None` (default) writes the TARGET into the **primary** (first) `&COLLECTIVE` block — aligned with reader-side `colvars.primary` semantics (pre-refactor behavior wrote all blocks; explicit change, zero impact on real corpora).
+
 ### `batch_generate_ti_workdirs` Signature
 
 ```python
@@ -133,7 +135,7 @@ def batch_generate_ti_workdirs(
 
 | File        | Source                          |
 |-------------|---------------------------------|
-| `cMD.inp`   | Modified SG inp file (PROJECT=cMD, TARGET=snapped a.u., TARGET_GROWTH=0, STEPS=user) |
+| `cMD.inp`   | SG inp parsed to a cit tree, edited (`project_name`=cMD, TARGET=snapped a.u. bare internal units in the `colvar_id`-selected `&COLLECTIVE`, TARGET_GROWTH=0 in all blocks, STEPS=user, TOPOLOGY → init.xyz) and re-generated |
 | `init.xyz`  | Extracted frame from SG trajectory (nearest to target CV) |
 
 ### Directory Naming
@@ -195,14 +197,16 @@ def batch_generate_potential_workdirs(
 | File        | Source                          |
 |-------------|---------------------------------|
 | `init.xyz`  | Extracted frame from MD trajectory |
-| `sp.inp`    | User-provided template with CELL ABC auto-replaced |
+| `sp.inp`    | Template (user-provided or built-in default) parsed to a cit tree, edited (CELL ABC + TOPOLOGY → init.xyz) and re-generated once; the text is reused for every directory |
 | `script.sh` | Copied from `script_path` or persistent config |
 
 ### Inp Template Path Resolution
 
 1. If `inp_template_path` explicitly provided → use it
 2. If `None` → read `KEY_SP_INP_TEMPLATE_PATH` from persistent config
-3. If neither → raise `PotentialGenError`
+3. If neither → use the **built-in default potential template** bundled at `scripts/template/sp_potential.inp` (plain parseable CP2K input; `&KIND` blocks upserted from the frame's elements via `ensure_kind_blocks`, defaults `DZVP-MOLOPT-SR-GTH` / `GTH-PBE`)
+
+User-supplied templates (level 1/2) are tree-validated against the potential-SP hard requirements: `&V_HARTREE_CUBE` present, `&SMEAR` present, `&KIND` blocks covering every frame element. Validation failure raises `PotentialGenError`; a template that fails to parse raises `PotentialGenError` with the template path (cause preserved).
 
 ### Directory Naming
 
@@ -268,7 +272,7 @@ from `scripts/_frame_selector.py`. See "Frame Selection (shared)" section below.
 | File        | Source                          |
 |-------------|---------------------------------|
 | `init.xyz`  | Extracted frame from MD trajectory |
-| `sp.inp`    | User-provided template with CELL ABC auto-replaced (shared `_inp_utils.py` helpers) |
+| `sp.inp`    | User-provided template parsed to a cit tree, edited (`set_cell_abc` + `ensure_topology_init_xyz`) and re-generated once; text reused for every directory (shared `_inp_tree_edit.py` helpers) |
 | `script.sh` | Copied from `script_path` or persistent config |
 
 ### Inp Template Path Resolution

@@ -98,7 +98,7 @@ dp_sp_template/              # 你提供的 CP2K SP inp 模板（菜单 914 配�
 ```
 sp_runs/
 ├── sp_t0_i0/
-│   ├── sp.inp               # 模板改造后
+│   ├── sp.inp               # 模板经树编辑后重新生成（cell + topology 已改）
 │   ├── init.xyz             # 该帧的原子坐标
 │   └── run.sh               # CP2K 提交脚本
 ├── sp_t10_i1/
@@ -129,13 +129,10 @@ md-pos-1.xyz
    atoms.set_cell(cell_abc)
    atoms.set_pbc(True)
    │
-   ▼ shutil.copy(template, dir/sp.inp)
-   ▼ ase.io.write(dir/init.xyz, atoms, format="xyz")
-   │
-   ▼ _inp_utils.modify_inp(dir/sp.inp, replacements)
-   │     PROJECT → sp_t<step>_i<frame>
-   │     ABC     → (a, b, c) Å
-   │     COORD_FILE_NAME / COORD_FILE_FORMAT → ensured
+   ▼ write dir/init.xyz  (ase.io.write, format="xyz")
+   ▼ write dir/sp.inp    (parse → 树编辑 → generate；批量只做一次，文本复用)
+   │     ABC     → (a, b, c) Å          (inp.set_cell_abc)
+   │     COORD_FILE_NAME / COORD_FILE_FORMAT → ensured (init.xyz / XYZ)
    │
    ▼ shutil.copy(config.cp2k_script_path, dir/run.sh)
 ```

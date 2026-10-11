@@ -25,7 +25,7 @@ Interactive CLI package providing a VASPKIT-style numbered menu interface. Repla
 - `cli` -> `scripts` (for `generate_bader_workdir`, `batch_generate_bader_workdirs`)
 - `cli` -> `enhanced_sampling.slowgrowth` (via `lazy_import` for `slowgrowth_analysis`)
 - `cli` -> `enhanced_sampling.constrained_ti` (via `lazy_import` for `standalone_diagnostics`, `analyze_ti`, `discover_ti_points`, etc.)
-- `cli` -> `utils.formats.cp2k_cell` (for `parse_abc_from_restart`, `parse_abc_from_md_inp`)
+- `cli` -> `engines.cp2k` (for `read_cell` in `CellAbcParam`; cell parsing itself lives in `utils.formats.cp2k.cell`, cit-tree backed)
 - `cli` -> `utils.formats.cp2k_colvar` (via `lazy_import` for `ColvarMDInfo`, used by `_enhanced_sampling.py` info display)
 - `cli` -> `config` (for persistent user configuration, `CONFIGURABLE_DEFAULTS` registry, and `delete_config`)
 - No reverse dependencies: no other module imports from `cli`
@@ -58,10 +58,10 @@ Interactive CLI package providing a VASPKIT-style numbered menu interface. Repla
 
 ## Cell parameter acquisition
 
-All sub-menus requiring cell parameters (water 101-105, scripts 411-412) use the shared `_prompt_cell_abc()` helper from `_prompt.py`:
+All sub-menus requiring cell parameters (water 101-105, scripts 411-412) use the shared `CellAbcParam` collector from `_params.py`:
 
-1. Prompt cell source: `.restart` (default) or `md.inp`
-2. Parse the chosen file (`parse_abc_from_restart` or `parse_abc_from_md_inp`)
+1. Prompt cell source: `.restart` (default) or `md.inp` (source-vs-suffix mismatch raises early)
+2. Parse the chosen file via `engines.cp2k.read_cell`, which dispatches to the cit-tree-backed `parse_abc_from_restart` / `parse_abc_from_md_inp` (the restart/vector path validates orthogonality; the `md.inp` path reads the three `ABC` scalars, where non-orthogonality cannot be detected)
 3. On failure, offer one retry with a different file
 4. On second failure, raise `CellParseError` (caught by `MenuCommand.run()` 的 try-except)
 5. Return `(a, b, c)` tuple, passed as `cell_abc` keyword argument to analysis functions

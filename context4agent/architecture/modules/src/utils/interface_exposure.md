@@ -142,31 +142,56 @@
   - 输出：增强的 `ase.Atoms`，附加 `atoms.arrays["bader_charge"]`（原始电子数）和 `atoms.arrays["bader_net_charge"]`（ZVAL - bader_charge，正值 = 失去电子）
   - 语义：解析 VASP Bader 电荷分析结果，与结构信息合并
 
-### 2.7 `formats/cp2k_cell.py` 导出（Stable）
+### 2.7 `formats/cp2k/inp.py` 导出（Stable）
+
+异常：
+
+- `InpParseError`
+  - CP2K 输入文本无法 parse 时抛出（预处理门禁或 cit 语法错误，含行号）
+- `InpGenerateError`
+  - 树无法忠实生成回文本时抛出（生成后 re-parse 自校验不一致）
+
+函数：
+
+- `parse_inp(text_or_path, *, xmlspec=None) -> dict`
+  - 输入：`.inp` 文本或文件路径（`str` 含 `\n` 按文本、不含按路径；`os.PathLike` 按路径）
+  - 输出：cit simplified 树（dict；键 = 规范名小写，`_` = section 参数，`*` = 默认 keyword 行）
+  - 语义：预处理管线（CRLF → `@` 指令门禁 → LIST 逗号归一 → 整数范围展开 → TARGET/TARGET_GROWTH 显式单位换算 → 注释清洗）后交给 cit；约束类 keyword 值落在 CP2K 内部单位（与 `.restart` 同口径）
+- `generate_inp(tree, *, xmlspec=None) -> str`
+  - 语义：`_stabilize_tree` 预反转无参重复 section 抵消 generator LIFO；生成后 re-parse 与原树全等自校验
+- `get_section(tree, path)` / `get_keyword(tree, path)` / `set_keyword(tree, path, value)`
+  - 点分路径走树；容忍 dict/list 两形态 section
+- `iter_collectives(tree)`
+  - 按 colvar_id 枚举 `motion.constraint.collective` 块
+- `set_cell_abc(tree, a, b, c)`
+  - 写 `force_eval.subsys.cell.abc`；A/B/C 向量形态模板 warning + no-op
+
+> `inp.py` 是全包唯一直接 import cp2k-input-tools（cit）与 pint 的模块，两者均惰性单例。树编辑的工作流语义 helper（`ensure_topology_init_xyz` 等）在 `scripts/_inp_tree_edit.py`，不在此层。
+
+### 2.8 `formats/cp2k/cell.py` 导出（Stable）
 
 异常：
 
 - `CellParseError`
-  - CP2K 文件格式错误（缺少 &CELL 块、缺少 A/B/C 向量、非正交 cell、缺少 ABC 行）时抛出
+  - CP2K 文件格式错误（缺少 &CELL 块、缺少 A/B/C 向量、非正交 cell【仅 restart/向量路径可检测】、缺少 ABC 行）时抛出
 
 函数：
 
 - `parse_abc_from_restart(restart_path) -> (float, float, float)`
   - 输入：CP2K `.restart` 文件路径
   - 输出：正交 cell 的 `(a, b, c)` 长度（Angstrom）
-  - 语义：解析 `&CELL ... &END CELL` 块中 A/B/C 向量的对角元素
-
+  - 语义：经 `formats.cp2k.inp.parse_inp` 解析成 cit 树，读 `&CELL` 块中 A/B/C 向量的对角元素并校验正交性（共享 helper `_abc_ang_from_cell_tree`）
 - `parse_abc_from_md_inp(md_inp_path) -> (float, float, float)`
   - 输入：CP2K 输入文件路径（如 `md.inp`）
   - 输出：正交 cell 的 `(a, b, c)` 长度（Angstrom）
-  - 语义：匹配 `ABC [angstrom] a b c` 行
+  - 语义：cit 树读 `force_eval.subsys.cell.abc` 三标量，任意显式单位 token 自动换算为 angstrom（`[angstrom]` / `[bohr]` / 裸值同值）；ABC 三标量无法检测非正交，正交校验仅 restart/向量路径有
   - 从 `water/WaterAnalysis/_common.py` 迁移而来，升级为公开 API
 
 > **注**：`_compute_water_mass_density_z_distribution`、`_compute_water_orientation_weighted_density_z_distribution`、
 > `_compute_water_orientation_theta_pdf_in_c_fraction_window` 三个函数已降级为内部（`_` 前缀），不再属于公开 API。
 > 它们针对全 cell z 轴分箱，与 `water` 层的界面-到-中点分析语义不同，不适合作为公开接口暴露。
 
-### 2.8 `formats/cp2k_colvar.py` 导出（Stable）
+### 2.9 `formats/cp2k/colvar.py` 导出（Stable）
 
 异常：
 
@@ -195,7 +220,7 @@
 函数：
 
 - `parse_colvar_restart(restart_path) -> ColvarRestart`
-  - 解析 CP2K COLVAR restart 文件，使用 `finditer` 解析所有 `&COLLECTIVE` 块，内部复用 `formats.cp2k_cell.parse_abc_from_restart()`
+  - 解析 CP2K COLVAR restart 文件：经 `formats.cp2k.inp.parse_inp` 解析成 cit 树后按树路径直读（多 `&COLLECTIVE` 块 = 树中 list），cell 经共享 helper `formats.cp2k.cell._abc_ang_from_cell_tree()`（与 cell 路径同一正交政策）
 - `parse_lagrange_mult_log(log_path) -> LagrangeMultLog`
   - 解析 LagrangeMultLog 文件，自动检测单约束/多约束格式
 - `compute_target_series(restart, n_steps, *, colvar_id=None) -> np.ndarray`
@@ -204,7 +229,7 @@
   - `k` 为绝对步数 `[0, 1, ..., n_steps-1]`；`target_au` 是 `step_start` 时刻的快照值
   - `colvar_id` 可选参数：指定使用哪个约束，默认使用 primary（第一个）
 
-### 2.9 `cell_resolver.py` 导出（Stable）
+### 2.10 `cell_resolver.py` 导出（Stable）
 
 函数：
 
@@ -229,8 +254,9 @@
 - `from md_analysis.utils.constants import INTERFACE_NORMAL_ALIGNED, INTERFACE_NORMAL_OPPOSED`
 - `from md_analysis.utils.constants import CHARGE_METHOD_COUNTERION, CHARGE_METHOD_LAYER`
 - `from md_analysis.utils.formats.bader import load_bader_atoms, BaderParseError`
-- `from md_analysis.utils.formats.cp2k_cell import parse_abc_from_md_inp, parse_abc_from_restart`
-- `from md_analysis.utils.formats import parse_colvar_restart, parse_lagrange_mult_log, ColvarMDInfo`
+- `from md_analysis.utils.formats.cp2k.cell import parse_abc_from_md_inp, parse_abc_from_restart`
+- `from md_analysis.utils.formats.cp2k.colvar import parse_colvar_restart, parse_lagrange_mult_log, ColvarMDInfo`
+- `from md_analysis.utils.formats.cp2k.inp import parse_inp, generate_inp`
 - `from md_analysis.utils.io.cell_resolver import resolve_cell_abc`
 
 ## 4. 非公开边界（必须遵守）

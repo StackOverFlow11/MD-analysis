@@ -124,7 +124,7 @@ sg_run/
 ```
 sg_run/slowgrowth-1.restart
    │
-   ▼ parse_colvar_restart() (regex on &MD, &CONSTRAINT, &CELL)
+   ▼ parse_colvar_restart() (cit 树直读 &MD / &CONSTRAINT / &CELL 树路径)
    │
 ColvarRestart {
    project_name, step_start, time_start_fs, timestep_fs,

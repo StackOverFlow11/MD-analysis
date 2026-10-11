@@ -63,6 +63,26 @@ prefix every test command with `PYTHONPATH=src` so pytest imports the
 current working tree instead of any older copy installed in your
 environment.
 
+#### Offline / HPC install
+
+`cp2k-input-tools` is pinned as a git direct dependency
+(`cp2k-input-tools @ git+https://github.com/cp2k/cp2k-input-tools.git@393e87b`),
+so a plain `pip install .` needs network access to GitHub. For HPC
+compute nodes without internet, pre-download all wheels on a networked
+machine and install from the local directory:
+
+```bash
+# on a machine with network access (same Python/platform as the target):
+pip download . -d wheels/
+
+# copy the wheels/ directory to the HPC login node, then offline:
+pip install --no-index --find-links=wheels/ .
+```
+
+The `pip download` step is the only part that requires connectivity
+(it clones the git-pinned dependency and builds its wheel); the install
+step afterwards runs fully offline.
+
 ### CLI (interactive menu)
 
 Run `md-analysis` with no arguments to enter the interactive menu:
@@ -205,6 +225,7 @@ src/md_analysis/
 │   │   ├── cp2k/           #     CP2K single-file parsers
 │   │   │   ├── cell.py     #       cell parameter parsing (.restart + md.inp)
 │   │   │   ├── colvar.py   #       COLVAR restart + LagrangeMultLog (ConstraintMetadata / LambdaSeries)
+│   │   │   ├── inp.py      #       CP2K .inp parse/generate via cp2k-input-tools (cit tree)
 │   │   │   ├── stdout.py   #       md.out / sp.out Fermi-level + step/time parsing
 │   │   │   └── xyz.py      #       xyz step-comment parser + per-step Atoms streaming
 │   │   ├── vasp/           #     VASP placeholders (NotImplementedError, NOT auto-registered)
@@ -256,8 +277,9 @@ src/md_analysis/
     ├── PotentialGen.py     #   CP2K SP potential work directory generation (Hartree analysis)
     ├── SpGen.py            #   CP2K SP work directory generation for DeePMD training data
     ├── _frame_selector.py  #   private: shared frame selection for batch Gen scripts
-    ├── _inp_utils.py       #   private: shared CP2K inp text patching (modify_inp_for_sp)
-    ├── template/           #   bundled VASP templates (INCAR, KPOINTS)
+    ├── _inp_tree_edit.py   #   private: workflow-level CP2K inp tree edits (parse -> edit -> generate)
+    ├── _potential_template.py  #   private: built-in potential template constants + tree validators
+    ├── template/           #   bundled templates (VASP INCAR, KPOINTS; CP2K sp_potential.inp)
     └── utils/
         └── IndexMapper.py  #   CP2K XYZ <-> VASP POSCAR bijective index mapping
 
