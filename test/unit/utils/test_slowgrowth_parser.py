@@ -369,21 +369,6 @@ class TestEdgeCases:
         with pytest.raises(ColvarParseError, match="CONSTRAINT"):
             read_constraint_metadata_from_restart(fake)
 
-    def test_fixed_atoms_range_expansion(self, tmp_path):
-        """Verify that N..M range syntax is expanded correctly."""
-        from md_analysis.utils.formats.cp2k.colvar import (
-            _parse_fixed_atoms_list,
-        )
-        text = (
-            "&CONSTRAINT\n"
-            "  &FIXED_ATOMS\n"
-            "    LIST 1 3..5 10\n"
-            "  &END FIXED_ATOMS\n"
-            "&END CONSTRAINT\n"
-        )
-        result = _parse_fixed_atoms_list(text)
-        assert result == (1, 3, 4, 5, 10)
-
 
 # =========================================================================
 # ConstraintRun

@@ -1,5 +1,22 @@
 """Parse CP2K COLVAR restart files and LagrangeMultLog files.
 
+The ``.restart`` path parses the file into a cit tree via
+:func:`.inp.parse_inp` and reads ``global.project_name``,
+``motion.md.{step_start_val, time_start_val, timestep, steps}`` (time
+keywords land on their XML default unit, fs),
+``motion.constraint.collective.{colvar, target, target_growth}``
+(internal CP2K units, direct read -- the same convention as the restart
+text itself), ``motion.constraint.lagrange_multipliers.filename`` and
+``motion.constraint.fixed_atoms.list`` (integer ranges are expanded by
+the inp.py preprocessing; the ascending-tuple contract is enforced
+here).  Cell parameters come from :func:`.cell._abc_ang_from_cell_tree`
+on the same tree, so the orthogonality policy is shared with
+``cell.py``.  Legacy error messages are preserved verbatim for the
+"parsed but the tree lacks the block" scenarios; the validation order
+is pinned: PROJECT_NAME -> MD -> CONSTRAINT -> COLLECTIVE -> cell (the
+lagrange-multipliers and fixed-atoms blocks are optional).  The
+LagrangeMultLog parser is plain-text and independent of cit.
+
 Output contract
 ---------------
 Parsers return **CP2K-specific raw dataclasses** (``Cp2kConstraintInfoRaw`` /
@@ -21,7 +38,8 @@ from pathlib import Path
 
 import numpy as np
 
-from .cell import parse_abc_from_restart
+from .cell import _abc_ang_from_cell_tree
+from .inp import get_keyword, get_section, iter_collectives, parse_inp
 
 from ....exceptions import MDAnalysisError
 
@@ -88,133 +106,112 @@ class Cp2kLambdaSeriesRaw:
 
 
 # ---------------------------------------------------------------------------
-# Private helpers — restart parsing
+# Private helpers — restart parsing (cit tree path)
 # ---------------------------------------------------------------------------
 
-_CONSTRAINT_BLOCK_RE = re.compile(
-    r"&CONSTRAINT\b(.*?)&END\s+CONSTRAINT", re.DOTALL | re.IGNORECASE,
-)
-_COLLECTIVE_BLOCK_RE = re.compile(
-    r"&COLLECTIVE\s*\n(.*?)&END\s+COLLECTIVE", re.DOTALL | re.IGNORECASE,
-)
-_LAGRANGE_BLOCK_RE = re.compile(
-    r"&LAGRANGE_MULTIPLIERS\b[^\n]*\n(.*?)&END\s+LAGRANGE_MULTIPLIERS",
-    re.DOTALL | re.IGNORECASE,
-)
-_FIXED_ATOMS_BLOCK_RE = re.compile(
-    r"&FIXED_ATOMS\s*\n(.*?)&END\s+FIXED_ATOMS",
-    re.DOTALL | re.IGNORECASE,
-)
+
+def _require_tree_value(section: dict, tree_key: str, keyword: str, context: str):
+    """Fetch *tree_key* from *section* or raise the legacy message."""
+    try:
+        return section[tree_key]
+    except KeyError:
+        raise ColvarParseError(f"{keyword} not found in {context}") from None
 
 
-def _extract_scalar(block: str, key: str) -> str | None:
-    m = re.search(rf"^\s*{key}\s+(\S+)", block, re.MULTILINE | re.IGNORECASE)
-    return m.group(1) if m else None
-
-
-def _require_scalar(block: str, key: str, context: str) -> str:
-    val = _extract_scalar(block, key)
-    if val is None:
-        raise ColvarParseError(f"{key} not found in {context}")
-    return val
-
-
-def _parse_md_block(text: str) -> dict:
-    md_match = re.search(r"&MD\b(.*?)&END\s+MD", text, re.DOTALL | re.IGNORECASE)
-    if not md_match:
-        raise ColvarParseError("No &MD block found")
-    block = md_match.group(1)
+def _parse_md_from_tree(tree: dict) -> dict:
+    """Read ``motion.md.{step_start_val, time_start_val, timestep, steps}``."""
+    try:
+        md = get_section(tree, "motion.md")
+    except KeyError:
+        raise ColvarParseError("No &MD block found") from None
     return {
-        "step_start": int(_require_scalar(block, "STEP_START_VAL", "&MD")),
-        "time_start_fs": float(_require_scalar(block, "TIME_START_VAL", "&MD")),
-        "timestep_fs": float(_require_scalar(block, "TIMESTEP", "&MD")),
-        "total_steps": int(_require_scalar(block, "STEPS", "&MD")),
+        "step_start": int(
+            _require_tree_value(md, "step_start_val", "STEP_START_VAL", "&MD")
+        ),
+        "time_start_fs": float(
+            _require_tree_value(md, "time_start_val", "TIME_START_VAL", "&MD")
+        ),
+        "timestep_fs": float(
+            _require_tree_value(md, "timestep", "TIMESTEP", "&MD")
+        ),
+        "total_steps": int(_require_tree_value(md, "steps", "STEPS", "&MD")),
     }
 
 
-def _parse_single_collective_block(block: str) -> Cp2kConstraintInfoRaw:
-    inter_val = _extract_scalar(block, "INTERMOLECULAR")
-    intermolecular = False
-    if inter_val is not None:
-        intermolecular = inter_val.upper().strip(".") in ("T", "TRUE", "YES")
+def _constraint_from_block(block: dict) -> Cp2kConstraintInfoRaw:
+    """Build one raw constraint from a ``&COLLECTIVE`` block dict.
 
+    ``target`` / ``target_growth`` are internal_cp2k keywords: the tree
+    holds the internal-unit values (bohr / radian / aut) directly, like
+    the ``.restart`` text itself -- no conversion happens here.
+    """
+    colvar = _require_tree_value(block, "colvar", "COLVAR", "&COLLECTIVE")
+    if isinstance(colvar, (tuple, list)):  # multi-value keyword: first id,
+        colvar = colvar[0]                 # as the legacy first-token read
     return Cp2kConstraintInfoRaw(
-        colvar_id=int(_require_scalar(block, "COLVAR", "&COLLECTIVE")),
-        target_au=float(_require_scalar(block, "TARGET", "&COLLECTIVE")),
-        target_growth_au=float(
-            _require_scalar(block, "TARGET_GROWTH", "&COLLECTIVE")
+        colvar_id=int(colvar),
+        target_au=float(
+            _require_tree_value(block, "target", "TARGET", "&COLLECTIVE")
         ),
-        intermolecular=intermolecular,
+        target_growth_au=float(
+            _require_tree_value(block, "target_growth", "TARGET_GROWTH", "&COLLECTIVE")
+        ),
+        intermolecular=block.get("intermolecular", False),
     )
 
 
-def _parse_all_collective_blocks(text: str) -> Cp2kColvarInfoRaw:
-    constraint_match = _CONSTRAINT_BLOCK_RE.search(text)
-    if not constraint_match:
-        raise ColvarParseError("No &CONSTRAINT block found")
-    constraint_text = constraint_match.group(1)
+def _parse_all_collective_blocks(tree: dict) -> Cp2kColvarInfoRaw:
+    """Enumerate the ``&COLLECTIVE`` blocks of ``motion.constraint``.
 
-    matches = list(_COLLECTIVE_BLOCK_RE.finditer(constraint_text))
-    if not matches:
-        raise ColvarParseError("No &COLLECTIVE block found in &CONSTRAINT")
+    ``iter_collectives`` handles both tree forms (single dict or list of
+    dicts for repeated ``&COLLECTIVE`` blocks).
+    """
+    try:
+        get_section(tree, "motion.constraint")
+    except KeyError:
+        raise ColvarParseError("No &CONSTRAINT block found") from None
+    try:
+        get_section(tree, "motion.constraint.collective")
+    except KeyError:
+        raise ColvarParseError("No &COLLECTIVE block found in &CONSTRAINT") from None
 
-    constraints = tuple(
-        _parse_single_collective_block(m.group(1)) for m in matches
-    )
-    return Cp2kColvarInfoRaw(constraints=constraints)
+    constraints = []
+    try:
+        for _, block in iter_collectives(tree):
+            constraints.append(_constraint_from_block(block))
+    except KeyError:
+        # only remaining failure: a &COLLECTIVE block without a COLVAR id
+        raise ColvarParseError("COLVAR not found in &COLLECTIVE") from None
+    return Cp2kColvarInfoRaw(constraints=tuple(constraints))
 
 
-def _parse_lagrange_filename(text: str) -> str | None:
-    constraint_match = _CONSTRAINT_BLOCK_RE.search(text)
-    if not constraint_match:
+def _parse_lagrange_filename(tree: dict) -> str | None:
+    """Read ``motion.constraint.lagrange_multipliers.filename`` (or None)."""
+    try:
+        lm = get_section(tree, "motion.constraint.lagrange_multipliers")
+    except KeyError:
         return None
-    lag_match = _LAGRANGE_BLOCK_RE.search(constraint_match.group(1))
-    if not lag_match:
+    if isinstance(lm, list):  # param-less repeats: first block, like the regex
+        lm = lm[0]
+    filename = lm.get("filename")
+    return filename if filename else None
+
+
+def _parse_fixed_atoms_from_tree(tree: dict) -> tuple[int, ...] | None:
+    """Read ``motion.constraint.fixed_atoms.list`` as a sorted int tuple.
+
+    Integer ranges are already expanded by the inp.py preprocessing
+    (W1); the explicit ``sorted`` keeps the ascending-tuple contract of
+    the legacy helper.  A ``&FIXED_ATOMS`` block without a ``LIST``
+    keyword yields ``()`` (legacy semantics), a missing block ``None``.
+    """
+    try:
+        fa = get_section(tree, "motion.constraint.fixed_atoms")
+    except KeyError:
         return None
-    fn = _extract_scalar(lag_match.group(1), "FILENAME")
-    return fn.strip() if fn else None
-
-
-def _parse_fixed_atoms_list(text: str) -> tuple[int, ...] | None:
-    constraint_match = _CONSTRAINT_BLOCK_RE.search(text)
-    if not constraint_match:
-        return None
-    fa_match = _FIXED_ATOMS_BLOCK_RE.search(constraint_match.group(1))
-    if not fa_match:
-        return None
-    block = fa_match.group(1)
-
-    # Collect LIST line(s), handling \ continuation
-    list_text = ""
-    collecting = False
-    for line in block.split("\n"):
-        stripped = line.strip()
-        if not collecting:
-            if stripped.upper().startswith("LIST"):
-                content = stripped[4:].strip()  # remove 'LIST' prefix
-                if content.endswith("\\"):
-                    list_text += content[:-1] + " "
-                    collecting = True
-                else:
-                    list_text += content
-        else:
-            if stripped.endswith("\\"):
-                list_text += stripped[:-1] + " "
-            else:
-                list_text += stripped
-                collecting = False
-
-    # Parse tokens, expanding N..M ranges
-    indices: list[int] = []
-    for token in list_text.replace(",", " ").split():
-        if ".." in token:
-            parts = token.split("..")
-            start, end = int(parts[0]), int(parts[1])
-            indices.extend(range(start, end + 1))
-        else:
-            indices.append(int(token))
-
-    return tuple(sorted(indices))
+    if isinstance(fa, list):  # param-less repeats: first block, like the regex
+        fa = fa[0]
+    return tuple(sorted(int(i) for i in fa.get("list", ())))
 
 
 # ---------------------------------------------------------------------------
@@ -313,26 +310,29 @@ def parse_colvar_restart(restart_path: str | Path) -> Cp2kConstraintMetadataRaw:
     :class:`md_analysis.engines.models.ConstraintMetadata` is performed by
     ``md_analysis.engines.cp2k._cp2k_raw_to_constraint_metadata``.
 
-    Reuses :func:`~md_analysis.utils.formats.cp2k.cell.parse_abc_from_restart`
-    for cell parameters.
+    The file is parsed once into a cit tree (see :mod:`.inp`); the cell
+    parameters are extracted from the same tree via
+    :func:`.cell._abc_ang_from_cell_tree`.  Missing blocks raise
+    :class:`ColvarParseError` with the legacy messages, in the pinned
+    order PROJECT_NAME -> MD -> CONSTRAINT -> COLLECTIVE -> cell (the
+    ``&LAGRANGE_MULTIPLIERS`` and ``&FIXED_ATOMS`` blocks are optional;
+    cell errors surface as :class:`.cell.CellParseError`).
     """
-    path = Path(restart_path)
-    text = path.read_text(encoding="utf-8")
+    tree = parse_inp(restart_path)
 
-    proj_match = re.search(
-        r"^\s*PROJECT_NAME\s+(\S+)", text, re.MULTILINE | re.IGNORECASE,
-    )
-    if not proj_match:
-        raise ColvarParseError(f"PROJECT_NAME not found in {restart_path}")
+    try:
+        project_name = get_keyword(tree, "global.project_name")
+    except KeyError:
+        raise ColvarParseError(f"PROJECT_NAME not found in {restart_path}") from None
 
-    md = _parse_md_block(text)
-    colvars = _parse_all_collective_blocks(text)
-    lagrange_filename = _parse_lagrange_filename(text)
-    cell_abc_ang = parse_abc_from_restart(restart_path)
-    fixed_atoms = _parse_fixed_atoms_list(text)
+    md = _parse_md_from_tree(tree)
+    colvars = _parse_all_collective_blocks(tree)
+    cell_abc_ang = _abc_ang_from_cell_tree(tree, restart_path)
+    lagrange_filename = _parse_lagrange_filename(tree)
+    fixed_atoms = _parse_fixed_atoms_from_tree(tree)
 
     return Cp2kConstraintMetadataRaw(
-        project_name=proj_match.group(1),
+        project_name=project_name,
         step_start=md["step_start"],
         time_start_fs=md["time_start_fs"],
         timestep_fs=md["timestep_fs"],

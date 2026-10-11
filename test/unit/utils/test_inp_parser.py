@@ -1,4 +1,4 @@
-"""Tests for ``md_analysis.utils.formats.cp2k.inp`` (refactor steps 1-2).
+"""Tests for ``md_analysis.utils.formats.cp2k.inp`` (refactor steps 1-3).
 
 Anchor groups follow the refactor plan §4 (step-1 group): preprocessing
 workarounds (W3/W1/W2), lazy singletons, xmlspec pass-through, exception
@@ -11,6 +11,13 @@ Step-2 group (see §4 / §3.2): CELL ``ABC`` unit three-form anchors,
 ``cell._abc_ang_from_cell_tree`` vector-form anchors, and the md_inp
 fourth-message anchor (GLOBAL-only fixture, migrated verbatim from
 ``test_cell_parser.py``).
+
+Step-3 group (see §4 / §3.2): the rewritten fixed-atoms W1 anchor
+(formerly ``test_slowgrowth_parser.py::test_fixed_atoms_range_expansion``,
+which directly tested the deleted regex helper), the disordered-LIST
+sorted-tuple anchor through ``parse_colvar_restart``, and the
+non-orthogonal dual-path anchor (``parse_abc_from_restart`` and
+``parse_colvar_restart`` on the same fixture).
 
 Real-data anchors use ``data_example/sg/distance_combinedCV`` (kept
 untouched); all synthetic anchors are inline strings, so no synthetic data
@@ -31,7 +38,9 @@ from md_analysis.utils.formats.cp2k.cell import (
     CellParseError,
     _abc_ang_from_cell_tree,
     parse_abc_from_md_inp,
+    parse_abc_from_restart,
 )
+from md_analysis.utils.formats.cp2k.colvar import parse_colvar_restart
 from md_analysis.utils.formats.cp2k.inp import (
     InpGenerateError,
     InpParseError,
@@ -640,3 +649,86 @@ class TestMdInpMissingAbc:
         f.write_text("&GLOBAL\n  PROJECT test\n&END GLOBAL\n", encoding="utf-8")
         with pytest.raises(CellParseError, match="Cannot find"):
             parse_abc_from_md_inp(f)
+
+
+# ---------------------------------------------------------------------------
+# Step-3 anchors: colvar.py on the cit tree path (plan §4 / §3.2)
+# ---------------------------------------------------------------------------
+
+_ORTHO_CELL = (
+    "      A  10.0  0.0  0.0\n"
+    "      B   0.0 10.0  0.0\n"
+    "      C   0.0  0.0 20.0"
+)
+
+_NON_ORTHO_CELL = (
+    "      A  10.0  5.0  0.0\n"
+    "      B   0.0 10.0  0.0\n"
+    "      C   0.0  0.0 20.0"
+)
+
+
+def _colvar_restart_text(cell_lines: str, constraint_extra: str = "") -> str:
+    """Complete synthetic .restart-shaped input for the colvar read path."""
+    return (
+        "&GLOBAL\n  PROJECT_NAME colvar\n&END GLOBAL\n"
+        "&FORCE_EVAL\n  &SUBSYS\n    &CELL\n"
+        f"{cell_lines}\n"
+        "    &END CELL\n  &END SUBSYS\n&END FORCE_EVAL\n"
+        "&MOTION\n  &MD\n"
+        "    STEPS 100\n    TIMESTEP 1.0\n"
+        "    STEP_START_VAL 0\n    TIME_START_VAL 0.0\n"
+        "  &END MD\n  &CONSTRAINT\n"
+        "    &COLLECTIVE\n      COLVAR 1\n      TARGET 1.5\n"
+        "      TARGET_GROWTH 0.001\n    &END COLLECTIVE\n"
+        f"{constraint_extra}"
+        "  &END CONSTRAINT\n&END MOTION\n"
+    )
+
+
+class TestFixedAtomsW1Expansion:
+    """Step 3: rewrite of ``test_slowgrowth_parser.py::
+    test_fixed_atoms_range_expansion``, which directly tested the deleted
+    regex helper ``_parse_fixed_atoms_list``.  Range expansion now lives
+    in the inp.py pipeline (W1), so the anchor parses a complete legal
+    input and checks the tree tuple (the legacy fixture, a bare
+    ``&CONSTRAINT`` fragment, was legalised by wrapping it in ``&MOTION``).
+    """
+
+    def test_range_expanded_in_tree(self):
+        tree = parse_inp(_fixed_atoms_text("LIST 1 3..5 10"))
+        assert tree["motion"]["constraint"]["fixed_atoms"]["list"] == (1, 3, 4, 5, 10)
+
+
+class TestFixedAtomsSortedThroughColvar:
+    """Step 3: ``parse_colvar_restart`` sorts the W1-expanded LIST into an
+    ascending tuple (explicit sorted -> tuple contract, plan §3.2)."""
+
+    def test_disordered_list_sorted(self, tmp_path):
+        f = tmp_path / "disordered.restart"
+        f.write_text(
+            _colvar_restart_text(
+                _ORTHO_CELL,
+                constraint_extra=(
+                    "    &FIXED_ATOMS\n      LIST 7 2 5..6\n    &END FIXED_ATOMS\n"
+                ),
+            ),
+            encoding="utf-8",
+        )
+        raw = parse_colvar_restart(f)
+        assert raw.fixed_atom_indices == (2, 5, 6, 7)
+
+
+class TestColvarNonOrthogonalDualAnchor:
+    """Step 3: the same non-orthogonal fixture fails on both cell read
+    paths with ``CellParseError`` "Non-orthogonal" — the shared
+    orthogonality policy of ``_abc_ang_from_cell_tree`` is not lost on
+    the colvar path (plan §3.2, Q6)."""
+
+    def test_both_paths_raise_non_orthogonal(self, tmp_path):
+        f = tmp_path / "non_ortho.restart"
+        f.write_text(_colvar_restart_text(_NON_ORTHO_CELL), encoding="utf-8")
+        with pytest.raises(CellParseError, match="Non-orthogonal"):
+            parse_abc_from_restart(f)
+        with pytest.raises(CellParseError, match="Non-orthogonal"):
+            parse_colvar_restart(f)
