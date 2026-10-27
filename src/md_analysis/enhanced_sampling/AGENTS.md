@@ -14,12 +14,12 @@ TIGen 工作目录生成在 `scripts/TIGen.py`（不在此包中）。
 
 | 目录 | 用途 |
 |---|---|
-| `slowgrowth/` | SG 数据结构、积分、绘图 → `slowgrowth/CLAUDE.md` |
-| `constrained_ti/` | 约束 TI 收敛诊断（ACF + F&P block avg + Geweke） → `constrained_ti/CLAUDE.md` |
+| `slowgrowth/` | SG 数据结构、积分、绘图 → `slowgrowth/AGENTS.md` |
+| `constrained_ti/` | 约束 TI 收敛诊断（ACF + F&P block avg + Geweke） → `constrained_ti/AGENTS.md` |
 
 ## Engine 抽象层（Phase 6 接入）
 
-约束 MD 的 parser 协议、注册表和 CP2K 实现已经统一搬到 `md_analysis.engines`（详见 `engines/CLAUDE.md`）。SG / TI 的 IO 层直接 import：
+约束 MD 的 parser 协议、注册表和 CP2K 实现已经统一搬到 `md_analysis.engines`（详见 `engines/AGENTS.md`）。SG / TI 的 IO 层直接 import：
 
 ```python
 from md_analysis.engines import (
@@ -89,7 +89,7 @@ from md_analysis.engines import (
 
 ### TI 收敛诊断模块（constrained_ti/）
 
-已实现，详见 `constrained_ti/CLAUDE.md`。核心流程：
+已实现，详见 `constrained_ti/AGENTS.md`。核心流程：
 1. ACF → τ_corr, N_eff, SEM_auto
 2. Flyvbjerg-Petersen block averaging → SEM_block（pow2 + δSEM 平台检测）
 3. Running average drift check

@@ -4,7 +4,7 @@
 >
 > 本文档定义 `md_analysis.utils` 的符号级公开接口与暴露边界。
 
-> ⚠️ **Phase 9 部分同步状态**：`utils/` 在 Phase 2-4 重组为 `formats/` / `structure/` / `io/` 三层，对应的导入路径串和子目录引用已在本文档全文做 sed 替换；下方按子模块组织的符号清单（§2 各小节）的章节标题和分组结构尚未按新三层重新排版。开发者请以 `src/md_analysis/utils/CLAUDE.md` 为准；本文档章节结构会在后续清理 pass 中重写。
+> ⚠️ **Phase 9 部分同步状态**：`utils/` 在 Phase 2-4 重组为 `formats/` / `structure/` / `io/` 三层，对应的导入路径串和子目录引用已在本文档全文做 sed 替换；下方按子模块组织的符号清单（§2 各小节）的章节标题和分组结构尚未按新三层重新排版。开发者请以 `src/md_analysis/utils/AGENTS.md` 为准；本文档章节结构会在后续清理 pass 中重写。
 
 ## 1. 接口角色定义
 

@@ -37,4 +37,4 @@ Bader 电荷分析：计算金属-水界面的表面电荷密度（μC/cm²）�
 
 | 目录 | 用途 |
 |---|---|
-| `Bader/` | Bader 电荷分析子包 → `Bader/CLAUDE.md` |
+| `Bader/` | Bader 电荷分析子包 → `Bader/AGENTS.md` |

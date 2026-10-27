@@ -14,7 +14,7 @@
   - 混淆这两个是常见错误
 - **NullHandler**：`__init__.py` 在 `md_analysis` logger 上设置 `NullHandler()`（PEP 282），CLI 或应用程序负责配置实际 handler
 - **异常层次**：所有领域异常继承 `MDAnalysisError`（在 `exceptions.py` 定义），调用方可 `except MDAnalysisError` 统一捕获
-- **编程入口**：`workflows/` 提供 `run_*()` 函数集，全部返回 `WorkflowResult`（`artifacts` / `metadata` / `extra`）。`main.py` 是同一批名字的薄 re-export facade（import-only）。**完整清单以 `workflows/__init__.py.__all__` 为权威**（亦见 `workflows/CLAUDE.md`）；composite `run_interface_analysis` 取代旧 `run_all`。
+- **编程入口**：`workflows/` 提供 `run_*()` 函数集，全部返回 `WorkflowResult`（`artifacts` / `metadata` / `extra`）。`main.py` 是同一批名字的薄 re-export facade（import-only）。**完整清单以 `workflows/__init__.py.__all__` 为权威**（亦见 `workflows/AGENTS.md`）；composite `run_interface_analysis` 取代旧 `run_all`。
 - **`run_*` 目录契约**：每个 `run_*()` 的 `output_dir` 参数即**最终写入目录**（不再自动前置 `water/`、`electrochemical/potential/` 等），仅保留必要的内部子目录（如 surface charge 的 `<method>/`）。调用方需自行提供完整路径；`run_interface_analysis` 会按下述标准布局分派路径。
 - **标准输出目录结构**（`run_interface_analysis` 以及 CLI 菜单路径均按此推导）：
   - `<outdir>/water/`
@@ -36,14 +36,14 @@
 
 | 目录 | 用途 |
 |---|---|
-| `cli/` | 交互式 CLI → `cli/CLAUDE.md` |
+| `cli/` | 交互式 CLI → `cli/AGENTS.md` |
 | `workflows/` | 程序化入口 facade（`run_*` + `WorkflowResult`；清单见 `workflows/__init__.py.__all__`） |
-| `engines/` | CP2K/VASP 引擎门面 + engine-neutral dataclass → `engines/CLAUDE.md` |
-| `utils/` | 底层工具（formats / structure / io 三层）→ `utils/CLAUDE.md` |
-| `water/` | 水分析 → `water/CLAUDE.md` |
-| `electrochemical/` | 电化学 → `electrochemical/CLAUDE.md` |
-| `enhanced_sampling/` | 增强采样 → `enhanced_sampling/CLAUDE.md` |
-| `scripts/` | 自动化脚本 → `scripts/CLAUDE.md` |
+| `engines/` | CP2K/VASP 引擎门面 + engine-neutral dataclass → `engines/AGENTS.md` |
+| `utils/` | 底层工具（formats / structure / io 三层）→ `utils/AGENTS.md` |
+| `water/` | 水分析 → `water/AGENTS.md` |
+| `electrochemical/` | 电化学 → `electrochemical/AGENTS.md` |
+| `enhanced_sampling/` | 增强采样 → `enhanced_sampling/AGENTS.md` |
+| `scripts/` | 自动化脚本 → `scripts/AGENTS.md` |
 
 ## 依赖方向（utils/engines 重构后）
 

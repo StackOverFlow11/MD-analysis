@@ -118,7 +118,7 @@ elif md_inp_path is not None:
 
 ### 2.2 业务实际需要的数据
 
-按 `electrochemical/potential/CLAUDE.md` 与函数体证据：
+按 `electrochemical/potential/AGENTS.md` 与函数体证据：
 
 **整帧序列消费**（已 engines 化）：
 - `list[PotentialFrame]`，每帧含 `step / time_fs / cube_path / header / values /
@@ -151,7 +151,7 @@ elif md_inp_path is not None:
   - `parse_md_out_fermi` 是 CP2K 文件解析层，engines 已经在 `read_fermi_series`
     facade 里包装了它（`FermiRecord.from_legacy_dict`）。但 `CenterPotential.py:447`
     仍直读，理由：`CenterPotential.py:455-457` 还用 dict-style `r["step"]` 访问
-    （`engines/CLAUDE.md` 行 73-78 已记录这个**有意保留的 dict 接口**）。
+    （`engines/AGENTS.md` 行 73-78 已记录这个**有意保留的 dict 接口**）。
 
 ### 2.4 Phase 3 候选
 
@@ -163,7 +163,7 @@ elif md_inp_path is not None:
   定 213 Fermi-only / distributed 路径也用统一 frame 模型，可以考虑引入"轻量帧"
   （只有 step/time/fermi，无 cube），让 `CenterPotential.py` 不再走 dict-style
   parse_md_out_fermi。
-  - **决策注意**：`engines/CLAUDE.md:73-78` 明确"dict 接口有意保留，强迫迁移会牵
+  - **决策注意**：`engines/AGENTS.md:73-78` 明确"dict 接口有意保留，强迫迁移会牵
     涉 caller"。Phase 3 拍板前需要先决定"是否在 Phase 4 一起迁移 CenterPotential
     的 dict access"，否则 EXTEND-MODEL 不能落地。
 
@@ -461,7 +461,7 @@ Protocol + registry sniffing 工作；`TIPointDefinition.metadata` 是
    费。
 3. 再决定 `ENGINE-SCOPE`（charge）——这是 Bader / correction 流程依赖，但牵扯
    `engines.vasp` placeholder 的实现节奏。
-4. 最后决定 `EXTEND-MODEL`（potential 轻量帧）——风险是与 `engines/CLAUDE.md`
+4. 最后决定 `EXTEND-MODEL`（potential 轻量帧）——风险是与 `engines/AGENTS.md`
    "dict 接口有意保留"的历史决策对冲，Phase 4 时再做。
 
 ### Phase 5/6 候选迁移点（doc-only，不指导实现）

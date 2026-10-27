@@ -1,7 +1,7 @@
 # `md_analysis.engines` 内部实现准则（当前实现口径）
 
 > 适用范围：`src/md_analysis/engines/`
-> 详细开发说明见 `src/md_analysis/engines/CLAUDE.md`。
+> 详细开发说明见 `src/md_analysis/engines/AGENTS.md`。
 
 ## 1. 职责边界
 

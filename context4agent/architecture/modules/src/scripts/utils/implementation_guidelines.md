@@ -39,4 +39,4 @@ scripts/
 Changes to this module must update:
 - This file (`implementation_guidelines.md`)
 - `interface_exposure.md` in the same directory
-- `CLAUDE.md` project map (if public API changes)
+- `AGENTS.md` project map (if public API changes)

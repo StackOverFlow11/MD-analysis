@@ -550,7 +550,7 @@ def run_sp_single(
     """Generate one CP2K SP work directory for DeePMD training data.
 
     Distinct from :func:`run_potential_single` even though both write
-    a CP2K SP input — see ``scripts/CLAUDE.md`` for the contract
+    a CP2K SP input — see ``scripts/AGENTS.md`` for the contract
     differences (config key ``KEY_DP_SP_INP_TEMPLATE_PATH`` and
     ``sp_t*_i*`` directory prefix for batches).
     """

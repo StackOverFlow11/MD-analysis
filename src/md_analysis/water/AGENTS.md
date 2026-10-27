@@ -22,4 +22,4 @@
 
 | 目录 | 用途 |
 |---|---|
-| `WaterAnalysis/` | 核心计算逻辑 → `WaterAnalysis/CLAUDE.md` |
+| `WaterAnalysis/` | 核心计算逻辑 → `WaterAnalysis/AGENTS.md` |

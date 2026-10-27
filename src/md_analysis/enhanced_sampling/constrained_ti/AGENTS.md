@@ -41,7 +41,7 @@ otherwise           → SEM at largest valid block size
 | `integration.py` | 梯形积分权重、SEM targets、自由能积分 |
 | `io.py` | Engine-agnostic 约束点目录发现 + 批量加载（`discover_ti_points(parser="auto", dir_filter=None, reverse, strict)`、`load_ti_series`）；解析委托给 `md_analysis.engines.protocols.ConstraintMDParser` Protocol（CP2K 实现在 `engines.cp2k.CP2KParser`，engines 包 import 时自动注册） |
 | `correction.py` | 恒电势自由能修正（Nørskov）：`ConstantPotentialCorrection`, `ConstantPotentialResult`, `compute_constant_potential_correction`。`plot_corrected_free_energy_profile` 已迁至 `plot.py`，`correction.py` 仅 re-export 以保持旧导入路径 |
-| `analysis/` | 四步诊断引擎 → `analysis/CLAUDE.md` |
+| `analysis/` | 四步诊断引擎 → `analysis/AGENTS.md` |
 
 ## BlockAverageResult 字段
 

@@ -8,6 +8,6 @@
 
 | 目录 | 用途 |
 |---|---|
-| `potential/` | Hartree 势 / 电极电位分析 → `potential/CLAUDE.md` |
-| `charge/` | Bader 电荷表面电荷密度 → `charge/CLAUDE.md` |
-| `calibration/` | σ→φ 标定映射 → `calibration/CLAUDE.md` |
+| `potential/` | Hartree 势 / 电极电位分析 → `potential/AGENTS.md` |
+| `charge/` | Bader 电荷表面电荷密度 → `charge/AGENTS.md` |
+| `calibration/` | σ→φ 标定映射 → `calibration/AGENTS.md` |

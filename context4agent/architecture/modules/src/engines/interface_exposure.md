@@ -3,7 +3,7 @@
 > 对应代码：`src/md_analysis/engines/`
 >
 > 本文档定义 `md_analysis.engines` 的符号级公开接口与暴露边界。
-> 详细开发说明见 `src/md_analysis/engines/CLAUDE.md`。
+> 详细开发说明见 `src/md_analysis/engines/AGENTS.md`。
 
 ## 1. 接口角色定义
 

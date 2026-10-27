@@ -613,7 +613,7 @@ return CenterPotentialScalarFrame(
 - ✅ 新增 `engines.cp2k.read_center_potential_scalar_frame(...)` facade
 - ✅ 在 `engines/__init__.py` re-export
 - ⚠️ **Phase 4 不改 `electrochemical/potential/CenterPotential.py`**:
-  - 业务保留 dict-style `parse_md_out_fermi` 访问(`engines/CLAUDE.md:73-78` 历史
+  - 业务保留 dict-style `parse_md_out_fermi` 访问(`engines/AGENTS.md:73-78` 历史
     决议)
   - 业务保留 `slab_average_potential_ev` 直接调用
   - 新 facade **仅作为 Phase 5 业务迁移入口**;Phase 4 只交付接口

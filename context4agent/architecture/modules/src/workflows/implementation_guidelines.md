@@ -1,6 +1,6 @@
 # `md_analysis.workflows` 内部实现准则（当前实现口径）
 
-> 适用范围：`src/md_analysis/workflows/`。详细开发备忘（陷阱与历史 Bug）见 `src/md_analysis/workflows/CLAUDE.md`。
+> 适用范围：`src/md_analysis/workflows/`。详细开发备忘（陷阱与历史 Bug）见 `src/md_analysis/workflows/AGENTS.md`。
 
 ## 1. 职责边界
 
@@ -66,5 +66,5 @@ engines / utils / exceptions
 
 - 同目录 `interface_exposure.md`（`__all__` 清单、artifacts 键、目录布局约定）
 - `src/md_analysis/main.py` re-export 清单（公开符号增删时）
-- `src/md_analysis/workflows/CLAUDE.md`（开发备忘，含陷阱记录）
+- `src/md_analysis/workflows/AGENTS.md`（开发备忘，含陷阱记录）
 - CLI 菜单接线变化时：`context4agent/architecture/modules/src/cli/` 两份文档

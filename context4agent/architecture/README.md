@@ -15,7 +15,7 @@
 - `data_example/`：最小可复现实例数据（`data_example/potential/`）
 - `context4agent/`：架构/契约/决策/需求上下文（本目录）
 - `README.md`：快速入口与最小跑通方式
-- `CLAUDE.md`：Claude Code 协作指引
+- `AGENTS.md`：Claude Code 协作指引
 
 ## `src/md_analysis/` 包内分层（当前）
 

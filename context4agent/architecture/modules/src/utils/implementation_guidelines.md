@@ -8,7 +8,7 @@
 >
 > 目标：在明确物理口径与输入输出契约的前提下，提供可复用、可测试、可维护的底层实现。
 
-> ⚠️ **Phase 9 部分同步状态**：本文档全文做了 sed 路径替换，但下方按旧目录结构组织的章节内容尚未按 formats/structure/io 重写。开发者请以 `src/md_analysis/utils/CLAUDE.md` 为准。
+> ⚠️ **Phase 9 部分同步状态**：本文档全文做了 sed 路径替换，但下方按旧目录结构组织的章节内容尚未按 formats/structure/io 重写。开发者请以 `src/md_analysis/utils/AGENTS.md` 为准。
 
 ## 1. 职责分层与边界
 

@@ -100,4 +100,4 @@ scripts/
 Changes to this module must update:
 - This file (`implementation_guidelines.md`)
 - `interface_exposure.md` in the same directory
-- `CLAUDE.md` project map
+- `AGENTS.md` project map

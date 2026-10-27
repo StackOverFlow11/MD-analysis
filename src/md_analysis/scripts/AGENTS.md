@@ -106,5 +106,5 @@
 
 | 目录 | 用途 |
 |---|---|
-| `utils/` | IndexMapper（CP2K↔VASP 索引映射）→ `utils/CLAUDE.md` |
+| `utils/` | IndexMapper（CP2K↔VASP 索引映射）→ `utils/AGENTS.md` |
 | `template/` | VASP 模板文件（INCAR, KPOINTS），通过 importlib.resources 访问 |
