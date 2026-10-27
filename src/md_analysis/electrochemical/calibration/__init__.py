@@ -23,10 +23,20 @@ from ._mapper import (
     mapper_from_dict,
 )
 from ._plot import plot_calibration
-from .CalibrationWorkflow import calibrate, convert_reference, predict_potential
+from .CalibrationWorkflow import (
+    CalibrationFitReport,
+    CalibrationPredictionReport,
+    calibrate,
+    calibrate_with_report,
+    convert_reference,
+    predict_potential,
+    predict_potential_with_report,
+)
 
 __all__ = [
     "CalibrationData",
+    "CalibrationFitReport",
+    "CalibrationPredictionReport",
     "load_calibration_csv",
     "load_calibration_json",
     "save_calibration_json",
@@ -40,6 +50,8 @@ __all__ = [
     "mapper_from_dict",
     "plot_calibration",
     "calibrate",
+    "calibrate_with_report",
     "convert_reference",
     "predict_potential",
+    "predict_potential_with_report",
 ]

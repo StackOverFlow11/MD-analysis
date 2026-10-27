@@ -1,4 +1,16 @@
-"""Integration tests for md_analysis.main programmatic API."""
+"""Integration tests for the ``md_analysis.main`` re-export facade.
+
+Phase 7a of the entrance refactor removed the legacy
+``run_*_analysis`` and ``run_all`` shims from ``md_analysis.main``.
+This module now re-exports the canonical workflow functions from
+``md_analysis.workflows``; the tests below cover the same
+scientific paths as before but against the new ``WorkflowResult``
+return contract.
+
+Fixtures live under ``data_example/potential/dense/`` (continuous
+mode) — the legacy ``data_example/potential/`` root-level files were
+moved into ``dense/`` during the Phase 0 utils/engines refactor.
+"""
 
 from __future__ import annotations
 
@@ -12,22 +24,24 @@ matplotlib.use("Agg")
 import pytest
 
 from md_analysis.main import (
-    run_all,
-    run_charge_analysis,
-    run_potential_analysis,
-    run_water_analysis,
+    WorkflowResult,
+    run_interface_analysis,
+    run_potential_full,
+    run_surface_charge,
+    run_water_three_panel,
 )
 
 # ---------------------------------------------------------------------------
 # Data directories
 # ---------------------------------------------------------------------------
 
-_DATA_DIR = Path(__file__).resolve().parents[2] / "data_example" / "potential"
-_BADER_DIR = Path(__file__).resolve().parents[2] / "data_example" / "bader" / "single_frame"
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_DATA_DIR = _REPO_ROOT / "data_example" / "potential" / "dense"
+_BADER_DIR = _REPO_ROOT / "data_example" / "bader" / "single_frame"
 
 pytestmark = pytest.mark.skipif(
     not _DATA_DIR.exists(),
-    reason=f"data_example/potential/ not found at {_DATA_DIR}",
+    reason=f"data_example/potential/dense/ not found at {_DATA_DIR}",
 )
 
 # Files needed per fake charge frame
@@ -46,24 +60,23 @@ def _build_fake_trajectory(tmp_path: Path, n_frames: int = 2) -> Path:
 
 
 # ===========================================================================
-# TestRunWaterAnalysis
+# run_water_three_panel
 # ===========================================================================
 
 
-class TestRunWaterAnalysis:
+class TestRunWaterThreePanel:
 
     def test_happy_path(self, tmp_path: Path):
-        # run_water_analysis writes directly into output_dir — caller provides
-        # the final directory (mirroring the canonical <root>/water/ layout
-        # produced by run_all).
         water_dir = tmp_path / "water"
-        results = run_water_analysis(
+        result = run_water_three_panel(
             xyz_path=_DATA_DIR / "md-pos-1.xyz",
             md_inp_path=_DATA_DIR / "md.inp",
             output_dir=water_dir,
         )
 
-        assert len(results) == 6
+        assert isinstance(result, WorkflowResult)
+        assert result.name == "water_three_panel"
+
         expected_keys = {
             "density_csv",
             "orientation_csv",
@@ -72,15 +85,15 @@ class TestRunWaterAnalysis:
             "adsorbed_theta_csv",
             "plot_png",
         }
-        assert set(results.keys()) == expected_keys
+        assert set(result.artifacts.keys()) == expected_keys
 
         # All files exist and water_dir was created
         assert water_dir.is_dir()
-        for key, path in results.items():
+        for key, path in result.artifacts.items():
             assert path.exists(), f"{key} not found: {path}"
 
     def test_frame_slicing(self, tmp_path: Path):
-        results = run_water_analysis(
+        result = run_water_three_panel(
             xyz_path=_DATA_DIR / "md-pos-1.xyz",
             md_inp_path=_DATA_DIR / "md.inp",
             output_dir=tmp_path,
@@ -89,23 +102,23 @@ class TestRunWaterAnalysis:
             frame_step=2,
         )
 
-        # Should succeed without error; outputs exist
-        for key, path in results.items():
+        assert isinstance(result, WorkflowResult)
+        for key, path in result.artifacts.items():
             assert path.exists(), f"{key} not found: {path}"
 
 
 # ===========================================================================
-# TestRunPotentialAnalysis
+# run_potential_full
 # ===========================================================================
 
 
-class TestRunPotentialAnalysis:
+class TestRunPotentialFull:
 
     def test_full_electrode(self, tmp_path: Path):
         old_cwd = os.getcwd()
         try:
             os.chdir(_DATA_DIR)
-            results = run_potential_analysis(
+            result = run_potential_full(
                 output_dir=tmp_path,
                 md_out_path=_DATA_DIR / "md.out",
                 xyz_path=_DATA_DIR / "md-pos-1.xyz",
@@ -117,17 +130,18 @@ class TestRunPotentialAnalysis:
         finally:
             os.chdir(old_cwd)
 
-        assert "electrode_csv" in results
-        assert "phi_z_png" in results
-        assert "thickness_sensitivity_csv" in results
-        for key, path in results.items():
+        assert isinstance(result, WorkflowResult)
+        assert "electrode_csv" in result.artifacts
+        assert "phi_z_png" in result.artifacts
+        assert "thickness_sensitivity_csv" in result.artifacts
+        for key, path in result.artifacts.items():
             assert path.exists(), f"{key} not found: {path}"
 
     def test_separate_center_fermi(self, tmp_path: Path):
         old_cwd = os.getcwd()
         try:
             os.chdir(_DATA_DIR)
-            results = run_potential_analysis(
+            result = run_potential_full(
                 output_dir=tmp_path,
                 md_out_path=_DATA_DIR / "md.out",
                 compute_u=False,
@@ -137,17 +151,17 @@ class TestRunPotentialAnalysis:
         finally:
             os.chdir(old_cwd)
 
-        assert "center_csv" in results
-        assert "fermi_csv" in results
-        assert "electrode_csv" not in results
-        for key, path in results.items():
+        assert "center_csv" in result.artifacts
+        assert "fermi_csv" in result.artifacts
+        assert "electrode_csv" not in result.artifacts
+        for key, path in result.artifacts.items():
             assert path.exists(), f"{key} not found: {path}"
 
     def test_no_md_out(self, tmp_path: Path):
         old_cwd = os.getcwd()
         try:
             os.chdir(_DATA_DIR)
-            results = run_potential_analysis(
+            result = run_potential_full(
                 output_dir=tmp_path,
                 md_out_path=None,
                 compute_phi_z=True,
@@ -156,19 +170,19 @@ class TestRunPotentialAnalysis:
         finally:
             os.chdir(old_cwd)
 
-        assert "center_csv" in results
-        assert "phi_z_png" in results
-        assert "fermi_csv" not in results
-        assert "electrode_csv" not in results
-        assert "thickness_sensitivity_csv" not in results
-        for key, path in results.items():
+        assert "center_csv" in result.artifacts
+        assert "phi_z_png" in result.artifacts
+        assert "fermi_csv" not in result.artifacts
+        assert "electrode_csv" not in result.artifacts
+        assert "thickness_sensitivity_csv" not in result.artifacts
+        for key, path in result.artifacts.items():
             assert path.exists(), f"{key} not found: {path}"
 
     def test_no_phi_z(self, tmp_path: Path):
         old_cwd = os.getcwd()
         try:
             os.chdir(_DATA_DIR)
-            results = run_potential_analysis(
+            result = run_potential_full(
                 output_dir=tmp_path,
                 md_out_path=None,
                 compute_phi_z=False,
@@ -177,15 +191,15 @@ class TestRunPotentialAnalysis:
         finally:
             os.chdir(old_cwd)
 
-        assert "phi_z_png" not in results
+        assert "phi_z_png" not in result.artifacts
 
 
 # ===========================================================================
-# TestRunChargeAnalysis
+# run_surface_charge
 # ===========================================================================
 
 
-class TestRunChargeAnalysis:
+class TestRunSurfaceCharge:
 
     @pytest.mark.skipif(
         not _BADER_DIR.exists(),
@@ -193,35 +207,35 @@ class TestRunChargeAnalysis:
     )
     def test_happy_path(self, tmp_path: Path):
         root = _build_fake_trajectory(tmp_path / "traj", n_frames=2)
-        # run_charge_analysis writes into output_dir/<method>/ — caller
-        # supplies the electrochemical/charge prefix (mirroring run_all).
+        # run_surface_charge writes into output_dir/<method>/.
         out = tmp_path / "output" / "electrochemical" / "charge"
 
-        results = run_charge_analysis(
+        result = run_surface_charge(
             output_dir=out,
             root_dir=root,
             method="counterion",
         )
 
-        assert "charge_csv" in results
-        assert "charge_png" in results
-        assert results["charge_csv"].exists()
+        assert isinstance(result, WorkflowResult)
+        assert "charge_csv" in result.artifacts
+        assert "charge_png" in result.artifacts
+        assert result.artifacts["charge_csv"].exists()
         # method subdirectory was created inside output_dir
         assert (out / "counterion").is_dir()
 
 
 # ===========================================================================
-# TestRunAll
+# run_interface_analysis (replaces legacy run_all)
 # ===========================================================================
 
 
-class TestRunAll:
+class TestRunInterfaceAnalysis:
 
     def test_happy_path(self, tmp_path: Path):
         old_cwd = os.getcwd()
         try:
             os.chdir(_DATA_DIR)
-            results = run_all(
+            result = run_interface_analysis(
                 xyz_path=_DATA_DIR / "md-pos-1.xyz",
                 md_inp_path=_DATA_DIR / "md.inp",
                 output_dir=tmp_path,
@@ -234,8 +248,18 @@ class TestRunAll:
         finally:
             os.chdir(old_cwd)
 
-        # Should contain both water and potential keys
-        assert "density_csv" in results
-        assert "electrode_csv" in results
-        for key, path in results.items():
+        assert isinstance(result, WorkflowResult)
+        assert result.name == "interface_analysis"
+        # Should contain both water and potential keys.
+        assert "density_csv" in result.artifacts
+        assert "electrode_csv" in result.artifacts
+        for key, path in result.artifacts.items():
             assert path.exists(), f"{key} not found: {path}"
+        # Composite metadata
+        assert result.metadata["sub_workflows"] == [
+            "water_three_panel", "potential_full",
+        ]
+        assert result.metadata["water_output_dir"].endswith("water")
+        assert result.metadata["potential_output_dir"].endswith(
+            "electrochemical/potential"
+        )

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from md_analysis.enhanced_sampling._parsers import (
+from md_analysis.engines import (
     CP2KParser,
     ParserInferenceError,
 )

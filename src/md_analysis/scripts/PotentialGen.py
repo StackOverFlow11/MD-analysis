@@ -4,21 +4,178 @@ from __future__ import annotations
 
 import logging
 import shutil
+from importlib.resources import files
 from pathlib import Path
+from typing import Iterable
 
 from ase import Atoms
 from ase.io import write
 
 from ..config import KEY_CP2K_SCRIPT_PATH, KEY_SP_INP_TEMPLATE_PATH, get_config
 from ..exceptions import MDAnalysisError
+from ..utils.formats.cp2k.inp import (
+    InpParseError,
+    generate_inp,
+    parse_inp,
+    set_cell_abc,
+)
 from ._frame_selector import FrameSelection, iter_selected_frames
-from ._inp_utils import modify_inp_for_sp
+from ._inp_tree_edit import ensure_kind_blocks, ensure_topology_init_xyz
+from ._potential_template import (
+    DEFAULT_TEMPLATE_RESOURCE,
+    extract_kind_elements,
+    has_smear,
+    has_v_hartree_cube,
+)
 
 logger = logging.getLogger(__name__)
 
 
 class PotentialGenError(MDAnalysisError):
     """Raised when potential work directory generation fails."""
+
+
+# ---------------------------------------------------------------------------
+# Template resolution: explicit argument > persisted config > built-in default
+# ---------------------------------------------------------------------------
+
+
+def _resolve_inp_template_path(
+    inp_template_path: str | Path | None,
+) -> Path | None:
+    """Resolve the sp.inp template path (level 1: explicit, level 2: config).
+
+    Returns ``None`` when neither is given; callers then fall back to the
+    built-in default template (level 3) when loading the text.
+    """
+    if inp_template_path is None:
+        cfg_val = get_config(KEY_SP_INP_TEMPLATE_PATH)
+        if cfg_val is not None:
+            inp_template_path = cfg_val
+    if inp_template_path is None:
+        return None
+    path = Path(inp_template_path)
+    if not path.is_file():
+        raise FileNotFoundError(f"SP inp template not found: {path}")
+    return path
+
+
+def _validate_user_inp_template(
+    tree: dict,
+    elements: tuple[str, ...],
+    *,
+    source: str,
+) -> None:
+    """Validate a user-supplied template tree against the potential-SP hard requirements.
+
+    Checked (see ``context4agent/requirements/vasp_md_to_cp2k_potential_sp.md``):
+
+    - ``&V_HARTREE_CUBE`` print present — the potential analysis (phi(z) /
+      PZC) reads the Hartree cube this print produces.
+    - ``&SMEAR`` present — metallic systems need smeared occupations to
+      converge and to print the Fermi energy the analysis consumes.
+    - ``&KIND`` blocks cover every element of the frame(s) — CP2K aborts on
+      atoms whose element has no ``&KIND``.
+
+    The built-in default template is exempt: its ``&KIND`` blocks are
+    generated from the element list and it ships both required sections.
+    """
+    problems: list[str] = []
+    if not has_v_hartree_cube(tree):
+        problems.append(
+            "missing '&V_HARTREE_CUBE' in &DFT &PRINT — the potential "
+            "analysis (phi(z) / PZC) reads the Hartree cube this print "
+            "produces; without it the SP run yields no cube. Add "
+            "'&V_HARTREE_CUBE ON' under &DFT &PRINT."
+        )
+    if not has_smear(tree):
+        problems.append(
+            "missing '&SMEAR' in &SCF — metallic systems need smeared "
+            "occupations to converge and to print the Fermi energy used by "
+            "the potential analysis. Add '&SMEAR ON' with "
+            "'METHOD FERMI_DIRAC' under &SCF (with diagonalization, cf. "
+            "ADDED_MOS / CHOLESKY)."
+        )
+    kind_elements = extract_kind_elements(tree)
+    missing = [el for el in elements if el.upper() not in kind_elements]
+    if missing:
+        problems.append(
+            f"&KIND blocks do not cover element(s): {', '.join(missing)} — "
+            "CP2K aborts when an atom's element has no matching &KIND. Add "
+            "one &KIND block per element (BASIS_SET + POTENTIAL), or drop "
+            "inp_template_path to use the built-in default template, which "
+            "generates &KIND blocks automatically."
+        )
+    if problems:
+        raise PotentialGenError(
+            f"SP inp template {source} failed potential-SP validation:\n"
+            + "\n".join(f"- {p}" for p in problems)
+        )
+
+
+def _load_inp_template_tree(
+    template_path: Path | None,
+    elements: tuple[str, ...],
+) -> dict:
+    """Load the sp.inp template as a cit tree (level 3 fallback: built-in default).
+
+    User templates (explicit argument or config) are parsed and validated
+    against the potential-SP hard requirements; the built-in template
+    instead gets its ``&KIND`` blocks upserted from *elements* (full
+    coverage by construction).  Templates that cannot be parsed raise
+    :class:`PotentialGenError` with the template path (cause preserved);
+    generate-side failures propagate untouched (programming errors).
+    """
+    if template_path is None:
+        logger.info(
+            "No SP inp template given or configured; using the built-in "
+            "default potential template (elements: %s)",
+            ", ".join(elements) or "<none>",
+        )
+        resource = files("md_analysis.scripts.template").joinpath(
+            DEFAULT_TEMPLATE_RESOURCE
+        )
+        text = resource.read_text(encoding="utf-8")
+        try:
+            tree = parse_inp(text)
+        except InpParseError as e:
+            raise PotentialGenError(
+                f"Cannot parse built-in potential template "
+                f"md_analysis.scripts.template/{DEFAULT_TEMPLATE_RESOURCE}: {e}"
+            ) from e
+        ensure_kind_blocks(tree, elements)
+        return tree
+    try:
+        tree = parse_inp(template_path)
+    except InpParseError as e:
+        raise PotentialGenError(
+            f"Cannot parse SP inp template {template_path}: {e}"
+        ) from e
+    _validate_user_inp_template(tree, elements, source=str(template_path))
+    return tree
+
+
+def _apply_sp_edits_and_generate(
+    tree: dict,
+    cell_abc: tuple[float, float, float],
+) -> str:
+    """Apply the frame-independent SP edits and generate the sp.inp text once.
+
+    ``&CELL ABC`` update + ``&TOPOLOGY`` → ``init.xyz`` do not depend on
+    the frame, so batch callers reuse the returned text for every work
+    directory (parse-once / generate-once discipline, refactor plan §3.3).
+    """
+    set_cell_abc(tree, *cell_abc)
+    ensure_topology_init_xyz(tree)
+    return generate_inp(tree)
+
+
+def _unique_elements(atoms_iterable: Iterable[Atoms]) -> tuple[str, ...]:
+    """Unique chemical symbols across the given Atoms, first-appearance order."""
+    seen: dict[str, None] = {}
+    for atoms in atoms_iterable:
+        seen.update(dict.fromkeys(atoms.get_chemical_symbols()))
+    return tuple(seen)
 
 
 # ---------------------------------------------------------------------------
@@ -45,8 +202,10 @@ def generate_potential_workdir(
     output_dir : str or Path
         Parent directory under which *workdir_name* will be created.
     inp_template_path : str, Path or None
-        Path to the CP2K sp.inp template file.
-        If ``None``, falls back to the persisted config value.
+        Path to the CP2K sp.inp template file. If ``None``, falls back to the
+        persisted config value (``KEY_SP_INP_TEMPLATE_PATH``); if that is also
+        unset, the built-in default potential template shipped with the
+        package is used (``&KIND`` blocks generated from the frame's elements).
     cell_abc : (float, float, float) or None
         Orthogonal cell lengths (A). If ``None``, uses cell from *atoms*.
     script_path : str, Path or None
@@ -67,23 +226,18 @@ def generate_potential_workdir(
     Raises
     ------
     PotentialGenError
-        If the inp template is not found or invalid.
+        If a user-supplied (explicit or config) template fails potential-SP
+        validation: missing ``&V_HARTREE_CUBE``, missing ``&SMEAR``, or
+        ``&KIND`` blocks not covering all frame elements.
+    FileNotFoundError
+        If a user-supplied template or script path does not exist.
     """
     logger.info("Generating potential workdir: frame=%d, workdir=%s", frame, workdir_name)
 
-    # Resolve inp template
-    if inp_template_path is None:
-        cfg_val = get_config(KEY_SP_INP_TEMPLATE_PATH)
-        if cfg_val is not None:
-            inp_template_path = cfg_val
-    if inp_template_path is None:
-        raise PotentialGenError(
-            "No SP inp template specified. Provide inp_template_path or "
-            "set it via Settings → Set SP Inp Template Path."
-        )
-    inp_template_path = Path(inp_template_path)
-    if not inp_template_path.is_file():
-        raise FileNotFoundError(f"SP inp template not found: {inp_template_path}")
+    # Resolve inp template: explicit argument > config > built-in default
+    # (parsed/validated before any directory is created)
+    template_path = _resolve_inp_template_path(inp_template_path)
+    inp_tree = _load_inp_template_tree(template_path, _unique_elements([atoms]))
 
     # Resolve cell
     if cell_abc is None:
@@ -97,8 +251,7 @@ def generate_potential_workdir(
     write(str(workdir / "init.xyz"), atoms, format="xyz")
 
     # 2. Modify and write sp.inp
-    inp_text = inp_template_path.read_text(encoding="utf-8")
-    modified = modify_inp_for_sp(inp_text, cell_abc)
+    modified = _apply_sp_edits_and_generate(inp_tree, cell_abc)
     (workdir / "sp.inp").write_text(modified, encoding="utf-8")
 
     # 3. Submission script
@@ -145,8 +298,12 @@ def batch_generate_potential_workdirs(
     output_dir : str or Path
         Parent directory; sub-directories ``potential_t{time}_i{step}`` are created.
     inp_template_path : str, Path or None
-        Path to the CP2K sp.inp template file.
-        If ``None``, falls back to the persisted config value.
+        Path to the CP2K sp.inp template file. If ``None``, falls back to the
+        persisted config value (``KEY_SP_INP_TEMPLATE_PATH``); if that is also
+        unset, the built-in default potential template shipped with the
+        package is used (``&KIND`` blocks generated from the frames' elements).
+        User-supplied templates are validated (``&V_HARTREE_CUBE`` /
+        ``&SMEAR`` / ``&KIND`` coverage) against the selected frames' elements.
     mode : {"index", "time"}
         Frame selection mode. See ``FrameSelection`` for details.
     frame_start, frame_end, frame_step : int
@@ -168,22 +325,11 @@ def batch_generate_potential_workdirs(
     output_dir = Path(output_dir)
     source = str(xyz_path)
 
-    # Pre-read and modify inp template once
-    if inp_template_path is None:
-        cfg_val = get_config(KEY_SP_INP_TEMPLATE_PATH)
-        if cfg_val is not None:
-            inp_template_path = cfg_val
-    if inp_template_path is None:
-        raise PotentialGenError(
-            "No SP inp template specified. Provide inp_template_path or "
-            "set it via Settings → Set SP Inp Template Path."
-        )
-    inp_template_path = Path(inp_template_path)
-    if not inp_template_path.is_file():
-        raise FileNotFoundError(f"SP inp template not found: {inp_template_path}")
-
-    inp_text = inp_template_path.read_text(encoding="utf-8")
-    modified_inp = modify_inp_for_sp(inp_text, cell_abc)
+    # Resolve inp template path: explicit argument > config > built-in default.
+    # The template *text* is loaded after frame selection, when the element
+    # composition is known — the built-in default's &KIND rendering and the
+    # user-template &KIND coverage check are both element-driven.
+    template_path = _resolve_inp_template_path(inp_template_path)
 
     # Resolve script path once
     if script_path is None:
@@ -214,6 +360,13 @@ def batch_generate_potential_workdirs(
         frames.append((idx, atoms))
 
     logger.info("Batch potential: %d frames from %s", len(frames), xyz_path)
+
+    # Load and modify the inp template once (parse + tree edits + generate
+    # shared across frames; &KIND blocks / coverage validation driven by
+    # the frame elements)
+    elements = _unique_elements(atoms for _, atoms in frames)
+    inp_tree = _load_inp_template_tree(template_path, elements)
+    modified_inp = _apply_sp_edits_and_generate(inp_tree, cell_abc)
 
     iterator: list[tuple[int, Atoms]] | object = frames
     if verbose:

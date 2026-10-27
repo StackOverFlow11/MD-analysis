@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import re
 from pathlib import Path
 
@@ -13,14 +14,22 @@ from md_analysis.scripts.TIGen import (
     TIGenError,
     _format_target_dirname,
     _load_trajectory_cv,
-    _modify_collective_block,
-    _modify_inp_for_ti,
+    _render_ti_inp,
     _snap_to_nearest_frame,
     batch_generate_ti_workdirs,
     generate_ti_workdir,
 )
-from md_analysis.utils.RestartParser.ColvarParser import (
-    ColvarRestart,
+from md_analysis.scripts._inp_tree_edit import (
+    set_collective_target,
+    zero_target_growth,
+)
+from md_analysis.utils.formats.cp2k.inp import (
+    InpParseError,
+    iter_collectives,
+    parse_inp,
+)
+from md_analysis.engines.models import (
+    ConstraintMetadata,
     ColvarInfo,
     ConstraintInfo,
 )
@@ -125,6 +134,71 @@ _INP_NO_COORD = """\
 &END FORCE_EVAL
 """
 
+# Two &COLLECTIVE blocks (double-block anchor, refactor plan §4):
+# COLVAR 1/2, TARGET 1.5/2.5, TARGET_GROWTH 0.001/0.002 (bare a.u.).
+_DOUBLE_COLLECTIVE_INP = """\
+&GLOBAL
+  PROJECT slowgrowth
+  RUN_TYPE MD
+&END GLOBAL
+
+&MOTION
+  &MD
+    STEPS 8000
+  &END MD
+  &CONSTRAINT
+    &COLLECTIVE
+      COLVAR 1
+      TARGET 1.5
+      TARGET_GROWTH 0.001
+    &END COLLECTIVE
+    &COLLECTIVE
+      COLVAR 2
+      TARGET 2.5
+      TARGET_GROWTH 0.002
+    &END COLLECTIVE
+  &END CONSTRAINT
+&END MOTION
+
+&FORCE_EVAL
+  &SUBSYS
+    &TOPOLOGY
+      COORD_FILE_NAME init.xyz
+      COORD_FILE_FORMAT xyz
+    &END TOPOLOGY
+  &END SUBSYS
+&END FORCE_EVAL
+"""
+
+# No &TOPOLOGY section at all (created on demand by the tree edits)
+_INP_NO_TOPOLOGY = """\
+&GLOBAL
+  PROJECT slowgrowth
+  RUN_TYPE MD
+&END GLOBAL
+
+&MOTION
+  &MD
+    STEPS 8000
+  &END MD
+  &CONSTRAINT
+    &COLLECTIVE
+      COLVAR 1
+      TARGET 1.5
+      TARGET_GROWTH 0.001
+    &END COLLECTIVE
+  &END CONSTRAINT
+&END MOTION
+
+&FORCE_EVAL
+  &SUBSYS
+    &CELL
+      ABC 10.0 10.0 20.0
+    &END CELL
+  &END SUBSYS
+&END FORCE_EVAL
+"""
+
 
 def _make_restart(
     *,
@@ -133,9 +207,9 @@ def _make_restart(
     timestep_fs: float = 1.0,
     step_start: int = 0,
     total_steps: int = 8000,
-) -> ColvarRestart:
-    """Create a synthetic ColvarRestart for testing."""
-    return ColvarRestart(
+) -> ConstraintMetadata:
+    """Create a synthetic ConstraintMetadata for testing."""
+    return ConstraintMetadata(
         project_name="slowgrowth",
         step_start=step_start,
         time_start_fs=0.0,
@@ -178,7 +252,7 @@ def _write_test_xyz(path: Path, n_frames: int = 10, step_interval: int = 5) -> N
     path.write_text("\n".join(lines) + "\n")
 
 
-def _write_restart_file(path: Path, restart: ColvarRestart) -> None:
+def _write_restart_file(path: Path, restart: ConstraintMetadata) -> None:
     """Write a minimal .restart file that ColvarParser can parse."""
     c = restart.colvars.primary
     inter = ".TRUE." if c.intermolecular else ".FALSE."
@@ -219,87 +293,159 @@ def _write_restart_file(path: Path, restart: ColvarRestart) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Tests for _modify_inp_for_ti
+# Tests for _render_ti_inp (tree-assertion rewrite of the regex-era
+# TestModifyInp / TestModifyCollectiveBlock, refactor plan §4)
 # ---------------------------------------------------------------------------
 
 
-class TestModifyInp:
-    """Tests for inp file modification logic."""
+class TestRenderTiInp:
+    """Tree assertions on the rendered cMD.inp (canonical key names)."""
 
-    def test_project_renamed(self):
-        result = _modify_inp_for_ti(_SAMPLE_INP, 5.0, 10000)
-        assert "PROJECT cMD" in result
-        assert "PROJECT slowgrowth" not in result
+    def test_project_renamed(self, assert_inp_tree):
+        text = _render_ti_inp(parse_inp(_SAMPLE_INP), 5.0, 10000)
+        assert_inp_tree(text, {"global.project_name": "cMD"})
 
-    def test_steps_replaced(self):
-        result = _modify_inp_for_ti(_SAMPLE_INP, 5.0, 15000)
-        # Should appear inside &MD
-        assert re.search(r"STEPS\s+15000", result)
-        assert not re.search(r"STEPS\s+8000", result)
+    def test_steps_replaced(self, assert_inp_tree):
+        text = _render_ti_inp(parse_inp(_SAMPLE_INP), 5.0, 15000)
+        assert_inp_tree(text, {"motion.md.steps": 15000})
 
-    def test_target_unit_stripped(self):
-        result = _modify_inp_for_ti(_SAMPLE_INP, 5.123456789, 10000)
-        # TARGET line should not have [angstrom] — extract COLLECTIVE block
-        import re as _re
-        coll = _re.search(
-            r"&COLLECTIVE.*?&END\s+COLLECTIVE", result, _re.DOTALL | _re.IGNORECASE
+    def test_target_bare_internal_unit(self, assert_inp_tree):
+        """[unit] annotations are gone; TARGET is the bare a.u. value."""
+        text = _render_ti_inp(parse_inp(_SAMPLE_INP), 5.123456789, 10000)
+        assert "[angstrom]" not in text
+        assert "[fs^-1*angstrom]" not in text
+        assert_inp_tree(text, {
+            "motion.constraint.collective.target": 5.123456789,
+            "motion.constraint.collective.target_growth": 0.0,
+        })
+
+    def test_target_growth_zeroed_bare_au_template(self, assert_inp_tree):
+        """Template without [unit] annotations (bare a.u.) works too."""
+        text = _render_ti_inp(parse_inp(_INP_NO_COORD), 5.0, 10000)
+        assert_inp_tree(text, {
+            "motion.constraint.collective.target": 5.0,
+            "motion.constraint.collective.target_growth": 0.0,
+        })
+
+    def test_target_does_not_touch_target_growth(self, assert_inp_tree):
+        """TARGET and TARGET_GROWTH are separate tree keys — a TARGET
+        write can never leak into TARGET_GROWTH (the old regex needed a
+        negative lookahead for this)."""
+        text = _render_ti_inp(parse_inp(_SAMPLE_INP), 9.99, 10000)
+        assert_inp_tree(text, {
+            "motion.constraint.collective.target": 9.99,
+            "motion.constraint.collective.target_growth": 0.0,
+        })
+
+    def test_base_tree_not_mutated_per_target(self):
+        """Per-target deep-copy discipline (plan §3.3): rendering leaves
+        the caller's base tree untouched, so batch entry points can
+        reuse it for every target."""
+        base = parse_inp(_SAMPLE_INP)
+        original = copy.deepcopy(base)
+        _render_ti_inp(base, 5.0, 10000)
+        _render_ti_inp(base, 6.0, 20000)
+        assert base == original
+
+
+class TestDoubleCollectiveBlock:
+    """Double-&COLLECTIVE anchor (plan §4): block-level semantics of the
+    deleted regex helper — colvar_id targeting, ``None`` = primary
+    (first block), TARGET_GROWTH zeroed in every block."""
+
+    def test_edit_tree_primary_target_and_all_growth_zeroed(self):
+        tree = copy.deepcopy(parse_inp(_DOUBLE_COLLECTIVE_INP))
+        set_collective_target(tree, 3.14)  # None = primary (first block)
+        zero_target_growth(tree)
+        blocks = list(iter_collectives(tree))
+        assert [cid for cid, _ in blocks] == [1, 2]
+        # list[0] = primary: TARGET rewritten
+        assert blocks[0][1]["target"] == 3.14
+        # list[1]: TARGET keeps its original value
+        assert blocks[1][1]["target"] == 2.5
+        # growth zeroed in BOTH blocks
+        assert blocks[0][1]["target_growth"] == 0.0
+        assert blocks[1][1]["target_growth"] == 0.0
+
+    def test_edit_tree_explicit_colvar_id_targets_matching_block(self):
+        tree = copy.deepcopy(parse_inp(_DOUBLE_COLLECTIVE_INP))
+        set_collective_target(tree, 3.14, colvar_id=2)
+        zero_target_growth(tree)
+        by_cvar = dict(iter_collectives(tree))
+        # non-matching block keeps its TARGET...
+        assert by_cvar[1]["target"] == 1.5
+        # ...matching block is rewritten; both growths zeroed
+        assert by_cvar[2]["target"] == 3.14
+        assert all(b["target_growth"] == 0.0 for b in by_cvar.values())
+
+    def test_rendered_output_located_by_colvar_value(self):
+        """Generate + re-parse, locate blocks by their COLVAR value (not
+        by list position); _render_ti_inp returning at all proves no
+        InpGenerateError (self-check passed)."""
+        text = _render_ti_inp(parse_inp(_DOUBLE_COLLECTIVE_INP), 3.14, 10000)
+        by_cvar = dict(iter_collectives(parse_inp(text)))
+        assert set(by_cvar) == {1, 2}
+        assert by_cvar[1]["target"] == 3.14  # primary block rewritten
+        assert by_cvar[2]["target"] == 2.5   # second block untouched
+        assert all(b["target_growth"] == 0.0 for b in by_cvar.values())
+
+    def test_rendered_output_explicit_colvar_id(self):
+        text = _render_ti_inp(
+            parse_inp(_DOUBLE_COLLECTIVE_INP), 3.14, 10000, colvar_id=2,
         )
-        assert coll is not None
-        coll_text = coll.group()
-        assert "[angstrom]" not in coll_text
-        assert "[fs^-1*angstrom]" not in coll_text
-        # Should have the bare a.u. value
-        assert "5.1234567890E" in coll_text
-
-    def test_target_growth_zeroed(self):
-        result = _modify_inp_for_ti(_SAMPLE_INP, 5.0, 10000)
-        # TARGET_GROWTH should be 0 without units
-        assert re.search(r"TARGET_GROWTH\s+0\s*$", result, re.MULTILINE)
-        assert "[fs^-1*angstrom]" not in result
-
-    def test_target_growth_bare_au(self):
-        """Handle inp with no [unit] annotation (bare a.u.)."""
-        result = _modify_inp_for_ti(_INP_NO_COORD, 5.0, 10000)
-        assert re.search(r"TARGET_GROWTH\s+0\s*$", result, re.MULTILINE)
-
-    def test_topology_coord_existing(self):
-        """Existing COORD_FILE_NAME/FORMAT are kept as init.xyz/XYZ."""
-        result = _modify_inp_for_ti(_SAMPLE_INP, 5.0, 10000)
-        assert re.search(r"COORD_FILE_NAME\s+init\.xyz", result)
-        assert re.search(r"COORD_FILE_FORMAT\s+XYZ", result)
-
-    def test_topology_coord_inserted_when_missing(self):
-        """COORD_FILE_NAME/FORMAT inserted when absent."""
-        result = _modify_inp_for_ti(_INP_NO_COORD, 5.0, 10000)
-        assert re.search(r"COORD_FILE_NAME\s+init\.xyz", result)
-        assert re.search(r"COORD_FILE_FORMAT\s+XYZ", result)
-
-    def test_target_does_not_affect_target_growth(self):
-        """TARGET replacement must not accidentally match TARGET_GROWTH."""
-        result = _modify_inp_for_ti(_SAMPLE_INP, 9.99, 10000)
-        # TARGET_GROWTH should be 0, not 9.99
-        lines = [l.strip() for l in result.splitlines()
-                 if l.strip().startswith("TARGET_GROWTH")]
-        assert len(lines) == 1
-        assert lines[0] == "TARGET_GROWTH 0"
+        by_cvar = dict(iter_collectives(parse_inp(text)))
+        assert by_cvar[1]["target"] == 1.5
+        assert by_cvar[2]["target"] == 3.14
+        assert all(b["target_growth"] == 0.0 for b in by_cvar.values())
 
 
-class TestModifyCollectiveBlock:
-    """Tests for per-block COLLECTIVE modification."""
+class TestTopologyForms:
+    """TOPOLOGY three-form anchor (plan §4): existing keys / empty block /
+    missing section created on demand."""
 
-    def test_target_and_growth_replaced(self):
-        block = "       COLVAR  1\n       TARGET [angstrom] 5.64\n       TARGET_GROWTH [fs^-1*angstrom] -0.5E-3\n"
-        result = _modify_collective_block(block, None, 3.14)
-        assert "TARGET_GROWTH 0" in result
-        assert "3.14" in result
-        assert "[angstrom]" not in result
+    def test_existing_coord_keys_overwritten(self, assert_inp_tree):
+        text = _render_ti_inp(parse_inp(_SAMPLE_INP), 5.0, 10000)
+        assert_inp_tree(text, {
+            "force_eval.subsys.topology.coord_file_name": "init.xyz",
+            "force_eval.subsys.topology.coord_file_format": "xyz",
+        })
 
-    def test_non_matching_colvar_growth_only(self):
-        """Non-matching colvar_id: only TARGET_GROWTH zeroed."""
-        block = "       COLVAR  2\n       TARGET 7.0\n       TARGET_GROWTH 1E-4\n"
-        result = _modify_collective_block(block, 1, 3.14)
-        assert "TARGET_GROWTH 0" in result
-        assert "TARGET 7.0" in result  # TARGET unchanged
+    def test_empty_topology_block_filled(self, assert_inp_tree):
+        """_INP_NO_COORD carries an empty &TOPOLOGY ... &END TOPOLOGY."""
+        text = _render_ti_inp(parse_inp(_INP_NO_COORD), 5.0, 10000)
+        assert_inp_tree(text, {
+            "force_eval.subsys.topology.coord_file_name": "init.xyz",
+            "force_eval.subsys.topology.coord_file_format": "xyz",
+        })
+
+    def test_missing_topology_section_created(self, assert_inp_tree):
+        """_INP_NO_TOPOLOGY has no &TOPOLOGY at all; the section is
+        created pointing at init.xyz."""
+        text = _render_ti_inp(parse_inp(_INP_NO_TOPOLOGY), 5.0, 10000)
+        assert_inp_tree(text, {
+            "force_eval.subsys.topology.coord_file_name": "init.xyz",
+            "force_eval.subsys.topology.coord_file_format": "xyz",
+        })
+
+
+class TestParseErrorTranslation:
+    """TIGen parse-error anchor (plan §4, step 6): a bad SG template
+    surfaces as TIGenError with the template path, InpParseError cause
+    preserved (generate-side failures are not translated)."""
+
+    def test_bad_template_raises_tigen_error(self, tmp_path):
+        bad = tmp_path / "bad_sg.inp"
+        bad.write_text(
+            "&GLOBAL\n  BOGUS_KEYWORD 1\n&END GLOBAL\n", encoding="utf-8",
+        )
+        with pytest.raises(
+            TIGenError, match=re.escape(str(bad)),
+        ) as excinfo:
+            generate_ti_workdir(
+                bad, tmp_path / "traj.xyz", tmp_path / "sg.restart",
+                10.0, tmp_path / "out",
+            )
+        assert isinstance(excinfo.value.__cause__, InpParseError)
 
 
 # ---------------------------------------------------------------------------
@@ -397,8 +543,8 @@ class TestGenerateTIWorkdir:
         assert (workdir / "cMD.inp").is_file()
         assert (workdir / "init.xyz").is_file()
 
-    def test_inp_is_modified(self, tmp_path):
-        """Generated cMD.inp has PROJECT=cMD and TARGET_GROWTH=0."""
+    def test_inp_is_modified(self, tmp_path, assert_inp_tree):
+        """Generated cMD.inp has PROJECT_NAME=cMD and TARGET_GROWTH=0."""
         xyz = tmp_path / "traj.xyz"
         _write_test_xyz(xyz, n_frames=5)
         restart = _make_restart()
@@ -410,9 +556,10 @@ class TestGenerateTIWorkdir:
         workdir = generate_ti_workdir(
             inp_file, xyz, restart_file, 10.0, tmp_path / "out",
         )
-        content = (workdir / "cMD.inp").read_text()
-        assert "PROJECT cMD" in content
-        assert re.search(r"TARGET_GROWTH\s+0\s*$", content, re.MULTILINE)
+        assert_inp_tree((workdir / "cMD.inp").read_text(), {
+            "global.project_name": "cMD",
+            "motion.constraint.collective.target_growth": 0.0,
+        })
 
     def test_auto_workdir_name(self, tmp_path):
         """Auto-generated workdir name follows ti_target_<value> pattern."""
@@ -557,16 +704,18 @@ class TestBatchGenerateTIWorkdirs:
                 # missing time_final_fs and n_points
             )
 
-    def test_all_dirs_have_project_cmd(self, tmp_path):
-        """Every generated cMD.inp has PROJECT cMD."""
+    def test_all_dirs_have_project_cmd(self, tmp_path, assert_inp_tree):
+        """Every generated cMD.inp has PROJECT_NAME=cMD."""
         inp, xyz, restart = self._setup_files(tmp_path)
         dirs = batch_generate_ti_workdirs(
             inp, xyz, restart, tmp_path / "out",
             targets_au=[10.0, 10.05],
         )
         for d in dirs:
-            content = (d / "cMD.inp").read_text()
-            assert "PROJECT cMD" in content
+            assert_inp_tree(
+                (d / "cMD.inp").read_text(),
+                {"global.project_name": "cMD"},
+            )
 
 
 class TestFormatTargetDirname:
@@ -686,3 +835,241 @@ class TestPlanTITargets:
         assert pt.dirname == _format_target_dirname(pt.snapped_cv)
 
 
+# ---------------------------------------------------------------------------
+# Tests for generate_ti_batch_with_report
+# ---------------------------------------------------------------------------
+
+
+class TestGenerateTIBatchWithReport:
+    """Tests for the batch wrapper (``generate_ti_batch_with_report``)."""
+
+    def _setup_files(self, tmp_path):
+        xyz = tmp_path / "traj.xyz"
+        _write_test_xyz(xyz, n_frames=20, step_interval=5)
+        restart = _make_restart(
+            target_au=10.0, target_growth_au=0.01, total_steps=100,
+        )
+        restart_file = tmp_path / "sg.restart"
+        _write_restart_file(restart_file, restart)
+        inp_file = tmp_path / "sg.inp"
+        inp_file.write_text(_SAMPLE_INP)
+        return inp_file, xyz, restart_file
+
+    def test_returns_report_with_all_fields(self, tmp_path):
+        from md_analysis.scripts.TIGen import (
+            generate_ti_batch_with_report, TIGenBatchReport,
+        )
+
+        inp, xyz, restart = self._setup_files(tmp_path)
+        report = generate_ti_batch_with_report(
+            inp, xyz, restart, tmp_path / "out",
+            targets_au=[10.05, 10.30],
+            steps=5000,
+        )
+        assert isinstance(report, TIGenBatchReport)
+        assert len(report.workdirs) == 2
+        assert len(report.requested_targets_au) == 2
+        assert len(report.snapped_targets_au) == 2
+        assert len(report.snap_deltas_au) == 2
+        assert report.steps == 5000
+        assert list(report.requested_targets_au) == [10.05, 10.30]
+
+    def test_creates_directories_with_files(self, tmp_path):
+        from md_analysis.scripts.TIGen import generate_ti_batch_with_report
+
+        inp, xyz, restart = self._setup_files(tmp_path)
+        report = generate_ti_batch_with_report(
+            inp, xyz, restart, tmp_path / "out",
+            targets_au=[10.05],
+        )
+        wd = report.workdirs[0]
+        assert wd.is_dir()
+        assert (wd / "cMD.inp").is_file()
+        assert (wd / "init.xyz").is_file()
+
+    def test_time_range_mode(self, tmp_path):
+        from md_analysis.scripts.TIGen import generate_ti_batch_with_report
+
+        inp, xyz, restart = self._setup_files(tmp_path)
+        report = generate_ti_batch_with_report(
+            inp, xyz, restart, tmp_path / "out",
+            time_range={
+                "time_initial_fs": 10.0,
+                "time_final_fs": 40.0,
+                "n_points": 3,
+            },
+        )
+        assert len(report.workdirs) == 3
+
+    def test_collision_raises_value_error_before_write(self, tmp_path):
+        """Collision check must fire before any mkdir/write happens."""
+        from md_analysis.scripts.TIGen import (
+            _plan_ti_targets, generate_ti_batch_with_report,
+        )
+
+        inp, xyz, restart = self._setup_files(tmp_path)
+
+        # Pre-compute the planned dirname and pre-create it with sentinel content
+        planned = _plan_ti_targets(inp, xyz, restart, targets_au=[10.05])
+        dirname = planned[0].dirname
+        collision_dir = tmp_path / "out" / dirname
+        collision_dir.mkdir(parents=True)
+        sentinel = collision_dir / "cMD.inp"
+        sentinel.write_text("SENTINEL_DO_NOT_OVERWRITE")
+
+        with pytest.raises(ValueError, match="collision"):
+            generate_ti_batch_with_report(
+                inp, xyz, restart, tmp_path / "out",
+                targets_au=[10.05],
+            )
+
+        # Sentinel unchanged
+        assert sentinel.read_text() == "SENTINEL_DO_NOT_OVERWRITE"
+
+    def test_collision_check_lists_all_offenders(self, tmp_path):
+        from md_analysis.scripts.TIGen import (
+            _plan_ti_targets, generate_ti_batch_with_report,
+        )
+
+        inp, xyz, restart = self._setup_files(tmp_path)
+        # Use well-separated targets so each snaps to a distinct dir
+        targets = [10.05, 10.80]
+        planned = _plan_ti_targets(inp, xyz, restart, targets_au=targets)
+        unique_dirnames = {pt.dirname for pt in planned}
+        assert len(unique_dirnames) >= 1  # may or may not collide; pre-create what's there
+
+        out = tmp_path / "out"
+        out.mkdir()
+        for dn in unique_dirnames:
+            (out / dn).mkdir()
+
+        with pytest.raises(ValueError) as exc_info:
+            generate_ti_batch_with_report(
+                inp, xyz, restart, out,
+                targets_au=targets,
+            )
+        msg = str(exc_info.value)
+        for dn in unique_dirnames:
+            assert dn in msg
+
+    def test_overwrite_true_skips_collision_guard(self, tmp_path, assert_inp_tree):
+        """Phase 6.6: overwrite=True skips the pre-write collision guard
+        and regenerates the colliding directory in place."""
+        from md_analysis.scripts.TIGen import (
+            _plan_ti_targets, generate_ti_batch_with_report,
+        )
+
+        inp, xyz, restart = self._setup_files(tmp_path)
+        planned = _plan_ti_targets(inp, xyz, restart, targets_au=[10.05])
+        out = tmp_path / "out"
+        collision_dir = out / planned[0].dirname
+        collision_dir.mkdir(parents=True)
+        (collision_dir / "cMD.inp").write_text("STALE_CONTENT")
+
+        # overwrite=True → no ValueError, cMD.inp regenerated
+        report = generate_ti_batch_with_report(
+            inp, xyz, restart, out,
+            targets_au=[10.05],
+            overwrite=True,
+        )
+        assert len(report.workdirs) == 1
+        regenerated = (collision_dir / "cMD.inp").read_text()
+        assert regenerated != "STALE_CONTENT"
+        assert_inp_tree(regenerated, {"global.project_name": "cMD"})
+
+    def test_overwrite_true_is_per_file_not_directory_wipe(self, tmp_path):
+        """overwrite=True must NOT rmtree/wipe the directory: an
+        unrelated pre-existing file in a colliding ti_target_* dir
+        survives regeneration (per-file overwrite only)."""
+        from md_analysis.scripts.TIGen import (
+            _plan_ti_targets, generate_ti_batch_with_report,
+        )
+
+        inp, xyz, restart = self._setup_files(tmp_path)
+        planned = _plan_ti_targets(inp, xyz, restart, targets_au=[10.05])
+        out = tmp_path / "out"
+        collision_dir = out / planned[0].dirname
+        collision_dir.mkdir(parents=True)
+        keep = collision_dir / "USER_NOTES.txt"
+        keep.write_text("do not delete me")
+
+        generate_ti_batch_with_report(
+            inp, xyz, restart, out,
+            targets_au=[10.05],
+            overwrite=True,
+        )
+        # Unrelated file untouched → proves no directory wipe
+        assert keep.is_file()
+        assert keep.read_text() == "do not delete me"
+        # Generated files present
+        assert (collision_dir / "cMD.inp").is_file()
+        assert (collision_dir / "init.xyz").is_file()
+
+    def test_colvar_id_threaded_to_cv_loaders(self, tmp_path, monkeypatch):
+        """Phase 6.6 D1 (pure threading): colvar_id reaches
+        _load_trajectory_cv unchanged. A real >=2-CV SG restart fixture
+        is heavy; assert the threading contract with a sentinel spy that
+        captures colvar_id then short-circuits (D1 explicitly does NOT
+        change snapping logic, so this proves the only thing 6.6 added)."""
+        from md_analysis.scripts import TIGen
+
+        inp, xyz, restart = self._setup_files(tmp_path)
+        seen: list = []
+
+        class _Sentinel(Exception):
+            pass
+
+        def spy_load(xyz_path, restart_obj, colvar_id):
+            seen.append(colvar_id)
+            raise _Sentinel
+
+        monkeypatch.setattr(TIGen, "_load_trajectory_cv", spy_load)
+
+        with pytest.raises(_Sentinel):
+            TIGen.generate_ti_batch_with_report(
+                inp, xyz, restart, tmp_path / "out",
+                targets_au=[10.05],
+                colvar_id=2,
+            )
+        # First _load_trajectory_cv call (inside _plan_ti_targets) got 2
+        assert seen == [2], seen
+
+    def test_colvar_id_default_none_unchanged(self, tmp_path, monkeypatch):
+        """Default colvar_id=None preserved (workflow byte-equal)."""
+        from md_analysis.scripts import TIGen
+
+        inp, xyz, restart = self._setup_files(tmp_path)
+        seen: list = []
+
+        class _Sentinel(Exception):
+            pass
+
+        def spy_load(xyz_path, restart_obj, colvar_id):
+            seen.append(colvar_id)
+            raise _Sentinel
+
+        monkeypatch.setattr(TIGen, "_load_trajectory_cv", spy_load)
+        with pytest.raises(_Sentinel):
+            TIGen.generate_ti_batch_with_report(
+                inp, xyz, restart, tmp_path / "out", targets_au=[10.05],
+            )
+        assert seen == [None], seen
+
+    def test_report_to_dict_is_json_serializable(self, tmp_path):
+        """``TIGenBatchReport.to_dict()`` must be directly JSON-dumpable
+        (no numpy scalars, no Path objects leaking through)."""
+        import json
+
+        from md_analysis.scripts.TIGen import generate_ti_batch_with_report
+
+        inp, xyz, restart = self._setup_files(tmp_path)
+        report = generate_ti_batch_with_report(
+            inp, xyz, restart, tmp_path / "out",
+            targets_au=[10.05, 10.30],
+            steps=5000,
+        )
+        data = report.to_dict()
+        json.dumps(data)   # raises TypeError on bad scalar/Path leak
+        assert isinstance(data["workdirs"], list)
+        assert all(isinstance(p, str) for p in data["workdirs"])
+        assert data["steps"] == 5000

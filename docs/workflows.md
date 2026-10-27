@@ -27,44 +27,30 @@
 
 CLI 是给人看的。如果你要在脚本 / Jupyter / 集群作业里跑：
 
-### 程序化入口（`main.py`）
+### 程序化入口（`md_analysis.workflows`）
 
 ```python
-from md_analysis.main import (
-    run_water_analysis, run_potential_analysis, run_charge_analysis,
-    run_tracked_charge_analysis, run_counterion_charge_analysis, run_all,
+from md_analysis.workflows import (
+    run_water_three_panel, run_potential_full,
+    run_surface_charge, run_tracked_charge, run_counterion_charge,
+    run_interface_analysis,  # composite: water + potential
 )
 
-# 跟 CLI 菜单一一对应；output_dir 是最终写入目录（不再前置 water/ 等）
-run_water_analysis(
+# 跟 CLI 菜单一一对应；output_dir 是最终写入目录（不再前置 water/ 等）。
+# 每个 run_* 都返回 WorkflowResult：artifacts 是 dict[str, Path]，
+# metadata 是轻量 scalars，extra 携带强类型 report（TI / calibration 等）。
+result = run_water_three_panel(
     xyz_path="md-pos-1.xyz",
     cell_abc=(10.22, 10.22, 26.42),
     output_dir="output/water/",
 )
+for name, path in result.artifacts.items():
+    print(name, path)
 ```
 
-### Agent 入口（`agent.dispatch`）
-
-JSON 序列化、JSON Schema 自描述，方便给 LLM / MCP / 批处理用：
-
-```python
-from md_analysis.agent import dispatch, list_tasks, get_task_schema
-
-for t in list_tasks():
-    print(t["name"], "—", t["description"])
-
-schema = get_task_schema("ti_full_analysis")
-
-result = dispatch("ti_full_analysis", {
-    "root_dir": "./ti_runs/",
-    "output_dir": "./output/",
-    "epsilon_tol_ev": 0.01,
-    "equilibration": 500,
-})
-print(result.success, result.summary["delta_A_eV"])
-```
-
-任务列表（14 个）见 [menu_reference.md 末尾](menu_reference.md#agent-任务列表)。
+> 历史说明：`md_analysis.main` 也 re-export 同一批新名（薄 facade，等价于
+> `md_analysis.workflows`）。旧的 `run_*_analysis` / `run_all` 名字已在
+> 入口重构期间移除，不再可用。
 
 ---
 

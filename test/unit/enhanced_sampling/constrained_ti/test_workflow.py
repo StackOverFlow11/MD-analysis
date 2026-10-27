@@ -202,6 +202,7 @@ class TestSEMSelection:
                 plateau_sem=real.plateau_sem,
                 plateau_delta=real.plateau_delta,
                 plateau_block_size=None,
+                n_blocks_plateau=real.n_blocks_plateau,
                 plateau_reached=False,
                 passed=None,
             )
@@ -237,6 +238,7 @@ class TestSEMSelection:
                 plateau_sem=real.plateau_sem * 3.0,
                 plateau_delta=real.plateau_delta,
                 plateau_block_size=real.plateau_block_size,
+                n_blocks_plateau=real.n_blocks_plateau,
                 plateau_reached=True,
                 passed=None,
             )
@@ -322,3 +324,84 @@ class TestAutoEquilibration:
         # Each point should have auto-equil annotation
         for r in report.point_reports:
             assert any("Auto-equilibration" in fr for fr in r.failure_reasons)
+
+
+# ---------------------------------------------------------------------------
+# Chi-square SEM upper bound (replaces N_eff >= 50 hard gate)
+# ---------------------------------------------------------------------------
+
+
+class TestSEMInflation:
+    """Report fields, pass/fail policy, and sigma_A propagation."""
+
+    def test_report_fields_populated(self):
+        series = make_ar1(5000, 0.5, seed=42)
+        report = analyze_standalone(series)
+        assert report.sem_inflation_factor > 1.0
+        assert report.sem_inflated == pytest.approx(
+            report.sem_final * report.sem_inflation_factor, rel=1e-12
+        )
+        assert report.n_blocks_plateau == report.block_avg.n_blocks_plateau
+        # sem_final keeps its un-inflated plateau-SEM semantics
+        assert report.sem_final == pytest.approx(
+            report.block_avg.plateau_sem, rel=1e-12
+        )
+
+    def test_factor_matches_chi2_formula(self):
+        from scipy.stats import chi2
+
+        series = make_ar1(5000, 0.5, seed=42)
+        report = analyze_standalone(series)
+        nu = report.n_blocks_plateau - 1
+        expected = float(np.sqrt(nu / chi2.ppf(0.05, nu)))
+        assert report.sem_inflation_factor == pytest.approx(expected, rel=1e-10)
+
+    def test_moderate_neff_now_passes(self):
+        """N_eff in [floor, 50) with abundant precision: the old hard gate
+        failed such points; the chi-square policy passes them."""
+        series = make_ar1(500, 0.9, seed=42)
+        report = analyze_standalone(series, sem_target=10.0)
+        assert 10.0 <= report.autocorr.n_eff < 50.0
+        assert report.passed == True  # noqa: E712
+
+    def test_neff_below_floor_fails(self):
+        """N_eff < floor → outright fail even with a loose SEM target."""
+        series = make_ar1(150, 0.95, seed=42)
+        report = analyze_standalone(series, sem_target=10.0)
+        assert report.autocorr.n_eff < 10.0
+        assert report.passed == False  # noqa: E712
+        assert any("N_eff" in r for r in report.failure_reasons)
+
+    def test_sem_ok_uses_inflated_value(self):
+        """sem_target between raw and inflated SEM → fail with SEM_report."""
+        series = make_ar1(5000, 0.5, seed=42)
+        probe = analyze_standalone(series)
+        assert probe.sem_inflated > probe.sem_final
+        target = 0.5 * (probe.sem_final + probe.sem_inflated)
+        report = analyze_standalone(series, sem_target=target)
+        assert report.passed == False  # noqa: E712
+        assert any("SEM_report" in r for r in report.failure_reasons)
+
+    def test_sigma_A_propagates_inflated_sem(self):
+        xi = np.array([1.0, 2.0, 3.0])
+        series_list = [make_ar1(5000, 0.3, seed=10 + i) for i in range(3)]
+        report = analyze_ti(xi, series_list, dt=1.0, epsilon_tol_ev=100.0)
+        for r, fe in zip(report.point_reports, report.force_errors):
+            assert fe == pytest.approx(r.sem_inflated, rel=1e-12)
+        expected_sigma = np.sqrt(
+            np.sum(report.weights**2 * report.force_errors**2)
+        )
+        assert report.sigma_A == pytest.approx(expected_sigma, rel=1e-12)
+
+    def test_csv_contains_inflation_columns(self, tmp_path):
+        from md_analysis.enhanced_sampling.constrained_ti.workflow import (
+            write_single_point_csv,
+        )
+
+        series = make_ar1(2000, 0.5, seed=42)
+        report = analyze_standalone(series)
+        path = write_single_point_csv(report, output_dir=tmp_path)
+        header = path.read_text().splitlines()[0].split(",")
+        assert "n_blocks_plateau" in header
+        assert "sem_inflation_factor" in header
+        assert "sem_inflated" in header

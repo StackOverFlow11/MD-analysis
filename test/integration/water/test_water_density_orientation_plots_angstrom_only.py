@@ -22,8 +22,8 @@ from md_analysis.water import water_orientation_weighted_density_z_distribution_
 
 def test_water_density_and_orientation_plots_angstrom_only() -> None:
     """Generate one combined figure with Angstrom x-axis only."""
-    xyz_path = REPO_ROOT / "data_example" / "potential" / "md-pos-1.xyz"
-    md_inp_path = REPO_ROOT / "data_example" / "potential" / "md.inp"
+    xyz_path = REPO_ROOT / "data_example" / "potential" / "dense" / "md-pos-1.xyz"
+    md_inp_path = REPO_ROOT / "data_example" / "potential" / "dense" / "md.inp"
     out_dir = REPO_ROOT / "test" / "_tmp_preview"
     out_dir.mkdir(parents=True, exist_ok=True)
 

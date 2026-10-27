@@ -60,7 +60,7 @@ class ConstantPotentialResult:
 
 def _get_electrode_area(bader_dir: Path, normal: str) -> float:
     """Compute electrode surface area from first Bader frame's POSCAR."""
-    from ...utils.BaderParser import load_bader_atoms
+    from ...utils.formats.bader.acf import load_bader_atoms
     from ...electrochemical.charge.config import (
         DEFAULT_ACF_FILENAME,
         DEFAULT_POTCAR_FILENAME,
@@ -267,7 +267,7 @@ def write_corrected_free_energy_csv(
     output_dir: Path | None = None,
 ) -> Path:
     """Write corrected free-energy CSV."""
-    from ...utils._io_helpers import _write_csv
+    from ...utils.io._io_helpers import _write_csv
 
     out = Path(output_dir) if output_dir else Path(".")
     out.mkdir(parents=True, exist_ok=True)

@@ -13,11 +13,13 @@ dependencies = [
     "ase",
     "matplotlib",
     "tqdm",
+    "scipy>=1.10",
+    "cp2k-input-tools @ git+https://github.com/cp2k/cp2k-input-tools.git@393e87b",
+    "pint>=0.24,<0.25",
 ]
 
 [project.optional-dependencies]
 test = ["pytest"]
-ti = ["scipy>=1.10"]
 
 [project.scripts]
 md-analysis = "md_analysis.cli:main"
@@ -28,3 +30,8 @@ md-analysis = "md_analysis.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["md_analysis*"]
+
+[tool.pytest.ini_options]
+testpaths = ["test"]
+norecursedirs = ["_tmp_preview", "build", "dist", "*.egg-info"]
+addopts = ["--import-mode=importlib"]

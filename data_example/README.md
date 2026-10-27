@@ -16,7 +16,7 @@
 | [`bader/`](#bader) | Bader 表面电荷分析 | CLI 221-226 | 4 MB |
 | [`calibration/`](#calibration) | σ→φ 标定（fit + predict） | CLI 231-233 | 16 KB |
 | [`sg/`](#sg) | Slow-Growth 自由能 | CLI 301-302 | 32 MB |
-| [`ti/`](#ti) | Constrained TI 收敛诊断 | CLI 311-312 | 9.6 MB |
+| [`ti/`](#ti) | Constrained TI 收敛诊断 | CLI 311-312 | 17 MB |
 | [`ti_with_correction/`](#ti_with_correction) | 恒电势修正（TI + bader + calibration） | CLI 313 | 33 MB |
 
 **总计**：~100 MB。
@@ -170,16 +170,21 @@ sg/<system>/
 
 ```
 ti/
-└── double_cv/
-    ├── 1k/                             # 300 K
-    │   ├── ti_target_0.031369/
-    │   │   ├── cMD-1.restart                                # 元数据
-    │   │   └── cMD-constraint_force.dat-1.LagrangeMultLog   # λ(t)
-    │   ├── ti_target_-0.103935/
-    │   └── ... 共 9 个约束点
-    └── 2k/                             # 200 K
-        └── ... 8 个约束点
+├── double_cv/
+│   ├── 1k/                             # 300 K
+│   │   ├── ti_target_0.031369/
+│   │   │   ├── cMD-1.restart                                # 元数据
+│   │   │   └── cMD-constraint_force.dat-1.LagrangeMultLog   # λ(t)
+│   │   ├── ti_target_-0.103935/
+│   │   └── ... 共 9 个约束点
+│   └── 2k/                             # 200 K
+│       └── ... 8 个约束点
+└── ag1cu4_volmer/
+    └── 2k/                             # Ag1Cu4 分散构型 Volmer TI，共 14 个约束点
+        └── ti_target_0.585260/         # 卡方 SEM 上界政策的动机点（N_eff≈15）
 ```
+
+`ag1cu4_volmer/2k` 来源：`group-hpc:/home/shaofl/projects/03_CuAg_SAA/explicit/Ag1Cu4/dispersed_configuration/water/pre/2k/volmer/ti/`（仅取 `cMD-1.restart` + `*.LagrangeMultLog` 两文件）。
 
 **对应工作流**：[`docs/workflows/03_sg_to_ti.md §7-§9`](../docs/workflows/03_sg_to_ti.md)。
 

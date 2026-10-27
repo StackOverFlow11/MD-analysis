@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import csv
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -33,6 +33,7 @@ from .config import (
     DEFAULT_N_WARN_SHORT,
     DEFAULT_N_WARN_UNRELIABLE,
     DEFAULT_NAN_FRACTION_MAX,
+    DEFAULT_SEM_CONFIDENCE,
     DEFAULT_STANDALONE_CSV_NAME,
     DEFAULT_STANDALONE_PNG_NAME,
     EV_TO_HARTREE,
@@ -43,6 +44,7 @@ from .integration import (
     _integrate_free_energy,
     _suggest_time_allocation,
     compute_trapezoid_weights,
+    sem_chi2_upper_bound,
 )
 from .models import (
     ConstraintPointInput,
@@ -198,6 +200,14 @@ def analyze_single_point(
     # otherwise block_average.py falls back to the largest valid block size.
     sem_final = block_avg.plateau_sem
 
+    # Reported SEM: chi-square one-sided upper bound.  The SEM estimated
+    # from the plateau blocks is itself uncertain; nu = n_blocks - 1
+    # degrees of freedom set the inflation factor.  Pass/fail and sigma_A
+    # propagation use the inflated value; sem_final stays un-inflated.
+    sem_inflated, sem_inflation_factor = sem_chi2_upper_bound(
+        sem_final, block_avg.n_blocks_plateau
+    )
+
     if not block_avg.plateau_reached:
         failure_reasons.append(
             "F&P block-average plateau not reached; using largest-block SEM."
@@ -235,7 +245,7 @@ def analyze_single_point(
 
     if not autocorr.passed_neff:
         failure_reasons.append(
-            f"N_eff ({autocorr.n_eff:.1f}) < minimum; "
+            f"N_eff ({autocorr.n_eff:.1f}) below floor; "
             f"need ~{autocorr.t_min_frames} frames."
         )
 
@@ -247,6 +257,16 @@ def analyze_single_point(
     if block_avg.passed is False and block_avg.plateau_reached:
         failure_reasons.append(
             f"SEM_block ({block_avg.plateau_sem:.6f}) > SEM_max ({inp.sem_max})."
+        )
+
+    # Decisive SEM criterion: the inflated (reported) SEM vs SEM_max.
+    sem_ok = sem_inflated <= inp.sem_max if inp.sem_max is not None else None
+    if sem_ok is False:
+        nu = block_avg.n_blocks_plateau - 1
+        failure_reasons.append(
+            f"SEM_report ({sem_inflated:.6f}) > SEM_max ({inp.sem_max:.6f}); "
+            f"chi-square {DEFAULT_SEM_CONFIDENCE:.0%} upper bound "
+            f"(x{sem_inflation_factor:.2f}, nu={nu})."
         )
 
     if not running_avg.passed:
@@ -267,17 +287,16 @@ def analyze_single_point(
 
     # Overall passed (use bool() to handle np.bool_ safely)
     # The overall pass/fail is based on:
-    #   1. N_eff >= threshold
-    #   2. sem_final <= sem_max (the already-selected best SEM estimate)
+    #   1. N_eff >= floor (DEFAULT_NEFF_FLOOR; tau_corr unreliable below it)
+    #   2. sem_inflated <= sem_max (chi-square upper bound of the best SEM)
     #   3. Running average drift check
     #   4. Geweke stationarity
     # Note: block_avg.passed and autocorr.passed_sem are per-engine
-    # diagnostics; the overall SEM check uses sem_final directly.
+    # diagnostics; the overall SEM check uses the inflated SEM directly.
     if inp.sem_max is not None:
-        sem_ok = sem_final <= inp.sem_max
         all_engine_pass = (
             bool(autocorr.passed_neff)
-            and sem_ok
+            and bool(sem_ok)
             and bool(running_avg.passed)
             and bool(geweke.passed)
         )
@@ -300,6 +319,9 @@ def analyze_single_point(
         running_avg=running_avg,
         geweke=geweke,
         sem_final=sem_final,
+        sem_inflated=sem_inflated,
+        sem_inflation_factor=sem_inflation_factor,
+        n_blocks_plateau=block_avg.n_blocks_plateau,
         sem_max=inp.sem_max,
         passed=passed,
         failure_reasons=tuple(failure_reasons),
@@ -382,23 +404,7 @@ def _auto_equilibrate(
         f"Auto-equilibration: used last {n_used}/{n_original} frames "
         f"({pct:.0f}%), {n_iter} iteration(s)."
     )
-    return ConstraintPointReport(
-        xi=report.xi,
-        point_index=report.point_index,
-        n_analyzed=report.n_analyzed,
-        time_start_fs=report.time_start_fs,
-        time_end_fs=report.time_end_fs,
-        lambda_mean=report.lambda_mean,
-        sigma_lambda=report.sigma_lambda,
-        autocorr=report.autocorr,
-        block_avg=report.block_avg,
-        running_avg=report.running_avg,
-        geweke=report.geweke,
-        sem_final=report.sem_final,
-        sem_max=report.sem_max,
-        passed=report.passed,
-        failure_reasons=(info,) + report.failure_reasons,
-    )
+    return replace(report, failure_reasons=(info,) + report.failure_reasons)
 
 
 # ---------------------------------------------------------------------------
@@ -470,21 +476,8 @@ def analyze_standalone(
 
     # Prepend pre-analysis warnings
     if pre_warnings:
-        report = ConstraintPointReport(
-            xi=report.xi,
-            point_index=report.point_index,
-            n_analyzed=report.n_analyzed,
-            time_start_fs=report.time_start_fs,
-            time_end_fs=report.time_end_fs,
-            lambda_mean=report.lambda_mean,
-            sigma_lambda=report.sigma_lambda,
-            autocorr=report.autocorr,
-            block_avg=report.block_avg,
-            running_avg=report.running_avg,
-            geweke=report.geweke,
-            sem_final=report.sem_final,
-            sem_max=report.sem_max,
-            passed=report.passed,
+        report = replace(
+            report,
             failure_reasons=tuple(pre_warnings) + report.failure_reasons,
         )
     return report
@@ -590,21 +583,8 @@ def analyze_ti(
             )
             report = analyze_single_point(inp, **engine_overrides)
         if pre_warnings:
-            report = ConstraintPointReport(
-                xi=report.xi,
-                point_index=report.point_index,
-                n_analyzed=report.n_analyzed,
-                time_start_fs=report.time_start_fs,
-                time_end_fs=report.time_end_fs,
-                lambda_mean=report.lambda_mean,
-                sigma_lambda=report.sigma_lambda,
-                autocorr=report.autocorr,
-                block_avg=report.block_avg,
-                running_avg=report.running_avg,
-                geweke=report.geweke,
-                sem_final=report.sem_final,
-                sem_max=report.sem_max,
-                passed=report.passed,
+            report = replace(
+                report,
                 failure_reasons=tuple(pre_warnings) + report.failure_reasons,
             )
         reports.append(report)
@@ -612,7 +592,9 @@ def analyze_ti(
     # Integrate
     # dA/dξ = -⟨λ_shake⟩  (standard constrained-MD / Blue Moon formula)
     forces = -np.array([r.lambda_mean for r in reports])
-    force_errors = np.array([r.sem_final for r in reports])
+    # Propagate the inflated SEM (chi-square upper bound) so sigma_A reflects
+    # the uncertainty of the SEM estimate itself.
+    force_errors = np.array([r.sem_inflated for r in reports])
     delta_A, sigma_A = _integrate_free_energy(forces, weights, force_errors)
 
     # Failing indices (use == to handle np.bool_ types)
@@ -678,20 +660,20 @@ def standalone_diagnostics(
     -------
     dict with keys "report", "diagnostics_png", "csv".
     """
-    from ...utils.RestartParser.ColvarParser import ColvarMDInfo
+    from ...engines.cp2k import read_constraint_run_from_files
 
-    md_info = ColvarMDInfo.from_paths(restart_path, log_path)
-    lambda_series = md_info.lagrange.collective_shake
+    md_info = read_constraint_run_from_files(restart_path, log_path)
+    lambda_series = md_info.lambda_series.collective_shake
 
     constraint = (
-        md_info.restart.colvars[colvar_id]
+        md_info.metadata.colvars[colvar_id]
         if colvar_id is not None
-        else md_info.restart.colvars.primary
+        else md_info.metadata.colvars.primary
     )
     xi = float(constraint.target_au)
-    dt = float(md_info.restart.timestep_fs)
+    dt = float(md_info.metadata.timestep_fs)
 
-    t0 = float(md_info.restart.time_start_fs)
+    t0 = float(md_info.metadata.time_start_fs)
     report = analyze_standalone(
         lambda_series,
         dt=dt,
@@ -731,11 +713,13 @@ def standalone_diagnostics(
     r = report
     logger.info(
         "Standalone diagnostics for xi=%.6f: tau_corr=%.1f, N_eff=%.1f, "
-        "SEM_final=%.6f, Geweke z=%.3f, passed=%s",
+        "SEM_final=%.6f, SEM_report=%.6f (x%.2f), Geweke z=%.3f, passed=%s",
         r.xi,
         r.autocorr.tau_corr,
         r.autocorr.n_eff,
         r.sem_final,
+        r.sem_inflated,
+        r.sem_inflation_factor,
         r.geweke.z,
         r.passed,
     )
@@ -766,6 +750,9 @@ _POINT_CSV_COLUMNS = [
     "plateau_reached",
     "sem_final",
     "sem_final_method",
+    "n_blocks_plateau",
+    "sem_inflation_factor",
+    "sem_inflated",
     "sem_max",
     "geweke_z",
     "geweke_reliable",
@@ -805,6 +792,9 @@ def _point_to_row(r: ConstraintPointReport) -> dict:
         "plateau_reached": str(ba.plateau_reached),
         "sem_final": f"{r.sem_final:.8f}",
         "sem_final_method": method,
+        "n_blocks_plateau": str(r.n_blocks_plateau),
+        "sem_inflation_factor": f"{r.sem_inflation_factor:.4f}",
+        "sem_inflated": f"{r.sem_inflated:.8f}",
         "sem_max": f"{r.sem_max:.8f}" if r.sem_max is not None else "N/A",
         "geweke_z": f"{r.geweke.z:.4f}",
         "geweke_reliable": str(r.geweke.reliable),
@@ -969,6 +959,7 @@ def run_ti_full_from_root(
     epsilon_tol_ev: float = DEFAULT_EPSILON_TOL_EV,
     auto_equilibration: bool = False,
     point_slice: str | None = None,
+    strict: bool = True,
 ) -> TIFullAnalysisReport:
     """End-to-end constrained-TI analysis from a root directory.
 
@@ -1007,6 +998,11 @@ def run_ti_full_from_root(
         (e.g. ``"0:2"``, ``":4"``, ``"::2"``).  Must be a valid slice with
         2–3 colon-separated parts.  After slicing, at least 2 points must
         remain.
+    strict : bool, default ``True``
+        Forwarded to :func:`discover_ti_points`.  ``True`` (agent-facing
+        default): a matched directory missing required files raises
+        ``FileNotFoundError``.  ``False`` (CLI menu path): such
+        directories are skipped with a warning.
 
     Returns
     -------
@@ -1038,16 +1034,18 @@ def run_ti_full_from_root(
             f"root_dir not found or not a directory: {root_path}"
         )
 
-    # ── 1. Discover constraint points (strict: agent-facing) ─────────
-    # strict=True so a matched directory missing required files
-    # surfaces as FileNotFoundError rather than being silently skipped
-    # (the latter is acceptable for the CLI menu path).
+    # ── 1. Discover constraint points ────────────────────────────────
+    # strict defaults to True (agent-facing): a matched directory
+    # missing required files surfaces as FileNotFoundError rather than
+    # being silently skipped. The CLI menu path passes strict=False to
+    # preserve its historical lenient behavior (skip broken subdirs
+    # with a warning).
     point_defs = discover_ti_points(
         root_path,
         parser=parser,
         dir_filter=dir_filter,
         reverse=reverse,
-        strict=True,
+        strict=strict,
     )
 
     # ── 2. Optional slice selection (hard-validated) ─────────────────
@@ -1109,6 +1107,9 @@ def run_ti_full_from_root(
             "tau_corr": float(rep.autocorr.tau_corr),
             "n_eff": float(rep.autocorr.n_eff),
             "sem_final_au": float(rep.sem_final),
+            "sem_inflated_au": float(rep.sem_inflated),
+            "sem_inflation_factor": float(rep.sem_inflation_factor),
+            "n_blocks_plateau": int(rep.n_blocks_plateau),
             "sem_max_au": (float(rep.sem_max) if rep.sem_max is not None else None),
             "geweke_z": float(rep.geweke.z),
             "drift_D": float(rep.running_avg.drift_D),

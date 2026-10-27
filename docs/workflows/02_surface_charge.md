@@ -95,8 +95,8 @@ POTCAR 第一行 `TITEL = ... <element>_pv` / `_sv` / `_h` 之类后缀会被自
 ```
 bader_runs/bader_t<step>_i<frame>/
 ├── POSCAR ───► ASE.read ──────────► atoms (含 cell + 元素)
-├── ACF.dat ──► BaderParser ───────► (atom_idx, bader_charge)
-├── POTCAR ───► BaderParser ───────► {element: ZVAL}
+├── ACF.dat ──► formats/bader ───────► (atom_idx, bader_charge)
+├── POTCAR ───► formats/bader ───────► {element: ZVAL}
                                       │
                                       ▼
                           load_bader_atoms() → atoms 加 .arrays["bader_charge"]
@@ -106,7 +106,7 @@ bader_runs/bader_t<step>_i<frame>/
                                       │
               ┌───────────────────────┴──────────────────────────┐
               ▼ counterion                                       ▼ layer
-         过滤非金属非水原子                            LayerParser 找界面金属层
+         过滤非金属非水原子                            structure.layer 找界面金属层
          按 z > / < midpoint 分两侧                   每层电荷之和
               │                                               │
               └─────────► σ_aligned, σ_opposed (μC/cm²) ◄─────┘

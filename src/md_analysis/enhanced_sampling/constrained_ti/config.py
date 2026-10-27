@@ -39,8 +39,11 @@ DEFAULT_ACF_ALPHA: int = 5
 # Hard upper limit fraction for ACF truncation window (M <= N * fraction).
 DEFAULT_ACF_M_MAX_FRACTION: float = 0.5
 
-# Minimum effective independent samples (N_eff >= 50).
-DEFAULT_NEFF_MIN: int = 50
+# Hard floor for effective independent samples: N_eff below this fails the
+# point outright — the IAT estimate itself is unreliable and the chi-square
+# SEM inflation cannot rescue it.  (The former N_eff >= 50 hard gate was
+# replaced by the chi-square SEM upper bound below.)
+DEFAULT_NEFF_FLOOR: int = 10
 
 # ---------------------------------------------------------------------------
 # Step 3: Block averaging (Flyvbjerg-Petersen)
@@ -59,6 +62,18 @@ DEFAULT_FP_FALLBACK_MIN_BLOCKS: int = 35
 
 # Cross-check tolerance: warn when |SEM_block - SEM_auto| / max > this.
 DEFAULT_CROSS_CHECK_RTOL: float = 0.15
+
+# ---------------------------------------------------------------------------
+# SEM reporting: chi-square upper bound
+# ---------------------------------------------------------------------------
+
+# One-sided confidence level for the reported SEM upper bound (hard-coded,
+# not user-adjustable).  The block SEM estimated from n_b independent blocks
+# carries a sampling uncertainty: nu * SEM^2 / SEM_true^2 ~ chi2(nu) with
+# nu = n_b - 1.  The reported SEM is inflated to its one-sided upper bound:
+#     SEM_report = SEM * sqrt(nu / chi2_ppf(1 - confidence, nu))
+# so the true SEM is at or below SEM_report with probability `confidence`.
+DEFAULT_SEM_CONFIDENCE: float = 0.95
 
 # ---------------------------------------------------------------------------
 # Step 1: Running average drift

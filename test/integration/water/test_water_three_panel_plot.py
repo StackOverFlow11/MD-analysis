@@ -39,8 +39,8 @@ def _as_2d(data: np.ndarray) -> np.ndarray:
 
 def _run(out_dir: Path) -> dict[str, Path]:
     out_dir = Path(out_dir)
-    xyz_path = REPO_ROOT / "data_example" / "potential" / "md-pos-1.xyz"
-    md_inp_path = REPO_ROOT / "data_example" / "potential" / "md.inp"
+    xyz_path = REPO_ROOT / "data_example" / "potential" / "dense" / "md-pos-1.xyz"
+    md_inp_path = REPO_ROOT / "data_example" / "potential" / "dense" / "md.inp"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     out_png_path = plot_water_three_panel_analysis(

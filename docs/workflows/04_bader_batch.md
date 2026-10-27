@@ -88,7 +88,7 @@ md-pos-1.xyz                  CP2K xyz 多帧文件
    ▼ for each (step, frame_index):
    │
    ┌─ atoms = ase.io.read(xyz, index=frame_index) ─┐
-   │   atoms.set_cell(cell_abc)                     │ cell 来自 md.inp 解析（CellParser）
+   │   atoms.set_cell(cell_abc)                     │ cell 来自 md.inp 解析（formats.cp2k_cell）
    │   atoms.set_pbc(True)                          │
    └────────────────────────────────────────────────┘
    │

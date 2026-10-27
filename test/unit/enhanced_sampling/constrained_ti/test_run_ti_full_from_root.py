@@ -1,4 +1,4 @@
-"""Tests for ``run_ti_full_from_root`` end-to-end wrapper and slice helper."""
+"""Tests for ``run_ti_full_from_root`` workflow wrapper and slice helper."""
 
 from __future__ import annotations
 
@@ -82,7 +82,7 @@ class TestRunTIFullInputValidation:
 
     def test_unknown_parser_raises(self, tmp_path):
         (tmp_path / "root").mkdir()
-        from md_analysis.enhanced_sampling._parsers import (
+        from md_analysis.engines import (
             ParserInferenceError,
         )
         with pytest.raises(ParserInferenceError):
@@ -204,6 +204,7 @@ class TestStrictDiscovery:
         # Strict discovery must fail before any output side effects.
         assert not (tmp_path / "out").exists()
 
+
 # ---------------------------------------------------------------------------
 # run_ti_full_from_root — end-to-end on real example data
 # ---------------------------------------------------------------------------
@@ -236,6 +237,7 @@ class TestRunTIFullEndToEnd:
             "point_index", "xi", "n_analyzed",
             "time_start_fs", "time_end_fs", "time_total_fs",
             "tau_corr", "n_eff", "sem_final_au", "sem_max_au",
+            "sem_inflated_au", "sem_inflation_factor", "n_blocks_plateau",
             "geweke_z", "drift_D", "passed", "failure_reasons",
         }
         for pt in report.per_point:
@@ -271,4 +273,3 @@ class TestRunTIFullEndToEnd:
         assert report.convergence_csv.name == "ti_convergence_report.csv"
         assert report.free_energy_csv.name == "ti_free_energy.csv"
         assert report.free_energy_png.name == "ti_free_energy.png"
-

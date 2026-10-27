@@ -37,7 +37,7 @@
 | 距离 | Å | 全局，包括输入 cell_abc |
 | 能量 | eV | 全局对外；内部 Hartree → eV 自动转换 |
 | 时间 | fs | 全局 |
-| 分数坐标 | [0, 1) | LayerParser 内部 |
+| 分数坐标 | [0, 1) | structure.layer 内部 |
 | TI / SG 内部 | a.u.（CP2K 默认） | restart 中所有 ξ / λ / TARGET / TARGET_GROWTH |
 | 表面电荷 | μC/cm² | 22x 输出 |
 | 电势 | V | 21x / 23x 输出 |
@@ -106,7 +106,7 @@ POTCAR 的元素后缀（`_pv` / `_sv`）会被自动剥离，不用手改。
 
 | reason | 含义 | 修法 |
 |---|---|---|
-| `acf_neff_low` | N_eff < 50（自相关时间过长 vs 总帧数） | 延长 traj，或加 equilibration |
+| `acf_neff_low` | N_eff < 10 地板（自相关时间过长 vs 总帧数，τ_corr 估计失效） | 延长 traj，或加 equilibration |
 | `block_plateau_not_reached` | F&P block 平均没找到平台（采样不够） | 同上 |
 | `running_avg_drift` | running average 漂移过大 | 加 equilibration（弃前期非平衡段） |
 | `geweke_z_high` | 平稳性 z > 阈值（前后段不一致） | 同上 |

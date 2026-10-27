@@ -4,6 +4,56 @@ from __future__ import annotations
 
 import numpy as np
 
+from .config import DEFAULT_SEM_CONFIDENCE
+
+
+def sem_chi2_upper_bound(
+    sem: float,
+    n_blocks: int,
+    *,
+    confidence: float = DEFAULT_SEM_CONFIDENCE,
+) -> tuple[float, float]:
+    """Inflate a block SEM to its chi-square one-sided upper bound.
+
+    A SEM estimated from ``n_blocks`` independent block means is itself a
+    random variable: ``nu * SEM^2 / SEM_true^2 ~ chi2(nu)`` with
+    ``nu = n_blocks - 1``.  The reported SEM is the one-sided *confidence*
+    upper bound::
+
+        SEM_report = SEM * sqrt(nu / chi2_ppf(1 - confidence, nu))
+
+    i.e. the true SEM is at or below ``SEM_report`` with probability
+    *confidence*.
+
+    Parameters
+    ----------
+    sem : float
+        Raw (un-inflated) block-average SEM.
+    n_blocks : int
+        Number of independent blocks at the F&P plateau level.
+    confidence : float
+        One-sided confidence level; defaults to ``DEFAULT_SEM_CONFIDENCE``.
+
+    Returns
+    -------
+    tuple[float, float]
+        ``(sem_report, inflation_factor)`` with ``inflation_factor >= 1``.
+
+    Raises
+    ------
+    ValueError
+        If ``n_blocks < 2`` (no degrees of freedom to constrain the SEM).
+    """
+    if n_blocks < 2:
+        raise ValueError(
+            f"Chi-square SEM bound requires n_blocks >= 2, got {n_blocks}."
+        )
+    from scipy.stats import chi2
+
+    nu = n_blocks - 1
+    factor = float(np.sqrt(nu / chi2.ppf(1.0 - confidence, nu)))
+    return sem * factor, factor
+
 
 def compute_trapezoid_weights(xi: np.ndarray) -> np.ndarray:
     """Non-uniform trapezoid weights for TI quadrature.

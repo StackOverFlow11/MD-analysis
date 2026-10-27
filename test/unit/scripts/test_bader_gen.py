@@ -275,3 +275,168 @@ class TestBatchGenerateBaderWorkdirs:
         assert isinstance(result, list)
         assert all(isinstance(p, Path) for p in result)
 
+
+# ---------------------------------------------------------------------------
+# Tests for generate_bader_batch_with_report (batch wrapper)
+# ---------------------------------------------------------------------------
+
+
+import pytest
+
+
+class TestGenerateBaderBatchWithReport:
+    """Wrapper adds preflight + structured report; core generation
+    behaviour is delegated to the existing stack."""
+
+    def test_index_mode_report_shape(self, tmp_path):
+        from md_analysis.scripts.BaderGen import (
+            generate_bader_batch_with_report, BaderGenBatchReport,
+        )
+
+        xyz = tmp_path / "traj.xyz"
+        _write_test_xyz(xyz, n_frames=3)
+        report = generate_bader_batch_with_report(
+            xyz, (3.6, 3.6, 10.0), tmp_path / "out",
+            generate_potcar=False,
+        )
+        assert isinstance(report, BaderGenBatchReport)
+        assert report.n_frames == 3
+        assert len(report.workdirs) == 3
+        assert list(report.frame_indices) == [0, 1, 2]
+        assert list(report.steps) == [0, 5, 10]
+        assert list(report.times_fs) == [0.0, 5.0, 10.0]
+        assert report.generate_potcar is False
+
+    def test_index_mode_slicing(self, tmp_path):
+        from md_analysis.scripts.BaderGen import (
+            generate_bader_batch_with_report,
+        )
+
+        xyz = tmp_path / "traj.xyz"
+        _write_test_xyz(xyz, n_frames=4)
+        report = generate_bader_batch_with_report(
+            xyz, (3.6, 3.6, 10.0), tmp_path / "out",
+            frame_start=1, frame_end=3,
+            generate_potcar=False,
+        )
+        assert report.n_frames == 2
+        assert list(report.frame_indices) == [1, 2]
+        assert list(report.steps) == [5, 10]
+
+    def test_time_mode(self, tmp_path):
+        from md_analysis.scripts.BaderGen import (
+            generate_bader_batch_with_report,
+        )
+
+        xyz = tmp_path / "traj.xyz"
+        _write_test_xyz(xyz, n_frames=5)    # times 0, 5, 10, 15, 20 fs
+        report = generate_bader_batch_with_report(
+            xyz, (3.6, 3.6, 10.0), tmp_path / "out",
+            mode="time",
+            time_start_fs=0.0, time_end_fs=15.0, time_step_fs=5.0,
+            generate_potcar=False,
+        )
+        assert report.n_frames == 4
+        assert list(report.times_fs) == [0.0, 5.0, 10.0, 15.0]
+
+    def test_workdirs_have_poscar_incar_kpoints(self, tmp_path):
+        from md_analysis.scripts.BaderGen import (
+            generate_bader_batch_with_report,
+        )
+
+        xyz = tmp_path / "traj.xyz"
+        _write_test_xyz(xyz, n_frames=2)
+        report = generate_bader_batch_with_report(
+            xyz, (3.6, 3.6, 10.0), tmp_path / "out",
+            generate_potcar=False,
+        )
+        for wd in report.workdirs:
+            assert (wd / "POSCAR").is_file()
+            assert (wd / "INCAR").is_file()
+            assert (wd / "KPOINTS").is_file()
+
+    def test_element_order_accepts_list(self, tmp_path):
+        """list[str] element_order should be normalised to tuple and
+        reflected in POSCAR IndexMap."""
+        from md_analysis.scripts.BaderGen import (
+            generate_bader_batch_with_report,
+        )
+        from md_analysis.scripts.utils.IndexMapper import read_index_map_from_poscar
+
+        xyz = tmp_path / "traj.xyz"
+        _write_test_xyz(xyz, n_frames=1)
+        report = generate_bader_batch_with_report(
+            xyz, (3.6, 3.6, 10.0), tmp_path / "out",
+            element_order=["H", "O", "Cu"],   # list, not tuple
+            generate_potcar=False,
+        )
+        assert report.n_frames == 1
+        imap = read_index_map_from_poscar(report.workdirs[0] / "POSCAR")
+        assert imap.element_order == ("H", "O", "Cu")
+
+    def test_missing_xyz_raises_filenotfound(self, tmp_path):
+        from md_analysis.scripts.BaderGen import (
+            generate_bader_batch_with_report,
+        )
+
+        with pytest.raises(FileNotFoundError, match="xyz_path"):
+            generate_bader_batch_with_report(
+                tmp_path / "nope.xyz", (3.6, 3.6, 10.0), tmp_path / "out",
+                generate_potcar=False,
+            )
+
+    def test_missing_script_raises_filenotfound_before_writes(self, tmp_path):
+        from md_analysis.scripts.BaderGen import (
+            generate_bader_batch_with_report,
+        )
+
+        xyz = tmp_path / "traj.xyz"
+        _write_test_xyz(xyz, n_frames=2)
+        out = tmp_path / "out"
+        with pytest.raises(FileNotFoundError, match="script_path"):
+            generate_bader_batch_with_report(
+                xyz, (3.6, 3.6, 10.0), out,
+                script_path=tmp_path / "nope.sh",
+                generate_potcar=False,
+            )
+        # Preflight: no workdir created
+        assert not out.exists() or not any(out.glob("bader_*"))
+
+    def test_bad_cell_abc_length_raises_value_error(self, tmp_path):
+        from md_analysis.scripts.BaderGen import (
+            generate_bader_batch_with_report,
+        )
+
+        xyz = tmp_path / "traj.xyz"
+        _write_test_xyz(xyz, n_frames=1)
+        out = tmp_path / "out"
+        with pytest.raises(ValueError, match="length 3"):
+            generate_bader_batch_with_report(
+                xyz, (3.6, 3.6), out,
+                generate_potcar=False,
+            )
+        # cell_abc check runs before any trajectory loading / mkdir;
+        # output_dir must not have been created.
+        assert not out.exists()
+
+    def test_report_to_dict_is_json_serializable(self, tmp_path):
+        """``BaderGenBatchReport.to_dict()`` must be directly JSON-dumpable
+        (no Path objects / numpy scalars leaking through)."""
+        import json
+
+        from md_analysis.scripts.BaderGen import (
+            generate_bader_batch_with_report,
+        )
+
+        xyz = tmp_path / "traj.xyz"
+        _write_test_xyz(xyz, n_frames=2)
+        report = generate_bader_batch_with_report(
+            xyz, (3.6, 3.6, 10.0), tmp_path / "out",
+            generate_potcar=False,
+        )
+        data = report.to_dict()
+        json.dumps(data)   # raises TypeError on bad scalar/Path leak
+        assert isinstance(data["workdirs"], list)
+        assert all(isinstance(p, str) for p in data["workdirs"])
+        assert data["n_frames"] == 2
+        assert data["generate_potcar"] is False

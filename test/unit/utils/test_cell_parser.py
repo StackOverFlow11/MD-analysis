@@ -1,10 +1,10 @@
-"""Tests for md_analysis.utils.CellParser."""
+"""Tests for md_analysis.utils.formats.cp2k.cell."""
 
 from __future__ import annotations
 
 import pytest
 
-from md_analysis.utils.RestartParser.CellParser import CellParseError, parse_abc_from_md_inp, parse_abc_from_restart
+from md_analysis.utils.formats.cp2k.cell import CellParseError, parse_abc_from_md_inp, parse_abc_from_restart
 
 
 _VALID_RESTART = """\
@@ -40,18 +40,22 @@ class TestParseAbcFromRestart:
     def test_parse_missing_cell_raises(self, tmp_path):
         """CellParseError if no &CELL block exists."""
         f = tmp_path / "bad.restart"
-        f.write_text("&MOTION\n  STEPS 1000\n&END MOTION\n")
+        f.write_text("&MOTION\n  &MD\n    STEPS 1000\n  &END MD\n&END MOTION\n")
         with pytest.raises(CellParseError, match="No &CELL"):
             parse_abc_from_restart(f)
 
     def test_parse_missing_vector_raises(self, tmp_path):
         """CellParseError if A/B/C vector line is missing."""
         content = (
-            "&CELL\n"
-            "  A  10.0  0.0  0.0\n"
-            "  B   0.0  10.0  0.0\n"
-            "  PERIODIC XYZ\n"
-            "&END CELL\n"
+            "&FORCE_EVAL\n"
+            "  &SUBSYS\n"
+            "    &CELL\n"
+            "      A  10.0  0.0  0.0\n"
+            "      B   0.0  10.0  0.0\n"
+            "      PERIODIC XYZ\n"
+            "    &END CELL\n"
+            "  &END SUBSYS\n"
+            "&END FORCE_EVAL\n"
         )
         f = tmp_path / "missing_c.restart"
         f.write_text(content)
@@ -61,11 +65,15 @@ class TestParseAbcFromRestart:
     def test_parse_non_orthogonal_raises(self, tmp_path):
         """CellParseError if off-diagonal elements are nonzero."""
         content = (
-            "&CELL\n"
-            "  A  10.0  5.0  0.0\n"
-            "  B   0.0  10.0  0.0\n"
-            "  C   0.0   0.0  20.0\n"
-            "&END CELL\n"
+            "&FORCE_EVAL\n"
+            "  &SUBSYS\n"
+            "    &CELL\n"
+            "      A  10.0  5.0  0.0\n"
+            "      B   0.0  10.0  0.0\n"
+            "      C   0.0   0.0  20.0\n"
+            "    &END CELL\n"
+            "  &END SUBSYS\n"
+            "&END FORCE_EVAL\n"
         )
         f = tmp_path / "non_ortho.restart"
         f.write_text(content)
@@ -75,7 +83,7 @@ class TestParseAbcFromRestart:
     def test_parse_with_surrounding_sections(self, tmp_path):
         """Only &CELL block is extracted; other sections are ignored."""
         content = (
-            "&MOTION\n  STEPS 1000\n&END MOTION\n"
+            "&MOTION\n  &MD\n    STEPS 1000\n  &END MD\n&END MOTION\n"
             "&FORCE_EVAL\n  &SUBSYS\n"
             "    &CELL\n"
             "      A  5.0  0.0  0.0\n"
@@ -100,11 +108,13 @@ class TestParseAbcFromMdInp:
         """Correct ABC values are extracted."""
         f = tmp_path / "md.inp"
         f.write_text(
-            "&SUBSYS\n"
-            "  &CELL\n"
-            "    ABC [angstrom] 10.2239 10.2239 26.422\n"
-            "  &END CELL\n"
-            "&END SUBSYS\n"
+            "&FORCE_EVAL\n"
+            "  &SUBSYS\n"
+            "    &CELL\n"
+            "      ABC [angstrom] 10.2239 10.2239 26.422\n"
+            "    &END CELL\n"
+            "  &END SUBSYS\n"
+            "&END FORCE_EVAL\n"
         )
         a, b, c = parse_abc_from_md_inp(f)
         assert a == pytest.approx(10.2239)
@@ -121,7 +131,15 @@ class TestParseAbcFromMdInp:
     def test_parse_scientific_notation(self, tmp_path):
         """Fortran-style scientific notation is parsed correctly."""
         f = tmp_path / "md.inp"
-        f.write_text("  ABC [angstrom] 1.0E+01 2.0E+01 3.0E+01\n")
+        f.write_text(
+            "&FORCE_EVAL\n"
+            "  &SUBSYS\n"
+            "    &CELL\n"
+            "      ABC [angstrom] 1.0E+01 2.0E+01 3.0E+01\n"
+            "    &END CELL\n"
+            "  &END SUBSYS\n"
+            "&END FORCE_EVAL\n"
+        )
         a, b, c = parse_abc_from_md_inp(f)
         assert a == pytest.approx(10.0)
         assert b == pytest.approx(20.0)

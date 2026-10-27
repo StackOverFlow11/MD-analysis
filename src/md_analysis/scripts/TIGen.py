@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+import copy
 import logging
-import re
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
@@ -13,11 +13,21 @@ from ase import Atoms
 from ase.io import iread, write
 
 from ..config import KEY_CP2K_SCRIPT_PATH, get_config
+from ..engines.models import ConstraintMetadata
 from ..exceptions import MDAnalysisError
 from ..utils.constants import AU_TIME_TO_FS
-from ..utils.RestartParser.ColvarParser import (
-    ColvarRestart,
-    parse_colvar_restart,
+from ..utils.formats.cp2k.inp import (
+    InpParseError,
+    generate_inp,
+    parse_inp,
+)
+from ..engines.cp2k import read_constraint_metadata_from_restart
+from ._inp_tree_edit import (
+    ensure_topology_init_xyz,
+    set_collective_target,
+    set_md_steps,
+    set_project,
+    zero_target_growth,
 )
 
 logger = logging.getLogger(__name__)
@@ -28,52 +38,11 @@ class TIGenError(MDAnalysisError):
 
 
 # ---------------------------------------------------------------------------
-# Compiled regex patterns for inp file modification
-# ---------------------------------------------------------------------------
-
-_PROJECT_RE = re.compile(
-    r"^(\s*PROJECT)\s+\S+", re.MULTILINE | re.IGNORECASE,
-)
-_STEPS_IN_MD_RE = re.compile(
-    r"(&MD\b)(.*?)(&END\s+MD)", re.DOTALL | re.IGNORECASE,
-)
-_STEPS_RE = re.compile(
-    r"^(\s*STEPS)\s+\d+", re.MULTILINE | re.IGNORECASE,
-)
-# TARGET but NOT TARGET_GROWTH — negative lookahead
-_TARGET_VALUE_RE = re.compile(
-    r"^(\s*TARGET)(?!_GROWTH)\s+(\[.*?\]\s+)?\S+",
-    re.MULTILINE | re.IGNORECASE,
-)
-_TARGET_GROWTH_RE = re.compile(
-    r"^(\s*TARGET_GROWTH)\s+(\[.*?\]\s+)?\S+",
-    re.MULTILINE | re.IGNORECASE,
-)
-_COLLECTIVE_BLOCK_RE = re.compile(
-    r"(&COLLECTIVE\s*\n)(.*?)(&END\s+COLLECTIVE)",
-    re.DOTALL | re.IGNORECASE,
-)
-_COLVAR_ID_RE = re.compile(
-    r"^\s*COLVAR\s+(\d+)", re.MULTILINE | re.IGNORECASE,
-)
-_TOPOLOGY_BLOCK_RE = re.compile(
-    r"(&TOPOLOGY\b)(.*?)(&END\s+TOPOLOGY)",
-    re.DOTALL | re.IGNORECASE,
-)
-_COORD_FILE_NAME_RE = re.compile(
-    r"^(\s*COORD_FILE_NAME)\s+\S+", re.MULTILINE | re.IGNORECASE,
-)
-_COORD_FILE_FORMAT_RE = re.compile(
-    r"^(\s*COORD_FILE_FORMAT)\s+\S+", re.MULTILINE | re.IGNORECASE,
-)
-
-
-# ---------------------------------------------------------------------------
 # Private helpers
 # ---------------------------------------------------------------------------
 
 
-def _cv_at_step(restart: ColvarRestart, step: int,
+def _cv_at_step(restart: ConstraintMetadata, step: int,
                 colvar_id: int | None = None) -> float:
     """Compute the target CV value (a.u.) at a given absolute step."""
     c = (restart.colvars[colvar_id]
@@ -85,7 +54,7 @@ def _cv_at_step(restart: ColvarRestart, step: int,
 
 def _load_trajectory_cv(
     xyz_path: str | Path,
-    restart: ColvarRestart,
+    restart: ConstraintMetadata,
     colvar_id: int | None = None,
 ) -> list[tuple[int, float, Atoms]]:
     """Load all trajectory frames, returning ``(step, cv_au, atoms)`` triples.
@@ -137,91 +106,51 @@ def _snap_to_nearest_frame(
     return step, snapped_cv, atoms
 
 
-def _modify_collective_block(
-    block_body: str,
-    colvar_id_to_set: int | None,
-    target_au: float,
-) -> str:
-    """Modify a single ``&COLLECTIVE`` block body.
+def _parse_sg_inp(inp_path: str | Path) -> dict:
+    """Parse the SG inp template into a cit tree.
 
-    - If *colvar_id_to_set* is ``None``, modify the first block
-      (caller passes the primary colvar_id).
-    - Always zero ``TARGET_GROWTH``; set ``TARGET`` only for the
-      matching ``COLVAR`` id.
+    A template that cannot be parsed raises :class:`TIGenError` carrying
+    the template path, with the underlying :class:`InpParseError`
+    preserved as ``__cause__`` (plan §3.3); generate-side failures are
+    programming errors and propagate untranslated.
     """
-    m = _COLVAR_ID_RE.search(block_body)
-    block_cid = int(m.group(1)) if m else 1
-
-    # Always zero TARGET_GROWTH (strip unit)
-    block_body = _TARGET_GROWTH_RE.sub(r"\1 0", block_body)
-
-    # Set TARGET only for the matching CV
-    if colvar_id_to_set is None or block_cid == colvar_id_to_set:
-        block_body = _TARGET_VALUE_RE.sub(
-            rf"\1 {target_au:.10E}", block_body,
-        )
-
-    return block_body
+    try:
+        return parse_inp(inp_path)
+    except InpParseError as e:
+        raise TIGenError(
+            f"Cannot parse SG inp template {inp_path}: {e}"
+        ) from e
 
 
-def _modify_inp_for_ti(
-    inp_text: str,
+def _render_ti_inp(
+    base_tree: dict,
     target_au: float,
     steps: int,
     colvar_id: int | None = None,
 ) -> str:
-    """Return *inp_text* modified for constrained-MD (TI sampling point).
+    """Return the ``cMD.inp`` text for one TI sampling point.
 
-    Modifications
-    -------------
-    - ``PROJECT`` → ``cMD``
-    - ``STEPS`` (inside ``&MD``) → *steps*
-    - ``TARGET`` → *target_au* (strip ``[unit]``, bare a.u.)
-    - ``TARGET_GROWTH`` → ``0`` (strip ``[unit]``)
-    - ``&TOPOLOGY``: ensure ``COORD_FILE_NAME init.xyz`` and
-      ``COORD_FILE_FORMAT XYZ``
+    *base_tree* is deep-copied first (per-target discipline, plan §3.3:
+    batch entry points parse the template once and reuse the tree for
+    every target, so the caller's tree must never be mutated).  Edits:
+
+    - ``GLOBAL.PROJECT_NAME`` → ``cMD`` (canonical key ``project_name``)
+    - ``MOTION.MD.STEPS`` → *steps*
+    - ``TARGET`` → *target_au* as a bare internal-unit value, in the
+      ``&COLLECTIVE`` block selected by *colvar_id* (``None`` = the
+      primary / first block, matching the reader-side ``colvars.primary``
+      semantics)
+    - ``TARGET_GROWTH`` → ``0`` in **every** ``&COLLECTIVE`` block
+    - ``&TOPOLOGY`` → ``COORD_FILE_NAME init.xyz`` / ``COORD_FILE_FORMAT
+      XYZ`` (the section is created when missing)
     """
-    # 1. PROJECT → cMD
-    text = _PROJECT_RE.sub(r"\1 cMD", inp_text)
-
-    # 2. STEPS inside &MD only
-    def _replace_steps_in_md(match: re.Match) -> str:
-        md_open, md_body, md_close = match.group(1), match.group(2), match.group(3)
-        md_body = _STEPS_RE.sub(rf"\g<1> {steps}", md_body)
-        return md_open + md_body + md_close
-
-    text = _STEPS_IN_MD_RE.sub(_replace_steps_in_md, text)
-
-    # 3. TARGET and TARGET_GROWTH inside &COLLECTIVE blocks
-    #    Determine which colvar_id to match for TARGET replacement.
-    primary_cid = colvar_id  # None means "primary (first)"
-
-    def _replace_collective(match: re.Match) -> str:
-        header, body, footer = match.group(1), match.group(2), match.group(3)
-        body = _modify_collective_block(body, primary_cid, target_au)
-        return header + body + footer
-
-    text = _COLLECTIVE_BLOCK_RE.sub(_replace_collective, text)
-
-    # 4. &TOPOLOGY: ensure COORD_FILE_NAME and COORD_FILE_FORMAT
-    def _replace_topology(match: re.Match) -> str:
-        header, body, footer = match.group(1), match.group(2), match.group(3)
-
-        if _COORD_FILE_NAME_RE.search(body):
-            body = _COORD_FILE_NAME_RE.sub(r"\1 init.xyz", body)
-        else:
-            body += "      COORD_FILE_NAME init.xyz\n"
-
-        if _COORD_FILE_FORMAT_RE.search(body):
-            body = _COORD_FILE_FORMAT_RE.sub(r"\1 XYZ", body)
-        else:
-            body += "      COORD_FILE_FORMAT XYZ\n"
-
-        return header + body + footer
-
-    text = _TOPOLOGY_BLOCK_RE.sub(_replace_topology, text)
-
-    return text
+    tree = copy.deepcopy(base_tree)
+    set_project(tree, "cMD")
+    set_md_steps(tree, steps)
+    set_collective_target(tree, target_au, colvar_id)
+    zero_target_growth(tree)
+    ensure_topology_init_xyz(tree)
+    return generate_inp(tree)
 
 
 def _format_target_dirname(cv_au: float) -> str:
@@ -258,19 +187,22 @@ def _plan_ti_targets(
     *,
     targets_au: list[float] | np.ndarray | None = None,
     time_range: dict[str, float | int] | None = None,
+    colvar_id: int | None = None,
 ) -> list[_PlannedTarget]:
-    """Plan a list of TI targets (primary CV only).
+    """Plan a list of TI targets.
 
     Accepts exactly one target specification:
 
     - ``targets_au``: explicit list of CV values in atomic units
     - ``time_range``: dict ``{time_initial_fs, time_final_fs, n_points}``
 
-    Each planned target carries the snapped CV (from the nearest SG
-    trajectory frame) plus metadata for agent-layer metrics and
-    collision checks.  ``inp_path`` is accepted for signature symmetry
-    with :func:`batch_generate_ti_workdirs` but not read here (the inp
-    file is consumed only at generation time).
+    ``colvar_id`` selects which constraint the CV is read from
+    (``None`` = primary / first colvar).  Each planned target carries
+    the snapped CV (from the nearest SG trajectory frame) plus metadata
+    for agent-layer metrics and collision checks.  ``inp_path`` is
+    accepted for signature symmetry with
+    :func:`batch_generate_ti_workdirs` but not read here (the inp file
+    is consumed only at generation time).
     """
     numeric_mode = targets_au is not None
     time_mode = time_range is not None
@@ -283,8 +215,8 @@ def _plan_ti_targets(
             "Must specify either targets_au or time_range."
         )
 
-    restart = parse_colvar_restart(restart_path)
-    frames = _load_trajectory_cv(xyz_path, restart, colvar_id=None)
+    restart = read_constraint_metadata_from_restart(restart_path)
+    frames = _load_trajectory_cv(xyz_path, restart, colvar_id)
 
     if time_mode:
         required_keys = {"time_initial_fs", "time_final_fs", "n_points"}
@@ -309,7 +241,7 @@ def _plan_ti_targets(
         requested: list[float] = []
         for t in times:
             step_idx = round(t / restart.timestep_fs)
-            requested.append(_cv_at_step(restart, step_idx, colvar_id=None))
+            requested.append(_cv_at_step(restart, step_idx, colvar_id))
     else:
         requested = [float(x) for x in targets_au]  # type: ignore[union-attr]
 
@@ -401,21 +333,41 @@ def generate_ti_batch_with_report(
     time_range: dict[str, float | int] | None = None,
     steps: int = 10000,
     script_path: str | Path | None = None,
+    colvar_id: int | None = None,
+    overwrite: bool = False,
+    verbose: bool = False,
 ) -> TIGenBatchReport:
     """Agent-safe batch generator with collision check and structured report.
 
-    This wrapper is intended as the backend for the ``ti_gen_batch`` agent
-    task.  Differences from :func:`batch_generate_ti_workdirs`:
+    This wrapper is the backend for the ``ti_gen_batch`` agent task and
+    (via ``workflows.scripts.run_ti_batch``) for CLI 422.  Differences
+    from :func:`batch_generate_ti_workdirs`:
 
     - Uses an object-form ``time_range`` dict instead of three separate
       positional-ish args (more JSON Schema friendly).
     - Returns a :class:`TIGenBatchReport` so metrics can flow into the
       agent layer without reparsing directory names.
     - **Collision check**: if any planned target directory name already
-      exists under ``output_dir``, raises :class:`ValueError` *before*
-      writing anything.  The old :func:`batch_generate_ti_workdirs` does
-      not do this and retains its overwrite behaviour for CLI 422.
-    - MVP: primary CV only (no ``colvar_id``).
+      exists under ``output_dir`` *and* ``overwrite`` is False, raises
+      :class:`ValueError` *before* writing anything.
+
+    ``colvar_id`` selects which constraint the CV target is read from
+    (``None`` = primary / first colvar; default).  This is pure
+    plumbing — snapping, ``ti_target_<cv>`` dirname formatting, and the
+    inp-modification rules are unchanged.
+
+    ``overwrite`` (default False = agent-safe collision guard) only
+    skips the pre-write collision check.  Per-target generation still
+    goes through :func:`generate_ti_workdir`, which uses
+    ``mkdir(exist_ok=True)`` and rewrites ``cMD.inp`` / ``init.xyz`` /
+    ``script.sh`` in place.  It is a per-file overwrite — **no
+    ``rmtree``, no directory wipe**; any other file already present in a
+    colliding ``ti_target_*`` directory is left untouched.  CLI 422
+    passes ``overwrite=True`` to preserve its historical
+    overwrite-on-regeneration behavior.
+
+    ``verbose`` shows a tqdm progress bar (CLI 422 passes True; the
+    agent task does not expose it).
 
     Parameters
     ----------
@@ -446,7 +398,8 @@ def generate_ti_batch_with_report(
         ``time_range``).
     ValueError
         A planned target directory already exists under ``output_dir``
-        (collision check).  No files are written in this case.
+        and ``overwrite`` is False (collision check).  No files are
+        written in this case.
     FileNotFoundError
         ``inp_path`` / ``xyz_path`` / ``restart_path`` / ``script_path``
         missing on disk.
@@ -470,38 +423,51 @@ def generate_ti_batch_with_report(
         restart_path=restart_path,
         targets_au=targets_au,
         time_range=time_range,
+        colvar_id=colvar_id,
     )
 
     # Collision check — compare planned dirnames against existing ti_target_*
     # directory names.  Use exact string match (6-decimal dirname) as key.
-    existing_names = {p.name for p in output_dir.glob("ti_target_*") if p.is_dir()} \
-        if output_dir.is_dir() else set()
-    collisions = [pl.dirname for pl in planned if pl.dirname in existing_names]
-    if collisions:
-        raise ValueError(
-            "TI workdir collision — the following target directories already "
-            f"exist under {output_dir}: {sorted(collisions)}. "
-            "Remove them or choose different targets to proceed."
-        )
+    # overwrite=True only skips this pre-write guard; per-target generation
+    # below still does a per-file overwrite via mkdir(exist_ok=True) — it
+    # never removes or wipes a colliding directory.
+    if not overwrite:
+        existing_names = {p.name for p in output_dir.glob("ti_target_*") if p.is_dir()} \
+            if output_dir.is_dir() else set()
+        collisions = [pl.dirname for pl in planned if pl.dirname in existing_names]
+        if collisions:
+            raise ValueError(
+                "TI workdir collision — the following target directories already "
+                f"exist under {output_dir}: {sorted(collisions)}. "
+                "Remove them, choose different targets, or pass overwrite=True "
+                "to proceed."
+            )
 
-    # Pre-load restart / inp / frames once for efficiency.
-    restart = parse_colvar_restart(restart_path)
-    inp_text = Path(inp_path).read_text(encoding="utf-8")
-    frames = _load_trajectory_cv(xyz_path, restart, colvar_id=None)
+    # Pre-load restart / template tree / frames once for efficiency.
+    # The template is parsed once into base_tree; each target deep-copies
+    # it inside _render_ti_inp before editing (per-target discipline).
+    restart = read_constraint_metadata_from_restart(restart_path)
+    base_tree = _parse_sg_inp(inp_path)
+    frames = _load_trajectory_cv(xyz_path, restart, colvar_id)
+
+    iterator: list[_PlannedTarget] | object = planned
+    if verbose:
+        from tqdm import tqdm
+        iterator = tqdm(planned, desc="TI workdirs", unit="point", ascii=" =")
 
     workdirs: list[Path] = []
-    for pl in planned:
+    for pl in iterator:
         wd = generate_ti_workdir(
             inp_path, xyz_path, restart_path,
             target_au=pl.requested_cv,
             output_dir=output_dir,
             steps=steps,
-            colvar_id=None,
+            colvar_id=colvar_id,
             workdir_name=pl.dirname,
             script_path=script_path,
             _preloaded=frames,
             _restart=restart,
-            _inp_text=inp_text,
+            _base_tree=base_tree,
         )
         workdirs.append(wd)
 
@@ -531,8 +497,8 @@ def generate_ti_workdir(
     workdir_name: str | None = None,
     script_path: str | Path | None = None,
     _preloaded: list[tuple[int, float, Atoms]] | None = None,
-    _restart: ColvarRestart | None = None,
-    _inp_text: str | None = None,
+    _restart: ConstraintMetadata | None = None,
+    _base_tree: dict | None = None,
 ) -> Path:
     """Create a CP2K constrained-MD work directory for one TI sampling point.
 
@@ -566,8 +532,11 @@ def generate_ti_workdir(
     Path
         The created work directory.
     """
-    restart = _restart or parse_colvar_restart(restart_path)
-    inp_text = _inp_text or Path(inp_path).read_text(encoding="utf-8")
+    # Parse the template first (fail fast on a bad template, before any
+    # trajectory loading or mkdir); batch callers pass the shared,
+    # never-mutated base tree via _base_tree instead.
+    base_tree = _base_tree if _base_tree is not None else _parse_sg_inp(inp_path)
+    restart = _restart or read_constraint_metadata_from_restart(restart_path)
     frames = _preloaded or _load_trajectory_cv(xyz_path, restart, colvar_id)
 
     step, snapped_cv, atoms = _snap_to_nearest_frame(frames, target_au)
@@ -582,8 +551,8 @@ def generate_ti_workdir(
     workdir = Path(output_dir) / workdir_name
     workdir.mkdir(parents=True, exist_ok=True)
 
-    # Write modified inp
-    modified = _modify_inp_for_ti(inp_text, snapped_cv, steps, colvar_id)
+    # Write modified inp (per-target deep copy of the base tree)
+    modified = _render_ti_inp(base_tree, snapped_cv, steps, colvar_id)
     (workdir / "cMD.inp").write_text(modified, encoding="utf-8")
 
     # Write init.xyz
@@ -673,8 +642,8 @@ def batch_generate_ti_workdirs(
             "(time_initial_fs, time_final_fs, n_points)."
         )
 
-    restart = parse_colvar_restart(restart_path)
-    inp_text = Path(inp_path).read_text(encoding="utf-8")
+    restart = read_constraint_metadata_from_restart(restart_path)
+    base_tree = _parse_sg_inp(inp_path)
     frames = _load_trajectory_cv(xyz_path, restart, colvar_id)
 
     if time_mode:
@@ -710,7 +679,7 @@ def batch_generate_ti_workdirs(
             script_path=script_path,
             _preloaded=frames,
             _restart=restart,
-            _inp_text=inp_text,
+            _base_tree=base_tree,
         )
         result.append(workdir)
 

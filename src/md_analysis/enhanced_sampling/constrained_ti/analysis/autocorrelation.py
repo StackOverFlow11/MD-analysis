@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..config import DEFAULT_ACF_ALPHA, DEFAULT_NEFF_MIN
+from ..config import DEFAULT_ACF_ALPHA, DEFAULT_NEFF_FLOOR
 from ..models import AutocorrResult
 from ._acf_core import compute_acf, compute_iat, compute_sem_corrected
 
@@ -14,7 +14,7 @@ def analyze_autocorrelation(
     *,
     sem_max: float | None = None,
     alpha: int = DEFAULT_ACF_ALPHA,
-    neff_min: int = DEFAULT_NEFF_MIN,
+    neff_min: int = DEFAULT_NEFF_FLOOR,
 ) -> AutocorrResult:
     """Run autocorrelation analysis on a Lagrange multiplier time series.
 
@@ -27,7 +27,8 @@ def analyze_autocorrelation(
     alpha : int
         Self-consistent truncation multiplier for IAT.
     neff_min : int
-        Minimum effective independent samples.
+        Hard floor for N_eff: below this the IAT estimate itself is
+        unreliable and the point fails outright.
 
     Returns
     -------
